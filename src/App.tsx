@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import AdminConsole from "./pages/AdminConsole";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,39 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('permission')
+        .eq('id', user.id)
+        .single();
+      
+      if (!error && data) {
+        setIsAdmin(data.permission === 'admin');
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user || !isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -39,6 +73,14 @@ const App = () => (
               <ProtectedRoute>
                 <Index />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminConsole />
+              </AdminRoute>
             }
           />
           <Route path="*" element={<NotFound />} />
