@@ -35,24 +35,39 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const checkAccessPermission = async () => {
+      console.log("Starting permission check");
+      console.log("Current user:", user);
+      
       try {
         if (!user) {
+          console.log("No user found, setting checkingAccess to false");
           setCheckingAccess(false);
           return;
         }
 
+        console.log("Fetching user profile for ID:", user.id);
         const { data, error } = await supabase
           .from('profiles')
           .select('permission')
           .eq('id', user.id)
           .single();
 
+        console.log("Profile data received:", data);
+        console.log("Profile error if any:", error);
+
         if (!error && data) {
-          setHasAccess(data.permission === 'update_settings');
+          const hasUpdatePermission = data.permission === 'update_settings';
+          console.log("Permission check result:", hasUpdatePermission);
+          setHasAccess(hasUpdatePermission);
+        } else {
+          console.log("No profile data found or error occurred");
+          setHasAccess(false);
         }
       } catch (error) {
         console.error('Error checking permissions:', error);
+        setHasAccess(false);
       } finally {
+        console.log("Setting checkingAccess to false");
         setCheckingAccess(false);
       }
     };
@@ -60,14 +75,26 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     checkAccessPermission();
   }, [user]);
 
+  console.log("AdminRoute render state:", {
+    loading,
+    checkingAccess,
+    hasAccess,
+    userExists: !!user
+  });
+
   if (loading || checkingAccess) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
   if (!user || !hasAccess) {
+    console.log("Redirecting to home - No access", {
+      userExists: !!user,
+      hasAccess
+    });
     return <Navigate to="/" replace />;
   }
 
+  console.log("Rendering admin console");
   return <>{children}</>;
 };
 
