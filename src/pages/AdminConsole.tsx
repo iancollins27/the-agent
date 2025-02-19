@@ -7,13 +7,15 @@ import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 
+type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
+
 type WorkflowPrompt = {
   id: number;
-  type: 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
+  type: WorkflowType;
   prompt_text: string;
 };
 
-const workflowTitles = {
+const workflowTitles: Record<WorkflowType, string> = {
   summary_generation: "Summary Generation",
   summary_update: "Summary Update",
   action_detection: "Action Detection",
@@ -33,7 +35,7 @@ const AdminConsole = () => {
         .order('type');
       
       if (error) throw error;
-      return data as WorkflowPrompt[];
+      return data as unknown as WorkflowPrompt[];
     }
   });
 
