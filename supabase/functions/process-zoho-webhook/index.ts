@@ -18,34 +18,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { projectData, updateType } = await req.json()
+    const { projectData, zohoId } = await req.json()
 
-    // Get the appropriate prompt based on the update type
+    // Check if project exists
+    const { data: existingProject } = await supabase
+      .from('projects')
+      .select('id, summary')
+      .eq('id', zohoId)
+      .maybeSingle()
+
+    // Get the appropriate prompt based on whether project exists
     const { data: promptData } = await supabase
       .from('workflow_prompts')
       .select('prompt_text')
-      .eq('type', updateType === 'new' ? 'summary_generation' : 'summary_update')
+      .eq('type', existingProject ? 'summary_update' : 'summary_generation')
       .single()
 
     if (!promptData) {
       throw new Error('Prompt not found')
     }
 
-    // Format the prompt with the project data
-    let prompt = promptData.prompt_text.replace('{project_data}', JSON.stringify(projectData))
-
-    if (updateType !== 'new') {
-      const { data: existingProject } = await supabase
-        .from('projects')
-        .select('summary')
-        .eq('id', projectData.id)
-        .single()
-
-      if (existingProject?.summary) {
-        prompt = promptData.prompt_text
-          .replace('{current_summary}', existingProject.summary)
-          .replace('{new_data}', JSON.stringify(projectData))
-      }
+    // Format the prompt based on whether it's a new or existing project
+    let prompt
+    if (existingProject) {
+      prompt = promptData.prompt_text
+        .replace('{current_summary}', existingProject.summary || '')
+        .replace('{new_data}', JSON.stringify(projectData))
+    } else {
+      prompt = promptData.prompt_text
+        .replace('{project_data}', JSON.stringify(projectData))
     }
 
     // Call OpenAI to generate or update summary
@@ -67,13 +68,31 @@ serve(async (req) => {
     const openAIData = await openAIResponse.json()
     const summary = openAIData.choices[0].message.content
 
-    // Update the project summary in the database
-    const { error: updateError } = await supabase
-      .from('projects')
-      .update({ summary })
-      .eq('id', projectData.id)
-
-    if (updateError) throw updateError
+    // Create or update the project
+    let projectId
+    if (existingProject) {
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({ summary })
+        .eq('id', zohoId)
+      
+      if (updateError) throw updateError
+      projectId = zohoId
+    } else {
+      const { data: newProject, error: createError } = await supabase
+        .from('projects')
+        .insert([{ 
+          id: zohoId,
+          summary,
+          company_id: projectData.company_id, // Assuming this is provided in projectData
+          project_track: projectData.project_track // Assuming this is provided in projectData
+        }])
+        .select()
+        .single()
+      
+      if (createError) throw createError
+      projectId = newProject.id
+    }
 
     // Check if any action is needed
     const { data: actionPrompt } = await supabase
@@ -110,14 +129,14 @@ serve(async (req) => {
       await supabase
         .from('action_logs')
         .insert({
-          project_id: projectData.id,
+          project_id: projectId,
           action_type: 'follow_up',
           action_description: actionNeeded
         })
     }
 
     return new Response(
-      JSON.stringify({ success: true, summary, actionNeeded }),
+      JSON.stringify({ success: true, summary, actionNeeded, isNewProject: !existingProject }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
