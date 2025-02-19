@@ -31,26 +31,36 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   useEffect(() => {
     const checkAccessPermission = async () => {
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('permission')
-        .eq('id', user.id)
-        .single();
-      
-      if (!error && data) {
-        setHasAccess(data.permission === 'update_settings');
+      try {
+        if (!user) {
+          setCheckingAccess(false);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('permission')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
+          setHasAccess(data.permission === 'update_settings');
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+      } finally {
+        setCheckingAccess(false);
       }
     };
 
     checkAccessPermission();
   }, [user]);
 
-  if (loading) {
+  if (loading || checkingAccess) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
