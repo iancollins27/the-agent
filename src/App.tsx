@@ -30,10 +30,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkAccessPermission = async () => {
       if (!user) return;
       
       const { data, error } = await supabase
@@ -43,18 +43,18 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
         .single();
       
       if (!error && data) {
-        setIsAdmin(data.permission === 'admin');
+        setHasAccess(data.permission === 'update_settings');
       }
     };
 
-    checkAdminStatus();
+    checkAccessPermission();
   }, [user]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  if (!user || !isAdmin) {
+  if (!user || !hasAccess) {
     return <Navigate to="/" replace />;
   }
 

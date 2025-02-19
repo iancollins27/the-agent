@@ -172,6 +172,30 @@ export type Database = {
           },
         ]
       }
+      workflow_prompts: {
+        Row: {
+          created_at: string | null
+          id: number
+          prompt_text: string
+          type: Database["public"]["Enums"]["workflow_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          prompt_text: string
+          type: Database["public"]["Enums"]["workflow_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          prompt_text?: string
+          type?: Database["public"]["Enums"]["workflow_type"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -182,6 +206,11 @@ export type Database = {
     Enums: {
       contact_role: "Roofer" | "HO" | "BidList Project Manager" | "Solar"
       user_permission: "read" | "update_settings"
+      workflow_type:
+        | "summary_generation"
+        | "summary_update"
+        | "action_detection"
+        | "action_execution"
     }
     CompositeTypes: {
       [_ in never]: never
