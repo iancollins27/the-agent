@@ -9,6 +9,44 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      action_logs: {
+        Row: {
+          action_description: string
+          action_type: string
+          created_at: string | null
+          executed_at: string | null
+          id: number
+          project_id: number | null
+          status: string | null
+        }
+        Insert: {
+          action_description: string
+          action_type: string
+          created_at?: string | null
+          executed_at?: string | null
+          id?: number
+          project_id?: number | null
+          status?: string | null
+        }
+        Update: {
+          action_description?: string
+          action_type?: string
+          created_at?: string | null
+          executed_at?: string | null
+          id?: number
+          project_id?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           id: number
@@ -140,18 +178,21 @@ export type Database = {
         Row: {
           company_id: number | null
           id: number
+          last_action_check: string | null
           project_track: number | null
           summary: string | null
         }
         Insert: {
           company_id?: number | null
           id?: number
+          last_action_check?: string | null
           project_track?: number | null
           summary?: string | null
         }
         Update: {
           company_id?: number | null
           id?: number
+          last_action_check?: string | null
           project_track?: number | null
           summary?: string | null
         }
