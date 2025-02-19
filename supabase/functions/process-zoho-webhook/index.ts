@@ -7,6 +7,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface ParsedProjectData {
+  id: string;
+  status: string;
+  lastUpdated: string;
+  nextStep: string;
+  propertyAddress: string;
+  installScheduled: boolean;
+  estimatedInstallDate: string;
+  lastActivityDate: string;
+  roofInstallComplete: boolean;
+  contractSigned: boolean;
+  priceToCustomer: number;
+  contractorCost: number;
+  bidListFee: number;
+  contractorNotes: string;
+  chatGPTReasoning: string;
+  chatGPTFollowUpNeeded: boolean;
+}
+
+function parseZohoData(rawData: any): ParsedProjectData {
+  return {
+    id: rawData.ID || '',
+    status: rawData.Status || '',
+    lastUpdated: rawData.Last_Updated || '',
+    nextStep: rawData.Next_Step || '',
+    propertyAddress: rawData.Property_Address || '',
+    installScheduled: Boolean(rawData.Install_Scheduled),
+    estimatedInstallDate: rawData.Estimated_Install_Date || '',
+    lastActivityDate: rawData.Last_Activity_Date || '',
+    roofInstallComplete: Boolean(rawData.Roof_Install_Complete),
+    contractSigned: Boolean(rawData.Contract_Signed),
+    priceToCustomer: Number(rawData.Price_to_Customer) || 0,
+    contractorCost: Number(rawData.Contractor_Cost) || 0,
+    bidListFee: Number(rawData.BidList_Fee) || 0,
+    contractorNotes: rawData.Contractor_performance_notes || '',
+    chatGPTReasoning: rawData.ChatGPT_Reasoning || '',
+    chatGPTFollowUpNeeded: Boolean(rawData.ChatGPT_Follow_up_Needed)
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -18,13 +58,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { projectData, zohoId } = await req.json()
-
+    const { rawData } = await req.json()
+    const projectData = parseZohoData(rawData)
+    
     // Check if project exists
     const { data: existingProject } = await supabase
       .from('projects')
       .select('id, summary')
-      .eq('id', zohoId)
+      .eq('id', projectData.id)
       .maybeSingle()
 
     // Get the appropriate prompt based on whether project exists
@@ -69,74 +110,47 @@ serve(async (req) => {
     const summary = openAIData.choices[0].message.content
 
     // Create or update the project
-    let projectId
     if (existingProject) {
       const { error: updateError } = await supabase
         .from('projects')
-        .update({ summary })
-        .eq('id', zohoId)
+        .update({ 
+          summary,
+          last_action_check: new Date().toISOString()
+        })
+        .eq('id', projectData.id)
       
       if (updateError) throw updateError
-      projectId = zohoId
     } else {
-      const { data: newProject, error: createError } = await supabase
+      const { error: createError } = await supabase
         .from('projects')
         .insert([{ 
-          id: zohoId,
+          id: projectData.id,
           summary,
-          company_id: projectData.company_id, // Assuming this is provided in projectData
-          project_track: projectData.project_track // Assuming this is provided in projectData
+          company_id: null, // You might want to add logic to determine company_id
+          last_action_check: new Date().toISOString()
         }])
-        .select()
-        .single()
       
       if (createError) throw createError
-      projectId = newProject.id
     }
 
     // Check if any action is needed
-    const { data: actionPrompt } = await supabase
-      .from('workflow_prompts')
-      .select('prompt_text')
-      .eq('type', 'action_detection')
-      .single()
-
-    const actionCheckPrompt = actionPrompt.prompt_text
-      .replace('{summary}', summary)
-      .replace('{track_requirements}', projectData.track_requirements || '')
-      .replace('{last_communication}', projectData.last_communication || '')
-
-    const actionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a project manager assistant that determines if actions are needed.' },
-          { role: 'user', content: actionCheckPrompt }
-        ],
-      }),
-    })
-
-    const actionData = await actionResponse.json()
-    const actionNeeded = actionData.choices[0].message.content
-
-    if (actionNeeded.toLowerCase().includes('action needed')) {
-      // Log the action
+    if (projectData.chatGPTFollowUpNeeded) {
       await supabase
         .from('action_logs')
         .insert({
-          project_id: projectId,
+          project_id: projectData.id,
           action_type: 'follow_up',
-          action_description: actionNeeded
+          action_description: projectData.chatGPTReasoning || 'Follow-up needed based on Zoho update'
         })
     }
 
     return new Response(
-      JSON.stringify({ success: true, summary, actionNeeded, isNewProject: !existingProject }),
+      JSON.stringify({ 
+        success: true, 
+        summary, 
+        isNewProject: !existingProject,
+        parsedData: projectData 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
