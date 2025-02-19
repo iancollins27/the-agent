@@ -9,41 +9,37 @@ const corsHeaders = {
 
 interface ParsedProjectData {
   id: string;
-  status: string;
-  lastUpdated: string;
+  lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
-  installScheduled: boolean;
-  estimatedInstallDate: string;
-  lastActivityDate: string;
-  roofInstallComplete: boolean;
-  contractSigned: boolean;
-  priceToCustomer: number;
-  contractorCost: number;
-  bidListFee: number;
-  contractorNotes: string;
-  chatGPTReasoning: string;
-  chatGPTFollowUpNeeded: boolean;
+  timeline: {
+    contractSigned: boolean;
+    siteVisitScheduled: boolean;
+    workOrderConfirmed: boolean;
+    roofInstallApproved: boolean;
+    roofInstallScheduled: boolean;
+    installDateConfirmedByRoofer: boolean;
+    roofInstallComplete: boolean;
+    roofInstallFinalized: boolean;
+  };
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
   return {
     id: rawData.ID || '',
-    status: rawData.Status || '',
-    lastUpdated: rawData.Last_Updated || '',
+    lastMilestone: rawData.Last_Milestone || '',
     nextStep: rawData.Next_Step || '',
     propertyAddress: rawData.Property_Address || '',
-    installScheduled: Boolean(rawData.Install_Scheduled),
-    estimatedInstallDate: rawData.Estimated_Install_Date || '',
-    lastActivityDate: rawData.Last_Activity_Date || '',
-    roofInstallComplete: Boolean(rawData.Roof_Install_Complete),
-    contractSigned: Boolean(rawData.Contract_Signed),
-    priceToCustomer: Number(rawData.Price_to_Customer) || 0,
-    contractorCost: Number(rawData.Contractor_Cost) || 0,
-    bidListFee: Number(rawData.BidList_Fee) || 0,
-    contractorNotes: rawData.Contractor_performance_notes || '',
-    chatGPTReasoning: rawData.ChatGPT_Reasoning || '',
-    chatGPTFollowUpNeeded: Boolean(rawData.ChatGPT_Follow_up_Needed)
+    timeline: {
+      contractSigned: Boolean(rawData.Contract_Signed),
+      siteVisitScheduled: Boolean(rawData.Site_Visit_Scheduled),
+      workOrderConfirmed: Boolean(rawData.Work_Order_Confirmed),
+      roofInstallApproved: Boolean(rawData.Roof_Install_Approved),
+      roofInstallScheduled: Boolean(rawData.Install_Scheduled),
+      installDateConfirmedByRoofer: Boolean(rawData.Install_Date_Confirmed_by_Roofer),
+      roofInstallComplete: Boolean(rawData.Roof_Install_Complete),
+      roofInstallFinalized: Boolean(rawData.Roof_Install_Finalized)
+    }
   };
 }
 
@@ -100,7 +96,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates concise project summaries.' },
+          { role: 'system', content: 'You are a helpful assistant that generates concise project summaries focusing on timeline milestones.' },
           { role: 'user', content: prompt }
         ],
       }),
@@ -126,21 +122,25 @@ serve(async (req) => {
         .insert([{ 
           id: projectData.id,
           summary,
-          company_id: null, // You might want to add logic to determine company_id
           last_action_check: new Date().toISOString()
         }])
       
       if (createError) throw createError
     }
 
-    // Check if any action is needed
-    if (projectData.chatGPTFollowUpNeeded) {
+    // Log any milestone transitions
+    const { timeline } = projectData
+    const milestones = Object.entries(timeline)
+      .filter(([_, completed]) => completed)
+      .map(([milestone]) => milestone)
+
+    if (milestones.length > 0) {
       await supabase
         .from('action_logs')
         .insert({
           project_id: projectData.id,
-          action_type: 'follow_up',
-          action_description: projectData.chatGPTReasoning || 'Follow-up needed based on Zoho update'
+          action_type: 'milestone_update',
+          action_description: `Project milestones updated: ${milestones.join(', ')}`
         })
     }
 
