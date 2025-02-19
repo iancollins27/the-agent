@@ -29,72 +29,50 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-  const [hasAccess, setHasAccess] = useState(false);
-  const [checkingAccess, setCheckingAccess] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkAccessPermission = async () => {
-      console.log("Starting permission check");
-      console.log("Current user:", user);
-      
-      try {
-        if (!user) {
-          console.log("No user found, setting checkingAccess to false");
-          setCheckingAccess(false);
-          return;
-        }
+      if (!user) {
+        setHasAccess(false);
+        return;
+      }
 
-        console.log("Fetching user profile for ID:", user.id);
+      try {
         const { data, error } = await supabase
           .from('profiles')
           .select('permission')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
-        console.log("Profile data received:", data);
-        console.log("Profile error if any:", error);
-
-        if (!error && data) {
-          const hasUpdatePermission = data.permission === 'update_settings';
-          console.log("Permission check result:", hasUpdatePermission);
-          setHasAccess(hasUpdatePermission);
-        } else {
-          console.log("No profile data found or error occurred");
+        if (error) {
+          console.error('Error checking permissions:', error);
           setHasAccess(false);
+          return;
         }
+
+        setHasAccess(data?.permission === 'update_settings');
       } catch (error) {
         console.error('Error checking permissions:', error);
         setHasAccess(false);
-      } finally {
-        console.log("Setting checkingAccess to false");
-        setCheckingAccess(false);
       }
     };
 
     checkAccessPermission();
   }, [user]);
 
-  console.log("AdminRoute render state:", {
-    loading,
-    checkingAccess,
-    hasAccess,
-    userExists: !!user
-  });
-
-  if (loading || checkingAccess) {
+  // Show loading state while either auth is loading or we haven't determined access yet
+  if (authLoading || hasAccess === null) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  if (!user || !hasAccess) {
-    console.log("Redirecting to home - No access", {
-      userExists: !!user,
-      hasAccess
-    });
+  // Only redirect if we're sure there's no access
+  if (!user || hasAccess === false) {
     return <Navigate to="/" replace />;
   }
 
-  console.log("Rendering admin console");
+  // At this point, we know the user has access
   return <>{children}</>;
 };
 
