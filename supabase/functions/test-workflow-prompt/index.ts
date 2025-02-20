@@ -12,68 +12,64 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to convert boolean timeline data to a more readable format
-const processTimelineData = (data: any) => {
-  // First, let's fetch the actual dates from the project data if they exist
-  const timelineDates = {
-    Contract_Signed_Date: data.Contract_Signed_Date,
-    Site_Visit_Date: data.Site_Visit_Date,
-    Work_Order_Date: data.Work_Order_Date,
-    Roof_Install_Approval_Date: data.Roof_Install_Approval_Date,
-    Install_Schedule_Date: data.Install_Schedule_Date,
-    Roofer_Confirmation_Date: data.Roofer_Confirmation_Date,
-    Install_Complete_Date: data.Install_Complete_Date,
-    Install_Finalized_Date: data.Install_Finalized_Date
-  };
+interface ProjectData {
+  ID: number;
+  Last_Milestone: string;
+  Next_Step: string;
+  Property_Address: string;
+  Contract_Signed: string | null;
+  Site_Visit_Scheduled: string | null;
+  Work_Order_Confirmed: string | null;
+  Roof_Install_Approved: string | null;
+  Install_Scheduled: string | null;
+  Install_Date_Confirmed_by_Roofer: string | null;
+  Roof_Install_Complete: string | null;
+  Roof_Install_Finalized: string | null;
+  Company_ID: number;
+}
 
-  // Create a processed version of the timeline that includes both status and dates
+// Helper function to process the project data with actual dates
+const processProjectData = (rawData: ProjectData) => {
   const processedData = {
-    ...data,
+    id: rawData.ID,
+    companyId: rawData.Company_ID,
+    lastMilestone: rawData.Last_Milestone,
+    nextStep: rawData.Next_Step,
+    propertyAddress: rawData.Property_Address,
     timeline: {
       contractSigned: {
-        status: data.timeline?.contractSigned ? 'completed' : 'pending',
-        completedAt: timelineDates.Contract_Signed_Date || null,
-        currentState: data.timeline?.contractSigned || false
+        date: rawData.Contract_Signed,
+        status: rawData.Contract_Signed ? 'completed' : 'pending'
       },
       siteVisitScheduled: {
-        status: data.timeline?.siteVisitScheduled ? 'completed' : 'pending',
-        completedAt: timelineDates.Site_Visit_Date || null,
-        currentState: data.timeline?.siteVisitScheduled || false
+        date: rawData.Site_Visit_Scheduled,
+        status: rawData.Site_Visit_Scheduled ? 'completed' : 'pending'
       },
       workOrderConfirmed: {
-        status: data.timeline?.workOrderConfirmed ? 'completed' : 'pending',
-        completedAt: timelineDates.Work_Order_Date || null,
-        currentState: data.timeline?.workOrderConfirmed || false
+        date: rawData.Work_Order_Confirmed,
+        status: rawData.Work_Order_Confirmed ? 'completed' : 'pending'
       },
       roofInstallApproved: {
-        status: data.timeline?.roofInstallApproved ? 'completed' : 'pending',
-        completedAt: timelineDates.Roof_Install_Approval_Date || null,
-        currentState: data.timeline?.roofInstallApproved || false
+        date: rawData.Roof_Install_Approved,
+        status: rawData.Roof_Install_Approved ? 'completed' : 'pending'
       },
       roofInstallScheduled: {
-        status: data.timeline?.roofInstallScheduled ? 'completed' : 'pending',
-        completedAt: timelineDates.Install_Schedule_Date || null,
-        currentState: data.timeline?.roofInstallScheduled || false
+        date: rawData.Install_Scheduled,
+        status: rawData.Install_Scheduled ? 'completed' : 'pending'
       },
       installDateConfirmedByRoofer: {
-        status: data.timeline?.installDateConfirmedByRoofer ? 'completed' : 'pending',
-        completedAt: timelineDates.Roofer_Confirmation_Date || null,
-        currentState: data.timeline?.installDateConfirmedByRoofer || false
+        date: rawData.Install_Date_Confirmed_by_Roofer,
+        status: rawData.Install_Date_Confirmed_by_Roofer ? 'completed' : 'pending'
       },
       roofInstallComplete: {
-        status: data.timeline?.roofInstallComplete ? 'completed' : 'pending',
-        completedAt: timelineDates.Install_Complete_Date || null,
-        currentState: data.timeline?.roofInstallComplete || false
+        date: rawData.Roof_Install_Complete,
+        status: rawData.Roof_Install_Complete ? 'completed' : 'pending'
       },
       roofInstallFinalized: {
-        status: data.timeline?.roofInstallFinalized ? 'completed' : 'pending',
-        completedAt: timelineDates.Install_Finalized_Date || null,
-        currentState: data.timeline?.roofInstallFinalized || false
+        date: rawData.Roof_Install_Finalized,
+        status: rawData.Roof_Install_Finalized ? 'completed' : 'pending'
       }
-    },
-    lastMilestone: data.lastMilestone,
-    nextStep: data.nextStep,
-    propertyAddress: data.propertyAddress
+    }
   };
 
   console.log('Processed project data:', JSON.stringify(processedData, null, 2));
@@ -93,28 +89,18 @@ serve(async (req) => {
     console.log('Previous results:', previousResults);
 
     // Fetch project data
-    const { data: project, error: projectError } = await supabase
+    const { data: rawProject, error: projectError } = await supabase
       .from('projects')
-      .select(`
-        *,
-        Contract_Signed_Date,
-        Site_Visit_Date,
-        Work_Order_Date,
-        Roof_Install_Approval_Date,
-        Install_Schedule_Date,
-        Roofer_Confirmation_Date,
-        Install_Complete_Date,
-        Install_Finalized_Date
-      `)
+      .select('*')
       .eq('id', projectId)
       .single();
 
     if (projectError) throw projectError;
 
-    console.log('Parsed project data:', project);
+    console.log('Raw project data:', rawProject);
 
-    // Process the project data to handle the timeline structure
-    const processedProject = processTimelineData(project);
+    // Process the project data
+    const processedProject = processProjectData(rawProject as ProjectData);
 
     // Generate the final prompt by replacing placeholders based on prompt type
     let finalPrompt = promptText;
@@ -126,12 +112,12 @@ serve(async (req) => {
       
       case 'summary_update':
         finalPrompt = finalPrompt
-          .replace('{current_summary}', processedProject.summary || '')
+          .replace('{current_summary}', rawProject.summary || '')
           .replace('{new_data}', JSON.stringify(processedProject, null, 2));
         break;
       
       case 'action_detection':
-        const summaryForAction = previousResults?.find(r => r.type === 'summary_generation')?.output || processedProject.summary;
+        const summaryForAction = previousResults?.find(r => r.type === 'summary_generation')?.output || rawProject.summary;
         finalPrompt = finalPrompt.replace('{summary}', summaryForAction || '');
         break;
       
@@ -151,7 +137,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are a helpful assistant that processes project data.' },
           { role: 'user', content: finalPrompt }
