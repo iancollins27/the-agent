@@ -9,7 +9,7 @@ const corsHeaders = {
 
 interface ParsedProjectData {
   id: number;
-  companyId: number; // Added company_id field
+  companyId: number;
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
@@ -128,7 +128,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: 'You are a helpful assistant that generates concise project summaries focusing on timeline milestones.' },
           { role: 'user', content: prompt }
