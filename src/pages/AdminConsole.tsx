@@ -30,6 +30,7 @@ type TestResult = {
   results: {
     type: WorkflowType;
     output: string;
+    finalPrompt: string;
   }[];
 };
 
@@ -141,10 +142,11 @@ const AdminConsole = () => {
 
           results.push({
             type: prompt.type,
-            output: data.result
+            output: data.result,
+            finalPrompt: data.finalPrompt
           });
           
-          console.log(`Results for ${prompt.type}:`, data.result);
+          console.log(`Results for ${prompt.type}:`, data);
         }
 
         setTestResults(prev => [...prev, { projectId, results }]);
@@ -348,30 +350,27 @@ const AdminConsole = () => {
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-6">
-                            {result.results.map((promptResult, index) => {
-                              const currentPrompt = prompts?.find(p => p.type === promptResult.type);
-                              return (
-                                <div key={index} className="space-y-2">
-                                  <h4 className="font-medium">
-                                    {workflowTitles[promptResult.type]}
-                                  </h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                      <h5 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h5>
-                                      <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
-                                        {currentPrompt?.prompt_text || 'Prompt not found'}
-                                      </pre>
-                                    </div>
-                                    <div>
-                                      <h5 className="text-sm font-medium text-muted-foreground mb-2">Response</h5>
-                                      <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
-                                        {promptResult.output}
-                                      </pre>
-                                    </div>
+                            {result.results.map((promptResult, index) => (
+                              <div key={index} className="space-y-2">
+                                <h4 className="font-medium">
+                                  {workflowTitles[promptResult.type]}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">Actual Prompt Sent to API</h5>
+                                    <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
+                                      {promptResult.finalPrompt}
+                                    </pre>
+                                  </div>
+                                  <div>
+                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">Response</h5>
+                                    <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
+                                      {promptResult.output}
+                                    </pre>
                                   </div>
                                 </div>
-                              );
-                            })}
+                              </div>
+                            ))}
                           </div>
                         </CardContent>
                       </Card>

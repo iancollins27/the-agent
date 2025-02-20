@@ -12,8 +12,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -50,13 +48,11 @@ serve(async (req) => {
         break;
       
       case 'action_detection':
-        // Use the project's summary or the latest generated summary from previous results
         const summaryForAction = previousResults?.find(r => r.type === 'summary_generation')?.output || project.summary;
         finalPrompt = finalPrompt.replace('{summary}', summaryForAction || '');
         break;
       
       case 'action_execution':
-        // Use the result from action detection
         const actionNeeded = previousResults?.find(r => r.type === 'action_detection')?.output;
         finalPrompt = finalPrompt.replace('{action_needed}', actionNeeded || '');
         break;
@@ -85,7 +81,10 @@ serve(async (req) => {
 
     console.log(`Result for ${promptType}:`, result);
 
-    return new Response(JSON.stringify({ result }), {
+    return new Response(JSON.stringify({ 
+      result,
+      finalPrompt // Include the actual prompt that was sent
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
