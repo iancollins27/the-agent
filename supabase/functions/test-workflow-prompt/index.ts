@@ -12,34 +12,71 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to convert timeline data from date strings to a more readable format
+// Helper function to convert boolean timeline data to a more readable format
 const processTimelineData = (data: any) => {
-  const timeline: Record<string, string | null> = {
-    contractSigned: data.Contract_Signed || null,
-    siteVisitScheduled: data.Site_Visit_Scheduled || null,
-    workOrderConfirmed: data.Work_Order_Confirmed || null,
-    roofInstallApproved: data.Roof_Install_Approved || null,
-    roofInstallScheduled: data.Install_Scheduled || null,
-    installDateConfirmedByRoofer: data.Install_Date_Confirmed_by_Roofer || null,
-    roofInstallComplete: data.Roof_Install_Complete || null,
-    roofInstallFinalized: data.Roof_Install_Finalized || null
+  // First, let's fetch the actual dates from the project data if they exist
+  const timelineDates = {
+    Contract_Signed_Date: data.Contract_Signed_Date,
+    Site_Visit_Date: data.Site_Visit_Date,
+    Work_Order_Date: data.Work_Order_Date,
+    Roof_Install_Approval_Date: data.Roof_Install_Approval_Date,
+    Install_Schedule_Date: data.Install_Schedule_Date,
+    Roofer_Confirmation_Date: data.Roofer_Confirmation_Date,
+    Install_Complete_Date: data.Install_Complete_Date,
+    Install_Finalized_Date: data.Install_Finalized_Date
   };
 
-  // Create a more readable version of the timeline
+  // Create a processed version of the timeline that includes both status and dates
   const processedData = {
     ...data,
-    timeline: Object.entries(timeline).reduce((acc, [key, value]) => ({
-      ...acc,
-      [key]: value ? {
-        status: 'completed',
-        completedAt: value
-      } : {
-        status: 'pending',
-        completedAt: null
+    timeline: {
+      contractSigned: {
+        status: data.timeline?.contractSigned ? 'completed' : 'pending',
+        completedAt: timelineDates.Contract_Signed_Date || null,
+        currentState: data.timeline?.contractSigned || false
+      },
+      siteVisitScheduled: {
+        status: data.timeline?.siteVisitScheduled ? 'completed' : 'pending',
+        completedAt: timelineDates.Site_Visit_Date || null,
+        currentState: data.timeline?.siteVisitScheduled || false
+      },
+      workOrderConfirmed: {
+        status: data.timeline?.workOrderConfirmed ? 'completed' : 'pending',
+        completedAt: timelineDates.Work_Order_Date || null,
+        currentState: data.timeline?.workOrderConfirmed || false
+      },
+      roofInstallApproved: {
+        status: data.timeline?.roofInstallApproved ? 'completed' : 'pending',
+        completedAt: timelineDates.Roof_Install_Approval_Date || null,
+        currentState: data.timeline?.roofInstallApproved || false
+      },
+      roofInstallScheduled: {
+        status: data.timeline?.roofInstallScheduled ? 'completed' : 'pending',
+        completedAt: timelineDates.Install_Schedule_Date || null,
+        currentState: data.timeline?.roofInstallScheduled || false
+      },
+      installDateConfirmedByRoofer: {
+        status: data.timeline?.installDateConfirmedByRoofer ? 'completed' : 'pending',
+        completedAt: timelineDates.Roofer_Confirmation_Date || null,
+        currentState: data.timeline?.installDateConfirmedByRoofer || false
+      },
+      roofInstallComplete: {
+        status: data.timeline?.roofInstallComplete ? 'completed' : 'pending',
+        completedAt: timelineDates.Install_Complete_Date || null,
+        currentState: data.timeline?.roofInstallComplete || false
+      },
+      roofInstallFinalized: {
+        status: data.timeline?.roofInstallFinalized ? 'completed' : 'pending',
+        completedAt: timelineDates.Install_Finalized_Date || null,
+        currentState: data.timeline?.roofInstallFinalized || false
       }
-    }), {})
+    },
+    lastMilestone: data.lastMilestone,
+    nextStep: data.nextStep,
+    propertyAddress: data.propertyAddress
   };
 
+  console.log('Processed project data:', JSON.stringify(processedData, null, 2));
   return processedData;
 };
 
@@ -58,13 +95,25 @@ serve(async (req) => {
     // Fetch project data
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('*')
+      .select(`
+        *,
+        Contract_Signed_Date,
+        Site_Visit_Date,
+        Work_Order_Date,
+        Roof_Install_Approval_Date,
+        Install_Schedule_Date,
+        Roofer_Confirmation_Date,
+        Install_Complete_Date,
+        Install_Finalized_Date
+      `)
       .eq('id', projectId)
       .single();
 
     if (projectError) throw projectError;
 
-    // Process the project data to handle date/time values
+    console.log('Parsed project data:', project);
+
+    // Process the project data to handle the timeline structure
     const processedProject = processTimelineData(project);
 
     // Generate the final prompt by replacing placeholders based on prompt type
