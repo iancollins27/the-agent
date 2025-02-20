@@ -14,14 +14,14 @@ interface ParsedProjectData {
   nextStep: string;
   propertyAddress: string;
   timeline: {
-    contractSigned: boolean;
-    siteVisitScheduled: boolean;
-    workOrderConfirmed: boolean;
-    roofInstallApproved: boolean;
-    roofInstallScheduled: boolean;
-    installDateConfirmedByRoofer: boolean;
-    roofInstallComplete: boolean;
-    roofInstallFinalized: boolean;
+    contractSigned: string;
+    siteVisitScheduled: string;
+    workOrderConfirmed: string;
+    roofInstallApproved: string;
+    roofInstallScheduled: string;
+    installDateConfirmedByRoofer: string;
+    roofInstallComplete: string;
+    roofInstallFinalized: string;
   };
 }
 
@@ -59,14 +59,14 @@ function parseZohoData(rawData: any): ParsedProjectData {
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
     timeline: {
-      contractSigned: Boolean(data.Contract_Signed),
-      siteVisitScheduled: Boolean(data.Site_Visit_Scheduled),
-      workOrderConfirmed: Boolean(data.Work_Order_Confirmed),
-      roofInstallApproved: Boolean(data.Roof_Install_Approved),
-      roofInstallScheduled: Boolean(data.Install_Scheduled),
-      installDateConfirmedByRoofer: Boolean(data.Install_Date_Confirmed_by_Roofer),
-      roofInstallComplete: Boolean(data.Roof_Install_Complete),
-      roofInstallFinalized: Boolean(data.Roof_Install_Finalized)
+      contractSigned: string(data.Contract_Signed),
+      siteVisitScheduled: string(data.Site_Visit_Scheduled),
+      workOrderConfirmed: string(data.Work_Order_Confirmed),
+      roofInstallApproved: string(data.Roof_Install_Approved),
+      roofInstallScheduled: string(data.Install_Scheduled),
+      installDateConfirmedByRoofer: string(data.Install_Date_Confirmed_by_Roofer),
+      roofInstallComplete: string(data.Roof_Install_Complete),
+      roofInstallFinalized: string(data.Roof_Install_Finalized)
     }
   };
 }
