@@ -10,19 +10,18 @@ const corsHeaders = {
 interface ParsedProjectData {
   id: number;
   companyId: number;
-  lastMilestone: string;
-  nextStep: string;
-  propertyAddress: string;
-  timeline: {
-    contractSigned: string;
-    siteVisitScheduled: string;
-    workOrderConfirmed: string;
-    roofInstallApproved: string;
-    roofInstallScheduled: string;
-    installDateConfirmedByRoofer: string;
-    roofInstallComplete: string;
-    roofInstallFinalized: string;
-  };
+  lastMilestone: String;
+  nextStep: String;
+  propertyAddress: String;
+  contractSigned: String;
+  siteVisitScheduled: String;
+  workOrderConfirmed: String;
+  roofInstallApproved: String;
+  roofInstallScheduled: String;
+  installDateConfirmedByRoofer: String;
+  roofInstallComplete: String;
+  roofInstallFinalized: String;
+  
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
