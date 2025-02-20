@@ -25,25 +25,41 @@ interface ParsedProjectData {
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
-  const id = parseInt(rawData.ID);
-  if (isNaN(id) || !rawData.ID) {
-    throw new Error('Invalid or missing project ID');
+  console.log('Parsing data:', rawData); // Additional logging
+
+  if (!rawData || typeof rawData !== 'object') {
+    throw new Error('Invalid data received from Zoho');
   }
+
+  // Handle both direct ID field and nested ID field cases
+  const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
+  
+  if (!idValue) {
+    throw new Error('Project ID is missing in the Zoho data');
+  }
+
+  const id = parseInt(idValue);
+  if (isNaN(id)) {
+    throw new Error('Invalid project ID format');
+  }
+
+  // Handle both direct fields and nested rawData fields
+  const data = rawData.rawData || rawData;
 
   return {
     id,
-    lastMilestone: rawData.Last_Milestone || '',
-    nextStep: rawData.Next_Step || '',
-    propertyAddress: rawData.Property_Address || '',
+    lastMilestone: data.Last_Milestone || '',
+    nextStep: data.Next_Step || '',
+    propertyAddress: data.Property_Address || '',
     timeline: {
-      contractSigned: Boolean(rawData.Contract_Signed),
-      siteVisitScheduled: Boolean(rawData.Site_Visit_Scheduled),
-      workOrderConfirmed: Boolean(rawData.Work_Order_Confirmed),
-      roofInstallApproved: Boolean(rawData.Roof_Install_Approved),
-      roofInstallScheduled: Boolean(rawData.Install_Scheduled),
-      installDateConfirmedByRoofer: Boolean(rawData.Install_Date_Confirmed_by_Roofer),
-      roofInstallComplete: Boolean(rawData.Roof_Install_Complete),
-      roofInstallFinalized: Boolean(rawData.Roof_Install_Finalized)
+      contractSigned: Boolean(data.Contract_Signed),
+      siteVisitScheduled: Boolean(data.Site_Visit_Scheduled),
+      workOrderConfirmed: Boolean(data.Work_Order_Confirmed),
+      roofInstallApproved: Boolean(data.Roof_Install_Approved),
+      roofInstallScheduled: Boolean(data.Install_Scheduled),
+      installDateConfirmedByRoofer: Boolean(data.Install_Date_Confirmed_by_Roofer),
+      roofInstallComplete: Boolean(data.Roof_Install_Complete),
+      roofInstallFinalized: Boolean(data.Roof_Install_Finalized)
     }
   };
 }
@@ -59,9 +75,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { rawData } = await req.json()
-    console.log('Received Zoho data:', rawData)
+    // Log the raw request body for debugging
+    const requestBody = await req.json()
+    console.log('Raw webhook payload:', requestBody)
     
+    // Handle both cases where data might be nested or not
+    const rawData = requestBody.rawData || requestBody
     const projectData = parseZohoData(rawData)
     console.log('Parsed project data:', projectData)
     
