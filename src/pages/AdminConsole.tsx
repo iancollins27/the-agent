@@ -347,17 +347,31 @@ const AdminConsole = () => {
                           <CardTitle>Project {result.projectId}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-4">
-                            {result.results.map((promptResult, index) => (
-                              <div key={index} className="space-y-2">
-                                <h4 className="font-medium">
-                                  {workflowTitles[promptResult.type]}
-                                </h4>
-                                <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
-                                  {promptResult.output}
-                                </pre>
-                              </div>
-                            ))}
+                          <div className="space-y-6">
+                            {result.results.map((promptResult, index) => {
+                              const currentPrompt = prompts?.find(p => p.type === promptResult.type);
+                              return (
+                                <div key={index} className="space-y-2">
+                                  <h4 className="font-medium">
+                                    {workflowTitles[promptResult.type]}
+                                  </h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <h5 className="text-sm font-medium text-muted-foreground mb-2">Prompt</h5>
+                                      <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
+                                        {currentPrompt?.prompt_text || 'Prompt not found'}
+                                      </pre>
+                                    </div>
+                                    <div>
+                                      <h5 className="text-sm font-medium text-muted-foreground mb-2">Response</h5>
+                                      <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
+                                        {promptResult.output}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </CardContent>
                       </Card>
