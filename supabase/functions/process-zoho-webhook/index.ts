@@ -13,16 +13,16 @@ interface ParsedProjectData {
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
-  timeline: {
-    contractSigned: boolean;
-    siteVisitScheduled: boolean;
-    workOrderConfirmed: boolean;
-    roofInstallApproved: boolean;
-    roofInstallScheduled: boolean;
-    installDateConfirmedByRoofer: boolean;
-    roofInstallComplete: boolean;
-    roofInstallFinalized: boolean;
-  };
+timeline: {
+  contractSigned: data.Contract_Signed || null,
+  siteVisitScheduled: data.Site_Visit_Scheduled || null,
+  workOrderConfirmed: data.Work_Order_Confirmed || null,
+  roofInstallApproved: data.Roof_Install_Approved || null,
+  roofInstallScheduled: data.Install_Scheduled || null,
+  installDateConfirmedByRoofer: data.Install_Date_Confirmed_by_Roofer || null,
+  roofInstallComplete: data.Roof_Install_Complete || null,
+  roofInstallFinalized: data.Roof_Install_Finalized || null
+};
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
