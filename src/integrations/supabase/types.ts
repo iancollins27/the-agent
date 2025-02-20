@@ -164,16 +164,19 @@ export type Database = {
           company_id: number
           description: string | null
           id: number
+          name: string
         }
         Insert: {
           company_id: number
           description?: string | null
           id?: number
+          name?: string
         }
         Update: {
           company_id?: number
           description?: string | null
           id?: number
+          name?: string
         }
         Relationships: [
           {

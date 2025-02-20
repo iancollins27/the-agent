@@ -21,6 +21,8 @@ type WorkflowPrompt = {
 type Project = {
   id: number;
   summary: string | null;
+  project_track: number | null;
+  track_name?: string | null;
 };
 
 type TestResult = {
@@ -64,15 +66,26 @@ const AdminConsole = () => {
   });
 
   const { data: projects, isLoading: isLoadingProjects } = useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects-with-tracks'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, summary')
+        .select(`
+          id,
+          summary,
+          project_track,
+          project_tracks (
+            name
+          )
+        `)
         .order('id');
       
       if (error) throw error;
-      return data as Project[];
+
+      return data.map(project => ({
+        ...project,
+        track_name: project.project_tracks?.name
+      })) as Project[];
     }
   });
 
@@ -107,11 +120,9 @@ const AdminConsole = () => {
     setTestResults([]);
     
     try {
-      // For each selected project
       for (const projectId of selectedProjects) {
         const results: TestResult['results'] = [];
         
-        // Run each prompt type in sequence
         for (const prompt of prompts || []) {
           console.log(`Testing prompt type: ${prompt.type}`);
           
@@ -120,7 +131,7 @@ const AdminConsole = () => {
               projectId,
               promptType: prompt.type,
               promptText: prompt.prompt_text,
-              previousResults: results // Pass all previous results to each prompt
+              previousResults: results
             },
           });
 
@@ -266,18 +277,19 @@ const AdminConsole = () => {
                         <TableHead className="w-12">Select</TableHead>
                         <TableHead>Project ID</TableHead>
                         <TableHead>Current Summary</TableHead>
+                        <TableHead>Project Track</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {isLoadingProjects ? (
                         <TableRow>
-                          <TableCell colSpan={3} className="text-center">
+                          <TableCell colSpan={4} className="text-center">
                             <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                           </TableCell>
                         </TableRow>
                       ) : !projects?.length ? (
                         <TableRow>
-                          <TableCell colSpan={3} className="text-center">
+                          <TableCell colSpan={4} className="text-center">
                             No projects found
                           </TableCell>
                         </TableRow>
@@ -299,6 +311,9 @@ const AdminConsole = () => {
                             <TableCell>{project.id}</TableCell>
                             <TableCell className="max-w-md truncate">
                               {project.summary || 'No summary'}
+                            </TableCell>
+                            <TableCell>
+                              {project.track_name || 'No track assigned'}
                             </TableCell>
                           </TableRow>
                         ))
