@@ -1,16 +1,26 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.1.0';
-
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+interface ProjectData {
+  ID: number;
+  Company_ID: number;
+  Last_Milestone: string;
+  Next_Step: string;
+  Property_Address: string;
+  Contract_Signed: string | null;
+  Site_Visit_Scheduled: string | null;
+  Work_Order_Confirmed: string | null;
+  Roof_Install_Approved: string | null;
+  Install_Scheduled: string | null;
+  Install_Date_Confirmed_by_Roofer: string | null;
+  Roof_Install_Complete: string | null;
+  Roof_Install_Finalized: string | null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -18,19 +28,30 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
     const { projectId, promptType, promptText, previousResults } = await req.json();
 
     console.log(`Processing ${promptType} for project ${projectId}`);
 
-    // Fetch project data
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', projectId)
-      .single();
+    // Fetch project data using direct fetch to Supabase REST API
+    const projectResponse = await fetch(
+      `${Deno.env.get('SUPABASE_URL')}/rest/v1/projects?id=eq.${projectId}&select=*`,
+      {
+        headers: {
+          'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+      }
+    );
 
-    if (projectError) throw projectError;
+    if (!projectResponse.ok) {
+      throw new Error(`Failed to fetch project: ${projectResponse.statusText}`);
+    }
+
+    const [project] = await projectResponse.json();
+    
+    if (!project) {
+      throw new Error(`Project ${projectId} not found`);
+    }
 
     // Log the raw data exactly as we receive it
     console.log('RAW PROJECT DATA:', JSON.stringify(project, null, 2));
@@ -89,17 +110,21 @@ serve(async (req) => {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: 'You are a helpful assistant that processes project data.' },
           { role: 'user', content: finalPrompt }
         ],
       }),
     });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.statusText}`);
+    }
 
     const data = await response.json();
     const result = data.choices[0].message.content;
