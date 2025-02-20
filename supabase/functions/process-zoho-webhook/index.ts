@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface ParsedProjectData {
   id: number;
+  companyId: number; // Added company_id field
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
@@ -25,7 +26,7 @@ interface ParsedProjectData {
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
-  console.log('Parsing data:', rawData); // Additional logging
+  console.log('Parsing data:', rawData);
 
   if (!rawData || typeof rawData !== 'object') {
     throw new Error('Invalid data received from Zoho');
@@ -33,9 +34,14 @@ function parseZohoData(rawData: any): ParsedProjectData {
 
   // Handle both direct ID field and nested ID field cases
   const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
+  const companyId = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
   
   if (!idValue) {
     throw new Error('Project ID is missing in the Zoho data');
+  }
+
+  if (!companyId) {
+    throw new Error('Company ID is missing in the Zoho data');
   }
 
   const id = parseInt(idValue);
@@ -48,6 +54,7 @@ function parseZohoData(rawData: any): ParsedProjectData {
 
   return {
     id,
+    companyId: parseInt(companyId),
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
@@ -138,7 +145,8 @@ serve(async (req) => {
         .from('projects')
         .update({ 
           summary,
-          last_action_check: new Date().toISOString()
+          last_action_check: new Date().toISOString(),
+          company_id: projectData.companyId // Add company_id on update
         })
         .eq('id', projectData.id)
       
@@ -149,7 +157,8 @@ serve(async (req) => {
         .insert([{ 
           id: projectData.id,
           summary,
-          last_action_check: new Date().toISOString()
+          last_action_check: new Date().toISOString(),
+          company_id: projectData.companyId // Add company_id on create
         }])
       
       if (createError) throw createError

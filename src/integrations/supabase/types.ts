@@ -49,18 +49,29 @@ export type Database = {
       }
       companies: {
         Row: {
+          default_project_track: number | null
           id: number
           name: string
         }
         Insert: {
+          default_project_track?: number | null
           id?: number
           name: string
         }
         Update: {
+          default_project_track?: number | null
           id?: number
           name?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_default_project_track_fkey"
+            columns: ["default_project_track"]
+            isOneToOne: false
+            referencedRelation: "project_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contacts: {
         Row: {
