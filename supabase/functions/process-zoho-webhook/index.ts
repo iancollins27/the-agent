@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 interface ParsedProjectData {
-  id: string;
+  id: number;
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
@@ -25,8 +25,13 @@ interface ParsedProjectData {
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
+  const id = parseInt(rawData.ID);
+  if (isNaN(id) || !rawData.ID) {
+    throw new Error('Invalid or missing project ID');
+  }
+
   return {
-    id: rawData.ID || '',
+    id,
     lastMilestone: rawData.Last_Milestone || '',
     nextStep: rawData.Next_Step || '',
     propertyAddress: rawData.Property_Address || '',
@@ -55,7 +60,10 @@ serve(async (req) => {
     )
 
     const { rawData } = await req.json()
+    console.log('Received Zoho data:', rawData)
+    
     const projectData = parseZohoData(rawData)
+    console.log('Parsed project data:', projectData)
     
     // Check if project exists
     const { data: existingProject } = await supabase
