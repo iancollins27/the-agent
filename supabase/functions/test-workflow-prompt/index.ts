@@ -12,6 +12,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +21,10 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
-    const { projectId, promptType, promptText } = await req.json();
+    const { projectId, promptType, promptText, previousResults } = await req.json();
+
+    console.log(`Processing ${promptType} for project ${projectId}`);
+    console.log('Previous results:', previousResults);
 
     // Fetch project data
     const { data: project, error: projectError } = await supabase
@@ -30,13 +35,34 @@ serve(async (req) => {
 
     if (projectError) throw projectError;
 
-    // Generate the final prompt by replacing placeholders
+    // Generate the final prompt by replacing placeholders based on prompt type
     let finalPrompt = promptText;
-    if (project.summary) {
-      finalPrompt = finalPrompt.replace('{current_summary}', project.summary);
+
+    switch (promptType) {
+      case 'summary_generation':
+        finalPrompt = finalPrompt.replace('{project_data}', JSON.stringify(project));
+        break;
+      
+      case 'summary_update':
+        finalPrompt = finalPrompt
+          .replace('{current_summary}', project.summary || '')
+          .replace('{new_data}', JSON.stringify(project));
+        break;
+      
+      case 'action_detection':
+        // Use the project's summary or the latest generated summary from previous results
+        const summaryForAction = previousResults?.find(r => r.type === 'summary_generation')?.output || project.summary;
+        finalPrompt = finalPrompt.replace('{summary}', summaryForAction || '');
+        break;
+      
+      case 'action_execution':
+        // Use the result from action detection
+        const actionNeeded = previousResults?.find(r => r.type === 'action_detection')?.output;
+        finalPrompt = finalPrompt.replace('{action_needed}', actionNeeded || '');
+        break;
     }
-    finalPrompt = finalPrompt.replace('{project_data}', JSON.stringify(project));
-    finalPrompt = finalPrompt.replace('{new_data}', JSON.stringify(project));
+
+    console.log(`Final prompt for ${promptType}:`, finalPrompt);
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -56,6 +82,8 @@ serve(async (req) => {
 
     const data = await response.json();
     const result = data.choices[0].message.content;
+
+    console.log(`Result for ${promptType}:`, result);
 
     return new Response(JSON.stringify({ result }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

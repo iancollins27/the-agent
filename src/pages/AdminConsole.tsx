@@ -113,11 +113,14 @@ const AdminConsole = () => {
         
         // Run each prompt type in sequence
         for (const prompt of prompts || []) {
+          console.log(`Testing prompt type: ${prompt.type}`);
+          
           const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
             body: {
               projectId,
               promptType: prompt.type,
-              promptText: prompt.prompt_text
+              promptText: prompt.prompt_text,
+              previousResults: results // Pass all previous results to each prompt
             },
           });
 
@@ -129,6 +132,8 @@ const AdminConsole = () => {
             type: prompt.type,
             output: data.result
           });
+          
+          console.log(`Results for ${prompt.type}:`, data.result);
         }
 
         setTestResults(prev => [...prev, { projectId, results }]);
