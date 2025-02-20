@@ -1,26 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-interface ProjectData {
-  ID: number;
-  Company_ID: number;
-  Last_Milestone: string;
-  Next_Step: string;
-  Property_Address: string;
-  Contract_Signed: string | null;
-  Site_Visit_Scheduled: string | null;
-  Work_Order_Confirmed: string | null;
-  Roof_Install_Approved: string | null;
-  Install_Scheduled: string | null;
-  Install_Date_Confirmed_by_Roofer: string | null;
-  Roof_Install_Complete: string | null;
-  Roof_Install_Finalized: string | null;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -32,23 +17,30 @@ serve(async (req) => {
 
     console.log(`Processing ${promptType} for project ${projectId}`);
 
-    // Fetch project data using direct fetch to Supabase REST API
-    const projectResponse = await fetch(
-      `${Deno.env.get('SUPABASE_URL')}/rest/v1/projects?id=eq.${projectId}&select=*`,
+    // Create Supabase client with the correct options for edge functions
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
-        headers: {
-          'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        }
       }
     );
 
-    if (!projectResponse.ok) {
-      throw new Error(`Failed to fetch project: ${projectResponse.statusText}`);
+    // Fetch project data
+    const { data: project, error: projectError } = await supabaseClient
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) {
+      throw new Error(`Failed to fetch project: ${projectError.message}`);
     }
 
-    const [project] = await projectResponse.json();
-    
     if (!project) {
       throw new Error(`Project ${projectId} not found`);
     }
