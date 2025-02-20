@@ -22,7 +22,6 @@ serve(async (req) => {
     const { projectId, promptType, promptText, previousResults } = await req.json();
 
     console.log(`Processing ${promptType} for project ${projectId}`);
-    console.log('Previous results:', previousResults);
 
     // Fetch project data
     const { data: project, error: projectError } = await supabase
@@ -33,9 +32,10 @@ serve(async (req) => {
 
     if (projectError) throw projectError;
 
-    console.log('Raw project data:', project);
+    // Log the raw data exactly as we receive it
+    console.log('RAW PROJECT DATA:', JSON.stringify(project, null, 2));
 
-    // Create processed data structure without any boolean conversion
+    // Create processed data structure preserving all original values
     const processedData = {
       id: project.ID,
       companyId: project.Company_ID,
@@ -43,42 +43,19 @@ serve(async (req) => {
       nextStep: project.Next_Step,
       propertyAddress: project.Property_Address,
       timeline: {
-        contractSigned: {
-          date: project.Contract_Signed,
-          status: project.Contract_Signed ? 'completed' : 'pending'
-        },
-        siteVisitScheduled: {
-          date: project.Site_Visit_Scheduled,
-          status: project.Site_Visit_Scheduled ? 'completed' : 'pending'
-        },
-        workOrderConfirmed: {
-          date: project.Work_Order_Confirmed,
-          status: project.Work_Order_Confirmed ? 'completed' : 'pending'
-        },
-        roofInstallApproved: {
-          date: project.Roof_Install_Approved,
-          status: project.Roof_Install_Approved ? 'completed' : 'pending'
-        },
-        roofInstallScheduled: {
-          date: project.Install_Scheduled,
-          status: project.Install_Scheduled ? 'completed' : 'pending'
-        },
-        installDateConfirmedByRoofer: {
-          date: project.Install_Date_Confirmed_by_Roofer,
-          status: project.Install_Date_Confirmed_by_Roofer ? 'completed' : 'pending'
-        },
-        roofInstallComplete: {
-          date: project.Roof_Install_Complete,
-          status: project.Roof_Install_Complete ? 'completed' : 'pending'
-        },
-        roofInstallFinalized: {
-          date: project.Roof_Install_Finalized,
-          status: project.Roof_Install_Finalized ? 'completed' : 'pending'
-        }
+        contractSigned: project.Contract_Signed,
+        siteVisitScheduled: project.Site_Visit_Scheduled,
+        workOrderConfirmed: project.Work_Order_Confirmed,
+        roofInstallApproved: project.Roof_Install_Approved,
+        roofInstallScheduled: project.Install_Scheduled,
+        installDateConfirmedByRoofer: project.Install_Date_Confirmed_by_Roofer,
+        roofInstallComplete: project.Roof_Install_Complete,
+        roofInstallFinalized: project.Roof_Install_Finalized
       }
     };
 
-    console.log('Processed project data:', JSON.stringify(processedData, null, 2));
+    // Log the processed data to verify no transformations occurred
+    console.log('PROCESSED DATA (before prompt):', JSON.stringify(processedData, null, 2));
 
     // Generate the final prompt by replacing placeholders based on prompt type
     let finalPrompt = promptText;
@@ -105,7 +82,8 @@ serve(async (req) => {
         break;
     }
 
-    console.log(`Final prompt for ${promptType}:`, finalPrompt);
+    // Log the final prompt to verify data is still intact
+    console.log('FINAL PROMPT:', finalPrompt);
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -125,8 +103,6 @@ serve(async (req) => {
 
     const data = await response.json();
     const result = data.choices[0].message.content;
-
-    console.log(`Result for ${promptType}:`, result);
 
     return new Response(JSON.stringify({ 
       result,
