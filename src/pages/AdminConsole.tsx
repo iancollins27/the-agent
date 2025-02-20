@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -114,24 +113,18 @@ const AdminConsole = () => {
         
         // Run each prompt type in sequence
         for (const prompt of prompts || []) {
-          const response = await fetch('/api/functions/v1/test-workflow-prompt', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.SUPABASE_ANON_KEY}`,
-            },
-            body: JSON.stringify({
+          const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
+            body: {
               projectId,
               promptType: prompt.type,
               promptText: prompt.prompt_text
-            }),
+            },
           });
 
-          if (!response.ok) {
-            throw new Error(`Error testing prompt: ${response.statusText}`);
+          if (error) {
+            throw error;
           }
 
-          const data = await response.json();
           results.push({
             type: prompt.type,
             output: data.result
@@ -150,7 +143,7 @@ const AdminConsole = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: `Failed to test prompts: ${error.message}`,
+        description: `Failed to test prompts: ${error}`,
       });
     } finally {
       setIsTestingPrompts(false);
@@ -361,4 +354,3 @@ const AdminConsole = () => {
 };
 
 export default AdminConsole;
-
