@@ -12,6 +12,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to convert timeline data from date strings to a more readable format
+const processTimelineData = (data: any) => {
+  const timeline: Record<string, string | null> = {
+    contractSigned: data.Contract_Signed || null,
+    siteVisitScheduled: data.Site_Visit_Scheduled || null,
+    workOrderConfirmed: data.Work_Order_Confirmed || null,
+    roofInstallApproved: data.Roof_Install_Approved || null,
+    roofInstallScheduled: data.Install_Scheduled || null,
+    installDateConfirmedByRoofer: data.Install_Date_Confirmed_by_Roofer || null,
+    roofInstallComplete: data.Roof_Install_Complete || null,
+    roofInstallFinalized: data.Roof_Install_Finalized || null
+  };
+
+  // Create a more readable version of the timeline
+  const processedData = {
+    ...data,
+    timeline: Object.entries(timeline).reduce((acc, [key, value]) => ({
+      ...acc,
+      [key]: value ? {
+        status: 'completed',
+        completedAt: value
+      } : {
+        status: 'pending',
+        completedAt: null
+      }
+    }), {})
+  };
+
+  return processedData;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -33,22 +64,25 @@ serve(async (req) => {
 
     if (projectError) throw projectError;
 
+    // Process the project data to handle date/time values
+    const processedProject = processTimelineData(project);
+
     // Generate the final prompt by replacing placeholders based on prompt type
     let finalPrompt = promptText;
 
     switch (promptType) {
       case 'summary_generation':
-        finalPrompt = finalPrompt.replace('{project_data}', JSON.stringify(project));
+        finalPrompt = finalPrompt.replace('{project_data}', JSON.stringify(processedProject, null, 2));
         break;
       
       case 'summary_update':
         finalPrompt = finalPrompt
-          .replace('{current_summary}', project.summary || '')
-          .replace('{new_data}', JSON.stringify(project));
+          .replace('{current_summary}', processedProject.summary || '')
+          .replace('{new_data}', JSON.stringify(processedProject, null, 2));
         break;
       
       case 'action_detection':
-        const summaryForAction = previousResults?.find(r => r.type === 'summary_generation')?.output || project.summary;
+        const summaryForAction = previousResults?.find(r => r.type === 'summary_generation')?.output || processedProject.summary;
         finalPrompt = finalPrompt.replace('{summary}', summaryForAction || '');
         break;
       
@@ -68,7 +102,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: 'You are a helpful assistant that processes project data.' },
           { role: 'user', content: finalPrompt }
@@ -83,7 +117,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       result,
-      finalPrompt // Include the actual prompt that was sent
+      finalPrompt
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
