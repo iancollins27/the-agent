@@ -1,6 +1,11 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.1.0';
+
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,42 +18,24 @@ serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(supabaseUrl!, supabaseServiceRoleKey!);
     const { projectId, promptType, promptText, previousResults } = await req.json();
 
     console.log(`Processing ${promptType} for project ${projectId}`);
-
-    // Create Supabase client with the correct options for edge functions
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        }
-      }
-    );
+    console.log('Previous results:', previousResults);
 
     // Fetch project data
-    const { data: project, error: projectError } = await supabaseClient
+    const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')
       .eq('id', projectId)
       .single();
 
-    if (projectError) {
-      throw new Error(`Failed to fetch project: ${projectError.message}`);
-    }
+    if (projectError) throw projectError;
 
-    if (!project) {
-      throw new Error(`Project ${projectId} not found`);
-    }
+    console.log('Raw project data:', project);
 
-    // Log the raw data exactly as we receive it
-    console.log('RAW PROJECT DATA:', JSON.stringify(project, null, 2));
-
-    // Create processed data structure preserving all original values
+    // Create processed data structure without any boolean conversion
     const processedData = {
       id: project.ID,
       companyId: project.Company_ID,
@@ -56,19 +43,42 @@ serve(async (req) => {
       nextStep: project.Next_Step,
       propertyAddress: project.Property_Address,
       timeline: {
-        contractSigned: project.Contract_Signed,
-        siteVisitScheduled: project.Site_Visit_Scheduled,
-        workOrderConfirmed: project.Work_Order_Confirmed,
-        roofInstallApproved: project.Roof_Install_Approved,
-        roofInstallScheduled: project.Install_Scheduled,
-        installDateConfirmedByRoofer: project.Install_Date_Confirmed_by_Roofer,
-        roofInstallComplete: project.Roof_Install_Complete,
-        roofInstallFinalized: project.Roof_Install_Finalized
+        contractSigned: {
+          date: project.Contract_Signed,
+          status: project.Contract_Signed ? 'completed' : 'pending'
+        },
+        siteVisitScheduled: {
+          date: project.Site_Visit_Scheduled,
+          status: project.Site_Visit_Scheduled ? 'completed' : 'pending'
+        },
+        workOrderConfirmed: {
+          date: project.Work_Order_Confirmed,
+          status: project.Work_Order_Confirmed ? 'completed' : 'pending'
+        },
+        roofInstallApproved: {
+          date: project.Roof_Install_Approved,
+          status: project.Roof_Install_Approved ? 'completed' : 'pending'
+        },
+        roofInstallScheduled: {
+          date: project.Install_Scheduled,
+          status: project.Install_Scheduled ? 'completed' : 'pending'
+        },
+        installDateConfirmedByRoofer: {
+          date: project.Install_Date_Confirmed_by_Roofer,
+          status: project.Install_Date_Confirmed_by_Roofer ? 'completed' : 'pending'
+        },
+        roofInstallComplete: {
+          date: project.Roof_Install_Complete,
+          status: project.Roof_Install_Complete ? 'completed' : 'pending'
+        },
+        roofInstallFinalized: {
+          date: project.Roof_Install_Finalized,
+          status: project.Roof_Install_Finalized ? 'completed' : 'pending'
+        }
       }
     };
 
-    // Log the processed data to verify no transformations occurred
-    console.log('PROCESSED DATA (before prompt):', JSON.stringify(processedData, null, 2));
+    console.log('Processed project data:', JSON.stringify(processedData, null, 2));
 
     // Generate the final prompt by replacing placeholders based on prompt type
     let finalPrompt = promptText;
@@ -95,18 +105,17 @@ serve(async (req) => {
         break;
     }
 
-    // Log the final prompt to verify data is still intact
-    console.log('FINAL PROMPT:', finalPrompt);
+    console.log(`Final prompt for ${promptType}:`, finalPrompt);
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'You are a helpful assistant that processes project data.' },
           { role: 'user', content: finalPrompt }
@@ -114,12 +123,10 @@ serve(async (req) => {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
-
     const data = await response.json();
     const result = data.choices[0].message.content;
+
+    console.log(`Result for ${promptType}:`, result);
 
     return new Response(JSON.stringify({ 
       result,
