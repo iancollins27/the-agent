@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,22 +32,6 @@ type TestResult = {
     output: string;
     finalPrompt: string;
   }[];
-};
-
-type ProjectData = {
-  ID: number;
-  Last_Milestone: string;
-  Next_Step: string;
-  Property_Address: string;
-  Contract_Signed: string | null;
-  Site_Visit_Scheduled: string | null;
-  Work_Order_Confirmed: string | null;
-  Roof_Install_Approved: string | null;
-  Install_Scheduled: string | null;
-  Install_Date_Confirmed_by_Roofer: string | null;
-  Roof_Install_Complete: string | null;
-  Roof_Install_Finalized: string | null;
-  Company_ID: number;
 };
 
 const workflowTitles: Record<WorkflowType, string> = {
@@ -374,9 +357,7 @@ const AdminConsole = () => {
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div>
-                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">
-                                      Actual Prompt Sent to API
-                                    </h5>
+                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">Actual Prompt Sent to API</h5>
                                     <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
                                       {promptResult.finalPrompt}
                                     </pre>

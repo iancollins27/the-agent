@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -6,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Updated interface to match the shape returned by parseZohoData
 interface ParsedProjectData {
   id: number;
   companyId: number;
@@ -14,14 +14,14 @@ interface ParsedProjectData {
   nextStep: string;
   propertyAddress: string;
   timeline: {
-    contractSigned: string;
-    siteVisitScheduled: string;
-    workOrderConfirmed: string;
-    roofInstallApproved: string;
-    roofInstallScheduled: string;
-    installDateConfirmedByRoofer: string;
-    roofInstallComplete: string;
-    roofInstallFinalized: string;
+    contractSigned: boolean;
+    siteVisitScheduled: boolean;
+    workOrderConfirmed: boolean;
+    roofInstallApproved: boolean;
+    roofInstallScheduled: boolean;
+    installDateConfirmedByRoofer: boolean;
+    roofInstallComplete: boolean;
+    roofInstallFinalized: boolean;
   };
 }
 
@@ -34,13 +34,13 @@ function parseZohoData(rawData: any): ParsedProjectData {
 
   // Handle both direct ID field and nested ID field cases
   const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
-  const companyIdValue = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
+  const companyId = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
   
   if (!idValue) {
     throw new Error('Project ID is missing in the Zoho data');
   }
 
-  if (!companyIdValue) {
+  if (!companyId) {
     throw new Error('Company ID is missing in the Zoho data');
   }
 
@@ -49,31 +49,25 @@ function parseZohoData(rawData: any): ParsedProjectData {
     throw new Error('Invalid project ID format');
   }
 
-  const companyId = parseInt(companyIdValue);
-  if (isNaN(companyId)) {
-    throw new Error('Invalid company ID format');
-  }
-
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
 
   return {
     id,
-    companyId,
+    companyId: parseInt(companyId),
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
     timeline: {
-      // Use String(...) instead of string(...)
-      contractSigned: String(data.Contract_Signed || ''),
-      siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),
-      workOrderConfirmed: String(data.Work_Order_Confirmed || ''),
-      roofInstallApproved: String(data.Roof_Install_Approved || ''),
-      roofInstallScheduled: String(data.Install_Scheduled || ''),
-      installDateConfirmedByRoofer: String(data.Install_Date_Confirmed_by_Roofer || ''),
-      roofInstallComplete: String(data.Roof_Install_Complete || ''),
-      roofInstallFinalized: String(data.Roof_Install_Finalized || '')
-    },
+      contractSigned: Boolean(data.Contract_Signed),
+      siteVisitScheduled: Boolean(data.Site_Visit_Scheduled),
+      workOrderConfirmed: Boolean(data.Work_Order_Confirmed),
+      roofInstallApproved: Boolean(data.Roof_Install_Approved),
+      roofInstallScheduled: Boolean(data.Install_Scheduled),
+      installDateConfirmedByRoofer: Boolean(data.Install_Date_Confirmed_by_Roofer),
+      roofInstallComplete: Boolean(data.Roof_Install_Complete),
+      roofInstallFinalized: Boolean(data.Roof_Install_Finalized)
+    }
   };
 }
 
@@ -136,14 +130,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4',
         messages: [
-          { 
-            role: 'system', 
-            content: 'You are a helpful assistant that generates concise project summaries focusing on timeline milestones.' 
-          },
-          { 
-            role: 'user', 
-            content: prompt 
-          }
+          { role: 'system', content: 'You are a helpful assistant that generates concise project summaries focusing on timeline milestones.' },
+          { role: 'user', content: prompt }
         ],
       }),
     })
@@ -179,8 +167,7 @@ serve(async (req) => {
     // Log any milestone transitions
     const { timeline } = projectData
     const milestones = Object.entries(timeline)
-      // “completed” here is a string, so you can check if it's truthy or maybe compare to a specific value
-      .filter(([_, value]) => value) 
+      .filter(([_, completed]) => completed)
       .map(([milestone]) => milestone)
 
     if (milestones.length > 0) {
