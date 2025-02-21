@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -13,15 +12,16 @@ interface ParsedProjectData {
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
+  // Each timeline field is now a string
   timeline: {
-    contractSigned: boolean;
-    siteVisitScheduled: boolean;
-    workOrderConfirmed: boolean;
-    roofInstallApproved: boolean;
-    roofInstallScheduled: boolean;
-    installDateConfirmedByRoofer: boolean;
-    roofInstallComplete: boolean;
-    roofInstallFinalized: boolean;
+    contractSigned: string;
+    siteVisitScheduled: string;
+    workOrderConfirmed: string;
+    roofInstallApproved: string;
+    roofInstallScheduled: string;
+    installDateConfirmedByRoofer: string;
+    roofInstallComplete: string;
+    roofInstallFinalized: string;
   };
 }
 
@@ -34,13 +34,13 @@ function parseZohoData(rawData: any): ParsedProjectData {
 
   // Handle both direct ID field and nested ID field cases
   const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
-  const companyId = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
-  
+  const companyIdValue = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
+
   if (!idValue) {
     throw new Error('Project ID is missing in the Zoho data');
   }
 
-  if (!companyId) {
+  if (!companyIdValue) {
     throw new Error('Company ID is missing in the Zoho data');
   }
 
@@ -49,24 +49,30 @@ function parseZohoData(rawData: any): ParsedProjectData {
     throw new Error('Invalid project ID format');
   }
 
+  const companyId = parseInt(companyIdValue);
+  if (isNaN(companyId)) {
+    throw new Error('Invalid company ID format');
+  }
+
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
 
   return {
     id,
-    companyId: parseInt(companyId),
+    companyId,
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
+    // Convert each milestone to a string
     timeline: {
-      contractSigned: Boolean(data.Contract_Signed),
-      siteVisitScheduled: Boolean(data.Site_Visit_Scheduled),
-      workOrderConfirmed: Boolean(data.Work_Order_Confirmed),
-      roofInstallApproved: Boolean(data.Roof_Install_Approved),
-      roofInstallScheduled: Boolean(data.Install_Scheduled),
-      installDateConfirmedByRoofer: Boolean(data.Install_Date_Confirmed_by_Roofer),
-      roofInstallComplete: Boolean(data.Roof_Install_Complete),
-      roofInstallFinalized: Boolean(data.Roof_Install_Finalized)
+      contractSigned: String(data.Contract_Signed || ''),
+      siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),
+      workOrderConfirmed: String(data.Work_Order_Confirmed || ''),
+      roofInstallApproved: String(data.Roof_Install_Approved || ''),
+      roofInstallScheduled: String(data.Install_Scheduled || ''),
+      installDateConfirmedByRoofer: String(data.Install_Date_Confirmed_by_Roofer || ''),
+      roofInstallComplete: String(data.Roof_Install_Complete || ''),
+      roofInstallFinalized: String(data.Roof_Install_Finalized || '')
     }
   };
 }
@@ -130,8 +136,14 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates concise project summaries focusing on timeline milestones.' },
-          { role: 'user', content: prompt }
+          { 
+            role: 'system', 
+            content: 'You are a helpful assistant that generates concise project summaries focusing on timeline milestones.' 
+          },
+          { 
+            role: 'user', 
+            content: prompt 
+          }
         ],
       }),
     })
@@ -146,10 +158,9 @@ serve(async (req) => {
         .update({ 
           summary,
           last_action_check: new Date().toISOString(),
-          company_id: projectData.companyId // Add company_id on update
+          company_id: projectData.companyId
         })
         .eq('id', projectData.id)
-      
       if (updateError) throw updateError
     } else {
       const { error: createError } = await supabase
@@ -158,16 +169,18 @@ serve(async (req) => {
           id: projectData.id,
           summary,
           last_action_check: new Date().toISOString(),
-          company_id: projectData.companyId // Add company_id on create
+          company_id: projectData.companyId
         }])
-      
       if (createError) throw createError
     }
 
     // Log any milestone transitions
     const { timeline } = projectData
+    // Now each milestone is a string rather than a boolean,
+    // so we must decide how to interpret "completed."
+    // For example, only consider them completed if they are non-empty strings:
     const milestones = Object.entries(timeline)
-      .filter(([_, completed]) => completed)
+      .filter(([_, value]) => value.trim() !== '')
       .map(([milestone]) => milestone)
 
     if (milestones.length > 0) {
