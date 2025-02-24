@@ -110,9 +110,24 @@ serve(async (req) => {
     // Check if project exists by crm_id
     const { data: existingProject } = await supabase
       .from('projects')
-      .select('id, summary')
+      .select('id, summary, project_track')
       .eq('crm_id', projectData.crmId)
       .maybeSingle()
+
+    // Get milestone instructions if next step exists
+    let nextStepInstructions = null
+    if (projectData.nextStep && existingProject?.project_track) {
+      const { data: milestoneData } = await supabase
+        .from('project_track_milestones')
+        .select('prompt_instructions')
+        .eq('track_id', existingProject.project_track)
+        .eq('step_title', projectData.nextStep)
+        .single()
+      
+      if (milestoneData) {
+        nextStepInstructions = milestoneData.prompt_instructions
+      }
+    }
 
     // Get the appropriate prompt based on whether project exists
     const { data: promptData } = await supabase
@@ -126,17 +141,11 @@ serve(async (req) => {
     }
 
     // Format the prompt based on whether it's a new or existing project
-    let prompt
-    if (existingProject) {
-      prompt = promptData.prompt_text
-        .replace('{{summary}}', existingProject.summary || '')
-        .replace('{{new_data}}', JSON.stringify(projectData))
-        .replace('{{current_date}}', new Date().toISOString().split('T')[0])
-    } else {
-      prompt = promptData.prompt_text
-        .replace('{{project_data}}', JSON.stringify(projectData))
-        .replace('{{current_date}}', new Date().toISOString().split('T')[0])
-    }
+    let prompt = promptData.prompt_text
+      .replace('{{summary}}', existingProject?.summary || '')
+      .replace('{{new_data}}', JSON.stringify(projectData))
+      .replace('{{current_date}}', new Date().toISOString().split('T')[0])
+      .replace('{{next_step_instructions}}', nextStepInstructions || '')
 
     // Call OpenAI to generate or update summary
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -169,6 +178,7 @@ serve(async (req) => {
         .from('projects')
         .update({ 
           summary,
+          next_step: projectData.nextStep,
           last_action_check: new Date().toISOString(),
           company_id: projectData.companyId
         })
@@ -179,6 +189,7 @@ serve(async (req) => {
         .from('projects')
         .insert([{ 
           crm_id: projectData.crmId,
+          next_step: projectData.nextStep,
           summary,
           last_action_check: new Date().toISOString(),
           company_id: projectData.companyId
@@ -207,7 +218,8 @@ serve(async (req) => {
         success: true, 
         summary, 
         isNewProject: !existingProject,
-        parsedData: projectData 
+        parsedData: projectData,
+        nextStepInstructions
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

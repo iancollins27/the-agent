@@ -224,6 +224,7 @@ export type Database = {
           crm_id: string | null
           id: string
           last_action_check: string | null
+          next_step: string | null
           project_track: string | null
           summary: string | null
         }
@@ -232,6 +233,7 @@ export type Database = {
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
+          next_step?: string | null
           project_track?: string | null
           summary?: string | null
         }
@@ -240,6 +242,7 @@ export type Database = {
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
+          next_step?: string | null
           project_track?: string | null
           summary?: string | null
         }
