@@ -221,6 +221,7 @@ export type Database = {
       projects: {
         Row: {
           company_id: string | null
+          crm_id: string | null
           id: string
           last_action_check: string | null
           project_track: string | null
@@ -228,6 +229,7 @@ export type Database = {
         }
         Insert: {
           company_id?: string | null
+          crm_id?: string | null
           id?: string
           last_action_check?: string | null
           project_track?: string | null
@@ -235,6 +237,7 @@ export type Database = {
         }
         Update: {
           company_id?: string | null
+          crm_id?: string | null
           id?: string
           last_action_check?: string | null
           project_track?: string | null

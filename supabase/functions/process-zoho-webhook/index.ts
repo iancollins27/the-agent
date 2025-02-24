@@ -8,8 +8,8 @@ const corsHeaders = {
 }
 
 interface ParsedProjectData {
-  id: string; // Changed to string to handle UUID
-  companyId: string; // Changed to string to handle UUID
+  crmId: string;
+  companyId: string;
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
@@ -23,14 +23,6 @@ interface ParsedProjectData {
     roofInstallComplete: string;
     roofInstallFinalized: string;
   };
-}
-
-function generateUUID(): string {
-  // Simple UUID generation for Zoho project IDs
-  const prefix = "zoho";
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8);
-  return `${prefix}-${timestamp}-${random}`;
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
@@ -52,15 +44,14 @@ function parseZohoData(rawData: any): ParsedProjectData {
     throw new Error('Company ID is missing in the Zoho data');
   }
 
-  // Generate UUIDs based on the Zoho IDs
-  const id = `zoho-project-${idValue}`;
+  const crmId = String(idValue);
   const companyId = `zoho-company-${companyIdValue}`;
 
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
 
   return {
-    id,
+    crmId,
     companyId,
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
@@ -116,11 +107,11 @@ serve(async (req) => {
       if (companyError) throw companyError
     }
     
-    // Check if project exists
+    // Check if project exists by crm_id
     const { data: existingProject } = await supabase
       .from('projects')
       .select('id, summary')
-      .eq('id', projectData.id)
+      .eq('crm_id', projectData.crmId)
       .maybeSingle()
 
     // Get the appropriate prompt based on whether project exists
@@ -181,13 +172,13 @@ serve(async (req) => {
           last_action_check: new Date().toISOString(),
           company_id: projectData.companyId
         })
-        .eq('id', projectData.id)
+        .eq('id', existingProject.id)
       if (updateError) throw updateError
     } else {
       const { error: createError } = await supabase
         .from('projects')
         .insert([{ 
-          id: projectData.id,
+          crm_id: projectData.crmId,
           summary,
           last_action_check: new Date().toISOString(),
           company_id: projectData.companyId
@@ -205,7 +196,7 @@ serve(async (req) => {
       await supabase
         .from('action_logs')
         .insert({
-          project_id: projectData.id,
+          project_id: existingProject?.id,
           action_type: 'milestone_update',
           action_description: `Project milestones updated: ${milestones.join(', ')}`
         })
@@ -231,4 +222,3 @@ serve(async (req) => {
     )
   }
 })
-
