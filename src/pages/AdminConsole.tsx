@@ -42,6 +42,25 @@ const workflowTitles: Record<WorkflowType, string> = {
   action_execution: "Action Execution"
 };
 
+const availableVariables = {
+  summary_generation: [
+    { name: "track_name", description: "The name of the project track" }
+  ],
+  summary_update: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" }
+  ],
+  action_detection: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" }
+  ],
+  action_execution: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" },
+    { name: "action_description", description: "The description of the action to be executed" }
+  ]
+};
+
 const AdminConsole = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
@@ -225,51 +244,70 @@ const AdminConsole = () => {
                     <CardTitle>{workflowTitles[prompt.type]}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {editingPrompt?.id === prompt.id ? (
-                      <div className="space-y-4">
-                        <Textarea
-                          value={editingPrompt.prompt_text}
-                          onChange={(e) => setEditingPrompt({
-                            ...editingPrompt,
-                            prompt_text: e.target.value
-                          })}
-                          rows={5}
-                        />
-                        <div className="flex gap-2">
-                          <Button 
-                            onClick={() => updatePromptMutation.mutate(editingPrompt)}
-                            disabled={updatePromptMutation.isPending}
-                          >
-                            {updatePromptMutation.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Saving...
-                              </>
-                            ) : (
-                              'Save Changes'
-                            )}
-                          </Button>
-                          <Button 
-                            variant="outline"
-                            onClick={() => setEditingPrompt(null)}
-                          >
-                            Cancel
-                          </Button>
+                    <div className="space-y-6">
+                      {/* Variables Reference Section */}
+                      <div className="bg-muted/50 p-4 rounded-md space-y-2">
+                        <h4 className="font-medium text-sm">Available Variables</h4>
+                        <div className="grid gap-2">
+                          {availableVariables[prompt.type].map((variable) => (
+                            <div key={variable.name} className="text-sm">
+                              <code className="bg-muted px-1 py-0.5 rounded">
+                                {`{{${variable.name}}}`}
+                              </code>
+                              <span className="text-muted-foreground ml-2">
+                                - {variable.description}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md">
-                          {prompt.prompt_text}
-                        </pre>
-                        <Button 
-                          variant="outline"
-                          onClick={() => setEditingPrompt(prompt)}
-                        >
-                          Edit Prompt
-                        </Button>
-                      </div>
-                    )}
+
+                      {editingPrompt?.id === prompt.id ? (
+                        <div className="space-y-4">
+                          <Textarea
+                            value={editingPrompt.prompt_text}
+                            onChange={(e) => setEditingPrompt({
+                              ...editingPrompt,
+                              prompt_text: e.target.value
+                            })}
+                            rows={5}
+                          />
+                          <div className="flex gap-2">
+                            <Button 
+                              onClick={() => updatePromptMutation.mutate(editingPrompt)}
+                              disabled={updatePromptMutation.isPending}
+                            >
+                              {updatePromptMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save Changes'
+                              )}
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              onClick={() => setEditingPrompt(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md">
+                            {prompt.prompt_text}
+                          </pre>
+                          <Button 
+                            variant="outline"
+                            onClick={() => setEditingPrompt(prompt)}
+                          >
+                            Edit Prompt
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -424,4 +462,3 @@ const AdminConsole = () => {
 };
 
 export default AdminConsole;
-
