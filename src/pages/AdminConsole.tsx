@@ -14,20 +14,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
 
 type WorkflowPrompt = {
-  id: string; // Changed from number to string for UUID
+  id: string;
   type: WorkflowType;
   prompt_text: string;
 };
 
 type Project = {
-  id: string; // Changed from number to string for UUID
+  id: string;
   summary: string | null;
-  project_track: string | null; // Changed from number to string for UUID
+  project_track: string | null;
   track_name?: string | null;
 };
 
 type TestResult = {
-  projectId: string; // Changed from number to string for UUID
+  projectId: string;
   results: {
     type: WorkflowType;
     output: string;
@@ -44,20 +44,24 @@ const workflowTitles: Record<WorkflowType, string> = {
 
 const availableVariables = {
   summary_generation: [
-    { name: "track_name", description: "The name of the project track" }
+    { name: "track_name", description: "The name of the project track" },
+    { name: "current_date", description: "Today's date" }
   ],
   summary_update: [
     { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" }
+    { name: "track_name", description: "The name of the project track" },
+    { name: "current_date", description: "Today's date" }
   ],
   action_detection: [
     { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" }
+    { name: "track_name", description: "The name of the project track" },
+    { name: "current_date", description: "Today's date" }
   ],
   action_execution: [
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
-    { name: "action_description", description: "The description of the action to be executed" }
+    { name: "action_description", description: "The description of the action to be executed" },
+    { name: "current_date", description: "Today's date" }
   ]
 };
 
