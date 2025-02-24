@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -7,12 +8,11 @@ const corsHeaders = {
 }
 
 interface ParsedProjectData {
-  id: number;
-  companyId: number;
+  id: string; // Changed to string to handle UUID
+  companyId: string; // Changed to string to handle UUID
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
-  // Each timeline field is now a string
   timeline: {
     contractSigned: string;
     siteVisitScheduled: string;
@@ -23,6 +23,14 @@ interface ParsedProjectData {
     roofInstallComplete: string;
     roofInstallFinalized: string;
   };
+}
+
+function generateUUID(): string {
+  // Simple UUID generation for Zoho project IDs
+  const prefix = "zoho";
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 8);
+  return `${prefix}-${timestamp}-${random}`;
 }
 
 function parseZohoData(rawData: any): ParsedProjectData {
@@ -44,15 +52,9 @@ function parseZohoData(rawData: any): ParsedProjectData {
     throw new Error('Company ID is missing in the Zoho data');
   }
 
-  const id = parseInt(idValue);
-  if (isNaN(id)) {
-    throw new Error('Invalid project ID format');
-  }
-
-  const companyId = parseInt(companyIdValue);
-  if (isNaN(companyId)) {
-    throw new Error('Invalid company ID format');
-  }
+  // Generate UUIDs based on the Zoho IDs
+  const id = `zoho-project-${idValue}`;
+  const companyId = `zoho-company-${companyIdValue}`;
 
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
@@ -63,7 +65,6 @@ function parseZohoData(rawData: any): ParsedProjectData {
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
-    // Convert each milestone to a string
     timeline: {
       contractSigned: String(data.Contract_Signed || ''),
       siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),
@@ -96,6 +97,24 @@ serve(async (req) => {
     const rawData = requestBody.rawData || requestBody
     const projectData = parseZohoData(rawData)
     console.log('Parsed project data:', projectData)
+
+    // Check if company exists, if not create it
+    const { data: existingCompany } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('id', projectData.companyId)
+      .single()
+
+    if (!existingCompany) {
+      const { error: companyError } = await supabase
+        .from('companies')
+        .insert([{ 
+          id: projectData.companyId,
+          name: `Zoho Company ${rawData.Company_ID || 'Unknown'}`
+        }])
+      
+      if (companyError) throw companyError
+    }
     
     // Check if project exists
     const { data: existingProject } = await supabase
@@ -119,11 +138,13 @@ serve(async (req) => {
     let prompt
     if (existingProject) {
       prompt = promptData.prompt_text
-        .replace('{current_summary}', existingProject.summary || '')
-        .replace('{new_data}', JSON.stringify(projectData))
+        .replace('{{summary}}', existingProject.summary || '')
+        .replace('{{new_data}}', JSON.stringify(projectData))
+        .replace('{{current_date}}', new Date().toISOString().split('T')[0])
     } else {
       prompt = promptData.prompt_text
-        .replace('{project_data}', JSON.stringify(projectData))
+        .replace('{{project_data}}', JSON.stringify(projectData))
+        .replace('{{current_date}}', new Date().toISOString().split('T')[0])
     }
 
     // Call OpenAI to generate or update summary
@@ -176,9 +197,6 @@ serve(async (req) => {
 
     // Log any milestone transitions
     const { timeline } = projectData
-    // Now each milestone is a string rather than a boolean,
-    // so we must decide how to interpret "completed."
-    // For example, only consider them completed if they are non-empty strings:
     const milestones = Object.entries(timeline)
       .filter(([_, value]) => value.trim() !== '')
       .map(([milestone]) => milestone)
@@ -213,3 +231,4 @@ serve(async (req) => {
     )
   }
 })
+
