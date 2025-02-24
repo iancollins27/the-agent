@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ const AdminConsole = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+  const [selectedPrompts, setSelectedPrompts] = useState<number[]>([]);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isTestingPrompts, setIsTestingPrompts] = useState(false);
 
@@ -117,14 +119,24 @@ const AdminConsole = () => {
   });
 
   const testPromptSequence = async () => {
+    if (selectedPrompts.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select at least one prompt to test.",
+      });
+      return;
+    }
+
     setIsTestingPrompts(true);
     setTestResults([]);
     
     try {
       for (const projectId of selectedProjects) {
         const results: TestResult['results'] = [];
+        const selectedPromptData = prompts?.filter(p => selectedPrompts.includes(p.id)) || [];
         
-        for (const prompt of prompts || []) {
+        for (const prompt of selectedPromptData) {
           console.log(`Testing prompt type: ${prompt.type}`);
           
           const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
@@ -154,7 +166,7 @@ const AdminConsole = () => {
 
       toast({
         title: "Test Complete",
-        description: "All prompts have been tested successfully.",
+        description: "Selected prompts have been tested successfully.",
       });
     } catch (error) {
       console.error('Error testing prompts:', error);
@@ -272,6 +284,27 @@ const AdminConsole = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Select Prompts to Test</h3>
+                  <div className="border rounded-lg p-4">
+                    {prompts?.map((prompt) => (
+                      <div key={prompt.id} className="flex items-center space-x-2 py-2">
+                        <Checkbox
+                          checked={selectedPrompts.includes(prompt.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedPrompts(prev =>
+                              checked
+                                ? [...prev, prompt.id]
+                                : prev.filter(id => id !== prompt.id)
+                            );
+                          }}
+                        />
+                        <span>{workflowTitles[prompt.type]}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="border rounded-lg">
                   <Table>
                     <TableHeader>
@@ -357,13 +390,17 @@ const AdminConsole = () => {
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div>
-                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">Actual Prompt Sent to API</h5>
+                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">
+                                      Actual Prompt Sent to API
+                                    </h5>
                                     <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
                                       {promptResult.finalPrompt}
                                     </pre>
                                   </div>
                                   <div>
-                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">Response</h5>
+                                    <h5 className="text-sm font-medium text-muted-foreground mb-2">
+                                      Response
+                                    </h5>
                                     <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm">
                                       {promptResult.output}
                                     </pre>
@@ -387,3 +424,4 @@ const AdminConsole = () => {
 };
 
 export default AdminConsole;
+
