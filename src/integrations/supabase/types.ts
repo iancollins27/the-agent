@@ -159,6 +159,44 @@ export type Database = {
           },
         ]
       }
+      project_track_milestones: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: number
+          prompt_instructions: string | null
+          step_order: number | null
+          step_title: string | null
+          track_id: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          prompt_instructions?: string | null
+          step_order?: number | null
+          step_title?: string | null
+          track_id?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          prompt_instructions?: string | null
+          step_order?: number | null
+          step_title?: string | null
+          track_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_track_milestones_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "project_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_tracks: {
         Row: {
           company_id: number
