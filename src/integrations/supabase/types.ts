@@ -15,8 +15,8 @@ export type Database = {
           action_type: string
           created_at: string | null
           executed_at: string | null
-          id: number
-          project_id: number | null
+          id: string
+          project_id: string | null
           status: string | null
         }
         Insert: {
@@ -24,8 +24,8 @@ export type Database = {
           action_type: string
           created_at?: string | null
           executed_at?: string | null
-          id?: number
-          project_id?: number | null
+          id?: string
+          project_id?: string | null
           status?: string | null
         }
         Update: {
@@ -33,8 +33,8 @@ export type Database = {
           action_type?: string
           created_at?: string | null
           executed_at?: string | null
-          id?: number
-          project_id?: number | null
+          id?: string
+          project_id?: string | null
           status?: string | null
         }
         Relationships: [
@@ -49,18 +49,18 @@ export type Database = {
       }
       companies: {
         Row: {
-          default_project_track: number | null
-          id: number
+          default_project_track: string | null
+          id: string
           name: string
         }
         Insert: {
-          default_project_track?: number | null
-          id?: number
+          default_project_track?: string | null
+          id?: string
           name: string
         }
         Update: {
-          default_project_track?: number | null
-          id?: number
+          default_project_track?: string | null
+          id?: string
           name?: string
         }
         Relationships: [
@@ -78,21 +78,21 @@ export type Database = {
           comms_preferences: string | null
           contact_info: string | null
           full_name: string
-          id: number
+          id: string
           role: Database["public"]["Enums"]["contact_role"]
         }
         Insert: {
           comms_preferences?: string | null
           contact_info?: string | null
           full_name: string
-          id?: number
+          id?: string
           role: Database["public"]["Enums"]["contact_role"]
         }
         Update: {
           comms_preferences?: string | null
           contact_info?: string | null
           full_name?: string
-          id?: number
+          id?: string
           role?: Database["public"]["Enums"]["contact_role"]
         }
         Relationships: []
@@ -119,28 +119,20 @@ export type Database = {
           permission?: Database["public"]["Enums"]["user_permission"]
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       project_contacts: {
         Row: {
-          contact_id: number
-          project_id: number
+          contact_id: string
+          project_id: string
         }
         Insert: {
-          contact_id: number
-          project_id: number
+          contact_id: string
+          project_id: string
         }
         Update: {
-          contact_id?: number
-          project_id?: number
+          contact_id?: string
+          project_id?: string
         }
         Relationships: [
           {
@@ -163,29 +155,29 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
-          id: number
+          id: string
           prompt_instructions: string | null
           step_order: number | null
           step_title: string | null
-          track_id: number | null
+          track_id: string | null
         }
         Insert: {
           created_at?: string
           description?: string | null
-          id?: number
+          id?: string
           prompt_instructions?: string | null
           step_order?: number | null
           step_title?: string | null
-          track_id?: number | null
+          track_id?: string | null
         }
         Update: {
           created_at?: string
           description?: string | null
-          id?: number
+          id?: string
           prompt_instructions?: string | null
           step_order?: number | null
           step_title?: string | null
-          track_id?: number | null
+          track_id?: string | null
         }
         Relationships: [
           {
@@ -199,21 +191,21 @@ export type Database = {
       }
       project_tracks: {
         Row: {
-          company_id: number
+          company_id: string
           description: string | null
-          id: number
+          id: string
           name: string
         }
         Insert: {
-          company_id: number
+          company_id: string
           description?: string | null
-          id?: number
+          id?: string
           name?: string
         }
         Update: {
-          company_id?: number
+          company_id?: string
           description?: string | null
-          id?: number
+          id?: string
           name?: string
         }
         Relationships: [
@@ -228,24 +220,24 @@ export type Database = {
       }
       projects: {
         Row: {
-          company_id: number | null
-          id: number
+          company_id: string | null
+          id: string
           last_action_check: string | null
-          project_track: number | null
+          project_track: string | null
           summary: string | null
         }
         Insert: {
-          company_id?: number | null
-          id?: number
+          company_id?: string | null
+          id?: string
           last_action_check?: string | null
-          project_track?: number | null
+          project_track?: string | null
           summary?: string | null
         }
         Update: {
-          company_id?: number | null
-          id?: number
+          company_id?: string | null
+          id?: string
           last_action_check?: string | null
-          project_track?: number | null
+          project_track?: string | null
           summary?: string | null
         }
         Relationships: [
@@ -268,21 +260,21 @@ export type Database = {
       workflow_prompts: {
         Row: {
           created_at: string | null
-          id: number
+          id: string
           prompt_text: string
           type: Database["public"]["Enums"]["workflow_type"]
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
-          id?: number
+          id?: string
           prompt_text: string
           type: Database["public"]["Enums"]["workflow_type"]
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
-          id?: number
+          id?: string
           prompt_text?: string
           type?: Database["public"]["Enums"]["workflow_type"]
           updated_at?: string | null

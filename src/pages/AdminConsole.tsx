@@ -14,20 +14,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
 
 type WorkflowPrompt = {
-  id: number;
+  id: string; // Changed from number to string for UUID
   type: WorkflowType;
   prompt_text: string;
 };
 
 type Project = {
-  id: number;
+  id: string; // Changed from number to string for UUID
   summary: string | null;
-  project_track: number | null;
+  project_track: string | null; // Changed from number to string for UUID
   track_name?: string | null;
 };
 
 type TestResult = {
-  projectId: number;
+  projectId: string; // Changed from number to string for UUID
   results: {
     type: WorkflowType;
     output: string;
@@ -45,8 +45,8 @@ const workflowTitles: Record<WorkflowType, string> = {
 const AdminConsole = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
-  const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
-  const [selectedPrompts, setSelectedPrompts] = useState<number[]>([]);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>(); // Changed from number[] to string[]
+  const [selectedPrompts, setSelectedPrompts] = useState<string[]>(); // Changed from number[] to string[]
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isTestingPrompts, setIsTestingPrompts] = useState(false);
 
@@ -119,7 +119,7 @@ const AdminConsole = () => {
   });
 
   const testPromptSequence = async () => {
-    if (selectedPrompts.length === 0) {
+    if (!selectedPrompts?.length) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -132,7 +132,7 @@ const AdminConsole = () => {
     setTestResults([]);
     
     try {
-      for (const projectId of selectedProjects) {
+      for (const projectId of (selectedProjects || [])) {
         const results: TestResult['results'] = [];
         const selectedPromptData = prompts?.filter(p => selectedPrompts.includes(p.id)) || [];
         
@@ -290,12 +290,12 @@ const AdminConsole = () => {
                     {prompts?.map((prompt) => (
                       <div key={prompt.id} className="flex items-center space-x-2 py-2">
                         <Checkbox
-                          checked={selectedPrompts.includes(prompt.id)}
+                          checked={selectedPrompts?.includes(prompt.id)}
                           onCheckedChange={(checked) => {
                             setSelectedPrompts(prev =>
                               checked
-                                ? [...prev, prompt.id]
-                                : prev.filter(id => id !== prompt.id)
+                                ? [...(prev || []), prompt.id]
+                                : prev?.filter(id => id !== prompt.id)
                             );
                           }}
                         />
@@ -333,12 +333,12 @@ const AdminConsole = () => {
                           <TableRow key={project.id}>
                             <TableCell>
                               <Checkbox
-                                checked={selectedProjects.includes(project.id)}
+                                checked={selectedProjects?.includes(project.id)}
                                 onCheckedChange={(checked) => {
                                   setSelectedProjects(prev => 
                                     checked 
-                                      ? [...prev, project.id]
-                                      : prev.filter(id => id !== project.id)
+                                      ? [...(prev || []), project.id]
+                                      : prev?.filter(id => id !== project.id)
                                   );
                                 }}
                               />
@@ -360,7 +360,7 @@ const AdminConsole = () => {
                 <div className="flex justify-end">
                   <Button
                     onClick={testPromptSequence}
-                    disabled={isTestingPrompts || selectedProjects.length === 0}
+                    disabled={isTestingPrompts || !selectedProjects?.length}
                   >
                     {isTestingPrompts ? (
                       <>
