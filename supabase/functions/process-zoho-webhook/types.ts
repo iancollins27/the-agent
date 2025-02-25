@@ -12,7 +12,7 @@ export interface Timeline {
 
 export interface ParsedProjectData {
   crmId: string;
-  companyId: string;
+  companyId: string;  // This will now be a UUID string
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;

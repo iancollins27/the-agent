@@ -1,5 +1,9 @@
 
 import { ParsedProjectData } from './types.ts';
+import { v5 as uuidv5 } from 'https://deno.land/std@0.110.0/uuid/mod.ts';
+
+// Using a namespace UUID for consistent company ID generation
+const COMPANY_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
 export function parseZohoData(rawData: any): ParsedProjectData {
   console.log('Parsing data:', rawData);
@@ -21,7 +25,8 @@ export function parseZohoData(rawData: any): ParsedProjectData {
   }
 
   const crmId = String(idValue);
-  const companyId = `zoho-company-${companyIdValue}`;
+  // Generate a UUID based on the Zoho company ID
+  const companyId = uuidv5(`zoho-company-${companyIdValue}`, COMPANY_NAMESPACE);
 
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
