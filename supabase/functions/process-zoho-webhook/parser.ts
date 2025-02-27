@@ -1,4 +1,3 @@
-
 import { ParsedProjectData } from './types.ts';
 import { validate, v5 } from "https://deno.land/std@0.204.0/uuid/mod.ts";
 
@@ -7,38 +6,44 @@ const NAMESPACE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
 export function parseZohoData(rawData: any): ParsedProjectData {
   console.log('Parsing data:', rawData);
-
+  
   if (!rawData || typeof rawData !== 'object') {
     throw new Error('Invalid data received from Zoho');
   }
-
+  
   // Handle both direct ID field and nested ID field cases
   const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
   const companyIdValue = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
-
+  
   if (!idValue) {
     throw new Error('Project ID is missing in the Zoho data');
   }
-
+  
   if (!companyIdValue) {
     throw new Error('Company ID is missing in the Zoho data');
   }
-
-  // Validate the namespace UUID
+  
+  // Validate the namespace UUID - Fixed the case mismatch
   if (!validate(NAMESPACE_UUID)) {
     throw new Error('Invalid namespace UUID');
   }
-
+  
   const crmId = String(idValue);
   
   // Convert the company ID to a string that will be used for UUID generation
   const nameString = `zoho-company-${companyIdValue}`;
+  
   // Generate the v5 UUID using the namespace and name
-  const companyId = v5.generate(NAMESPACE_UUID, nameString);
-
+  const companyId = v5.generate(NAMESPACE_UUID, nameString).toString();
+  
+  // Add a check to ensure UUID is valid before returning
+  if (!validate(companyId)) {
+    throw new Error(`Generated invalid company UUID: ${companyId}`);
+  }
+  
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
-
+  
   return {
     crmId,
     companyId,
