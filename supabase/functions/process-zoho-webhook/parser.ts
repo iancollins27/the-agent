@@ -1,7 +1,6 @@
 
 import { ParsedProjectData } from './types.ts';
-import { validate } from "https://deno.land/std@0.204.0/uuid/mod.ts";
-import { v5 } from "https://deno.land/std@0.204.0/uuid/mod.ts";
+import { validate, v5 } from "https://deno.land/std@0.204.0/uuid/mod.ts";
 
 // Using a namespace UUID for consistent company ID generation
 const NAMESPACE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
@@ -32,10 +31,10 @@ export function parseZohoData(rawData: any): ParsedProjectData {
 
   const crmId = String(idValue);
   
-  // Convert the company ID to bytes
-  const nameBytes = new TextEncoder().encode(`zoho-company-${companyIdValue}`);
-  // Generate the UUID using the namespace and name
-  const companyId = v5.generate(NAMESPACE_UUID, nameBytes);
+  // Convert the company ID to a string that will be used for UUID generation
+  const nameString = `zoho-company-${companyIdValue}`;
+  // Generate the v5 UUID using the namespace and name
+  const companyId = v5.generate(NAMESPACE_UUID, nameString);
 
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
