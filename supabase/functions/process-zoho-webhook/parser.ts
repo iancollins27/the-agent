@@ -10,13 +10,13 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   
   // Handle both direct ID field and nested ID field cases
   const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
-  const companyIdValue = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
+  const companyIdFromZoho = rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID);
   
   if (!idValue) {
     throw new Error('Project ID is missing in the Zoho data');
   }
   
-  if (!companyIdValue) {
+  if (!companyIdFromZoho) {
     throw new Error('Company ID is missing in the Zoho data');
   }
   
@@ -27,7 +27,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   
   const result = {
     crmId,
-    companyId: companyIdValue, // Now just passing through the Zoho company ID
+    zohoCompanyId: String(companyIdFromZoho), // Store the original Zoho ID, don't try to make it a UUID
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
