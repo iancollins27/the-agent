@@ -1,6 +1,7 @@
 
 import { ParsedProjectData } from './types.ts';
-import { validate, v5, stringify } from "https://deno.land/std@0.204.0/uuid/mod.ts";
+import { v5 } from "https://deno.land/std@0.204.0/uuid/v5.ts";
+import { validate } from "https://deno.land/std@0.204.0/uuid/mod.ts";
 
 // Using a namespace UUID for consistent company ID generation
 const NAMESPACE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
@@ -33,9 +34,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   try {
     // Generate the v5 UUID using the namespace and name
     // Wait for the promise to resolve
-    const uuidObj = await v5.generate(NAMESPACE_UUID, nameString);
-    // Convert to standard UUID string format
-    const companyId = stringify(uuidObj);
+    const companyId = await v5.generate(NAMESPACE_UUID, nameString);
     
     console.log(`Generated UUID: ${companyId}`);
     
