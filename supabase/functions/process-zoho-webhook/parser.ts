@@ -1,8 +1,9 @@
 
 import { ParsedProjectData } from './types.ts';
-import { generate } from "https://deno.land/std@0.204.0/uuid/v5.ts";
+import { v5 } from "https://deno.land/std@0.204.0/uuid/mod.ts";
 
 // Using a namespace UUID for consistent company ID generation
+// This is the URL namespace UUID as defined in RFC 4122
 const NAMESPACE_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
 export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
@@ -31,8 +32,8 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   console.log(`Generating UUID for name: ${nameString}`);
   
   try {
-    // Generate the v5 UUID using nameString and namespace UUID directly
-    const companyId = generate(nameString, NAMESPACE_UUID);
+    // Generate the v5 UUID using the URL namespace
+    const companyId = v5.generate(nameString);
     
     console.log(`Generated UUID: ${companyId}`);
     
