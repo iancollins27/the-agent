@@ -35,7 +35,7 @@ serve(async (req) => {
     
     // Handle both cases where data might be nested or not
     const rawData = requestBody.rawData || requestBody
-    const projectData = parseZohoData(rawData)
+    const projectData = await parseZohoData(rawData)
     console.log('Parsed project data:', projectData)
 
     // Handle company creation/verification
