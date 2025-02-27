@@ -25,8 +25,12 @@ export function parseZohoData(rawData: any): ParsedProjectData {
   }
 
   const crmId = String(idValue);
-  // Generate a UUID based on the Zoho company ID using the namespace
-  const companyId = v5.generate(COMPANY_NAMESPACE, new TextEncoder().encode(`zoho-company-${companyIdValue}`));
+  
+  // First convert the company ID to a byte array
+  const nameBytes = new TextEncoder().encode(`zoho-company-${companyIdValue}`);
+  // Then generate the UUID using the correct order: namespace first, then name
+  const namespaceBytes = new TextEncoder().encode(COMPANY_NAMESPACE);
+  const companyId = v5.generate(namespaceBytes, nameBytes);
 
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
