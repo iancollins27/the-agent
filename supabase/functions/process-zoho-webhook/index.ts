@@ -38,8 +38,9 @@ serve(async (req) => {
     const projectData = await parseZohoData(rawData)
     console.log('Parsed project data:', projectData)
 
-    // Handle company creation/verification
-    await handleCompany(supabase, projectData, rawData)
+    // Handle company creation/verification and get the Supabase UUID
+    const companyUuid = await handleCompany(supabase, projectData, rawData)
+    console.log('Using company UUID:', companyUuid)
     
     // Get existing project if any
     const existingProject = await getExistingProject(supabase, projectData.crmId)
@@ -62,12 +63,12 @@ serve(async (req) => {
     // Generate summary using OpenAI
     const summary = await generateSummary(prompt, Deno.env.get('OPENAI_API_KEY') ?? '')
 
-    // Prepare project data
+    // Prepare project data using the company UUID from Supabase
     const projectUpdateData = {
       summary,
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
-      company_id: projectData.companyId
+      company_id: companyUuid  // Use the UUID we got from handleCompany
     }
 
     // Update or create project
@@ -89,7 +90,8 @@ serve(async (req) => {
         summary, 
         isNewProject: !existingProject,
         parsedData: projectData,
-        nextStepInstructions
+        nextStepInstructions,
+        companyUuid
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

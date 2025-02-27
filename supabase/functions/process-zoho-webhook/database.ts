@@ -1,27 +1,57 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { ParsedProjectData } from './types.ts';
+import { ParsedProjectData } from './types.ts'
 
-export async function handleCompany(supabase: any, projectData: ParsedProjectData, rawData: any) {
-  const { data: existingCompany } = await supabase
+export async function handleCompany(
+  supabase: ReturnType<typeof createClient>,
+  projectData: ParsedProjectData,
+  rawData: any
+) {
+  console.log('Handling company with Zoho ID:', projectData.zohoCompanyId);
+  
+  // First, try to find an existing company with this Zoho ID
+  const { data: existingCompanies, error: findError } = await supabase
     .from('companies')
-    .select('id')
-    .eq('id', projectData.companyId)
-    .single()
+    .select('id, name')
+    .eq('zoho_id', projectData.zohoCompanyId)
+    .maybeSingle();
 
-  if (!existingCompany) {
-    const { error: companyError } = await supabase
-      .from('companies')
-      .insert([{ 
-        id: projectData.companyId,
-        name: `Zoho Company ${rawData.Company_ID || 'Unknown'}`
-      }])
-    
-    if (companyError) throw companyError
+  if (findError) {
+    console.error('Error finding company:', findError);
+    throw findError;
   }
+
+  // If company exists, use its UUID
+  if (existingCompanies) {
+    console.log('Found existing company:', existingCompanies);
+    return existingCompanies.id;
+  }
+
+  // If company doesn't exist, create it and get the new UUID
+  const companyName = rawData.Company_Name || rawData.rawData?.Company_Name || 'Unknown Company';
+  console.log('Creating new company with name:', companyName);
+
+  const { data: newCompany, error: createError } = await supabase
+    .from('companies')
+    .insert({
+      name: companyName,
+      zoho_id: projectData.zohoCompanyId
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error('Error creating company:', createError);
+    throw createError;
+  }
+
+  console.log('Created new company:', newCompany);
+  return newCompany.id;
 }
 
-export async function getExistingProject(supabase: any, crmId: string) {
+export async function getExistingProject(
+  supabase: ReturnType<typeof createClient>,
+  crmId: string
+) {
   const { data: existingProject } = await supabase
     .from('projects')
     .select('id, summary, project_track')
@@ -31,20 +61,27 @@ export async function getExistingProject(supabase: any, crmId: string) {
   return existingProject;
 }
 
-export async function getMilestoneInstructions(supabase: any, nextStep: string, projectTrack: string) {
-  if (!nextStep || !projectTrack) return null;
+export async function getMilestoneInstructions(
+  supabase: ReturnType<typeof createClient>,
+  nextStep: string | undefined,
+  trackId: string | undefined
+) {
+  if (!nextStep || !trackId) return null;
   
   const { data: milestoneData } = await supabase
     .from('project_track_milestones')
     .select('prompt_instructions')
-    .eq('track_id', projectTrack)
+    .eq('track_id', trackId)
     .eq('step_title', nextStep)
     .single()
   
   return milestoneData?.prompt_instructions || null;
 }
 
-export async function getWorkflowPrompt(supabase: any, isUpdate: boolean) {
+export async function getWorkflowPrompt(
+  supabase: ReturnType<typeof createClient>,
+  isUpdate: boolean
+) {
   const { data: promptData } = await supabase
     .from('workflow_prompts')
     .select('prompt_text')
@@ -58,7 +95,16 @@ export async function getWorkflowPrompt(supabase: any, isUpdate: boolean) {
   return promptData.prompt_text;
 }
 
-export async function updateProject(supabase: any, projectId: string, data: any) {
+export async function updateProject(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string,
+  data: {
+    summary: string;
+    next_step: string | undefined;
+    last_action_check: string;
+    company_id: string;
+  }
+) {
   const { error: updateError } = await supabase
     .from('projects')
     .update(data)
@@ -67,7 +113,16 @@ export async function updateProject(supabase: any, projectId: string, data: any)
   if (updateError) throw updateError;
 }
 
-export async function createProject(supabase: any, data: any) {
+export async function createProject(
+  supabase: ReturnType<typeof createClient>,
+  data: {
+    summary: string;
+    next_step: string | undefined;
+    last_action_check: string;
+    company_id: string;
+    crm_id: string;
+  }
+) {
   const { error: createError } = await supabase
     .from('projects')
     .insert([data])
@@ -75,7 +130,11 @@ export async function createProject(supabase: any, data: any) {
   if (createError) throw createError;
 }
 
-export async function logMilestoneUpdates(supabase: any, projectId: string | undefined, timeline: Record<string, string>) {
+export async function logMilestoneUpdates(
+  supabase: ReturnType<typeof createClient>,
+  projectId: string | undefined,
+  timeline: ParsedProjectData['timeline']
+) {
   const milestones = Object.entries(timeline)
     .filter(([_, value]) => value.trim() !== '')
     .map(([milestone]) => milestone)
