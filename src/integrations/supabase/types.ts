@@ -52,16 +52,19 @@ export type Database = {
           default_project_track: string | null
           id: string
           name: string
+          zoho_id: string | null
         }
         Insert: {
           default_project_track?: string | null
           id?: string
           name: string
+          zoho_id?: string | null
         }
         Update: {
           default_project_track?: string | null
           id?: string
           name?: string
+          zoho_id?: string | null
         }
         Relationships: [
           {
