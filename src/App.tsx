@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminConsole from "./pages/AdminConsole";
@@ -38,7 +37,7 @@ const App = () => (
             path="/"
             element={
               <ProtectedRoute>
-                <Index />
+                <AdminConsole />
               </ProtectedRoute>
             }
           />
