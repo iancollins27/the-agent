@@ -1,0 +1,56 @@
+
+export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution';
+
+export type WorkflowPrompt = {
+  id: string;
+  type: WorkflowType;
+  prompt_text: string;
+};
+
+export type Project = {
+  id: string;
+  summary: string | null;
+  project_track: string | null;
+  track_name?: string | null;
+};
+
+export type TestResult = {
+  projectId: string;
+  results: {
+    type: WorkflowType;
+    output: string;
+    finalPrompt: string;
+  }[];
+};
+
+export const workflowTitles: Record<WorkflowType, string> = {
+  summary_generation: "Summary Generation",
+  summary_update: "Summary Update",
+  action_detection: "Action Detection",
+  action_execution: "Action Execution"
+};
+
+export const availableVariables = {
+  summary_generation: [
+    { name: "track_name", description: "The name of the project track" },
+    { name: "new_data", description: "The data received from CRM" },
+    { name: "current_date", description: "Today's date" }
+  ],
+  summary_update: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" },
+    { name: "new_data", description: "The data received from CRM" },
+    { name: "current_date", description: "Today's date" }
+  ],
+  action_detection: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" },
+    { name: "current_date", description: "Today's date" }
+  ],
+  action_execution: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" },
+    { name: "action_description", description: "The description of the action to be executed" },
+    { name: "current_date", description: "Today's date" }
+  ]
+};
