@@ -68,8 +68,8 @@ const availableVariables = {
 const AdminConsole = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
-  const [selectedProjects, setSelectedProjects] = useState<string[]>(); // Changed from number[] to string[]
-  const [selectedPrompts, setSelectedPrompts] = useState<string[]>(); // Changed from number[] to string[]
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [selectedPrompts, setSelectedPrompts] = useState<string[]>([]);
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const [isTestingPrompts, setIsTestingPrompts] = useState(false);
 
@@ -158,20 +158,41 @@ const AdminConsole = () => {
       for (const projectId of (selectedProjects || [])) {
         const results: TestResult['results'] = [];
         const selectedPromptData = prompts?.filter(p => selectedPrompts.includes(p.id)) || [];
+        const project = projects?.find(p => p.id === projectId);
         
+        // Prepare the project data for variable replacement
+        if (!project) {
+          console.error(`Project with ID ${projectId} not found`);
+          continue;
+        }
+
         for (const prompt of selectedPromptData) {
           console.log(`Testing prompt type: ${prompt.type}`);
+          
+          // Get all context data needed for testing
+          const testContextData = {
+            projectId,
+            summary: project.summary || '',
+            track_name: project.track_name || 'No Track',
+            current_date: new Date().toLocaleDateString(),
+            action_description: 'Sample action description for testing', // For action execution testing
+            previousResults: results
+          };
+          
+          console.log('Test context data:', testContextData);
           
           const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
             body: {
               projectId,
               promptType: prompt.type,
               promptText: prompt.prompt_text,
+              contextData: testContextData,
               previousResults: results
             },
           });
 
           if (error) {
+            console.error(`Error testing prompt ${prompt.type}:`, error);
             throw error;
           }
 
