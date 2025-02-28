@@ -39,6 +39,35 @@ const PromptEditor = ({
     }
   };
 
+  // Helper function to provide a default prompt template for summary update
+  const getSuggestedPromptTemplate = () => {
+    if (prompt.type === 'summary_update') {
+      return `You are an AI assistant tasked with updating a project summary with new information.
+
+Current Project Summary:
+{{summary}}
+
+Project Track: {{track_name}}
+
+New Information:
+{{new_data}}
+
+Today's Date: {{current_date}}
+
+Instructions:
+1. Review the current project summary
+2. Integrate the new information provided
+3. Maintain a professional tone and clarity
+4. Keep the updated summary comprehensive but concise
+5. Include key dates, actions, and relevant stakeholders
+6. Preserve any critical historical information from the original summary
+7. Ensure the updated summary provides a complete picture of the project status
+
+Please provide an updated project summary that incorporates the new information while maintaining the context and structure of the original summary.`;
+    }
+    return null;
+  };
+
   return (
     <Card key={prompt.id}>
       <CardHeader>
@@ -68,8 +97,28 @@ const PromptEditor = ({
               <Textarea
                 value={editingPrompt?.prompt_text || prompt.prompt_text}
                 onChange={handleChange}
-                rows={5}
+                rows={10}
               />
+              
+              {/* Add a suggested template button for summary_update type */}
+              {prompt.type === 'summary_update' && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    const template = getSuggestedPromptTemplate();
+                    if (template && editingPrompt) {
+                      setEditingPrompt({
+                        ...editingPrompt,
+                        prompt_text: template
+                      });
+                    }
+                  }}
+                  className="mb-2"
+                >
+                  Use Suggested Template
+                </Button>
+              )}
+              
               <div className="flex gap-2">
                 <Button 
                   onClick={() => editingPrompt && updatePromptMutation.mutate(editingPrompt)}
@@ -94,7 +143,7 @@ const PromptEditor = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md">
+              <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm overflow-auto">
                 {prompt.prompt_text}
               </pre>
               <Button 
