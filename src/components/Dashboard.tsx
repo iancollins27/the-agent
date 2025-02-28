@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ProjectSummary } from "./ProjectSummary";
@@ -17,10 +18,21 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
+    <div className="container mx-auto p-6 space-y-6">
+      <header className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">AI Project Manager</h1>
+          <p className="text-muted-foreground">Intelligent project oversight and management</p>
+        </div>
+        <Button variant="ghost" onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </Button>
+      </header>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="slide-in">
+          <CardHeader>
             <CardTitle>Project Summary</CardTitle>
           </CardHeader>
           <CardContent>
@@ -28,17 +40,8 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>Communication Log</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CommunicationLog />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="slide-in">
+          <CardHeader>
             <CardTitle>Action Center</CardTitle>
           </CardHeader>
           <CardContent>
@@ -47,14 +50,25 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>Project Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ProjectTimeline />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="slide-in">
+          <CardHeader>
+            <CardTitle>Communication Log</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CommunicationLog />
+          </CardContent>
+        </Card>
+
+        <Card className="slide-in">
+          <CardHeader>
+            <CardTitle>Project Timeline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ProjectTimeline />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
