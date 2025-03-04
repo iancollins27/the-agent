@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import PromptsTab from "@/components/admin/PromptsTab";
 import TestingTab from "@/components/admin/TestingTab";
+import AIProviderConfig from "@/components/admin/AIProviderConfig";
 
 const AdminConsole = () => {
   return (
@@ -33,6 +34,7 @@ const AdminConsole = () => {
         <TabsList>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
+          <TabsTrigger value="ai-provider">AI Provider</TabsTrigger>
         </TabsList>
 
         <TabsContent value="prompts" className="space-y-6">
@@ -41,6 +43,10 @@ const AdminConsole = () => {
 
         <TabsContent value="testing" className="space-y-6">
           <TestingTab />
+        </TabsContent>
+
+        <TabsContent value="ai-provider" className="space-y-6">
+          <AIProviderConfig />
         </TabsContent>
       </Tabs>
     </div>

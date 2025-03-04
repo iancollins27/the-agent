@@ -67,8 +67,35 @@ serve(async (req) => {
       .replace('{{current_date}}', new Date().toISOString().split('T')[0])
       .replace('{{next_step_instructions}}', nextStepInstructions || '')
 
-    // Generate summary using OpenAI
-    const summary = await generateSummary(prompt, Deno.env.get('OPENAI_API_KEY') ?? '')
+    // Get AI configuration
+    const { data: aiConfig, error: aiConfigError } = await supabase
+      .from('ai_config')
+      .select('provider, model')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const aiProvider = aiConfig?.provider || 'openai';
+    const aiModel = aiConfig?.model || 'gpt-4o';
+    
+    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
+
+    // Determine which API key to use based on the provider
+    let apiKey;
+    if (aiProvider === 'openai') {
+      apiKey = Deno.env.get('OPENAI_API_KEY') ?? '';
+    } else if (aiProvider === 'claude') {
+      apiKey = Deno.env.get('CLAUDE_API_KEY') ?? '';
+    } else if (aiProvider === 'deepseek') {
+      apiKey = Deno.env.get('DEEPSEEK_API_KEY') ?? '';
+    }
+
+    if (!apiKey) {
+      throw new Error(`API key for ${aiProvider} is not configured`);
+    }
+
+    // Generate summary using the configured AI provider
+    const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
 
     // Prepare project data using the company UUID from Supabase
     const projectUpdateData = {
@@ -100,7 +127,9 @@ serve(async (req) => {
         parsedData: projectData,
         nextStepInstructions,
         companyUuid,
-        projectTrackId
+        projectTrackId,
+        aiProvider,
+        aiModel
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

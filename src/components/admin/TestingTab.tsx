@@ -1,247 +1,170 @@
 
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import TestResults from "@/components/admin/TestResults";
+import ProjectSelector from "@/components/admin/ProjectSelector";
+import PromptSelector from "@/components/admin/PromptSelector";
 import { Loader2 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { TestResult, WorkflowPrompt, WorkflowType, Project } from "@/types/workflow";
-import ProjectSelector from "./ProjectSelector";
-import PromptSelector from "./PromptSelector";
-import TestResults from "./TestResults";
+import { useToast } from "@/components/ui/use-toast";
 
 const TestingTab = () => {
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
-  const [selectedPrompts, setSelectedPrompts] = useState<string[]>([]);
-  const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [isTestingPrompts, setIsTestingPrompts] = useState(false);
-
-  const { data: prompts, isLoading: isLoadingPrompts } = useQuery({
-    queryKey: ['workflow-prompts'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('workflow_prompts')
-        .select('*')
-        .order('type');
-      
-      if (error) throw error;
-      return data as WorkflowPrompt[];
-    }
-  });
-
-  const { data: projects, isLoading: isLoadingProjects } = useQuery({
-    queryKey: ['projects-with-tracks'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select(`
-          id,
-          summary,
-          project_track,
-          next_step,
-          project_tracks (
-            name
-          )
-        `)
-        .order('id');
-      
-      if (error) throw error;
-
-      return data.map(project => ({
-        ...project,
-        track_name: project.project_tracks?.name
-      })) as Project[];
-    }
-  });
-
-  const handlePromptSelection = (promptId: string, checked: boolean) => {
-    setSelectedPrompts(prev =>
-      checked
-        ? [...prev, promptId]
-        : prev.filter(id => id !== promptId)
-    );
-  };
-
-  const handleProjectSelection = (projectId: string, checked: boolean) => {
-    setSelectedProjects(prev =>
-      checked
-        ? [...prev, projectId]
-        : prev.filter(id => id !== projectId)
-    );
-  };
-
-  const fetchMilestoneInstructions = async (projectId: string) => {
-    try {
-      const project = projects?.find(p => p.id === projectId);
-      
-      if (!project || !project.project_track || !project.next_step) {
-        console.log(`No track or next step for project ${projectId}`, {
-          track: project?.project_track,
-          nextStep: project?.next_step
-        });
-        return "";
-      }
-      
-      console.log(`Fetching milestone instructions for project ${projectId}`, {
-        track: project.project_track,
-        nextStep: project.next_step
-      });
-      
-      const { data, error } = await supabase
-        .from('project_track_milestones')
-        .select('prompt_instructions')
-        .eq('track_id', project.project_track)
-        .eq('step_title', project.next_step)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching milestone instructions:', error);
-        return "";
-      }
-      
-      console.log('Milestone instructions found:', data);
-      return data?.prompt_instructions || "";
-    } catch (error) {
-      console.error('Exception fetching milestone instructions:', error);
-      return "";
-    }
-  };
-
-  const testPromptSequence = async () => {
-    if (!selectedPrompts?.length) {
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [testResults, setTestResults] = useState<any>(null);
+  const { toast } = useToast();
+  
+  const runTest = async () => {
+    if (!selectedPromptId || !selectedProjectId) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Please select at least one prompt to test.",
+        title: "Selection Required",
+        description: "Please select both a prompt and a project to test."
       });
       return;
     }
-
-    setIsTestingPrompts(true);
-    setTestResults([]);
+    
+    setIsLoading(true);
+    setTestResults(null);
     
     try {
-      for (const projectId of selectedProjects) {
-        const results: TestResult['results'] = [];
-        const selectedPromptData = prompts?.filter(p => selectedPrompts.includes(p.id)) || [];
-        const project = projects?.find(p => p.id === projectId);
+      // First, fetch the prompt details
+      const { data: promptData, error: promptError } = await supabase
+        .from('workflow_prompts')
+        .select('*')
+        .eq('id', selectedPromptId)
+        .single();
+      
+      if (promptError) throw promptError;
+      
+      // Then, fetch the project details
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select(`
+          id,
+          crm_id,
+          summary,
+          next_step,
+          company_id,
+          project_track,
+          companies(name),
+          project_tracks(name, description)
+        `)
+        .eq('id', selectedProjectId)
+        .single();
+      
+      if (projectError) throw projectError;
+      
+      // Get AI configuration
+      const { data: aiConfig, error: aiConfigError } = await supabase
+        .from('ai_config')
+        .select('provider, model')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
         
-        // Prepare the project data for variable replacement
-        if (!project) {
-          console.error(`Project with ID ${projectId} not found`);
-          continue;
+      const aiProvider = aiConfig?.provider || 'openai';
+      const aiModel = aiConfig?.model || 'gpt-4o';
+      
+      // Prepare context data
+      const contextData = {
+        summary: projectData.summary || '',
+        next_step: projectData.next_step || '',
+        company_name: projectData.companies?.name || 'Unknown Company',
+        track_name: projectData.project_tracks?.name || 'Default Track',
+        track_description: projectData.project_tracks?.description || '',
+        current_date: new Date().toISOString().split('T')[0],
+        milestone_instructions: '',
+        action_description: 'Sample action for testing'
+      };
+      
+      // Get milestone instructions if this is a next step
+      if (projectData.next_step) {
+        const { data: milestoneData } = await supabase
+          .from('track_milestones')
+          .select('instructions')
+          .eq('project_track', projectData.project_track)
+          .eq('name', projectData.next_step)
+          .maybeSingle();
+          
+        if (milestoneData) {
+          contextData.milestone_instructions = milestoneData.instructions || '';
         }
-
-        // Fetch milestone instructions for this project
-        const milestoneInstructions = await fetchMilestoneInstructions(projectId);
-        console.log(`Milestone instructions for project ${projectId}:`, milestoneInstructions);
-
-        for (const prompt of selectedPromptData) {
-          console.log(`Testing prompt type: ${prompt.type}`);
-          
-          // Get all context data needed for testing
-          const testContextData = {
-            projectId,
-            summary: project.summary || '',
-            track_name: project.track_name || 'No Track',
-            current_date: new Date().toLocaleDateString(),
-            action_description: 'Sample action description for testing', // For action execution testing
-            milestone_instructions: milestoneInstructions,
-            previousResults: results,
-            new_data: JSON.stringify({sampleData: 'Test data for project update'})
-          };
-          
-          console.log('Test context data:', testContextData);
-          
-          const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
-            body: {
-              projectId,
-              promptType: prompt.type,
-              promptText: prompt.prompt_text,
-              contextData: testContextData,
-              previousResults: results
-            },
-          });
-
-          if (error) {
-            console.error(`Error testing prompt ${prompt.type}:`, error);
-            throw error;
-          }
-
-          results.push({
-            type: prompt.type as WorkflowType,
-            output: data.result,
-            finalPrompt: data.finalPrompt
-          });
-          
-          console.log(`Results for ${prompt.type}:`, data);
-        }
-
-        setTestResults(prev => [...prev, { projectId, results }]);
       }
-
-      toast({
-        title: "Test Complete",
-        description: "Selected prompts have been tested successfully.",
+      
+      // Call the edge function to test the prompt
+      const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
+        body: {
+          promptType: promptData.type,
+          promptText: promptData.prompt_text,
+          projectId: projectData.id,
+          contextData: contextData,
+          aiProvider: aiProvider,
+          aiModel: aiModel
+        }
       });
+      
+      if (error) throw error;
+      
+      setTestResults(data);
     } catch (error) {
-      console.error('Error testing prompts:', error);
+      console.error('Error testing prompt:', error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: `Failed to test prompts: ${error}`,
+        title: "Test Failed",
+        description: `Error: ${error.message || "Unknown error occurred"}`
       });
     } finally {
-      setIsTestingPrompts(false);
+      setIsLoading(false);
     }
   };
-
+  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Test Workflow Prompts</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Select Prompts to Test</h3>
-            <PromptSelector
-              prompts={prompts}
-              selectedPrompts={selectedPrompts}
-              onPromptSelectionChange={handlePromptSelection}
-            />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Test Workflow Prompts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-lg font-medium mb-2">Select Prompt</h3>
+              <PromptSelector 
+                selectedPromptId={selectedPromptId} 
+                setSelectedPromptId={setSelectedPromptId} 
+              />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium mb-2">Select Project</h3>
+              <ProjectSelector 
+                selectedProjectId={selectedProjectId} 
+                setSelectedProjectId={setSelectedProjectId} 
+              />
+            </div>
           </div>
-
-          <div className="border rounded-lg">
-            <ProjectSelector
-              projects={projects}
-              isLoading={isLoadingProjects}
-              selectedProjects={selectedProjects}
-              onProjectSelectionChange={handleProjectSelection}
-            />
-          </div>
-
+          
           <div className="flex justify-end">
-            <Button
-              onClick={testPromptSequence}
-              disabled={isTestingPrompts || !selectedProjects?.length || !selectedPrompts?.length}
+            <Button 
+              onClick={runTest} 
+              disabled={isLoading || !selectedPromptId || !selectedProjectId}
             >
-              {isTestingPrompts ? (
+              {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Testing Prompts...
+                  Testing...
                 </>
-              ) : (
-                'Test Selected Projects'
-              )}
+              ) : "Run Test"}
             </Button>
           </div>
-
-          <TestResults results={testResults} />
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+      
+      {testResults && (
+        <TestResults results={testResults} />
+      )}
+    </div>
   );
 };
 

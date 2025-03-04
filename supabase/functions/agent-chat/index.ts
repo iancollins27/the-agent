@@ -15,11 +15,6 @@ serve(async (req) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not set')
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -51,6 +46,19 @@ serve(async (req) => {
     };
     
     console.log('Using bot configuration:', botConfig);
+
+    // Fetch AI provider configuration
+    const { data: aiConfig, error: aiConfigError } = await supabase
+      .from('ai_config')
+      .select('provider, model')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const aiProvider = aiConfig?.provider || 'openai';
+    const aiModel = botConfig.model || 'gpt-4o-mini'; // Use model from chatbot config as fallback
+    
+    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
     
     // Extract the latest user message to check for CRM ID
     const latestUserMessage = messages.length > 0 && messages[messages.length - 1].role === 'user' 
@@ -157,32 +165,43 @@ serve(async (req) => {
     // Add system message to the beginning of the messages array
     const fullMessages = [systemMessage, ...messages]
 
-    console.log('Sending messages to OpenAI:', fullMessages)
+    console.log('Sending messages to AI provider:', aiProvider, 'model:', aiModel);
+    console.log('Messages:', fullMessages);
 
-    // Call OpenAI API with the configured model and temperature
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: botConfig.model || 'gpt-4o-mini',
-        messages: fullMessages,
-        temperature: botConfig.temperature || 0.7,
-      }),
-    })
-
-    const openAIData = await openAIResponse.json()
-    
-    if (!openAIResponse.ok) {
-      console.error('OpenAI API error:', openAIData)
-      throw new Error(`OpenAI API error: ${openAIData.error?.message || 'Unknown error'}`)
+    // Determine API key based on provider
+    let apiKey;
+    if (aiProvider === 'openai') {
+      apiKey = Deno.env.get('OPENAI_API_KEY');
+    } else if (aiProvider === 'claude') {
+      apiKey = Deno.env.get('CLAUDE_API_KEY');
+    } else if (aiProvider === 'deepseek') {
+      apiKey = Deno.env.get('DEEPSEEK_API_KEY');
+    } else {
+      // Default to OpenAI
+      apiKey = Deno.env.get('OPENAI_API_KEY');
     }
 
-    console.log('OpenAI response received')
+    if (!apiKey) {
+      throw new Error(`API key for ${aiProvider} is not configured`);
+    }
+
+    let aiResponse;
+    
+    // Call appropriate AI provider based on configuration
+    if (aiProvider === 'openai') {
+      aiResponse = await callOpenAI(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
+    } else if (aiProvider === 'claude') {
+      aiResponse = await callClaude(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
+    } else if (aiProvider === 'deepseek') {
+      aiResponse = await callDeepseek(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
+    } else {
+      // Default to OpenAI if provider is not recognized
+      aiResponse = await callOpenAI(fullMessages, apiKey, 'gpt-4o-mini', botConfig.temperature || 0.7);
+    }
+
+    console.log('AI response received');
     return new Response(JSON.stringify({ 
-      reply: openAIData.choices[0].message.content,
+      reply: aiResponse,
       projectData: projectData
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -195,3 +214,97 @@ serve(async (req) => {
     })
   }
 })
+
+async function callOpenAI(messages, apiKey, model = 'gpt-4o-mini', temperature = 0.7) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      temperature: temperature,
+    }),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('OpenAI API error:', data);
+    throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+  }
+  
+  return data.choices[0].message.content;
+}
+
+async function callClaude(messages, apiKey, model = 'claude-3-haiku-20240307', temperature = 0.7) {
+  // Convert the messages format to what Claude expects
+  const claudeMessages = messages.map(msg => ({
+    role: msg.role === 'system' ? 'user' : msg.role,
+    content: msg.content
+  }));
+  
+  // If there's a system message, prepend it to the first user message
+  const systemMessage = messages.find(msg => msg.role === 'system');
+  if (systemMessage && claudeMessages.length > 1) {
+    // Find the first non-system message
+    const firstUserIndex = claudeMessages.findIndex(msg => msg.role === 'user');
+    if (firstUserIndex >= 0) {
+      claudeMessages[firstUserIndex].content = 
+        `${systemMessage.content}\n\nUser message: ${claudeMessages[firstUserIndex].content}`;
+    }
+    // Remove the system message
+    claudeMessages.shift();
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'X-API-Key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: claudeMessages,
+      max_tokens: 1000,
+      temperature: temperature,
+    }),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('Claude API error:', data);
+    throw new Error(`Claude API error: ${data.error?.message || 'Unknown error'}`);
+  }
+  
+  return data.content[0].text;
+}
+
+async function callDeepseek(messages, apiKey, model = 'deepseek-chat', temperature = 0.7) {
+  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      temperature: temperature,
+      max_tokens: 1000,
+    }),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('DeepSeek API error:', data);
+    throw new Error(`DeepSeek API error: ${data.error?.message || 'Unknown error'}`);
+  }
+  
+  return data.choices[0].message.content;
+}

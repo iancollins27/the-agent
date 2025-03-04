@@ -5,6 +5,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const openaiApiKey = Deno.env.get("OPENAI_API_KEY") || "";
+const claudeApiKey = Deno.env.get("CLAUDE_API_KEY") || "";
+const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "";
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -30,6 +32,109 @@ function replaceVariables(text: string, variables: Record<string, string>): stri
   return processedText;
 }
 
+async function callOpenAI(prompt: string, model: string = "gpt-4o-mini") {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    }),
+  });
+  
+  const data = await response.json();
+  if (data.error) {
+    console.error("OpenAI API error:", data.error);
+    throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+  }
+  
+  return data.choices?.[0]?.message?.content || "Error: No response from OpenAI";
+}
+
+async function callClaude(prompt: string, model: string = "claude-3-haiku-20240307") {
+  if (!claudeApiKey) {
+    throw new Error("Claude API key is not set");
+  }
+  
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": claudeApiKey,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 500,
+    }),
+  });
+  
+  const data = await response.json();
+  if (data.error) {
+    console.error("Claude API error:", data.error);
+    throw new Error(`Claude API error: ${data.error.message || data.error}`);
+  }
+  
+  return data.content?.[0]?.text || "Error: No response from Claude";
+}
+
+async function callDeepseek(prompt: string, model: string = "deepseek-chat") {
+  if (!deepseekApiKey) {
+    throw new Error("DeepSeek API key is not set");
+  }
+  
+  const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${deepseekApiKey}`,
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    }),
+  });
+  
+  const data = await response.json();
+  if (data.error) {
+    console.error("DeepSeek API error:", data.error);
+    throw new Error(`DeepSeek API error: ${data.error.message || data.error}`);
+  }
+  
+  return data.choices?.[0]?.message?.content || "Error: No response from DeepSeek";
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -37,9 +142,10 @@ serve(async (req) => {
   }
   
   try {
-    const { promptType, promptText, projectId, contextData, previousResults } = await req.json();
+    const { promptType, promptText, projectId, contextData, aiProvider, aiModel } = await req.json();
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
+    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
     console.log("Context data provided:", contextData);
     console.log("Milestone instructions:", contextData.milestone_instructions);
     
@@ -48,62 +154,43 @@ serve(async (req) => {
     }
     
     // Replace variables in the prompt text with actual values
-    // Use contextData for variable replacement
     const finalPrompt = replaceVariables(promptText, contextData);
     
-    // Would normally call OpenAI here, but for testing we'll simulate a response
     let result: string;
     
-    if (openaiApiKey) {
-      // Use OpenAI if we have an API key
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openaiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
-            },
-            {
-              role: "user",
-              content: finalPrompt
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 500,
-        }),
-      });
-      
-      const data = await response.json();
-      result = data.choices?.[0]?.message?.content || "Error: No response from OpenAI";
-      
-      if (data.error) {
-        console.error("OpenAI API error:", data.error);
-        result = `Error from OpenAI API: ${data.error.message || data.error}`;
-      }
-    } else {
-      // If we don't have an OpenAI API key, generate mock results
-      switch (promptType) {
-        case "summary_generation":
-          result = `This is a sample summary for a project in the ${contextData.track_name} track. Generated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+    try {
+      // Call the appropriate AI provider based on the aiProvider parameter
+      switch (aiProvider) {
+        case "openai":
+          if (openaiApiKey) {
+            result = await callOpenAI(finalPrompt, aiModel);
+          } else {
+            throw new Error("OpenAI API key not configured");
+          }
           break;
-        case "summary_update":
-          result = `Updated summary based on: "${contextData.summary}". Project is in the ${contextData.track_name} track. Last updated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+        case "claude":
+          if (claudeApiKey) {
+            result = await callClaude(finalPrompt, aiModel);
+          } else {
+            throw new Error("Claude API key not configured");
+          }
           break;
-        case "action_detection":
-          result = `Based on the summary "${contextData.summary}" for the ${contextData.track_name} track, here are some detected actions:\n1. Schedule a follow-up call\n2. Prepare project materials\n3. Review timeline. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
-          break;
-        case "action_execution":
-          result = `For the action "${contextData.action_description}" on project with summary "${contextData.summary}" in the ${contextData.track_name} track, here are execution steps:\n1. Step one\n2. Step two\n3. Step three. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+        case "deepseek":
+          if (deepseekApiKey) {
+            result = await callDeepseek(finalPrompt, aiModel);
+          } else {
+            throw new Error("DeepSeek API key not configured");
+          }
           break;
         default:
-          result = "Unknown prompt type";
+          // If no valid AI provider is specified or API key is missing, generate mock results
+          result = generateMockResult(promptType, contextData);
       }
+    } catch (error) {
+      console.error(`Error calling AI provider (${aiProvider}):`, error);
+      // Fall back to mock results if there's an error
+      result = generateMockResult(promptType, contextData);
+      result += `\n\nNote: There was an error using the ${aiProvider} API: ${error.message}`;
     }
     
     return new Response(
@@ -112,6 +199,8 @@ serve(async (req) => {
         result,
         projectId,
         promptType,
+        aiProvider,
+        aiModel
       }),
       {
         headers: {
@@ -138,3 +227,18 @@ serve(async (req) => {
     );
   }
 });
+
+function generateMockResult(promptType: string, contextData: Record<string, string>): string {
+  switch (promptType) {
+    case "summary_generation":
+      return `This is a sample summary for a project in the ${contextData.track_name} track. Generated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+    case "summary_update":
+      return `Updated summary based on: "${contextData.summary}". Project is in the ${contextData.track_name} track. Last updated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+    case "action_detection":
+      return `Based on the summary "${contextData.summary}" for the ${contextData.track_name} track, here are some detected actions:\n1. Schedule a follow-up call\n2. Prepare project materials\n3. Review timeline. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+    case "action_execution":
+      return `For the action "${contextData.action_description}" on project with summary "${contextData.summary}" in the ${contextData.track_name} track, here are execution steps:\n1. Step one\n2. Step two\n3. Step three. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+    default:
+      return "Unknown prompt type";
+  }
+}
