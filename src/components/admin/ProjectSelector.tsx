@@ -1,68 +1,65 @@
 
-import { Checkbox } from "@/components/ui/checkbox";
+import { useState, useEffect } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Project } from "@/types/workflow";
 
 type ProjectSelectorProps = {
-  projects: Project[] | undefined;
-  isLoading: boolean;
-  selectedProjects: string[];
-  onProjectSelectionChange: (projectId: string, checked: boolean) => void;
+  selectedProjectId: string | null;
+  setSelectedProjectId: (id: string | null) => void;
 };
 
-const ProjectSelector = ({
-  projects,
-  isLoading,
-  selectedProjects,
-  onProjectSelectionChange
-}: ProjectSelectorProps) => {
+const ProjectSelector = ({ selectedProjectId, setSelectedProjectId }: ProjectSelectorProps) => {
+  const [projects, setProjects] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          id,
+          companies(name)
+        `)
+        .order('id');
+        
+      if (error) {
+        console.error('Error fetching projects:', error);
+      } else {
+        setProjects(data || []);
+      }
+      setIsLoading(false);
+    };
+    
+    fetchProjects();
+  }, []);
+  
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-12">Select</TableHead>
-          <TableHead>Project ID</TableHead>
-          <TableHead>Current Summary</TableHead>
-          <TableHead>Project Track</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {isLoading ? (
-          <TableRow>
-            <TableCell colSpan={4} className="text-center">
-              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-            </TableCell>
-          </TableRow>
-        ) : !projects?.length ? (
-          <TableRow>
-            <TableCell colSpan={4} className="text-center">
-              No projects found
-            </TableCell>
-          </TableRow>
-        ) : (
-          projects.map((project) => (
-            <TableRow key={project.id}>
-              <TableCell>
-                <Checkbox
-                  checked={selectedProjects.includes(project.id)}
-                  onCheckedChange={(checked) => {
-                    onProjectSelectionChange(project.id, !!checked);
-                  }}
-                />
-              </TableCell>
-              <TableCell>{project.id}</TableCell>
-              <TableCell className="max-w-md truncate">
-                {project.summary || 'No summary'}
-              </TableCell>
-              <TableCell>
-                {project.track_name || 'No track assigned'}
-              </TableCell>
-            </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+    <div>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 size={16} className="animate-spin" />
+          <span>Loading projects...</span>
+        </div>
+      ) : (
+        <Select 
+          value={selectedProjectId || ''} 
+          onValueChange={(value) => setSelectedProjectId(value || null)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a project" />
+          </SelectTrigger>
+          <SelectContent>
+            {projects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {project.companies?.name || 'Unknown'} - {project.id.substring(0, 8)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
   );
 };
 

@@ -83,14 +83,14 @@ const TestingTab = () => {
       // Get milestone instructions if this is a next step
       if (projectData.next_step) {
         const { data: milestoneData } = await supabase
-          .from('track_milestones')
-          .select('instructions')
-          .eq('project_track', projectData.project_track)
-          .eq('name', projectData.next_step)
+          .from('project_track_milestones')
+          .select('prompt_instructions')
+          .eq('track_id', projectData.project_track)
+          .eq('step_title', projectData.next_step)
           .maybeSingle();
           
         if (milestoneData) {
-          contextData.milestone_instructions = milestoneData.instructions || '';
+          contextData.milestone_instructions = milestoneData.prompt_instructions || '';
         }
       }
       

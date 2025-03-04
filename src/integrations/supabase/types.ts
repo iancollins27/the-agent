@@ -47,6 +47,27 @@ export type Database = {
           },
         ]
       }
+      ai_config: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          provider: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string
+          provider?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          provider?: string
+        }
+        Relationships: []
+      }
       chatbot_config: {
         Row: {
           created_at: string
