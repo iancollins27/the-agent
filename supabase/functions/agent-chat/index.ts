@@ -26,11 +26,23 @@ serve(async (req) => {
     )
 
     const { messages, projectId } = await req.json()
-
-    // If a project ID is provided, fetch relevant project data
-    let projectData = null
+    
+    // Extract the latest user message to check for CRM ID
+    const latestUserMessage = messages.length > 0 && messages[messages.length - 1].role === 'user' 
+      ? messages[messages.length - 1].content 
+      : '';
+    
+    // Check if the message mentions a CRM ID
+    const crmIdMatch = latestUserMessage.match(/crm\s*id\s*(\d+)/i) || 
+                       latestUserMessage.match(/crmid\s*(\d+)/i) || 
+                       latestUserMessage.match(/project\s*(\d+)/i);
+    
+    let projectData = null;
+    let searchContext = '';
+    
+    // First try to get project by explicit projectId
     if (projectId) {
-      console.log('Fetching project data for ID:', projectId)
+      console.log('Fetching project data for ID:', projectId);
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select(`
@@ -42,13 +54,58 @@ serve(async (req) => {
           companies(name)
         `)
         .eq('id', projectId)
-        .single()
+        .single();
 
       if (projectError) {
-        console.error('Error fetching project:', projectError)
+        console.error('Error fetching project by ID:', projectError);
       } else if (project) {
-        projectData = project
-        console.log('Found project data:', project)
+        projectData = project;
+        console.log('Found project data by ID:', project);
+      }
+    } 
+    // If no project found by ID or no ID provided, try CRM ID
+    else if (crmIdMatch && crmIdMatch[1]) {
+      const crmId = crmIdMatch[1];
+      console.log('Attempting to fetch project by CRM ID:', crmId);
+      
+      const { data: projects, error: crmError } = await supabase
+        .from('projects')
+        .select(`
+          id, 
+          summary, 
+          next_step,
+          project_track,
+          crm_id,
+          company_id,
+          companies(name)
+        `)
+        .eq('crm_id', crmId);
+      
+      if (crmError) {
+        console.error('Error fetching project by CRM ID:', crmError);
+      } else if (projects && projects.length > 0) {
+        projectData = projects[0];
+        console.log('Found project data by CRM ID:', projectData);
+        searchContext = `I found information for project with CRM ID ${crmId}.`;
+      } else {
+        searchContext = `I searched for a project with CRM ID ${crmId} but couldn't find any matching records.`;
+      }
+    }
+
+    // Fetch related project track information if project has a track
+    let trackData = null;
+    if (projectData?.project_track) {
+      const { data: track, error: trackError } = await supabase
+        .from('project_tracks')
+        .select('id, name, description')
+        .eq('id', projectData.project_track)
+        .single();
+      
+      if (trackError) {
+        console.error('Error fetching project track:', trackError);
+      } else if (track) {
+        trackData = track;
+        console.log('Found project track data:', track);
       }
     }
 
@@ -56,15 +113,21 @@ serve(async (req) => {
     const systemMessage = {
       role: 'system',
       content: `You are an intelligent project assistant that helps manage project workflows. 
+      ${searchContext}
       ${projectData ? `
         Current project information:
         - Project ID: ${projectData.id}
         - Company: ${projectData.companies?.name || 'Unknown'}
+        - ${projectData.crm_id ? `CRM ID: ${projectData.crm_id}` : ''}
         - Summary: ${projectData.summary || 'No summary available'}
         - Next Step: ${projectData.next_step || 'No next step defined'}
+        ${trackData ? `- Project Track: ${trackData.name}
+        - Track Description: ${trackData.description || 'No description available'}` : ''}
       ` : 'No specific project context is loaded.'}
       
-      Answer questions about the current project or workflow processes. If you don't know something, say so clearly.`
+      Answer questions about the current project or workflow processes. If you don't know something, say so clearly.
+      When asked about schedules or timelines, check the summary and next_step fields for relevant information.
+      If no scheduling information is found, suggest contacting the project manager for more details.`
     }
 
     // Add system message to the beginning of the messages array

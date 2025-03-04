@@ -13,7 +13,8 @@ const AgentChat: React.FC = () => {
       <h1 className="text-2xl font-bold mb-6">AI Project Assistant</h1>
       <p className="text-muted-foreground mb-6">
         Chat with our AI assistant to get information about projects, workflows, and more.
-        {projectId && " Your conversation is contextualized with the current project's data."}
+        You can refer to projects by their CRM ID or Project ID in your questions.
+        {projectId && " Your conversation is already contextualized with the current project's data."}
       </p>
       <ChatInterface projectId={projectId} />
     </div>
