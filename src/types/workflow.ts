@@ -12,6 +12,7 @@ export type Project = {
   summary: string | null;
   project_track: string | null;
   track_name?: string | null;
+  next_step?: string | null;  // Added this field to match the database schema
 };
 
 export type TestResult = {
