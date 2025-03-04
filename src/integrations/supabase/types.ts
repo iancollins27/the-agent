@@ -47,6 +47,33 @@ export type Database = {
           },
         ]
       }
+      chatbot_config: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          search_project_data: boolean
+          system_prompt: string
+          temperature: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string
+          search_project_data?: boolean
+          system_prompt: string
+          temperature?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          search_project_data?: boolean
+          system_prompt?: string
+          temperature?: number
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           default_project_track: string | null

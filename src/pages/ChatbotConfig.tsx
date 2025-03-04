@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +12,15 @@ import { supabase } from "@/integrations/supabase/client";
 import ChatInterface from '@/components/Chat/ChatInterface';
 
 type ModelOption = 'gpt-4o-mini' | 'gpt-4o';
+
+interface ChatbotConfig {
+  id: string;
+  system_prompt: string;
+  model: ModelOption;
+  temperature: number;
+  search_project_data: boolean;
+  created_at: string;
+}
 
 const ChatbotConfig = () => {
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -40,7 +48,6 @@ const ChatbotConfig = () => {
       
       if (error) {
         console.error('Error fetching system prompt:', error);
-        // Set default prompt if none exists
         setSystemPrompt(
           `You are an intelligent project assistant that helps manage project workflows.
 Answer questions about projects or workflow processes. If you don't know something, say so clearly.
@@ -48,10 +55,11 @@ When asked about schedules or timelines, check the summary and next_step fields 
 If no scheduling information is found, suggest contacting the project manager for more details.`
         );
       } else if (data) {
-        setSystemPrompt(data.system_prompt);
-        setSelectedModel(data.model || 'gpt-4o-mini');
-        setTemperature(data.temperature || 0.7);
-        setSearchProjectData(data.search_project_data !== false);
+        const config = data as ChatbotConfig;
+        setSystemPrompt(config.system_prompt);
+        setSelectedModel(config.model || 'gpt-4o-mini');
+        setTemperature(config.temperature || 0.7);
+        setSearchProjectData(config.search_project_data !== false);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -63,14 +71,16 @@ If no scheduling information is found, suggest contacting the project manager fo
   const saveConfiguration = async () => {
     setIsSaving(true);
     try {
+      const configData = {
+        system_prompt: systemPrompt,
+        model: selectedModel,
+        temperature: temperature,
+        search_project_data: searchProjectData
+      };
+      
       const { error } = await supabase
         .from('chatbot_config')
-        .insert({
-          system_prompt: systemPrompt,
-          model: selectedModel,
-          temperature: temperature,
-          search_project_data: searchProjectData
-        });
+        .insert(configData);
       
       if (error) {
         throw error;
