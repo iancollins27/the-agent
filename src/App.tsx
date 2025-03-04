@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminConsole from "./pages/AdminConsole";
+import AgentChat from "./pages/AgentChat";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,14 @@ const App = () => (
             }
           />
           <Route path="/admin" element={<AdminConsole />} />
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <AgentChat />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
