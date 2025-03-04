@@ -69,13 +69,21 @@ export async function getMilestoneInstructions(
 ) {
   if (!nextStep || !trackId) return null;
   
-  const { data: milestoneData } = await supabase
+  console.log(`Fetching milestone instructions for step: ${nextStep} and track: ${trackId}`);
+  
+  const { data: milestoneData, error } = await supabase
     .from('project_track_milestones')
     .select('prompt_instructions')
     .eq('track_id', trackId)
     .eq('step_title', nextStep)
-    .single()
+    .maybeSingle()
   
+  if (error) {
+    console.error('Error fetching milestone instructions:', error);
+    return null;
+  }
+  
+  console.log('Milestone data retrieved:', milestoneData);
   return milestoneData?.prompt_instructions || null;
 }
 

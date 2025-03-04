@@ -41,6 +41,7 @@ serve(async (req) => {
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
     console.log("Context data provided:", contextData);
+    console.log("Milestone instructions:", contextData.milestone_instructions);
     
     if (!promptText) {
       throw new Error("Prompt text is required");
@@ -89,16 +90,16 @@ serve(async (req) => {
       // If we don't have an OpenAI API key, generate mock results
       switch (promptType) {
         case "summary_generation":
-          result = `This is a sample summary for a project in the ${contextData.track_name} track. Generated on ${contextData.current_date}.`;
+          result = `This is a sample summary for a project in the ${contextData.track_name} track. Generated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
           break;
         case "summary_update":
-          result = `Updated summary based on: "${contextData.summary}". Project is in the ${contextData.track_name} track. Last updated on ${contextData.current_date}.`;
+          result = `Updated summary based on: "${contextData.summary}". Project is in the ${contextData.track_name} track. Last updated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
           break;
         case "action_detection":
-          result = `Based on the summary "${contextData.summary}" for the ${contextData.track_name} track, here are some detected actions:\n1. Schedule a follow-up call\n2. Prepare project materials\n3. Review timeline`;
+          result = `Based on the summary "${contextData.summary}" for the ${contextData.track_name} track, here are some detected actions:\n1. Schedule a follow-up call\n2. Prepare project materials\n3. Review timeline. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
           break;
         case "action_execution":
-          result = `For the action "${contextData.action_description}" on project with summary "${contextData.summary}" in the ${contextData.track_name} track, here are execution steps:\n1. Step one\n2. Step two\n3. Step three`;
+          result = `For the action "${contextData.action_description}" on project with summary "${contextData.summary}" in the ${contextData.track_name} track, here are execution steps:\n1. Step one\n2. Step two\n3. Step three. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
           break;
         default:
           result = "Unknown prompt type";

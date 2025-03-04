@@ -39,6 +39,7 @@ const TestingTab = () => {
           id,
           summary,
           project_track,
+          next_step,
           project_tracks (
             name
           )
@@ -70,6 +71,43 @@ const TestingTab = () => {
     );
   };
 
+  const fetchMilestoneInstructions = async (projectId: string) => {
+    try {
+      const project = projects?.find(p => p.id === projectId);
+      
+      if (!project || !project.project_track || !project.next_step) {
+        console.log(`No track or next step for project ${projectId}`, {
+          track: project?.project_track,
+          nextStep: project?.next_step
+        });
+        return "";
+      }
+      
+      console.log(`Fetching milestone instructions for project ${projectId}`, {
+        track: project.project_track,
+        nextStep: project.next_step
+      });
+      
+      const { data, error } = await supabase
+        .from('project_track_milestones')
+        .select('prompt_instructions')
+        .eq('track_id', project.project_track)
+        .eq('step_title', project.next_step)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching milestone instructions:', error);
+        return "";
+      }
+      
+      console.log('Milestone instructions found:', data);
+      return data?.prompt_instructions || "";
+    } catch (error) {
+      console.error('Exception fetching milestone instructions:', error);
+      return "";
+    }
+  };
+
   const testPromptSequence = async () => {
     if (!selectedPrompts?.length) {
       toast({
@@ -95,24 +133,9 @@ const TestingTab = () => {
           continue;
         }
 
-        // Fetch milestone instructions for this project's track
-        let milestoneInstructions = "";
-        if (project.project_track) {
-          const { data: milestoneData, error: milestoneError } = await supabase
-            .from('project_track_milestones')
-            .select('prompt_instructions')
-            .eq('track_id', project.project_track)
-            .order('step_order', { ascending: true })
-            .limit(1);
-          
-          if (!milestoneError && milestoneData && milestoneData.length > 0) {
-            milestoneInstructions = milestoneData[0].prompt_instructions || "";
-          }
-          
-          if (milestoneError) {
-            console.error("Error fetching milestone instructions:", milestoneError);
-          }
-        }
+        // Fetch milestone instructions for this project
+        const milestoneInstructions = await fetchMilestoneInstructions(projectId);
+        console.log(`Milestone instructions for project ${projectId}:`, milestoneInstructions);
 
         for (const prompt of selectedPromptData) {
           console.log(`Testing prompt type: ${prompt.type}`);
@@ -125,7 +148,8 @@ const TestingTab = () => {
             current_date: new Date().toLocaleDateString(),
             action_description: 'Sample action description for testing', // For action execution testing
             milestone_instructions: milestoneInstructions,
-            previousResults: results
+            previousResults: results,
+            new_data: JSON.stringify({sampleData: 'Test data for project update'})
           };
           
           console.log('Test context data:', testContextData);
