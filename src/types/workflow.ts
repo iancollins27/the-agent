@@ -34,23 +34,27 @@ export const availableVariables = {
   summary_generation: [
     { name: "track_name", description: "The name of the project track" },
     { name: "new_data", description: "The data received from CRM" },
-    { name: "current_date", description: "Today's date" }
+    { name: "current_date", description: "Today's date" },
+    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
   ],
   summary_update: [
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "new_data", description: "The data received from CRM" },
-    { name: "current_date", description: "Today's date" }
+    { name: "current_date", description: "Today's date" },
+    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
   ],
   action_detection: [
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
-    { name: "current_date", description: "Today's date" }
+    { name: "current_date", description: "Today's date" },
+    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
   ],
   action_execution: [
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "action_description", description: "The description of the action to be executed" },
-    { name: "current_date", description: "Today's date" }
+    { name: "current_date", description: "Today's date" },
+    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
   ]
 };

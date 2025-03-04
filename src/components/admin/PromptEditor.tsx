@@ -39,6 +39,30 @@ const PromptEditor = ({
     }
   };
 
+  const insertVariable = (variable: string) => {
+    if (editingPrompt) {
+      const textArea = document.querySelector('textarea') as HTMLTextAreaElement;
+      if (textArea) {
+        const cursorPos = textArea.selectionStart;
+        const textBefore = editingPrompt.prompt_text.substring(0, cursorPos);
+        const textAfter = editingPrompt.prompt_text.substring(cursorPos);
+        
+        const newText = `${textBefore}{{${variable}}}${textAfter}`;
+        setEditingPrompt({
+          ...editingPrompt,
+          prompt_text: newText
+        });
+        
+        // Set cursor position after the inserted variable
+        setTimeout(() => {
+          textArea.focus();
+          const newCursorPos = cursorPos + variable.length + 4; // +4 for the {{ and }}
+          textArea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+      }
+    }
+  };
+
   // Helper function to provide a default prompt template for summary update
   const getSuggestedPromptTemplate = () => {
     if (prompt.type === 'summary_update') {
@@ -54,14 +78,18 @@ New Information:
 
 Today's Date: {{current_date}}
 
+Milestone Instructions:
+{{milestone_instructions}}
+
 Instructions:
 1. Review the current project summary
 2. Integrate the new information provided
-3. Maintain a professional tone and clarity
-4. Keep the updated summary comprehensive but concise
-5. Include key dates, actions, and relevant stakeholders
-6. Preserve any critical historical information from the original summary
-7. Ensure the updated summary provides a complete picture of the project status
+3. Follow any specific milestone instructions above
+4. Maintain a professional tone and clarity
+5. Keep the updated summary comprehensive but concise
+6. Include key dates, actions, and relevant stakeholders
+7. Preserve any critical historical information from the original summary
+8. Ensure the updated summary provides a complete picture of the project status
 
 Please provide an updated project summary that incorporates the new information while maintaining the context and structure of the original summary.`;
     }
@@ -80,13 +108,25 @@ Please provide an updated project summary that incorporates the new information 
             <h4 className="font-medium text-sm">Available Variables</h4>
             <div className="grid gap-2">
               {availableVariables[prompt.type].map((variable) => (
-                <div key={variable.name} className="text-sm">
-                  <code className="bg-muted px-1 py-0.5 rounded">
-                    {`{{${variable.name}}}`}
-                  </code>
-                  <span className="text-muted-foreground ml-2">
-                    - {variable.description}
-                  </span>
+                <div key={variable.name} className="text-sm flex items-center justify-between">
+                  <div>
+                    <code className="bg-muted px-1 py-0.5 rounded">
+                      {`{{${variable.name}}}`}
+                    </code>
+                    <span className="text-muted-foreground ml-2">
+                      - {variable.description}
+                    </span>
+                  </div>
+                  {isEditing && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => insertVariable(variable.name)}
+                      className="text-xs"
+                    >
+                      Insert
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

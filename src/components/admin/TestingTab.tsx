@@ -95,6 +95,25 @@ const TestingTab = () => {
           continue;
         }
 
+        // Fetch milestone instructions for this project's track
+        let milestoneInstructions = "";
+        if (project.project_track) {
+          const { data: milestoneData, error: milestoneError } = await supabase
+            .from('project_track_milestones')
+            .select('prompt_instructions')
+            .eq('track_id', project.project_track)
+            .order('step_order', { ascending: true })
+            .limit(1);
+          
+          if (!milestoneError && milestoneData && milestoneData.length > 0) {
+            milestoneInstructions = milestoneData[0].prompt_instructions || "";
+          }
+          
+          if (milestoneError) {
+            console.error("Error fetching milestone instructions:", milestoneError);
+          }
+        }
+
         for (const prompt of selectedPromptData) {
           console.log(`Testing prompt type: ${prompt.type}`);
           
@@ -105,6 +124,7 @@ const TestingTab = () => {
             track_name: project.track_name || 'No Track',
             current_date: new Date().toLocaleDateString(),
             action_description: 'Sample action description for testing', // For action execution testing
+            milestone_instructions: milestoneInstructions,
             previousResults: results
           };
           
