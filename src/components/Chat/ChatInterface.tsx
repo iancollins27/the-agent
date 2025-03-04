@@ -16,9 +16,10 @@ type Message = {
 type ChatInterfaceProps = {
   projectId?: string;
   className?: string;
+  presetMessage?: string;
 };
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, presetMessage }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,6 +30,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className }) =
     // Scroll to bottom whenever messages change
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle preset message if provided
+  useEffect(() => {
+    if (presetMessage && presetMessage.trim() !== '') {
+      setInput(presetMessage);
+    }
+  }, [presetMessage]);
 
   const handleSend = async () => {
     if (!input.trim()) return;

@@ -27,6 +27,31 @@ serve(async (req) => {
 
     const { messages, projectId } = await req.json()
     
+    // Fetch the latest chatbot configuration
+    const { data: configData, error: configError } = await supabase
+      .from('chatbot_config')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (configError && configError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('Error fetching chatbot config:', configError);
+    }
+    
+    // Default configuration if none found
+    const botConfig = configData || {
+      system_prompt: `You are an intelligent project assistant that helps manage project workflows.
+      Answer questions about projects or workflow processes. If you don't know something, say so clearly.
+      When asked about schedules or timelines, check the summary and next_step fields for relevant information.
+      If no scheduling information is found, suggest contacting the project manager for more details.`,
+      model: 'gpt-4o-mini',
+      temperature: 0.7,
+      search_project_data: true
+    };
+    
+    console.log('Using bot configuration:', botConfig);
+    
     // Extract the latest user message to check for CRM ID
     const latestUserMessage = messages.length > 0 && messages[messages.length - 1].role === 'user' 
       ? messages[messages.length - 1].content 
@@ -40,55 +65,58 @@ serve(async (req) => {
     let projectData = null;
     let searchContext = '';
     
-    // First try to get project by explicit projectId
-    if (projectId) {
-      console.log('Fetching project data for ID:', projectId);
-      const { data: project, error: projectError } = await supabase
-        .from('projects')
-        .select(`
-          id, 
-          summary, 
-          next_step,
-          project_track,
-          company_id,
-          companies(name)
-        `)
-        .eq('id', projectId)
-        .single();
+    // Only search for project data if enabled in config
+    if (botConfig.search_project_data !== false) {
+      // First try to get project by explicit projectId
+      if (projectId) {
+        console.log('Fetching project data for ID:', projectId);
+        const { data: project, error: projectError } = await supabase
+          .from('projects')
+          .select(`
+            id, 
+            summary, 
+            next_step,
+            project_track,
+            company_id,
+            companies(name)
+          `)
+          .eq('id', projectId)
+          .single();
 
-      if (projectError) {
-        console.error('Error fetching project by ID:', projectError);
-      } else if (project) {
-        projectData = project;
-        console.log('Found project data by ID:', project);
-      }
-    } 
-    // If no project found by ID or no ID provided, try CRM ID
-    else if (crmIdMatch && crmIdMatch[1]) {
-      const crmId = crmIdMatch[1];
-      console.log('Attempting to fetch project by CRM ID:', crmId);
-      
-      const { data: projects, error: crmError } = await supabase
-        .from('projects')
-        .select(`
-          id, 
-          summary, 
-          next_step,
-          project_track,
-          crm_id,
-          company_id,
-          companies(name)
-        `)
-        .eq('crm_id', crmId);
-      
-      if (crmError) {
-        console.error('Error fetching project by CRM ID:', crmError);
-      } else if (projects && projects.length > 0) {
-        projectData = projects[0];
-        console.log('Found project data by CRM ID:', projectData);
-        searchContext = `I found information for project with CRM ID ${crmId}.`;
-      } else {
-        searchContext = `I searched for a project with CRM ID ${crmId} but couldn't find any matching records.`;
+        if (projectError) {
+          console.error('Error fetching project by ID:', projectError);
+        } else if (project) {
+          projectData = project;
+          console.log('Found project data by ID:', project);
+        }
+      } 
+      // If no project found by ID or no ID provided, try CRM ID
+      else if (crmIdMatch && crmIdMatch[1]) {
+        const crmId = crmIdMatch[1];
+        console.log('Attempting to fetch project by CRM ID:', crmId);
+        
+        const { data: projects, error: crmError } = await supabase
+          .from('projects')
+          .select(`
+            id, 
+            summary, 
+            next_step,
+            project_track,
+            crm_id,
+            company_id,
+            companies(name)
+          `)
+          .eq('crm_id', crmId);
+        
+        if (crmError) {
+          console.error('Error fetching project by CRM ID:', crmError);
+        } else if (projects && projects.length > 0) {
+          projectData = projects[0];
+          console.log('Found project data by CRM ID:', projectData);
+          searchContext = `I found information for project with CRM ID ${crmId}.`;
+        } else {
+          searchContext = `I searched for a project with CRM ID ${crmId} but couldn't find any matching records.`;
+        }
       }
     }
 
@@ -109,10 +137,10 @@ serve(async (req) => {
       }
     }
 
-    // Construct system message with project data if available
+    // Use the custom system prompt from configuration
     const systemMessage = {
       role: 'system',
-      content: `You are an intelligent project assistant that helps manage project workflows. 
+      content: `${botConfig.system_prompt}
       ${searchContext}
       ${projectData ? `
         Current project information:
@@ -123,11 +151,7 @@ serve(async (req) => {
         - Next Step: ${projectData.next_step || 'No next step defined'}
         ${trackData ? `- Project Track: ${trackData.name}
         - Track Description: ${trackData.description || 'No description available'}` : ''}
-      ` : 'No specific project context is loaded.'}
-      
-      Answer questions about the current project or workflow processes. If you don't know something, say so clearly.
-      When asked about schedules or timelines, check the summary and next_step fields for relevant information.
-      If no scheduling information is found, suggest contacting the project manager for more details.`
+      ` : 'No specific project context is loaded.'}`
     }
 
     // Add system message to the beginning of the messages array
@@ -135,7 +159,7 @@ serve(async (req) => {
 
     console.log('Sending messages to OpenAI:', fullMessages)
 
-    // Call OpenAI API
+    // Call OpenAI API with the configured model and temperature
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -143,9 +167,9 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: botConfig.model || 'gpt-4o-mini',
         messages: fullMessages,
-        temperature: 0.7,
+        temperature: botConfig.temperature || 0.7,
       }),
     })
 

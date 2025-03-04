@@ -1,0 +1,248 @@
+
+import React, { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Save } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import ChatInterface from '@/components/Chat/ChatInterface';
+
+type ModelOption = 'gpt-4o-mini' | 'gpt-4o';
+
+const ChatbotConfig = () => {
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ModelOption>('gpt-4o-mini');
+  const [temperature, setTemperature] = useState(0.7);
+  const [searchProjectData, setSearchProjectData] = useState(true);
+  const [testMessage, setTestMessage] = useState('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchCurrentSystemPrompt();
+  }, []);
+
+  const fetchCurrentSystemPrompt = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('chatbot_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching system prompt:', error);
+        // Set default prompt if none exists
+        setSystemPrompt(
+          `You are an intelligent project assistant that helps manage project workflows.
+Answer questions about projects or workflow processes. If you don't know something, say so clearly.
+When asked about schedules or timelines, check the summary and next_step fields for relevant information.
+If no scheduling information is found, suggest contacting the project manager for more details.`
+        );
+      } else if (data) {
+        setSystemPrompt(data.system_prompt);
+        setSelectedModel(data.model || 'gpt-4o-mini');
+        setTemperature(data.temperature || 0.7);
+        setSearchProjectData(data.search_project_data !== false);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveConfiguration = async () => {
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('chatbot_config')
+        .insert({
+          system_prompt: systemPrompt,
+          model: selectedModel,
+          temperature: temperature,
+          search_project_data: searchProjectData
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Configuration Saved",
+        description: "The chatbot configuration has been updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save chatbot configuration.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <header className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Chatbot Configuration</h1>
+        <p className="text-muted-foreground">Customize the AI project assistant's behavior</p>
+      </header>
+
+      <Tabs defaultValue="prompt">
+        <TabsList>
+          <TabsTrigger value="prompt">System Prompt</TabsTrigger>
+          <TabsTrigger value="settings">Model Settings</TabsTrigger>
+          <TabsTrigger value="test">Test Interface</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="prompt" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Prompt</CardTitle>
+              <CardDescription>
+                This is the instruction that primes the AI assistant's behavior and knowledge. 
+                This prompt will be sent at the beginning of every conversation.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <Textarea 
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  className="min-h-[300px] font-mono text-sm"
+                  placeholder="Enter system prompt..."
+                />
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button onClick={saveConfiguration} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Settings</CardTitle>
+              <CardDescription>
+                Configure the AI model parameters to adjust the assistant's responses
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="model">Model</Label>
+                <select 
+                  id="model" 
+                  className="w-full border border-input bg-background px-3 py-2 rounded-md"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value as ModelOption)}
+                >
+                  <option value="gpt-4o-mini">GPT-4o Mini (Faster, cheaper)</option>
+                  <option value="gpt-4o">GPT-4o (More powerful)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="temperature">
+                  Temperature: {temperature}
+                </Label>
+                <Input 
+                  id="temperature" 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.1" 
+                  value={temperature}
+                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Lower values make responses more deterministic. Higher values make responses more creative.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="search-project-data" 
+                  checked={searchProjectData}
+                  onCheckedChange={setSearchProjectData}
+                />
+                <Label htmlFor="search-project-data">Search project data when CRM ID is mentioned</Label>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button onClick={saveConfiguration} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="test" className="space-y-6">
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Test Message</CardTitle>
+              <CardDescription>
+                Enter a test message to simulate a user interaction with the configured bot
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Input 
+                value={testMessage} 
+                onChange={(e) => setTestMessage(e.target.value)}
+                placeholder="e.g., What is the status of project CRM ID 12345?"
+                className="mb-4"
+              />
+              <p className="text-sm text-muted-foreground mb-2">
+                Tip: Try including a CRM ID to test the project data lookup functionality
+              </p>
+            </CardContent>
+          </Card>
+          
+          <div className="h-[600px]">
+            <ChatInterface projectId={undefined} presetMessage={testMessage} />
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default ChatbotConfig;

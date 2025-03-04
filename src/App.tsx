@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminConsole from "./pages/AdminConsole";
 import AgentChat from "./pages/AgentChat";
+import ChatbotConfig from "./pages/ChatbotConfig";
 
 const queryClient = new QueryClient();
 
@@ -42,12 +43,27 @@ const App = () => (
               </ProtectedRoute>
             }
           />
-          <Route path="/admin" element={<AdminConsole />} />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute>
+                <AdminConsole />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="/chat" 
             element={
               <ProtectedRoute>
                 <AgentChat />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chatbot-config" 
+            element={
+              <ProtectedRoute>
+                <ChatbotConfig />
               </ProtectedRoute>
             } 
           />
