@@ -1,15 +1,16 @@
 
 import { useState, useEffect } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
 type ProjectSelectorProps = {
-  selectedProjectId: string | null;
-  setSelectedProjectId: (id: string | null) => void;
+  selectedProjectIds: string[];
+  setSelectedProjectIds: (ids: string[]) => void;
 };
 
-const ProjectSelector = ({ selectedProjectId, setSelectedProjectId }: ProjectSelectorProps) => {
+const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectSelectorProps) => {
   const [projects, setProjects] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -20,6 +21,7 @@ const ProjectSelector = ({ selectedProjectId, setSelectedProjectId }: ProjectSel
         .from('projects')
         .select(`
           id,
+          next_step,
           companies(name)
         `)
         .order('id');
@@ -35,6 +37,14 @@ const ProjectSelector = ({ selectedProjectId, setSelectedProjectId }: ProjectSel
     fetchProjects();
   }, []);
   
+  const handleProjectToggle = (projectId: string) => {
+    if (selectedProjectIds.includes(projectId)) {
+      setSelectedProjectIds(selectedProjectIds.filter(id => id !== projectId));
+    } else {
+      setSelectedProjectIds([...selectedProjectIds, projectId]);
+    }
+  };
+  
   return (
     <div>
       {isLoading ? (
@@ -43,21 +53,27 @@ const ProjectSelector = ({ selectedProjectId, setSelectedProjectId }: ProjectSel
           <span>Loading projects...</span>
         </div>
       ) : (
-        <Select 
-          value={selectedProjectId || ''} 
-          onValueChange={(value) => setSelectedProjectId(value || null)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select a project" />
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.companies?.name || 'Unknown'} - {project.id.substring(0, 8)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="space-y-2">
+          {projects.map((project) => (
+            <div key={project.id} className="flex items-center space-x-2">
+              <Checkbox 
+                id={`project-${project.id}`} 
+                checked={selectedProjectIds.includes(project.id)}
+                onCheckedChange={() => handleProjectToggle(project.id)}
+              />
+              <Label htmlFor={`project-${project.id}`} className="flex-1">
+                <span>{project.companies?.name || 'Unknown'}</span>
+                <span className="mx-2">-</span>
+                <span className="text-sm text-muted-foreground">{project.id.substring(0, 8)}</span>
+                {project.next_step && (
+                  <span className="ml-2 text-sm bg-muted px-2 py-0.5 rounded-full">
+                    {project.next_step}
+                  </span>
+                )}
+              </Label>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

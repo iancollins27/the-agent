@@ -1,16 +1,17 @@
 
 import { useState, useEffect } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { workflowTitles } from "@/types/workflow";
 import { Loader2 } from "lucide-react";
 
 type PromptSelectorProps = {
-  selectedPromptId: string | null;
-  setSelectedPromptId: (id: string | null) => void;
+  selectedPromptIds: string[];
+  setSelectedPromptIds: (ids: string[]) => void;
 };
 
-const PromptSelector = ({ selectedPromptId, setSelectedPromptId }: PromptSelectorProps) => {
+const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelectorProps) => {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -33,6 +34,14 @@ const PromptSelector = ({ selectedPromptId, setSelectedPromptId }: PromptSelecto
     fetchPrompts();
   }, []);
   
+  const handlePromptToggle = (promptId: string) => {
+    if (selectedPromptIds.includes(promptId)) {
+      setSelectedPromptIds(selectedPromptIds.filter(id => id !== promptId));
+    } else {
+      setSelectedPromptIds([...selectedPromptIds, promptId]);
+    }
+  };
+  
   return (
     <div>
       {isLoading ? (
@@ -41,21 +50,20 @@ const PromptSelector = ({ selectedPromptId, setSelectedPromptId }: PromptSelecto
           <span>Loading prompts...</span>
         </div>
       ) : (
-        <Select 
-          value={selectedPromptId || ''} 
-          onValueChange={(value) => setSelectedPromptId(value || null)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select a prompt" />
-          </SelectTrigger>
-          <SelectContent>
-            {prompts.map((prompt) => (
-              <SelectItem key={prompt.id} value={prompt.id}>
+        <div className="space-y-2">
+          {prompts.map((prompt) => (
+            <div key={prompt.id} className="flex items-center space-x-2">
+              <Checkbox 
+                id={`prompt-${prompt.id}`} 
+                checked={selectedPromptIds.includes(prompt.id)}
+                onCheckedChange={() => handlePromptToggle(prompt.id)}
+              />
+              <Label htmlFor={`prompt-${prompt.id}`}>
                 {workflowTitles[prompt.type] || prompt.type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              </Label>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
