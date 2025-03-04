@@ -12,7 +12,7 @@ export async function handleCompany(
   // First, try to find an existing company with this Zoho ID
   const { data: existingCompanies, error: findError } = await supabase
     .from('companies')
-    .select('id, name')
+    .select('id, name, default_project_track')
     .eq('zoho_id', projectData.zohoCompanyId)
     .maybeSingle();
 
@@ -24,7 +24,10 @@ export async function handleCompany(
   // If company exists, use its UUID
   if (existingCompanies) {
     console.log('Found existing company:', existingCompanies);
-    return existingCompanies.id;
+    return {
+      id: existingCompanies.id,
+      defaultTrackId: existingCompanies.default_project_track
+    };
   }
 
   // If company doesn't exist, create it and get the new UUID
@@ -46,7 +49,10 @@ export async function handleCompany(
   }
 
   console.log('Created new company:', newCompany);
-  return newCompany.id;
+  return {
+    id: newCompany.id,
+    defaultTrackId: newCompany.default_project_track
+  };
 }
 
 export async function getExistingProject(
@@ -112,6 +118,7 @@ export async function updateProject(
     next_step: string | undefined;
     last_action_check: string;
     company_id: string;
+    project_track?: string | null;
   }
 ) {
   const { error: updateError } = await supabase
@@ -130,6 +137,7 @@ export async function createProject(
     last_action_check: string;
     company_id: string;
     crm_id: string;
+    project_track?: string | null;
   }
 ) {
   const { error: createError } = await supabase

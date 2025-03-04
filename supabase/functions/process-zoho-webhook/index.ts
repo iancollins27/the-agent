@@ -38,18 +38,25 @@ serve(async (req) => {
     const projectData = await parseZohoData(rawData)
     console.log('Parsed project data:', projectData)
 
-    // Handle company creation/verification and get the Supabase UUID
-    const companyUuid = await handleCompany(supabase, projectData, rawData)
-    console.log('Using company UUID:', companyUuid)
+    // Handle company creation/verification and get the Supabase UUID and default track
+    const companyInfo = await handleCompany(supabase, projectData, rawData)
+    const companyUuid = companyInfo.id
+    const defaultTrackId = companyInfo.defaultTrackId
+    
+    console.log('Using company UUID:', companyUuid, 'Default track ID:', defaultTrackId)
     
     // Get existing project if any
     const existingProject = await getExistingProject(supabase, projectData.crmId)
+
+    // Determine which project track to use
+    const projectTrackId = existingProject?.project_track || defaultTrackId || null
+    console.log('Using project track ID:', projectTrackId)
 
     // Get milestone instructions if next step exists
     const nextStepInstructions = await getMilestoneInstructions(
       supabase,
       projectData.nextStep,
-      existingProject?.project_track
+      projectTrackId
     )
 
     // Get and format the workflow prompt
@@ -68,7 +75,8 @@ serve(async (req) => {
       summary,
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
-      company_id: companyUuid  // Use the UUID we got from handleCompany
+      company_id: companyUuid,  // Use the UUID we got from handleCompany
+      project_track: projectTrackId  // Add project track ID
     }
 
     // Update or create project
@@ -91,7 +99,8 @@ serve(async (req) => {
         isNewProject: !existingProject,
         parsedData: projectData,
         nextStepInstructions,
-        companyUuid
+        companyUuid,
+        projectTrackId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
