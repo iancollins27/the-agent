@@ -14,4 +14,6 @@ export type PromptRun = {
   error_message: string | null;
   project_name?: string;
   workflow_prompt_type?: string;
+  ai_provider?: string | null;
+  ai_model?: string | null;
 };

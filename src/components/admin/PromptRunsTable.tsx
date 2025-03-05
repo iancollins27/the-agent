@@ -27,6 +27,8 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               <TableHead>Created</TableHead>
               <TableHead>Project</TableHead>
               <TableHead>Workflow Type</TableHead>
+              <TableHead>AI Provider</TableHead>
+              <TableHead>AI Model</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Rating</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -40,6 +42,8 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 </TableCell>
                 <TableCell>{run.project_name}</TableCell>
                 <TableCell>{run.workflow_prompt_type}</TableCell>
+                <TableCell>{run.ai_provider || 'Not specified'}</TableCell>
+                <TableCell>{run.ai_model || 'Not specified'}</TableCell>
                 <TableCell>
                   <PromptRunStatusBadge status={run.status} />
                 </TableCell>

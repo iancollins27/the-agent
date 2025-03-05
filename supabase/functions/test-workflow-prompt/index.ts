@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -136,7 +135,7 @@ async function callDeepseek(prompt: string, model: string = "deepseek-chat") {
 }
 
 // New function to log prompt runs
-async function logPromptRun(projectId: string | null, workflowPromptId: string | null, promptInput: string) {
+async function logPromptRun(projectId: string | null, workflowPromptId: string | null, promptInput: string, aiProvider: string, aiModel: string) {
   try {
     const { data, error } = await supabase
       .from('prompt_runs')
@@ -144,7 +143,9 @@ async function logPromptRun(projectId: string | null, workflowPromptId: string |
         project_id: projectId,
         workflow_prompt_id: workflowPromptId,
         prompt_input: promptInput,
-        status: 'PENDING'
+        status: 'PENDING',
+        ai_provider: aiProvider,
+        ai_model: aiModel
       })
       .select()
       .single();
@@ -211,8 +212,8 @@ serve(async (req) => {
     // Replace variables in the prompt text with actual values
     const finalPrompt = replaceVariables(promptText, contextData);
     
-    // Log the prompt run
-    const promptRunId = await logPromptRun(projectId, workflowPromptId, finalPrompt);
+    // Log the prompt run with AI provider and model information
+    const promptRunId = await logPromptRun(projectId, workflowPromptId, finalPrompt, aiProvider, aiModel);
     
     let result: string;
     
