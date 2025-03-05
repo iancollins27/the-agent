@@ -93,15 +93,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
 
   return (
     <Card className={`flex flex-col h-[600px] ${className}`}>
-      <CardHeader className="px-4 py-3 border-b">
+      <CardHeader className="px-4 py-3 border-b shrink-0">
         <CardTitle className="text-lg">Project Assistant</CardTitle>
       </CardHeader>
       
       <CardContent className="flex-1 overflow-hidden p-0">
-        <MessageList messages={messages} />
+        <div className="h-full overflow-y-auto">
+          <MessageList messages={messages} />
+        </div>
       </CardContent>
       
-      <CardFooter className="p-4 border-t">
+      <CardFooter className="p-4 border-t shrink-0">
         <MessageInput 
           onSendMessage={handleSendMessage} 
           isLoading={isLoading} 

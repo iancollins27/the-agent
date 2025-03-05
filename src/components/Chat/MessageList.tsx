@@ -16,8 +16,8 @@ const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-0">
-      <div className="flex flex-col p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto p-0 h-full">
+      <div className="flex flex-col p-4 space-y-4 min-h-full">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4 text-center p-6">
             <p className="text-muted-foreground">
