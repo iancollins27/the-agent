@@ -9,7 +9,7 @@ import {
   getWorkflowPrompt,
   updateProject,
   createProject,
-  logMilestoneUpdates
+  createMilestoneActionRecord
 } from './database.ts'
 import { generateSummary } from './ai.ts'
 
@@ -116,8 +116,8 @@ serve(async (req) => {
       })
     }
 
-    // Log milestone updates
-    await logMilestoneUpdates(supabase, existingProject?.id, projectData.timeline)
+    // Log milestone updates using the new action_records table
+    await createMilestoneActionRecord(supabase, existingProject?.id, projectData.timeline)
 
     return new Response(
       JSON.stringify({ 

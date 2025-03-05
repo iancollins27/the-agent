@@ -153,22 +153,44 @@ export async function createProject(
   if (createError) throw createError;
 }
 
-export async function logMilestoneUpdates(
+export async function createMilestoneActionRecord(
   supabase: ReturnType<typeof createClient>,
-  projectId: string | undefined,
+  projectId: string,
   timeline: ParsedProjectData['timeline']
 ) {
   const milestones = Object.entries(timeline)
     .filter(([_, value]) => value.trim() !== '')
-    .map(([milestone]) => milestone)
+    .map(([milestone]) => milestone);
 
   if (milestones.length > 0) {
-    await supabase
-      .from('action_logs')
+    // Get the project to find the company_id
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('company_id')
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError) {
+      console.error("Error fetching project:", projectError);
+      return null;
+    }
+
+    // Create an action record instead of an action log
+    const { error } = await supabase
+      .from('action_records')
       .insert({
         project_id: projectId,
         action_type: 'milestone_update',
-        action_description: `Project milestones updated: ${milestones.join(', ')}`
-      })
+        action_payload: {
+          milestones: milestones,
+          description: `Project milestones updated: ${milestones.join(', ')}`
+        },
+        requires_approval: false,
+        status: 'completed'
+      });
+      
+    if (error) {
+      console.error("Error creating milestone action record:", error);
+    }
   }
 }

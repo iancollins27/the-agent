@@ -9,44 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      action_logs: {
-        Row: {
-          action_description: string
-          action_type: string
-          created_at: string | null
-          executed_at: string | null
-          id: string
-          project_id: string | null
-          status: string | null
-        }
-        Insert: {
-          action_description: string
-          action_type: string
-          created_at?: string | null
-          executed_at?: string | null
-          id?: string
-          project_id?: string | null
-          status?: string | null
-        }
-        Update: {
-          action_description?: string
-          action_type?: string
-          created_at?: string | null
-          executed_at?: string | null
-          id?: string
-          project_id?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "action_logs_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       action_records: {
         Row: {
           action_payload: Json
