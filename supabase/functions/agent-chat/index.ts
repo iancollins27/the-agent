@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -85,6 +86,7 @@ serve(async (req) => {
           console.error('Error fetching project by ID:', projectError);
         } else if (project) {
           projectData = project;
+          companyId = project.company_id;
           console.log('Found project data by ID:', project);
         }
       } else if (crmIdMatch && crmIdMatch[1]) {
@@ -108,6 +110,7 @@ serve(async (req) => {
           console.error('Error fetching project by CRM ID:', crmError);
         } else if (projects && projects.length > 0) {
           projectData = projects[0];
+          companyId = projects[0].company_id;
           console.log('Found project data by CRM ID:', projectData);
           searchContext = `I found information for project with CRM ID ${crmId}.`;
         } else {
@@ -207,21 +210,8 @@ respond with what you know based on the search results I provide to you. If no k
 in your knowledge base.`;
 
     if (notionIntegrationRequest) {
-      systemPromptWithActions += `\n\nIMPORTANT: The user is asking about integrating with Notion. Help them connect their Notion workspace by responding with:
-1. A normal conversational response explaining what information you need to connect to Notion
-2. A JSON block in this format:
-
-\`\`\`json
-{
-  "action_type": "notion_integration",
-  "notion_token": "User needs to provide their Notion integration token",
-  "notion_database_id": "Optional: ID of a database to import",
-  "notion_page_id": "Optional: ID of a specific page to import",
-  "description": "Connect to Notion to import knowledge base content"
-}
-\`\`\`
-
-Explain that the user needs to provide at least their Notion integration token, and optionally the ID of a database or page they want to import.`;
+      systemPromptWithActions += `\n\nIMPORTANT: The user is asking about integrating with Notion. Inform them that they can connect their Notion workspace by going to the Company Settings page and selecting the Knowledge Base tab.
+Let them know that they don't need to provide their credentials through the chat - they can do it securely through the dedicated settings page.`;
     }
 
     systemPromptWithActions += `\n\nFor data update requests, reply with:
@@ -282,7 +272,7 @@ The JSON block MUST be properly formatted as it will be automatically processed.
           project_id: projectData?.id || null,
           prompt_input: JSON.stringify({
             system: systemMessage.content,
-            user: userMessage
+            user: latestUserMessage
           }),
           status: 'PENDING'
         })
@@ -418,33 +408,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
             } else {
               actionRecordId = actionRecord.id;
               console.log('Created message action record:', actionRecord);
-              
-              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
-            }
-          } else if (actionData.action_type === "notion_integration") {
-            const { data: actionRecord, error: actionError } = await supabase
-              .from('action_records')
-              .insert({
-                prompt_run_id: promptRunId,
-                project_id: projectData.id,
-                action_type: 'notion_integration',
-                action_payload: {
-                  notion_token: actionData.notion_token || "User needs to provide",
-                  notion_database_id: actionData.notion_database_id || null,
-                  notion_page_id: actionData.notion_page_id || null,
-                  description: actionData.description || "Connect to Notion for knowledge base integration"
-                },
-                requires_approval: true,
-                status: 'pending'
-              })
-              .select()
-              .single();
-            
-            if (actionError) {
-              console.error('Error creating Notion integration action record:', actionError);
-            } else {
-              actionRecordId = actionRecord.id;
-              console.log('Created Notion integration action record:', actionRecord);
               
               aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }

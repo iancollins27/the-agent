@@ -206,6 +206,17 @@ If no scheduling information is found, suggest contacting the project manager fo
                 />
                 <Label htmlFor="search-project-data">Search project data when CRM ID is mentioned</Label>
               </div>
+
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-md">
+                <h3 className="font-medium mb-2">Knowledge Base Integration</h3>
+                <p className="text-sm">
+                  To connect your company's knowledge base to the chatbot, please visit the{" "}
+                  <a href="/company-settings" className="text-primary hover:underline">
+                    Company Settings
+                  </a>{" "}
+                  page and set up your integration.
+                </p>
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button onClick={saveConfiguration} disabled={isSaving}>

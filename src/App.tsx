@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +9,7 @@ import NotFound from "./pages/NotFound";
 import AdminConsole from "./pages/AdminConsole";
 import AgentChat from "./pages/AgentChat";
 import ChatbotConfig from "./pages/ChatbotConfig";
+import CompanySettings from "./pages/CompanySettings";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +67,7 @@ const App = () => (
               </ProtectedRoute>
             } 
           />
+          <Route path="/company-settings" element={<CompanySettings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
