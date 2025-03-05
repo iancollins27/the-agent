@@ -145,10 +145,52 @@ serve(async (req) => {
       }
     }
 
+    // Check if the user message contains an action request (like updating a field)
+    // This is a simple pattern matching approach, can be enhanced with NLP
+    const actionRequestPatterns = [
+      { pattern: /mark\s+(the\s+)?(.*?)\s+for\s+(.*)/i, type: 'data_update' },
+      { pattern: /(update|change|set)\s+(the\s+)?(.*?)\s+to\s+(.*)/i, type: 'data_update' },
+      { pattern: /schedule\s+(the\s+)?(.*?)\s+for\s+(.*)/i, type: 'data_update' },
+    ];
+
+    let actionRequest = null;
+    for (const { pattern, type } of actionRequestPatterns) {
+      const match = latestUserMessage.match(pattern);
+      if (match) {
+        console.log('Detected potential action request:', match);
+        actionRequest = { 
+          type, 
+          match: match.slice(1).filter(Boolean),
+          originalMatch: match[0]
+        };
+        break;
+      }
+    }
+
+    // Add action detection instructions to the system prompt if an action request is detected
+    let systemPromptWithActions = botConfig.system_prompt;
+    if (actionRequest && projectData) {
+      systemPromptWithActions += `\n\nI detected that the user might be asking to update project data. 
+      If you think this is an action request to update project information, please respond with:
+      1. A normal conversational reply confirming what will be updated
+      2. Also include a JSON block in the following format:
+      
+      \`\`\`json
+      {
+        "action_type": "data_update",
+        "field_to_update": "the field name that should be updated (e.g. 'next_step', 'summary', etc.)",
+        "new_value": "the new value for the field",
+        "description": "A human-readable description of what's being updated"
+      }
+      \`\`\`
+      
+      Please ensure the JSON block is valid and properly formatted as it will be automatically processed.`;
+    }
+
     // Use the custom system prompt from configuration
     const systemMessage = {
       role: 'system',
-      content: `${botConfig.system_prompt}
+      content: `${systemPromptWithActions}
       ${searchContext}
       ${projectData ? `
         Current project information:
@@ -262,21 +304,68 @@ serve(async (req) => {
       }
     }
 
-    console.log('AI response received');
+    console.log('AI response received:', aiResponse);
+    
+    // Extract action from AI response if an action request was detected
+    let actionRecordId = null;
+    if (actionRequest && projectData && aiResponse) {
+      try {
+        const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+          const actionData = JSON.parse(jsonMatch[1].trim());
+          console.log('Extracted action data:', actionData);
+          
+          if (actionData && actionData.field_to_update && actionData.new_value) {
+            // Create an action record
+            const { data: actionRecord, error: actionError } = await supabase
+              .from('action_records')
+              .insert({
+                prompt_run_id: promptRunId,
+                project_id: projectData.id,
+                action_type: actionData.action_type || 'data_update',
+                action_payload: {
+                  field: actionData.field_to_update,
+                  value: actionData.new_value,
+                  description: actionData.description || `Update ${actionData.field_to_update} to ${actionData.new_value}`
+                },
+                requires_approval: true,
+                status: 'pending'
+              })
+              .select()
+              .single();
+            
+            if (actionError) {
+              console.error('Error creating action record:', actionError);
+            } else {
+              actionRecordId = actionRecord.id;
+              console.log('Created action record:', actionRecord);
+              
+              // Remove the JSON block from the response
+              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+            }
+          }
+        }
+      } catch (parseError) {
+        console.error('Error parsing action data:', parseError);
+      }
+    }
+
+    console.log('Final AI response returned:', aiResponse);
     return new Response(JSON.stringify({ 
       reply: aiResponse,
-      projectData: projectData
+      projectData: projectData,
+      actionRecordId: actionRecordId
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
   } catch (error) {
-    console.error('Error in agent-chat function:', error)
+    console.error('Error in agent-chat function:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+    });
   }
-})
+});
 
 async function callOpenAI(messages, apiKey, model = 'gpt-4o-mini', temperature = 0.7) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
