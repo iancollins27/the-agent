@@ -54,8 +54,15 @@ export function extractJsonFromResponse(response: string): any | null {
     // First try direct parsing
     return JSON.parse(response);
   } catch (error) {
-    // If that fails, try to find JSON in the string
+    // If direct parsing fails, try to extract JSON from the response
     try {
+      // Look for JSON in markdown code blocks (```json ... ```)
+      const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        return JSON.parse(codeBlockMatch[1]);
+      }
+      
+      // If no code block, try to find any JSON object in the string
       const jsonRegex = /\{[\s\S]*\}/;
       const match = response.match(jsonRegex);
       if (match) {

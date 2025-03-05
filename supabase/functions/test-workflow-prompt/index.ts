@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { callAIProvider } from "./ai-providers.ts";
 import { logPromptRun, updatePromptRunWithResult, createActionRecord } from "./database.ts";
-import { replaceVariables, generateMockResult } from "./utils.ts";
+import { replaceVariables, generateMockResult, extractJsonFromResponse } from "./utils.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -45,6 +45,7 @@ serve(async (req) => {
     try {
       // Call the appropriate AI provider
       result = await callAIProvider(aiProvider, aiModel, finalPrompt);
+      console.log("Raw AI response:", result);
       
       // Update the prompt run with the result
       await updatePromptRunWithResult(supabase, promptRunId, result);
@@ -52,11 +53,17 @@ serve(async (req) => {
       // For action detection+execution prompt, create an action record if applicable
       if (promptType === "action_detection_execution" && promptRunId && projectId) {
         try {
-          console.log("Checking for action data in result:", result);
-          // Try to parse the result as JSON
-          const actionData = JSON.parse(result);
+          console.log("Checking for action data in result");
+          // Try to parse the result as JSON using our improved extractor
+          const actionData = extractJsonFromResponse(result);
           console.log("Parsed action data:", actionData);
-          actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
+          
+          if (actionData && actionData.decision === "ACTION_NEEDED") {
+            actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
+            console.log("Created action record:", actionRecordId);
+          } else {
+            console.log("No action needed or invalid action data format");
+          }
         } catch (parseError) {
           console.error("Error parsing action data:", parseError);
           // If parsing fails, we don't create an action record
