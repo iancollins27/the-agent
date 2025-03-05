@@ -89,13 +89,27 @@ export async function createActionRecord(
     
     // Only create an action record if the decision is ACTION_NEEDED
     if (decision === "ACTION_NEEDED") {
-      const requiresApproval = true; // Default to requiring approval for safety
-      const actionType = "message"; // Default to message type
+      // Extract action type from response or default to message
+      const actionType = actionData.action_type || "message";
       
-      const actionPayload = {
+      // Extract requires_approval flag or default to true for safety
+      const requiresApproval = actionData.requires_approval !== undefined 
+        ? actionData.requires_approval 
+        : true;
+      
+      // Use provided action_payload or build a default one
+      const actionPayload = actionData.action_payload || {
         message_text: actionData.message_text,
         reason: actionData.reason
       };
+      
+      console.log("Creating action record with data:", {
+        prompt_run_id: promptRunId,
+        project_id: projectId,
+        action_type: actionType,
+        action_payload: actionPayload,
+        requires_approval: requiresApproval
+      });
       
       const { data, error } = await supabase
         .from('action_records')
@@ -115,6 +129,7 @@ export async function createActionRecord(
         return null;
       }
       
+      console.log("Action record created successfully:", data);
       return data.id;
     } else {
       console.log("No action needed based on AI decision:", decision);
