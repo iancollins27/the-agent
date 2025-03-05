@@ -47,6 +47,70 @@ export type Database = {
           },
         ]
       }
+      action_records: {
+        Row: {
+          action_payload: Json
+          action_type: string
+          approver_id: string | null
+          created_at: string
+          executed_at: string | null
+          execution_result: Json | null
+          id: string
+          project_id: string | null
+          prompt_run_id: string | null
+          requires_approval: boolean
+          status: string
+        }
+        Insert: {
+          action_payload: Json
+          action_type: string
+          approver_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          execution_result?: Json | null
+          id?: string
+          project_id?: string | null
+          prompt_run_id?: string | null
+          requires_approval?: boolean
+          status?: string
+        }
+        Update: {
+          action_payload?: Json
+          action_type?: string
+          approver_id?: string | null
+          created_at?: string
+          executed_at?: string | null
+          execution_result?: Json | null
+          id?: string
+          project_id?: string | null
+          prompt_run_id?: string | null
+          requires_approval?: boolean
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_records_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_records_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_records_prompt_run_id_fkey"
+            columns: ["prompt_run_id"]
+            isOneToOne: false
+            referencedRelation: "prompt_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_config: {
         Row: {
           created_at: string
@@ -316,6 +380,8 @@ export type Database = {
       }
       prompt_runs: {
         Row: {
+          ai_model: string | null
+          ai_provider: string | null
           completed_at: string | null
           created_at: string
           error_message: string | null
@@ -330,6 +396,8 @@ export type Database = {
           workflow_prompt_id: string | null
         }
         Insert: {
+          ai_model?: string | null
+          ai_provider?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
@@ -344,6 +412,8 @@ export type Database = {
           workflow_prompt_id?: string | null
         }
         Update: {
+          ai_model?: string | null
+          ai_provider?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null

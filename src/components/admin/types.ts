@@ -17,3 +17,19 @@ export type PromptRun = {
   ai_provider?: string | null;
   ai_model?: string | null;
 };
+
+export type ActionRecord = {
+  id: string;
+  prompt_run_id: string;
+  project_id: string;
+  action_type: 'message' | 'data_update' | 'request_for_data_update';
+  action_payload: Record<string, any>;
+  created_at: string;
+  executed_at: string | null;
+  approver_id: string | null;
+  requires_approval: boolean;
+  execution_result: Record<string, any> | null;
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
+  project_name?: string;
+  approver_name?: string;
+};

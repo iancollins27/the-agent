@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -134,7 +135,7 @@ async function callDeepseek(prompt: string, model: string = "deepseek-chat") {
   return data.choices?.[0]?.message?.content || "Error: No response from DeepSeek";
 }
 
-// New function to log prompt runs
+// Function to log prompt runs
 async function logPromptRun(projectId: string | null, workflowPromptId: string | null, promptInput: string, aiProvider: string, aiModel: string) {
   try {
     const { data, error } = await supabase
@@ -191,6 +192,51 @@ async function updatePromptRunWithResult(promptRunId: string, result: string, is
   }
 }
 
+// New function to create action records from action detection+execution results
+async function createActionRecord(promptRunId: string, projectId: string, actionData: any) {
+  try {
+    // Parse the decision and other data from the AI response
+    const decision = actionData.decision;
+    
+    // Only create an action record if the decision is ACTION_NEEDED
+    if (decision === "ACTION_NEEDED") {
+      const requiresApproval = true; // Default to requiring approval for safety
+      const actionType = "message"; // Default to message type
+      
+      const actionPayload = {
+        message_text: actionData.message_text,
+        reason: actionData.reason
+      };
+      
+      const { data, error } = await supabase
+        .from('action_records')
+        .insert({
+          prompt_run_id: promptRunId,
+          project_id: projectId,
+          action_type: actionType,
+          action_payload: actionPayload,
+          requires_approval: requiresApproval,
+          status: 'pending'
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error creating action record:", error);
+        return null;
+      }
+      
+      return data.id;
+    } else {
+      console.log("No action needed based on AI decision:", decision);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error creating action record:", error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -216,6 +262,7 @@ serve(async (req) => {
     const promptRunId = await logPromptRun(projectId, workflowPromptId, finalPrompt, aiProvider, aiModel);
     
     let result: string;
+    let actionRecordId: string | null = null;
     
     try {
       // Call the appropriate AI provider based on the aiProvider parameter
@@ -248,6 +295,18 @@ serve(async (req) => {
       
       // Update the prompt run with the result
       await updatePromptRunWithResult(promptRunId, result);
+      
+      // For action detection+execution prompt, create an action record if applicable
+      if (promptType === "action_detection_execution" && promptRunId && projectId) {
+        try {
+          // Try to parse the result as JSON
+          const actionData = JSON.parse(result);
+          actionRecordId = await createActionRecord(promptRunId, projectId, actionData);
+        } catch (parseError) {
+          console.error("Error parsing action data:", parseError);
+          // If parsing fails, we don't create an action record
+        }
+      }
     } catch (error) {
       console.error(`Error calling AI provider (${aiProvider}):`, error);
       // Fall back to mock results if there's an error
@@ -266,7 +325,8 @@ serve(async (req) => {
         promptType,
         aiProvider,
         aiModel,
-        promptRunId
+        promptRunId,
+        actionRecordId
       }),
       {
         headers: {
