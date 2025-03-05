@@ -1,4 +1,3 @@
-
 /**
  * Replaces variables in a text with values from a variables object
  */
@@ -38,7 +37,6 @@ export function generateMockResult(promptType: string, contextData: Record<strin
   "message_text": "Hi, I noticed that you haven't updated your project. Would you like to schedule a call to discuss next steps?",
   "reason": "The project has been idle for 2 weeks and the next step '${contextData.next_step || "project milestone"}' requires client input.",
   "action_type": "message",
-  "requires_approval": true,
   "action_payload": {
     "message_text": "Hi, I noticed that you haven't updated your project. Would you like to schedule a call to discuss next steps?",
     "reason": "The project has been idle for 2 weeks and the next step '${contextData.next_step || "project milestone"}' requires client input."

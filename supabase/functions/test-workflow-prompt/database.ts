@@ -92,10 +92,33 @@ export async function createActionRecord(
       // Extract action type from response or default to message
       const actionType = actionData.action_type || "message";
       
-      // Extract requires_approval flag or default to true for safety
-      const requiresApproval = actionData.requires_approval !== undefined 
-        ? actionData.requires_approval 
-        : true;
+      // Get the company ID from the project
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('company_id')
+        .eq('id', projectId)
+        .single();
+        
+      if (projectError) {
+        console.error("Error fetching project:", projectError);
+        return null;
+      }
+      
+      // Get the company's approval settings
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('action_approval_settings')
+        .eq('id', projectData.company_id)
+        .single();
+        
+      if (companyError) {
+        console.error("Error fetching company:", companyError);
+        return null;
+      }
+      
+      // Determine if this action type requires approval based on company settings
+      // Default to true if the setting isn't found (safer default)
+      const requiresApproval = companyData.action_approval_settings?.[actionType] !== false;
       
       // Use provided action_payload or build a default one
       const actionPayload = actionData.action_payload || {
@@ -108,7 +131,8 @@ export async function createActionRecord(
         project_id: projectId,
         action_type: actionType,
         action_payload: actionPayload,
-        requires_approval: requiresApproval
+        requires_approval: requiresApproval,
+        company_id: projectData.company_id
       });
       
       const { data, error } = await supabase

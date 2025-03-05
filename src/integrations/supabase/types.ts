@@ -161,18 +161,21 @@ export type Database = {
       }
       companies: {
         Row: {
+          action_approval_settings: Json | null
           default_project_track: string | null
           id: string
           name: string
           zoho_id: string | null
         }
         Insert: {
+          action_approval_settings?: Json | null
           default_project_track?: string | null
           id?: string
           name: string
           zoho_id?: string | null
         }
         Update: {
+          action_approval_settings?: Json | null
           default_project_track?: string | null
           id?: string
           name?: string
