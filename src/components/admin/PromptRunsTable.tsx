@@ -9,7 +9,7 @@ import { PromptRun } from './types';
 
 type PromptRunsTableProps = {
   promptRuns: PromptRun[];
-  onRatingChange: (promptRunId: string, rating: number) => void;
+  onRatingChange: (promptRunId: string, rating: number | null) => void;
   onViewDetails: (run: PromptRun) => void;
 };
 

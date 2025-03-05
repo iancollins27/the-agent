@@ -15,6 +15,7 @@ const PromptRunsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,7 +64,7 @@ const PromptRunsTab: React.FC = () => {
     }
   };
 
-  const handleRatingChange = async (promptRunId: string, rating: number) => {
+  const handleRatingChange = async (promptRunId: string, rating: number | null) => {
     try {
       const { error } = await supabase
         .from('prompt_runs')
@@ -81,9 +82,15 @@ const PromptRunsTab: React.FC = () => {
         )
       );
 
+      if (selectedRun && selectedRun.id === promptRunId) {
+        setSelectedRun(prev => prev ? { ...prev, feedback_rating: rating } : null);
+      }
+
       toast({
-        title: "Rating Updated",
-        description: "Prompt run rating has been updated successfully",
+        title: rating ? "Rating Updated" : "Rating Cleared",
+        description: rating 
+          ? "Prompt run rating has been updated successfully" 
+          : "Prompt run rating has been cleared",
       });
     } catch (error) {
       console.error('Error updating rating:', error);
@@ -95,12 +102,61 @@ const PromptRunsTab: React.FC = () => {
     }
   };
 
-  const viewPromptRunDetails = (run: PromptRun) => {
-    setSelectedRun(run);
+  const handleFeedbackChange = async (promptRunId: string, feedback: { description?: string; tags?: string[] }) => {
+    try {
+      const { error } = await supabase
+        .from('prompt_runs')
+        .update({
+          feedback_description: feedback.description,
+          feedback_tags: feedback.tags
+        })
+        .eq('id', promptRunId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state to reflect the change
+      setPromptRuns(prev => 
+        prev.map(run => 
+          run.id === promptRunId 
+            ? { 
+                ...run, 
+                feedback_description: feedback.description || null, 
+                feedback_tags: feedback.tags || null 
+              } 
+            : run
+        )
+      );
+
+      if (selectedRun && selectedRun.id === promptRunId) {
+        setSelectedRun(prev => prev 
+          ? { 
+              ...prev, 
+              feedback_description: feedback.description || null, 
+              feedback_tags: feedback.tags || null 
+            } 
+          : null
+        );
+      }
+
+      toast({
+        title: "Feedback Updated",
+        description: "Prompt run feedback has been updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update feedback",
+      });
+    }
   };
 
-  const closePromptRunDetails = () => {
-    setSelectedRun(null);
+  const viewPromptRunDetails = (run: PromptRun) => {
+    setSelectedRun(run);
+    setDetailsOpen(true);
   };
 
   return (
@@ -144,13 +200,13 @@ const PromptRunsTab: React.FC = () => {
         />
       )}
 
-      {selectedRun && (
-        <PromptRunDetails 
-          promptRun={selectedRun} 
-          onClose={closePromptRunDetails} 
-          onRatingChange={handleRatingChange} 
-        />
-      )}
+      <PromptRunDetails 
+        promptRun={selectedRun} 
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        onRatingChange={handleRatingChange}
+        onFeedbackChange={handleFeedbackChange}
+      />
     </div>
   );
 };

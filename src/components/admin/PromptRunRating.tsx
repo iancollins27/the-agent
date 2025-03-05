@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 
 type PromptRunRatingProps = {
   rating: number | null;
-  onRatingChange?: (rating: number) => void;
+  onRatingChange?: (rating: number | null) => void;
   size?: 'sm' | 'md';
 };
 
@@ -25,7 +25,16 @@ const PromptRunRating: React.FC<PromptRunRatingProps> = ({
               ? "fill-yellow-400 text-yellow-400"
               : "text-gray-300"
           }`}
-          onClick={() => onRatingChange && onRatingChange(star)}
+          onClick={() => {
+            if (onRatingChange) {
+              // Clear rating if clicking on the current star or a lower one
+              if (rating === star) {
+                onRatingChange(null);
+              } else {
+                onRatingChange(star);
+              }
+            }
+          }}
         />
       ))}
     </div>
