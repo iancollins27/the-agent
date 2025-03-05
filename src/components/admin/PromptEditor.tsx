@@ -63,7 +63,7 @@ const PromptEditor = ({
     }
   };
 
-  // Helper function to provide a default prompt template for summary update
+  // Helper function to provide a default prompt template
   const getSuggestedPromptTemplate = () => {
     if (prompt.type === 'summary_update') {
       return `You are an AI assistant tasked with updating a project summary with new information.
@@ -92,6 +92,37 @@ Instructions:
 8. Ensure the updated summary provides a complete picture of the project status
 
 Please provide an updated project summary that incorporates the new information while maintaining the context and structure of the original summary.`;
+    } else if (prompt.type === 'action_detection_execution') {
+      return `You are an AI assistant responsible for analyzing project details and determining if any automated actions should be taken.
+
+Current Project Summary:
+{{summary}}
+
+Project Track: {{track_name}}
+
+Next Step: {{next_step}}
+
+Today's Date: {{current_date}}
+
+Milestone Instructions:
+{{milestone_instructions}}
+
+Instructions:
+1. Review the current project summary and next step information
+2. Determine if any action should be taken based on the project status
+3. Your response must be a JSON object in the following format:
+
+{
+  "decision": "ACTION_NEEDED" or "NO_ACTION",
+  "reason": "Explanation for your decision",
+  "action_type": "message" | "data_update" | "request_for_data_update", (only if action needed)
+  "message_text": "The message you want to send", (only if action type is message)
+  "action_payload": {
+    // Additional data needed for the action, including the message and reason if action type is message
+  }
+}
+
+The system will automatically create action records based on your response if you return "decision": "ACTION_NEEDED".`;
     }
     return null;
   };
@@ -140,8 +171,8 @@ Please provide an updated project summary that incorporates the new information 
                 rows={10}
               />
               
-              {/* Add a suggested template button for summary_update type */}
-              {prompt.type === 'summary_update' && (
+              {/* Add suggested templates for different prompt types */}
+              {(prompt.type === 'summary_update' || prompt.type === 'action_detection_execution') && (
                 <Button 
                   variant="outline" 
                   onClick={() => {

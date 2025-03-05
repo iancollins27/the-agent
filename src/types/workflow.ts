@@ -21,6 +21,8 @@ export type TestResult = {
     type: WorkflowType;
     output: string;
     finalPrompt: string;
+    promptRunId?: string;
+    actionRecordId?: string;
   }[];
 };
 

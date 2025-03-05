@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TestResult, workflowTitles } from "@/types/workflow";
+import { Badge } from "@/components/ui/badge";
 
 type TestResultsProps = {
   results: TestResult[];
@@ -42,6 +43,15 @@ const TestResults = ({ results }: TestResultsProps) => {
                       </pre>
                     </div>
                   </div>
+                  
+                  {/* Show action record info if one was created */}
+                  {promptResult.actionRecordId && (
+                    <div className="mt-2">
+                      <Badge variant="outline" className="bg-green-50">
+                        Action Record Created: {promptResult.actionRecordId}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

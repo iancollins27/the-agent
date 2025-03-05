@@ -1,3 +1,4 @@
+
 /**
  * Replaces variables in a text with values from a variables object
  */
