@@ -84,6 +84,8 @@ export async function createActionRecord(
   actionData: any
 ) {
   try {
+    console.log("Creating action record with data:", actionData);
+    
     // Parse the decision and other data from the AI response
     const decision = actionData.decision;
     
@@ -104,34 +106,18 @@ export async function createActionRecord(
         return null;
       }
       
-      // Get the company's approval settings
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('action_approval_settings')
-        .eq('id', projectData.company_id)
-        .single();
-        
-      if (companyError) {
-        console.error("Error fetching company:", companyError);
-        return null;
-      }
-      
-      // Determine if this action type requires approval based on company settings
-      // Default to true if the setting isn't found (safer default)
-      const requiresApproval = companyData.action_approval_settings?.[actionType] !== false;
-      
       // Use provided action_payload or build a default one
       const actionPayload = actionData.action_payload || {
-        message_text: actionData.message_text,
-        reason: actionData.reason
+        message_text: actionData.message_text || "Follow up on project status",
+        reason: actionData.reason || "No specific reason provided"
       };
       
-      console.log("Creating action record with data:", {
+      console.log("Creating action record with payload:", {
         prompt_run_id: promptRunId,
         project_id: projectId,
         action_type: actionType,
         action_payload: actionPayload,
-        requires_approval: requiresApproval,
+        requires_approval: true,
         company_id: projectData.company_id
       });
       
@@ -142,7 +128,7 @@ export async function createActionRecord(
           project_id: projectId,
           action_type: actionType,
           action_payload: actionPayload,
-          requires_approval: requiresApproval,
+          requires_approval: true,
           status: 'pending'
         })
         .select()

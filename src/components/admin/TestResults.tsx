@@ -44,10 +44,10 @@ const TestResults = ({ results }: TestResultsProps) => {
                     </div>
                   </div>
                   
-                  {/* Show action record info if one was created */}
+                  {/* Show action record info if one was created - make it more prominent */}
                   {promptResult.actionRecordId && (
-                    <div className="mt-2">
-                      <Badge variant="outline" className="bg-green-50">
+                    <div className="mt-4 mb-2">
+                      <Badge variant="outline" className="bg-green-100 text-green-800 px-3 py-1 text-sm font-medium">
                         Action Record Created: {promptResult.actionRecordId}
                       </Badge>
                     </div>

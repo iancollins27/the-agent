@@ -52,8 +52,10 @@ serve(async (req) => {
       // For action detection+execution prompt, create an action record if applicable
       if (promptType === "action_detection_execution" && promptRunId && projectId) {
         try {
+          console.log("Checking for action data in result:", result);
           // Try to parse the result as JSON
           const actionData = JSON.parse(result);
+          console.log("Parsed action data:", actionData);
           actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
         } catch (parseError) {
           console.error("Error parsing action data:", parseError);

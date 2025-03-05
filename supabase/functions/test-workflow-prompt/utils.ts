@@ -2,48 +2,68 @@
 /**
  * Replaces variables in a text with values from a variables object
  */
-export function replaceVariables(text: string, variables: Record<string, string>): string {
-  let processedText = text;
-  
-  // Log the variables available for replacement
-  console.log("Variables for replacement:", variables);
-  
-  for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`{{${key}}}`, "g");
-    processedText = processedText.replace(regex, value);
-  }
-  
-  // Log the final text after variable replacement
-  console.log("Text after variable replacement:", processedText);
-  
-  return processedText;
+export function replaceVariables(text: string, variables: Record<string, any>): string {
+  return text.replace(/\{\{([^}]+)\}\}/g, (match, variable) => {
+    const trimmedVar = variable.trim();
+    return variables[trimmedVar] !== undefined ? variables[trimmedVar] : match;
+  });
 }
 
 /**
- * Generates mock result based on prompt type when API calls fail
+ * Generate a mock result for testing purposes
  */
-export function generateMockResult(promptType: string, contextData: Record<string, string>): string {
+export function generateMockResult(promptType: string, contextData: any): string {
   switch (promptType) {
-    case "summary_generation":
-      return `This is a sample summary for a project in the ${contextData.track_name} track. Generated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
-    case "summary_update":
-      return `Updated summary based on: "${contextData.summary}". Project is in the ${contextData.track_name} track. Last updated on ${contextData.current_date}. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
-    case "action_detection":
-      return `Based on the summary "${contextData.summary}" for the ${contextData.track_name} track, here are some detected actions:\n1. Schedule a follow-up call\n2. Prepare project materials\n3. Review timeline. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
-    case "action_execution":
-      return `For the action "${contextData.action_description}" on project with summary "${contextData.summary}" in the ${contextData.track_name} track, here are execution steps:\n1. Step one\n2. Step two\n3. Step three. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
-    case "action_detection_execution":
-      return `{
-  "decision": "ACTION_NEEDED",
-  "message_text": "Hi, I noticed that you haven't updated your project. Would you like to schedule a call to discuss next steps?",
-  "reason": "The project has been idle for 2 weeks and the next step '${contextData.next_step || "project milestone"}' requires client input.",
-  "action_type": "message",
-  "action_payload": {
-    "message_text": "Hi, I noticed that you haven't updated your project. Would you like to schedule a call to discuss next steps?",
-    "reason": "The project has been idle for 2 weeks and the next step '${contextData.next_step || "project milestone"}' requires client input."
-  }
-}`;
+    case 'summary_generation':
+      return `Project Summary: This is a mock summary for a ${contextData.track_name || 'unknown'} project.`;
+    case 'summary_update':
+      return `Updated Project Summary: This is a mock updated summary for a ${contextData.track_name || 'unknown'} project.`;
+    case 'action_detection':
+      return JSON.stringify({
+        decision: 'ACTION_NEEDED',
+        reason: 'This is a mock action detection result',
+        action_type: 'message',
+        message_text: 'This is a mock message for testing purposes',
+      }, null, 2);
+    case 'action_execution':
+      return JSON.stringify({
+        success: true,
+        message: 'Mock action execution completed',
+      }, null, 2);
+    case 'action_detection_execution':
+      return JSON.stringify({
+        decision: 'ACTION_NEEDED',
+        reason: 'This is a mock action detection and execution result',
+        action_type: 'message',
+        message_text: 'This is a mock message for testing purposes',
+        action_payload: {
+          message_text: 'This is a mock message for testing purposes',
+          reason: 'This is a mock action detection and execution result',
+        }
+      }, null, 2);
     default:
-      return "Unknown prompt type";
+      return 'Mock result for unknown prompt type';
+  }
+}
+
+/**
+ * Utility to help extract JSON from a response that might contain additional text
+ */
+export function extractJsonFromResponse(response: string): any | null {
+  try {
+    // First try direct parsing
+    return JSON.parse(response);
+  } catch (error) {
+    // If that fails, try to find JSON in the string
+    try {
+      const jsonRegex = /\{[\s\S]*\}/;
+      const match = response.match(jsonRegex);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+    } catch (innerError) {
+      console.error("Error extracting JSON from response:", innerError);
+    }
+    return null;
   }
 }
