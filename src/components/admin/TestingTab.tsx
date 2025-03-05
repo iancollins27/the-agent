@@ -108,7 +108,8 @@ const TestingTab = () => {
               projectId: projectData.id,
               contextData: contextData,
               aiProvider: aiProvider,
-              aiModel: aiModel
+              aiModel: aiModel,
+              workflowPromptId: promptData.id // Add the workflow prompt ID
             }
           });
           
@@ -117,7 +118,8 @@ const TestingTab = () => {
           projectResults.push({
             type: promptData.type,
             output: data.output,
-            finalPrompt: data.finalPrompt
+            finalPrompt: data.finalPrompt,
+            promptRunId: data.promptRunId // Store the prompt run ID
           });
         }
         

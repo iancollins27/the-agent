@@ -2,6 +2,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { ParsedProjectData } from './types.ts'
 
+// Create a supabase client for use in other modules
+export const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
+
 export async function handleCompany(
   supabase: ReturnType<typeof createClient>,
   projectData: ParsedProjectData,
@@ -99,7 +105,7 @@ export async function getWorkflowPrompt(
 ) {
   const { data: promptData } = await supabase
     .from('workflow_prompts')
-    .select('prompt_text')
+    .select('prompt_text, id')
     .eq('type', isUpdate ? 'summary_update' : 'summary_generation')
     .single()
 

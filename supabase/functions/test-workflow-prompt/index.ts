@@ -135,6 +135,61 @@ async function callDeepseek(prompt: string, model: string = "deepseek-chat") {
   return data.choices?.[0]?.message?.content || "Error: No response from DeepSeek";
 }
 
+// New function to log prompt runs
+async function logPromptRun(projectId: string | null, workflowPromptId: string | null, promptInput: string) {
+  try {
+    const { data, error } = await supabase
+      .from('prompt_runs')
+      .insert({
+        project_id: projectId,
+        workflow_prompt_id: workflowPromptId,
+        prompt_input: promptInput,
+        status: 'PENDING'
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error("Error logging prompt run:", error);
+      return null;
+    }
+    
+    return data.id;
+  } catch (error) {
+    console.error("Error logging prompt run:", error);
+    return null;
+  }
+}
+
+// Function to update prompt run with result
+async function updatePromptRunWithResult(promptRunId: string, result: string, isError: boolean = false) {
+  if (!promptRunId) return;
+  
+  try {
+    const updateData: any = {
+      status: isError ? 'ERROR' : 'COMPLETED',
+      completed_at: new Date().toISOString()
+    };
+    
+    if (isError) {
+      updateData.error_message = result;
+    } else {
+      updateData.prompt_output = result;
+    }
+    
+    const { error } = await supabase
+      .from('prompt_runs')
+      .update(updateData)
+      .eq('id', promptRunId);
+      
+    if (error) {
+      console.error("Error updating prompt run:", error);
+    }
+  } catch (error) {
+    console.error("Error updating prompt run:", error);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -142,7 +197,7 @@ serve(async (req) => {
   }
   
   try {
-    const { promptType, promptText, projectId, contextData, aiProvider, aiModel } = await req.json();
+    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId } = await req.json();
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
     console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
@@ -155,6 +210,9 @@ serve(async (req) => {
     
     // Replace variables in the prompt text with actual values
     const finalPrompt = replaceVariables(promptText, contextData);
+    
+    // Log the prompt run
+    const promptRunId = await logPromptRun(projectId, workflowPromptId, finalPrompt);
     
     let result: string;
     
@@ -186,21 +244,28 @@ serve(async (req) => {
           // If no valid AI provider is specified or API key is missing, generate mock results
           result = generateMockResult(promptType, contextData);
       }
+      
+      // Update the prompt run with the result
+      await updatePromptRunWithResult(promptRunId, result);
     } catch (error) {
       console.error(`Error calling AI provider (${aiProvider}):`, error);
       // Fall back to mock results if there's an error
       result = generateMockResult(promptType, contextData);
       result += `\n\nNote: There was an error using the ${aiProvider} API: ${error.message}`;
+      
+      // Update the prompt run with the error
+      await updatePromptRunWithResult(promptRunId, error.message, true);
     }
     
     return new Response(
       JSON.stringify({
+        output: result,
         finalPrompt,
-        result,
         projectId,
         promptType,
         aiProvider,
-        aiModel
+        aiModel,
+        promptRunId
       }),
       {
         headers: {

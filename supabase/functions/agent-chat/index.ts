@@ -167,6 +167,35 @@ serve(async (req) => {
 
     console.log('Sending messages to AI provider:', aiProvider, 'model:', aiModel);
     console.log('Messages:', fullMessages);
+    
+    // Log prompt run to database
+    const userMessage = messages[messages.length - 1]?.content || '';
+    let promptRunId: string | null = null;
+    
+    // Create a prompt run record
+    try {
+      const { data: promptRun, error: logError } = await supabase
+        .from('prompt_runs')
+        .insert({
+          project_id: projectData?.id || null,
+          prompt_input: JSON.stringify({
+            system: systemMessage.content,
+            user: userMessage
+          }),
+          status: 'PENDING'
+        })
+        .select()
+        .single();
+        
+      if (logError) {
+        console.error('Error logging chat prompt run:', logError);
+      } else {
+        promptRunId = promptRun.id;
+        console.log('Created prompt run with ID:', promptRunId);
+      }
+    } catch (error) {
+      console.error('Error creating prompt run:', error);
+    }
 
     // Determine API key based on provider
     let apiKey;
@@ -186,17 +215,51 @@ serve(async (req) => {
     }
 
     let aiResponse;
+    let error = null;
     
-    // Call appropriate AI provider based on configuration
-    if (aiProvider === 'openai') {
-      aiResponse = await callOpenAI(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
-    } else if (aiProvider === 'claude') {
-      aiResponse = await callClaude(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
-    } else if (aiProvider === 'deepseek') {
-      aiResponse = await callDeepseek(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
-    } else {
-      // Default to OpenAI if provider is not recognized
-      aiResponse = await callOpenAI(fullMessages, apiKey, 'gpt-4o-mini', botConfig.temperature || 0.7);
+    try {
+      // Call appropriate AI provider based on configuration
+      if (aiProvider === 'openai') {
+        aiResponse = await callOpenAI(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
+      } else if (aiProvider === 'claude') {
+        aiResponse = await callClaude(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
+      } else if (aiProvider === 'deepseek') {
+        aiResponse = await callDeepseek(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
+      } else {
+        // Default to OpenAI if provider is not recognized
+        aiResponse = await callOpenAI(fullMessages, apiKey, 'gpt-4o-mini', botConfig.temperature || 0.7);
+      }
+    } catch (e) {
+      error = e;
+      console.error('Error calling AI provider:', e);
+      aiResponse = "I'm sorry, I encountered an error while processing your request. Please try again later.";
+    }
+    
+    // Update the prompt run with the result
+    if (promptRunId) {
+      try {
+        if (error) {
+          await supabase
+            .from('prompt_runs')
+            .update({
+              error_message: error.message || 'Unknown error',
+              status: 'ERROR',
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', promptRunId);
+        } else {
+          await supabase
+            .from('prompt_runs')
+            .update({
+              prompt_output: aiResponse,
+              status: 'COMPLETED',
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', promptRunId);
+        }
+      } catch (updateError) {
+        console.error('Error updating prompt run:', updateError);
+      }
     }
 
     console.log('AI response received');
