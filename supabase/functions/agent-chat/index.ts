@@ -39,7 +39,12 @@ serve(async (req) => {
       system_prompt: `You are an intelligent project assistant that helps manage project workflows.
       Answer questions about projects or workflow processes. If you don't know something, say so clearly.
       When asked about schedules or timelines, check the summary and next_step fields for relevant information.
-      If no scheduling information is found, suggest contacting the project manager for more details.`,
+      If no scheduling information is found, suggest contacting the project manager for more details.
+      
+      IMPORTANT: You can help users update project data! When users ask you to update fields like installation dates,
+      schedules, or other project details, you should offer to create an update action that they can approve.
+      For example, if a user asks "update the install date to March 14, 2025", create an action to update the appropriate 
+      field with that value.`,
       model: 'gpt-4o-mini',
       temperature: 0.7,
       search_project_data: true
