@@ -39,12 +39,7 @@ serve(async (req) => {
       system_prompt: `You are an intelligent project assistant that helps manage project workflows.
       Answer questions about projects or workflow processes. If you don't know something, say so clearly.
       When asked about schedules or timelines, check the summary and next_step fields for relevant information.
-      If no scheduling information is found, suggest contacting the project manager for more details.
-      
-      IMPORTANT: You can help users update project data! When users ask you to update fields like installation dates,
-      schedules, or other project details, you should offer to create an update action that they can approve.
-      For example, if a user asks "update the install date to March 14, 2025", create an action to update the appropriate 
-      field with that value.`,
+      If no scheduling information is found, suggest contacting the project manager for more details.`,
       model: 'gpt-4o-mini',
       temperature: 0.7,
       search_project_data: true
@@ -151,11 +146,15 @@ serve(async (req) => {
     }
 
     // Check if the user message contains an action request (like updating a field)
-    // This is a simple pattern matching approach, can be enhanced with NLP
+    // Enhanced pattern matching approach to detect more update requests
     const actionRequestPatterns = [
-      { pattern: /mark\s+(the\s+)?(.*?)\s+for\s+(.*)/i, type: 'data_update' },
-      { pattern: /(update|change|set)\s+(the\s+)?(.*?)\s+to\s+(.*)/i, type: 'data_update' },
-      { pattern: /schedule\s+(the\s+)?(.*?)\s+for\s+(.*)/i, type: 'data_update' },
+      { pattern: /update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      { pattern: /change\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      { pattern: /set\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      { pattern: /schedule\s+(the\s+)?(.+?)\s+for\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      { pattern: /mark\s+(the\s+)?(.+?)\s+for\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      { pattern: /can you update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      { pattern: /please update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' }
     ];
 
     let actionRequest = null;
@@ -174,23 +173,27 @@ serve(async (req) => {
 
     // Add action detection instructions to the system prompt if an action request is detected
     let systemPromptWithActions = botConfig.system_prompt;
-    if (actionRequest && projectData) {
-      systemPromptWithActions += `\n\nI detected that the user might be asking to update project data. 
-      If you think this is an action request to update project information, please respond with:
-      1. A normal conversational reply confirming what will be updated
-      2. Also include a JSON block in the following format:
-      
-      \`\`\`json
-      {
-        "action_type": "data_update",
-        "field_to_update": "the field name that should be updated (e.g. 'next_step', 'summary', etc.)",
-        "new_value": "the new value for the field",
-        "description": "A human-readable description of what's being updated"
-      }
-      \`\`\`
-      
-      Please ensure the JSON block is valid and properly formatted as it will be automatically processed.`;
-    }
+    
+    // Always add action capability instructions to make the model aware it can perform updates
+    systemPromptWithActions += `\n\nIMPORTANT: You MUST help users update project data when they ask. If users ask you to update fields like installation dates, 
+schedules, or other project details, you SHOULD create an update action for them to approve.
+When a user asks something like "update the install date to March 16, 2025", you MUST respond with your willingness to help with the update
+and provide a JSON block that will be processed automatically.
+
+For ANY update request, reply with:
+1. A normal conversational response confirming what will be updated
+2. A JSON block in this format:
+
+\`\`\`json
+{
+  "action_type": "data_update",
+  "field_to_update": "the field name to update (e.g. 'next_step', 'summary', etc.)",
+  "new_value": "the new value for the field",
+  "description": "A human-readable description of what's being updated"
+}
+\`\`\`
+
+The JSON block MUST be properly formatted as it will be automatically processed.`;
 
     // Use the custom system prompt from configuration
     const systemMessage = {
@@ -313,7 +316,7 @@ serve(async (req) => {
     
     // Extract action from AI response if an action request was detected
     let actionRecordId = null;
-    if (actionRequest && projectData && aiResponse) {
+    if (projectData && aiResponse) {
       try {
         const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
         if (jsonMatch && jsonMatch[1]) {
