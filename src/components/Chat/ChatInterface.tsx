@@ -4,9 +4,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Message, ActionRecord } from "./types";
-import ActionConfirmation from "./ActionConfirmation";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
+import ActionConfirmDialog from "./ActionConfirmDialog";
 
 type ChatInterfaceProps = {
   projectId?: string;
@@ -18,6 +18,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<ActionRecord | null>(null);
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const handleSendMessage = async (input: string) => {
@@ -71,6 +72,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
             requires_approval: actionRecordData.requires_approval
           };
           setPendingAction(actionRecord);
+          setActionDialogOpen(true);
         }
       }
     } catch (error) {
@@ -95,13 +97,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         <CardTitle className="text-lg">Project Assistant</CardTitle>
       </CardHeader>
       
-      {pendingAction && pendingAction.status === 'pending' && (
-        <ActionConfirmation 
-          action={pendingAction} 
-          onActionResolved={handleActionResolved} 
-        />
-      )}
-      
       <CardContent className="flex-1 overflow-hidden p-0">
         <MessageList messages={messages} />
       </CardContent>
@@ -113,6 +108,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           presetMessage={presetMessage}
         />
       </CardFooter>
+
+      <ActionConfirmDialog
+        action={pendingAction}
+        isOpen={actionDialogOpen}
+        onClose={() => setActionDialogOpen(false)}
+        onActionResolved={handleActionResolved}
+      />
     </Card>
   );
 };

@@ -1,0 +1,138 @@
+
+import React from 'react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogDescription,
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Check, AlertCircle } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { ActionRecord } from "./types";
+
+type ActionConfirmDialogProps = {
+  action: ActionRecord | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onActionResolved: () => void;
+};
+
+const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({ 
+  action, 
+  isOpen, 
+  onClose,
+  onActionResolved 
+}) => {
+  const { toast } = useToast();
+
+  if (!action) return null;
+
+  const handleActionResponse = async (approve: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('action_records')
+        .update({
+          status: approve ? 'approved' : 'rejected',
+          executed_at: approve ? new Date().toISOString() : null
+        })
+        .eq('id', action.id);
+        
+      if (error) {
+        throw error;
+      }
+
+      // If approved and it's a data update, update the project data
+      if (approve && action.action_type === 'data_update' && action.project_id) {
+        const updateData = {
+          [action.action_payload.field]: action.action_payload.value
+        };
+        
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update(updateData)
+          .eq('id', action.project_id);
+          
+        if (updateError) {
+          console.error('Error updating project:', updateError);
+          toast({
+            title: "Error",
+            description: `Failed to update ${action.action_payload.field}`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: action.action_payload.description || "Project updated successfully",
+          });
+        }
+      } else if (!approve) {
+        toast({
+          title: "Action Rejected",
+          description: "The proposed change was rejected",
+        });
+      }
+      
+      // Notify parent component that action has been handled
+      onClose();
+      onActionResolved();
+    } catch (error) {
+      console.error('Error handling action response:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process your response",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            Confirm Action
+          </DialogTitle>
+          <DialogDescription>
+            Please review and confirm the requested action.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="py-4">
+          <h4 className="font-medium mb-2">Action Details:</h4>
+          <p className="text-sm text-muted-foreground mb-1">
+            <span className="font-medium">Type:</span> {action.action_type.replace(/_/g, ' ')}
+          </p>
+          {action.action_type === 'data_update' && (
+            <>
+              <p className="text-sm text-muted-foreground mb-1">
+                <span className="font-medium">Field:</span> {action.action_payload.field}
+              </p>
+              <p className="text-sm text-muted-foreground mb-1">
+                <span className="font-medium">New Value:</span> {action.action_payload.value}
+              </p>
+            </>
+          )}
+          <p className="text-sm mt-2 p-3 bg-muted rounded-md">
+            {action.action_payload.description}
+          </p>
+        </div>
+        
+        <DialogFooter className="sm:justify-between">
+          <Button variant="outline" onClick={() => handleActionResponse(false)}>
+            Reject
+          </Button>
+          <Button onClick={() => handleActionResponse(true)}>
+            <Check className="h-4 w-4 mr-2" /> Approve
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default ActionConfirmDialog;
