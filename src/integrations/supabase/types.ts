@@ -353,6 +353,7 @@ export type Database = {
         | "summary_update"
         | "action_detection"
         | "action_execution"
+        | "action_detection_execution"
     }
     CompositeTypes: {
       [_ in never]: never
