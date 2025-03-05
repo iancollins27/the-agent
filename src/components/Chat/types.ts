@@ -15,6 +15,9 @@ export type ActionRecord = {
     recipient?: string;
     message_content?: string;
     description: string;
+    notion_token?: string;
+    notion_database_id?: string;
+    notion_page_id?: string;
   };
   status: string;
   approver_id?: string | null;

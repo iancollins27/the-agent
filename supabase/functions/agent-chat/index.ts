@@ -8,7 +8,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -21,7 +20,6 @@ serve(async (req) => {
 
     const { messages, projectId } = await req.json()
     
-    // Fetch the latest chatbot configuration
     const { data: configData, error: configError } = await supabase
       .from('chatbot_config')
       .select('*')
@@ -29,11 +27,10 @@ serve(async (req) => {
       .limit(1)
       .single();
     
-    if (configError && configError.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (configError && configError.code !== 'PGRST116') {
       console.error('Error fetching chatbot config:', configError);
     }
     
-    // Default configuration if none found
     const botConfig = configData || {
       system_prompt: `You are an intelligent project assistant that helps manage project workflows.
       Answer questions about projects or workflow processes. If you don't know something, say so clearly.
@@ -46,7 +43,6 @@ serve(async (req) => {
     
     console.log('Using bot configuration:', botConfig);
 
-    // Fetch AI provider configuration
     const { data: aiConfig, error: aiConfigError } = await supabase
       .from('ai_config')
       .select('provider, model')
@@ -55,26 +51,21 @@ serve(async (req) => {
       .single();
     
     const aiProvider = aiConfig?.provider || 'openai';
-    const aiModel = botConfig.model || 'gpt-4o-mini'; // Use model from chatbot config as fallback
-    
-    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
-    
-    // Extract the latest user message to check for CRM ID
+    const aiModel = botConfig.model || 'gpt-4o-mini';
+
     const latestUserMessage = messages.length > 0 && messages[messages.length - 1].role === 'user' 
       ? messages[messages.length - 1].content 
       : '';
     
-    // Check if the message mentions a CRM ID
     const crmIdMatch = latestUserMessage.match(/crm\s*id\s*(\d+)/i) || 
                        latestUserMessage.match(/crmid\s*(\d+)/i) || 
                        latestUserMessage.match(/project\s*(\d+)/i);
     
     let projectData = null;
     let searchContext = '';
+    let companyId = null;
     
-    // Only search for project data if enabled in config
     if (botConfig.search_project_data !== false) {
-      // First try to get project by explicit projectId
       if (projectId) {
         console.log('Fetching project data for ID:', projectId);
         const { data: project, error: projectError } = await supabase
@@ -96,9 +87,7 @@ serve(async (req) => {
           projectData = project;
           console.log('Found project data by ID:', project);
         }
-      } 
-      // If no project found by ID or no ID provided, try CRM ID
-      else if (crmIdMatch && crmIdMatch[1]) {
+      } else if (crmIdMatch && crmIdMatch[1]) {
         const crmId = crmIdMatch[1];
         console.log('Attempting to fetch project by CRM ID:', crmId);
         
@@ -127,7 +116,6 @@ serve(async (req) => {
       }
     }
 
-    // Fetch related project track information if project has a track
     let trackData = null;
     if (projectData?.project_track) {
       const { data: track, error: trackError } = await supabase
@@ -144,8 +132,37 @@ serve(async (req) => {
       }
     }
 
-    // Check if the user message contains an action request (like updating a field)
-    // Enhanced pattern matching approach to detect more update requests
+    const isKnowledgeQuery = 
+      latestUserMessage.toLowerCase().includes('knowledge base') ||
+      latestUserMessage.toLowerCase().includes('find information') ||
+      latestUserMessage.toLowerCase().includes('search for') ||
+      latestUserMessage.toLowerCase().includes('do you know') ||
+      latestUserMessage.toLowerCase().includes('tell me about');
+    
+    let knowledgeResults = [];
+    if (isKnowledgeQuery && companyId) {
+      knowledgeResults = await searchKnowledgeBase(supabase, companyId, latestUserMessage);
+      
+      if (knowledgeResults.length > 0) {
+        searchContext += `\nI found some relevant information in the knowledge base that might help answer your question:\n\n`;
+        
+        knowledgeResults.forEach((result, index) => {
+          searchContext += `Source ${index + 1}: ${result.title}\n`;
+          searchContext += `Content: ${result.content}\n\n`;
+        });
+        
+        searchContext += `I'll use this information to help answer your question.\n`;
+      }
+    }
+
+    const notionIntegrationRequest = 
+      latestUserMessage.toLowerCase().includes('connect notion') ||
+      latestUserMessage.toLowerCase().includes('integrate notion') ||
+      latestUserMessage.toLowerCase().includes('notion integration') ||
+      latestUserMessage.toLowerCase().includes('add notion') ||
+      (latestUserMessage.toLowerCase().includes('notion') && 
+       latestUserMessage.toLowerCase().includes('token'));
+    
     const actionRequestPatterns = [
       { pattern: /update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
       { pattern: /change\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
@@ -155,7 +172,6 @@ serve(async (req) => {
       { pattern: /can you update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
       { pattern: /please update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
       
-      // Message sending pattern detection
       { pattern: /send\s+(a\s+)?message\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
       { pattern: /send\s+(.+?)\s+a\s+message(?:\?|$|\.|;)/i, type: 'message' },
       { pattern: /notify\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
@@ -179,16 +195,36 @@ serve(async (req) => {
       }
     }
 
-    // Add action detection instructions to the system prompt if an action request is detected
     let systemPromptWithActions = botConfig.system_prompt;
     
-    // Always add action capability instructions to make the model aware it can perform updates
     systemPromptWithActions += `\n\nIMPORTANT: You MUST help users update project data when they ask. If users ask you to update fields like installation dates, 
 schedules, or other project details, you SHOULD create an update action for them to approve.
 When a user asks something like "update the install date to March 16, 2025", you MUST respond with your willingness to help with the update
-and provide a JSON block that will be processed automatically.
+and provide a JSON block that will be processed automatically.`;
 
-For data update requests, reply with:
+    systemPromptWithActions += `\n\nYou can search the company's knowledge base for information. If a user asks for information that might be in the knowledge base, 
+respond with what you know based on the search results I provide to you. If no knowledge base results are provided, tell the user that you don't have that information 
+in your knowledge base.`;
+
+    if (notionIntegrationRequest) {
+      systemPromptWithActions += `\n\nIMPORTANT: The user is asking about integrating with Notion. Help them connect their Notion workspace by responding with:
+1. A normal conversational response explaining what information you need to connect to Notion
+2. A JSON block in this format:
+
+\`\`\`json
+{
+  "action_type": "notion_integration",
+  "notion_token": "User needs to provide their Notion integration token",
+  "notion_database_id": "Optional: ID of a database to import",
+  "notion_page_id": "Optional: ID of a specific page to import",
+  "description": "Connect to Notion to import knowledge base content"
+}
+\`\`\`
+
+Explain that the user needs to provide at least their Notion integration token, and optionally the ID of a database or page they want to import.`;
+    }
+
+    systemPromptWithActions += `\n\nFor data update requests, reply with:
 1. A normal conversational response confirming what will be updated
 2. A JSON block in this format:
 
@@ -216,7 +252,6 @@ For message sending requests (like "send a message to the customer"), reply with
 
 The JSON block MUST be properly formatted as it will be automatically processed.`;
 
-    // Use the custom system prompt from configuration
     const systemMessage = {
       role: 'system',
       content: `${systemPromptWithActions}
@@ -233,17 +268,13 @@ The JSON block MUST be properly formatted as it will be automatically processed.
       ` : 'No specific project context is loaded.'}`
     }
 
-    // Add system message to the beginning of the messages array
     const fullMessages = [systemMessage, ...messages]
 
     console.log('Sending messages to AI provider:', aiProvider, 'model:', aiModel);
     console.log('Messages:', fullMessages);
     
-    // Log prompt run to database
-    const userMessage = messages[messages.length - 1]?.content || '';
     let promptRunId: string | null = null;
     
-    // Create a prompt run record
     try {
       const { data: promptRun, error: logError } = await supabase
         .from('prompt_runs')
@@ -268,7 +299,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
       console.error('Error creating prompt run:', error);
     }
 
-    // Determine API key based on provider
     let apiKey;
     if (aiProvider === 'openai') {
       apiKey = Deno.env.get('OPENAI_API_KEY');
@@ -277,7 +307,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
     } else if (aiProvider === 'deepseek') {
       apiKey = Deno.env.get('DEEPSEEK_API_KEY');
     } else {
-      // Default to OpenAI
       apiKey = Deno.env.get('OPENAI_API_KEY');
     }
 
@@ -289,7 +318,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
     let error = null;
     
     try {
-      // Call appropriate AI provider based on configuration
       if (aiProvider === 'openai') {
         aiResponse = await callOpenAI(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
       } else if (aiProvider === 'claude') {
@@ -297,7 +325,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
       } else if (aiProvider === 'deepseek') {
         aiResponse = await callDeepseek(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
       } else {
-        // Default to OpenAI if provider is not recognized
         aiResponse = await callOpenAI(fullMessages, apiKey, 'gpt-4o-mini', botConfig.temperature || 0.7);
       }
     } catch (e) {
@@ -306,7 +333,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
       aiResponse = "I'm sorry, I encountered an error while processing your request. Please try again later.";
     }
     
-    // Update the prompt run with the result
     if (promptRunId) {
       try {
         if (error) {
@@ -335,7 +361,6 @@ The JSON block MUST be properly formatted as it will be automatically processed.
 
     console.log('AI response received:', aiResponse);
     
-    // Extract action from AI response if an action request was detected
     let actionRecordId = null;
     if (projectData && aiResponse) {
       try {
@@ -344,9 +369,7 @@ The JSON block MUST be properly formatted as it will be automatically processed.
           const actionData = JSON.parse(jsonMatch[1].trim());
           console.log('Extracted action data:', actionData);
           
-          // For data update actions
           if (actionData.action_type === "data_update" && actionData.field_to_update && actionData.new_value) {
-            // Create an action record
             const { data: actionRecord, error: actionError } = await supabase
               .from('action_records')
               .insert({
@@ -370,13 +393,9 @@ The JSON block MUST be properly formatted as it will be automatically processed.
               actionRecordId = actionRecord.id;
               console.log('Created data update action record:', actionRecord);
               
-              // Remove the JSON block from the response
               aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }
-          }
-          // For message sending actions
-          else if (actionData.action_type === "message" && actionData.recipient && actionData.message_content) {
-            // Create an action record for sending a message
+          } else if (actionData.action_type === "message" && actionData.recipient && actionData.message_content) {
             const { data: actionRecord, error: actionError } = await supabase
               .from('action_records')
               .insert({
@@ -400,7 +419,33 @@ The JSON block MUST be properly formatted as it will be automatically processed.
               actionRecordId = actionRecord.id;
               console.log('Created message action record:', actionRecord);
               
-              // Remove the JSON block from the response
+              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+            }
+          } else if (actionData.action_type === "notion_integration") {
+            const { data: actionRecord, error: actionError } = await supabase
+              .from('action_records')
+              .insert({
+                prompt_run_id: promptRunId,
+                project_id: projectData.id,
+                action_type: 'notion_integration',
+                action_payload: {
+                  notion_token: actionData.notion_token || "User needs to provide",
+                  notion_database_id: actionData.notion_database_id || null,
+                  notion_page_id: actionData.notion_page_id || null,
+                  description: actionData.description || "Connect to Notion for knowledge base integration"
+                },
+                requires_approval: true,
+                status: 'pending'
+              })
+              .select()
+              .single();
+            
+            if (actionError) {
+              console.error('Error creating Notion integration action record:', actionError);
+            } else {
+              actionRecordId = actionRecord.id;
+              console.log('Created Notion integration action record:', actionRecord);
+              
               aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }
           }
@@ -427,6 +472,68 @@ The JSON block MUST be properly formatted as it will be automatically processed.
   }
 });
 
+async function searchKnowledgeBase(supabase, companyId, query) {
+  try {
+    const embedding = await generateEmbedding(query);
+    
+    if (!embedding) {
+      console.log('Could not generate embedding for search query');
+      return [];
+    }
+    
+    const { data, error } = await supabase.rpc('match_knowledge_embeddings', {
+      query_embedding: embedding,
+      match_threshold: 0.5,
+      match_count: 5,
+      company_id: companyId
+    });
+    
+    if (error) {
+      console.error('Error searching knowledge base:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error in knowledge base search:', error);
+    return [];
+  }
+}
+
+async function generateEmbedding(text) {
+  try {
+    const apiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!apiKey) {
+      console.error('OpenAI API key is not configured');
+      return null;
+    }
+    
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('OpenAI API error:', error);
+      return null;
+    }
+
+    const result = await response.json();
+    return result.data[0].embedding;
+  } catch (error) {
+    console.error('Error generating search embedding:', error);
+    return null;
+  }
+}
+
 async function callOpenAI(messages, apiKey, model = 'gpt-4o-mini', temperature = 0.7) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -452,22 +559,17 @@ async function callOpenAI(messages, apiKey, model = 'gpt-4o-mini', temperature =
 }
 
 async function callClaude(messages, apiKey, model = 'claude-3-haiku-20240307', temperature = 0.7) {
-  // Convert the messages format to what Claude expects
   const claudeMessages = messages.map(msg => ({
     role: msg.role === 'system' ? 'user' : msg.role,
     content: msg.content
   }));
   
-  // If there's a system message, prepend it to the first user message
-  const systemMessage = messages.find(msg => msg.role === 'system');
-  if (systemMessage && claudeMessages.length > 1) {
-    // Find the first non-system message
+  if (messages.find(msg => msg.role === 'system')) {
     const firstUserIndex = claudeMessages.findIndex(msg => msg.role === 'user');
     if (firstUserIndex >= 0) {
       claudeMessages[firstUserIndex].content = 
-        `${systemMessage.content}\n\nUser message: ${claudeMessages[firstUserIndex].content}`;
+        `${messages.find(msg => msg.role === 'system').content}\n\nUser message: ${claudeMessages[firstUserIndex].content}`;
     }
-    // Remove the system message
     claudeMessages.shift();
   }
 

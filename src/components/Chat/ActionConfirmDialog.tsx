@@ -9,7 +9,7 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, AlertCircle, Mail } from "lucide-react";
+import { Check, AlertCircle, Mail, Database } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "./types";
@@ -94,6 +94,50 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
         if (executionError) {
           console.error('Error recording execution result:', executionError);
         }
+      }
+      // If approved and it's a notion integration
+      else if (approve && action.action_type === 'notion_integration') {
+        // Call the edge function to process the notion integration
+        const { data, error: notionError } = await supabase.functions.invoke('process-notion-integration', {
+          body: { 
+            companyId: action.project_id ? 
+              (await supabase.from('projects').select('company_id').eq('id', action.project_id).single()).data?.company_id : 
+              null,
+            notionToken: action.action_payload.notion_token,
+            notionDatabaseId: action.action_payload.notion_database_id,
+            notionPageId: action.action_payload.notion_page_id
+          }
+        });
+        
+        if (notionError) {
+          console.error('Error processing Notion integration:', notionError);
+          toast({
+            title: "Error",
+            description: "Failed to process Notion integration",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Notion integration started. Content will be processed in the background.",
+          });
+          
+          // Record the execution result
+          const { error: executionError } = await supabase
+            .from('action_records')
+            .update({
+              execution_result: {
+                status: 'notion_integration_started',
+                timestamp: new Date().toISOString(),
+                details: data
+              }
+            })
+            .eq('id', action.id);
+            
+          if (executionError) {
+            console.error('Error recording execution result:', executionError);
+          }
+        }
       } else if (!approve) {
         toast({
           title: "Action Rejected",
@@ -152,6 +196,31 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
               <div className="mt-2 p-3 bg-muted rounded-md">
                 <p className="text-sm font-medium mb-1">Message Content:</p>
                 <p className="text-sm">{action.action_payload.message_content}</p>
+              </div>
+            </>
+          )}
+          
+          {action.action_type === 'notion_integration' && (
+            <>
+              <p className="text-sm text-muted-foreground mb-1">
+                <span className="font-medium">Integration Type:</span> Notion
+              </p>
+              {action.action_payload.notion_database_id && (
+                <p className="text-sm text-muted-foreground mb-1">
+                  <span className="font-medium">Database ID:</span> {action.action_payload.notion_database_id}
+                </p>
+              )}
+              {action.action_payload.notion_page_id && (
+                <p className="text-sm text-muted-foreground mb-1">
+                  <span className="font-medium">Page ID:</span> {action.action_payload.notion_page_id}
+                </p>
+              )}
+              <div className="mt-2 p-3 bg-muted rounded-md">
+                <p className="text-sm font-medium mb-1">Note:</p>
+                <p className="text-sm">
+                  This will integrate with Notion and create vector embeddings for search functionality. 
+                  The API token will be securely stored.
+                </p>
               </div>
             </>
           )}
