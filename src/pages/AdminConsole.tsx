@@ -6,6 +6,7 @@ import { MessageCircle } from "lucide-react";
 import PromptsTab from "@/components/admin/PromptsTab";
 import TestingTab from "@/components/admin/TestingTab";
 import AIProviderConfig from "@/components/admin/AIProviderConfig";
+import PromptRunsTab from "@/components/admin/PromptRunsTab";
 
 const AdminConsole = () => {
   return (
@@ -34,6 +35,7 @@ const AdminConsole = () => {
         <TabsList>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
+          <TabsTrigger value="runs">Prompt Runs</TabsTrigger>
           <TabsTrigger value="ai-provider">AI Provider</TabsTrigger>
         </TabsList>
 
@@ -43,6 +45,10 @@ const AdminConsole = () => {
 
         <TabsContent value="testing" className="space-y-6">
           <TestingTab />
+        </TabsContent>
+
+        <TabsContent value="runs" className="space-y-6">
+          <PromptRunsTab />
         </TabsContent>
 
         <TabsContent value="ai-provider" className="space-y-6">

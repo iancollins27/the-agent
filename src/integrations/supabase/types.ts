@@ -314,6 +314,66 @@ export type Database = {
           },
         ]
       }
+      prompt_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          feedback_description: string | null
+          feedback_rating: number | null
+          feedback_tags: string[] | null
+          id: string
+          project_id: string | null
+          prompt_input: string
+          prompt_output: string | null
+          status: string
+          workflow_prompt_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          feedback_description?: string | null
+          feedback_rating?: number | null
+          feedback_tags?: string[] | null
+          id?: string
+          project_id?: string | null
+          prompt_input: string
+          prompt_output?: string | null
+          status?: string
+          workflow_prompt_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          feedback_description?: string | null
+          feedback_rating?: number | null
+          feedback_tags?: string[] | null
+          id?: string
+          project_id?: string | null
+          prompt_input?: string
+          prompt_output?: string | null
+          status?: string
+          workflow_prompt_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prompt_runs_workflow_prompt_id_fkey"
+            columns: ["workflow_prompt_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_prompts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_prompts: {
         Row: {
           created_at: string | null
