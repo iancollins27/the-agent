@@ -238,6 +238,12 @@ function generateMockResult(promptType: string, contextData: Record<string, stri
       return `Based on the summary "${contextData.summary}" for the ${contextData.track_name} track, here are some detected actions:\n1. Schedule a follow-up call\n2. Prepare project materials\n3. Review timeline. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
     case "action_execution":
       return `For the action "${contextData.action_description}" on project with summary "${contextData.summary}" in the ${contextData.track_name} track, here are execution steps:\n1. Step one\n2. Step two\n3. Step three. ${contextData.milestone_instructions ? 'Using milestone instructions: ' + contextData.milestone_instructions : 'No milestone instructions available.'}`;
+    case "action_detection_execution":
+      return `{
+  "decision": "ACTION_NEEDED",
+  "message_text": "Hi, I noticed that you haven't updated your project. Would you like to schedule a call to discuss next steps?",
+  "reason": "The project has been idle for 2 weeks and the next step '${contextData.next_step || "project milestone"}' requires client input."
+}`;
     default:
       return "Unknown prompt type";
   }

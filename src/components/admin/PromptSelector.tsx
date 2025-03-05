@@ -50,15 +50,15 @@ const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelec
           <span>Loading prompts...</span>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-2">
           {prompts.map((prompt) => (
-            <div key={prompt.id} className="flex items-center space-x-2">
+            <div key={prompt.id} className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded-md">
               <Checkbox 
                 id={`prompt-${prompt.id}`} 
                 checked={selectedPromptIds.includes(prompt.id)}
                 onCheckedChange={() => handlePromptToggle(prompt.id)}
               />
-              <Label htmlFor={`prompt-${prompt.id}`}>
+              <Label htmlFor={`prompt-${prompt.id}`} className="flex-1 cursor-pointer">
                 {workflowTitles[prompt.type] || prompt.type}
               </Label>
             </div>
