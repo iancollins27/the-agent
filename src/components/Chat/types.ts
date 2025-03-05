@@ -10,8 +10,10 @@ export type ActionRecord = {
   id: string;
   action_type: string;
   action_payload: {
-    field: string;
-    value: string;
+    field?: string;
+    value?: string;
+    recipient?: string;
+    message_content?: string;
     description: string;
   };
   status: string;

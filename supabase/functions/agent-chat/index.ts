@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -154,7 +153,16 @@ serve(async (req) => {
       { pattern: /schedule\s+(the\s+)?(.+?)\s+for\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
       { pattern: /mark\s+(the\s+)?(.+?)\s+for\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
       { pattern: /can you update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /please update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' }
+      { pattern: /please update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
+      
+      // Message sending pattern detection
+      { pattern: /send\s+(a\s+)?message\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
+      { pattern: /send\s+(.+?)\s+a\s+message(?:\?|$|\.|;)/i, type: 'message' },
+      { pattern: /notify\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
+      { pattern: /let\s+(.+?)\s+know(?:\?|$|\.|;)/i, type: 'message' },
+      { pattern: /inform\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
+      { pattern: /contact\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
+      { pattern: /message\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' }
     ];
 
     let actionRequest = null;
@@ -180,7 +188,7 @@ schedules, or other project details, you SHOULD create an update action for them
 When a user asks something like "update the install date to March 16, 2025", you MUST respond with your willingness to help with the update
 and provide a JSON block that will be processed automatically.
 
-For ANY update request, reply with:
+For data update requests, reply with:
 1. A normal conversational response confirming what will be updated
 2. A JSON block in this format:
 
@@ -190,6 +198,19 @@ For ANY update request, reply with:
   "field_to_update": "the field name to update (e.g. 'next_step', 'summary', etc.)",
   "new_value": "the new value for the field",
   "description": "A human-readable description of what's being updated"
+}
+\`\`\`
+
+For message sending requests (like "send a message to the customer"), reply with:
+1. A normal conversational response explaining that you can prepare a message request for approval
+2. A JSON block in this format:
+
+\`\`\`json
+{
+  "action_type": "message",
+  "recipient": "the intended recipient (e.g. 'customer', 'team', etc.)",
+  "message_content": "the suggested content of the message",
+  "description": "A brief description of what the message is about"
 }
 \`\`\`
 
@@ -323,14 +344,15 @@ The JSON block MUST be properly formatted as it will be automatically processed.
           const actionData = JSON.parse(jsonMatch[1].trim());
           console.log('Extracted action data:', actionData);
           
-          if (actionData && actionData.field_to_update && actionData.new_value) {
+          // For data update actions
+          if (actionData.action_type === "data_update" && actionData.field_to_update && actionData.new_value) {
             // Create an action record
             const { data: actionRecord, error: actionError } = await supabase
               .from('action_records')
               .insert({
                 prompt_run_id: promptRunId,
                 project_id: projectData.id,
-                action_type: actionData.action_type || 'data_update',
+                action_type: 'data_update',
                 action_payload: {
                   field: actionData.field_to_update,
                   value: actionData.new_value,
@@ -346,7 +368,37 @@ The JSON block MUST be properly formatted as it will be automatically processed.
               console.error('Error creating action record:', actionError);
             } else {
               actionRecordId = actionRecord.id;
-              console.log('Created action record:', actionRecord);
+              console.log('Created data update action record:', actionRecord);
+              
+              // Remove the JSON block from the response
+              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+            }
+          }
+          // For message sending actions
+          else if (actionData.action_type === "message" && actionData.recipient && actionData.message_content) {
+            // Create an action record for sending a message
+            const { data: actionRecord, error: actionError } = await supabase
+              .from('action_records')
+              .insert({
+                prompt_run_id: promptRunId,
+                project_id: projectData.id,
+                action_type: 'message',
+                action_payload: {
+                  recipient: actionData.recipient,
+                  message_content: actionData.message_content,
+                  description: actionData.description || `Send message to ${actionData.recipient}`
+                },
+                requires_approval: true,
+                status: 'pending'
+              })
+              .select()
+              .single();
+            
+            if (actionError) {
+              console.error('Error creating message action record:', actionError);
+            } else {
+              actionRecordId = actionRecord.id;
+              console.log('Created message action record:', actionRecord);
               
               // Remove the JSON block from the response
               aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();

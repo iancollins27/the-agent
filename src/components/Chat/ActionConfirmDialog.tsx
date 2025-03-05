@@ -9,7 +9,7 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, AlertCircle } from "lucide-react";
+import { Check, AlertCircle, Mail } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "./types";
@@ -69,10 +69,35 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
             description: action.action_payload.description || "Project updated successfully",
           });
         }
+      } 
+      // If approved and it's a message, handle the message sending action
+      else if (approve && action.action_type === 'message') {
+        // In a real implementation, this would connect to an email/messaging service
+        // For now, we'll just show a toast notification
+        toast({
+          title: "Message Prepared",
+          description: `Message to ${action.action_payload.recipient} has been prepared for sending`,
+        });
+        
+        // Record that the message was "sent" (in a real app, we would actually send it here)
+        const { error: executionError } = await supabase
+          .from('action_records')
+          .update({
+            execution_result: {
+              status: 'message_prepared',
+              timestamp: new Date().toISOString(),
+              details: `Message to ${action.action_payload.recipient} prepared for sending`
+            }
+          })
+          .eq('id', action.id);
+          
+        if (executionError) {
+          console.error('Error recording execution result:', executionError);
+        }
       } else if (!approve) {
         toast({
           title: "Action Rejected",
-          description: "The proposed change was rejected",
+          description: "The proposed action was rejected",
         });
       }
       
@@ -107,6 +132,7 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           <p className="text-sm text-muted-foreground mb-1">
             <span className="font-medium">Type:</span> {action.action_type.replace(/_/g, ' ')}
           </p>
+          
           {action.action_type === 'data_update' && (
             <>
               <p className="text-sm text-muted-foreground mb-1">
@@ -117,6 +143,19 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
               </p>
             </>
           )}
+          
+          {action.action_type === 'message' && (
+            <>
+              <p className="text-sm text-muted-foreground mb-1">
+                <span className="font-medium">Recipient:</span> {action.action_payload.recipient}
+              </p>
+              <div className="mt-2 p-3 bg-muted rounded-md">
+                <p className="text-sm font-medium mb-1">Message Content:</p>
+                <p className="text-sm">{action.action_payload.message_content}</p>
+              </div>
+            </>
+          )}
+          
           <p className="text-sm mt-2 p-3 bg-muted rounded-md">
             {action.action_payload.description}
           </p>
