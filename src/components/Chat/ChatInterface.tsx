@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import ChatMessage from "./ChatMessage";
 import { AlertCircle } from 'lucide-react';
+import { Json } from "@/integrations/supabase/types";
 
 type Message = {
   role: 'user' | 'assistant';
@@ -23,6 +24,14 @@ type ActionRecord = {
     description: string;
   };
   status: string;
+  // Add other needed fields
+  approver_id?: string | null;
+  created_at?: string;
+  executed_at?: string | null;
+  execution_result?: Json | null;
+  project_id?: string | null;
+  prompt_run_id?: string | null;
+  requires_approval?: boolean;
 };
 
 type ChatInterfaceProps = {
@@ -80,7 +89,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         console.log('Action record created:', data.actionRecordId);
         
         // Fetch action record details
-        const { data: actionRecord, error: actionError } = await supabase
+        const { data: actionRecordData, error: actionError } = await supabase
           .from('action_records')
           .select('*')
           .eq('id', data.actionRecordId)
@@ -88,9 +97,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           
         if (actionError) {
           console.error('Error fetching action record:', actionError);
-        } else if (actionRecord) {
-          console.log('Fetched action record:', actionRecord);
-          setPendingAction(actionRecord as ActionRecord);
+        } else if (actionRecordData) {
+          console.log('Fetched action record:', actionRecordData);
+          // Convert the database record to our ActionRecord type
+          const actionRecord: ActionRecord = {
+            id: actionRecordData.id,
+            action_type: actionRecordData.action_type,
+            action_payload: actionRecordData.action_payload as ActionRecord['action_payload'],
+            status: actionRecordData.status,
+            approver_id: actionRecordData.approver_id,
+            created_at: actionRecordData.created_at,
+            executed_at: actionRecordData.executed_at,
+            execution_result: actionRecordData.execution_result,
+            project_id: actionRecordData.project_id,
+            prompt_run_id: actionRecordData.prompt_run_id,
+            requires_approval: actionRecordData.requires_approval
+          };
+          setPendingAction(actionRecord);
         }
       }
     } catch (error) {
