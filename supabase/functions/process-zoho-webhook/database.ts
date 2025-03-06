@@ -1,198 +1,180 @@
+import { ParsedProjectData } from './types.ts';
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { ParsedProjectData } from './types.ts'
-
-// Create a supabase client for use in other modules
-export const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
-export async function handleCompany(
-  supabase: ReturnType<typeof createClient>,
-  projectData: ParsedProjectData,
-  rawData: any
-) {
-  console.log('Handling company with Zoho ID:', projectData.zohoCompanyId);
-  
-  // First, try to find an existing company with this Zoho ID
-  const { data: existingCompanies, error: findError } = await supabase
+export async function handleCompany(supabase: any, projectData: ParsedProjectData, rawData: any) {
+  // Check if the company already exists
+  let { data: existingCompany, error: companyError } = await supabase
     .from('companies')
-    .select('id, name, default_project_track')
+    .select('*')
     .eq('zoho_id', projectData.zohoCompanyId)
-    .maybeSingle();
-
-  if (findError) {
-    console.error('Error finding company:', findError);
-    throw findError;
-  }
-
-  // If company exists, use its UUID
-  if (existingCompanies) {
-    console.log('Found existing company:', existingCompanies);
-    return {
-      id: existingCompanies.id,
-      defaultTrackId: existingCompanies.default_project_track
-    };
-  }
-
-  // If company doesn't exist, create it and get the new UUID
-  const companyName = rawData.Company_Name || rawData.rawData?.Company_Name || 'Unknown Company';
-  console.log('Creating new company with name:', companyName);
-
-  const { data: newCompany, error: createError } = await supabase
-    .from('companies')
-    .insert({
-      name: companyName,
-      zoho_id: projectData.zohoCompanyId
-    })
-    .select()
     .single();
 
-  if (createError) {
-    console.error('Error creating company:', createError);
-    throw createError;
+  if (companyError && companyError.status !== 404) {
+    console.error('Error checking existing company:', companyError);
+    throw new Error('Failed to check existing company');
   }
 
-  console.log('Created new company:', newCompany);
+  if (!existingCompany) {
+    // If the company doesn't exist, create it
+    const companyName = rawData?.Company_Name || rawData?.rawData?.Company_Name || 'Unknown Company';
+    let { data: newCompany, error: newCompanyError } = await supabase
+      .from('companies')
+      .insert({ zoho_id: projectData.zohoCompanyId, name: companyName })
+      .select('*')
+      .single();
+
+    if (newCompanyError) {
+      console.error('Error creating company:', newCompanyError);
+      throw new Error('Failed to create company');
+    }
+
+    existingCompany = newCompany;
+    console.log('New company created:', existingCompany);
+  } else {
+    console.log('Company already exists:', existingCompany);
+  }
+
+  // Fetch the default project track for the company
+  let { data: defaultTrack, error: trackError } = await supabase
+    .from('project_tracks')
+    .select('id')
+    .eq('company_id', existingCompany.id)
+    .eq('is_default', true)
+    .single();
+
+  if (trackError && trackError.status !== 404) {
+    console.error('Error fetching default track:', trackError);
+    throw new Error('Failed to fetch default track');
+  }
+
+  const defaultTrackId = defaultTrack ? defaultTrack.id : null;
+
   return {
-    id: newCompany.id,
-    defaultTrackId: newCompany.default_project_track
+    id: existingCompany.id,
+    defaultTrackId: defaultTrackId
   };
 }
 
-export async function getExistingProject(
-  supabase: ReturnType<typeof createClient>,
-  crmId: string
-) {
-  const { data: existingProject } = await supabase
+export async function getExistingProject(supabase: any, crmId: string) {
+  const { data: projects, error } = await supabase
     .from('projects')
-    .select('id, summary, project_track')
+    .select(`
+      id,
+      crm_id,
+      summary,
+      project_track
+    `)
     .eq('crm_id', crmId)
-    .maybeSingle()
-  
-  return existingProject;
-}
+    .limit(1)
 
-export async function getMilestoneInstructions(
-  supabase: ReturnType<typeof createClient>,
-  nextStep: string | undefined,
-  trackId: string | undefined
-) {
-  if (!nextStep || !trackId) return null;
-  
-  console.log(`Fetching milestone instructions for step: ${nextStep} and track: ${trackId}`);
-  
-  const { data: milestoneData, error } = await supabase
-    .from('project_track_milestones')
-    .select('prompt_instructions')
-    .eq('track_id', trackId)
-    .eq('step_title', nextStep)
-    .maybeSingle()
-  
   if (error) {
-    console.error('Error fetching milestone instructions:', error);
-    return null;
+    console.error('Error fetching project:', error)
   }
-  
-  console.log('Milestone data retrieved:', milestoneData);
-  return milestoneData?.prompt_instructions || null;
+
+  return projects && projects.length > 0 ? projects[0] : null
 }
 
-export async function getWorkflowPrompt(
-  supabase: ReturnType<typeof createClient>,
-  isUpdate: boolean
-) {
-  const { data: promptData } = await supabase
-    .from('workflow_prompts')
-    .select('prompt_text, id')
-    .eq('type', isUpdate ? 'summary_update' : 'summary_generation')
+export async function getMilestoneInstructions(supabase: any, nextStep: string, projectTrackId: string | null) {
+  if (!nextStep || !projectTrackId) {
+    return null
+  }
+
+  const { data: milestone, error } = await supabase
+    .from('project_track_milestones')
+    .select('instructions')
+    .eq('project_track_id', projectTrackId)
+    .eq('name', nextStep)
     .single()
 
-  if (!promptData) {
-    throw new Error('Prompt not found')
+  if (error && error.status !== 404) {
+    console.error('Error fetching milestone instructions:', error)
+    return null
   }
 
-  return promptData.prompt_text;
+  return milestone ? milestone.instructions : null
+}
+
+export async function getWorkflowPrompt(supabase: any, isUpdate: boolean) {
+  const workflowType = isUpdate ? 'summary_update' : 'summary_generation';
+
+  const { data: prompt, error } = await supabase
+    .from('workflow_prompts')
+    .select('prompt_text')
+    .eq('type', workflowType)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error) {
+    console.error('Error fetching workflow prompt:', error)
+    throw new Error('Failed to get workflow prompt')
+  }
+
+  return prompt.prompt_text
 }
 
 export async function updateProject(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   projectId: string,
   data: {
     summary: string;
-    next_step: string | undefined;
+    next_step: string;
     last_action_check: string;
     company_id: string;
     project_track?: string | null;
-    notes?: string;
   }
 ) {
-  const { error: updateError } = await supabase
+  const { error } = await supabase
     .from('projects')
     .update(data)
     .eq('id', projectId)
-  
-  if (updateError) throw updateError;
+
+  if (error) {
+    console.error('Error updating project:', error)
+    throw new Error('Failed to update project')
+  }
 }
 
 export async function createProject(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   data: {
     summary: string;
-    next_step: string | undefined;
+    next_step: string;
     last_action_check: string;
     company_id: string;
     crm_id: string;
     project_track?: string | null;
-    notes?: string;
   }
 ) {
-  const { error: createError } = await supabase
+  const { error } = await supabase
     .from('projects')
-    .insert([data])
-  
-  if (createError) throw createError;
+    .insert(data)
+    .select()
+
+  if (error) {
+    console.error('Error creating project:', error)
+    throw new Error('Failed to create project')
+  }
 }
 
-export async function createMilestoneActionRecord(
-  supabase: ReturnType<typeof createClient>,
-  projectId: string,
-  timeline: ParsedProjectData['timeline']
-) {
-  const milestones = Object.entries(timeline)
-    .filter(([_, value]) => value.trim() !== '')
-    .map(([milestone]) => milestone);
+export async function createMilestoneActionRecord(supabase: any, projectId: string | undefined, timeline: any) {
+  if (!projectId) {
+    console.warn('Project ID is undefined, skipping milestone action record creation.')
+    return
+  }
 
-  if (milestones.length > 0) {
-    // Get the project to find the company_id
-    const { data: projectData, error: projectError } = await supabase
-      .from('projects')
-      .select('company_id')
-      .eq('id', projectId)
-      .single();
-      
-    if (projectError) {
-      console.error("Error fetching project:", projectError);
-      return null;
-    }
+  const actions = Object.entries(timeline).map(([milestone, date]) => ({
+    project_id: projectId,
+    milestone: milestone,
+    action_date: date,
+    action_type: 'timeline_update',
+    description: `Timeline updated for ${milestone} on ${date}`
+  }))
 
-    // Create an action record instead of an action log
-    const { error } = await supabase
-      .from('action_records')
-      .insert({
-        project_id: projectId,
-        action_type: 'milestone_update',
-        action_payload: {
-          milestones: milestones,
-          description: `Project milestones updated: ${milestones.join(', ')}`
-        },
-        requires_approval: false,
-        status: 'completed'
-      });
-      
-    if (error) {
-      console.error("Error creating milestone action record:", error);
-    }
+  const { error } = await supabase
+    .from('action_records')
+    .insert(actions)
+
+  if (error) {
+    console.error('Error creating milestone action records:', error)
   }
 }

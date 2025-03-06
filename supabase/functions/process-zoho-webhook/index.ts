@@ -98,13 +98,13 @@ serve(async (req) => {
     const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
 
     // Prepare project data using the company UUID from Supabase
+    // Remove the notes field since it doesn't exist in the projects table
     const projectUpdateData = {
       summary,
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
       company_id: companyUuid,  // Use the UUID we got from handleCompany
-      project_track: projectTrackId,  // Add project track ID
-      notes: projectData.notes // Add notes field
+      project_track: projectTrackId  // Add project track ID
     }
 
     // Update or create project
