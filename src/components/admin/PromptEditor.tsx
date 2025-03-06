@@ -110,19 +110,38 @@ Milestone Instructions:
 Instructions:
 1. Review the current project summary and next step information
 2. Determine if any action should be taken based on the project status
-3. Your response must be a JSON object in the following format:
+3. Your response must be a JSON object in one of these formats:
 
+IF ACTION IS NEEDED:
 {
-  "decision": "ACTION_NEEDED" or "NO_ACTION",
+  "decision": "ACTION_NEEDED",
   "reason": "Explanation for your decision",
-  "action_type": "message" | "data_update" | "request_for_data_update", (only if action needed)
+  "action_type": "message" | "data_update" | "request_for_data_update",
   "message_text": "The message you want to send", (only if action type is message)
   "action_payload": {
     // Additional data needed for the action, including the message and reason if action type is message
   }
 }
 
-The system will automatically create action records based on your response if you return "decision": "ACTION_NEEDED".`;
+IF NO IMMEDIATE ACTION BUT FUTURE CHECK NEEDED:
+{
+  "decision": "SET_FUTURE_REMINDER",
+  "reason": "Explanation why a future check is needed",
+  "action_type": "set_future_reminder",
+  "days_until_check": 7, // Number of days until the next check (adjust as needed)
+  "check_reason": "Reason to check again in the future",
+  "action_payload": {
+    "description": "Set reminder to check in X days: reason"
+  }
+}
+
+IF NO ACTION IS NEEDED:
+{
+  "decision": "NO_ACTION",
+  "reason": "Explanation why no action is needed"
+}
+
+The system will automatically execute your decision. If you choose ACTION_NEEDED, action records will be created. If you choose SET_FUTURE_REMINDER, the project's next_check_date will be updated.`;
     }
     return null;
   };
