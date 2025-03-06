@@ -103,7 +103,8 @@ serve(async (req) => {
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
       company_id: companyUuid,  // Use the UUID we got from handleCompany
-      project_track: projectTrackId  // Add project track ID
+      project_track: projectTrackId,  // Add project track ID
+      notes: projectData.notes // Add notes field
     }
 
     // Update or create project

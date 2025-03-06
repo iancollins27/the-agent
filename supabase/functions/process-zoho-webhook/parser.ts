@@ -28,12 +28,16 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
   
+  // Log the notes data for debugging
+  console.log('Notes from Zoho:', data.Notes || 'No notes provided');
+  
   const result = {
     crmId: idValue, // Using the string version of the ID
     zohoCompanyId: companyIdFromZoho,
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
     propertyAddress: data.Property_Address || '',
+    notes: data.Notes || '', // Adding the notes field
     timeline: {
       contractSigned: String(data.Contract_Signed || ''),
       siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),

@@ -125,6 +125,7 @@ export async function updateProject(
     last_action_check: string;
     company_id: string;
     project_track?: string | null;
+    notes?: string;
   }
 ) {
   const { error: updateError } = await supabase
@@ -144,6 +145,7 @@ export async function createProject(
     company_id: string;
     crm_id: string;
     project_track?: string | null;
+    notes?: string;
   }
 ) {
   const { error: createError } = await supabase

@@ -5,6 +5,7 @@ export interface ParsedProjectData {
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
+  notes: string; // Added notes field
   timeline: {
     contractSigned: string;
     siteVisitScheduled: string;
