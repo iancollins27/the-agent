@@ -18,6 +18,9 @@ export type ActionRecord = {
     notion_token?: string;
     notion_database_id?: string;
     notion_page_id?: string;
+    days_until_check?: number;
+    check_reason?: string;
+    date?: string;
   };
   status: string;
   approver_id?: string | null;

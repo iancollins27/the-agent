@@ -354,6 +354,7 @@ export type Database = {
           crm_id: string | null
           id: string
           last_action_check: string | null
+          next_check_date: string | null
           next_step: string | null
           project_track: string | null
           summary: string | null
@@ -363,6 +364,7 @@ export type Database = {
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
+          next_check_date?: string | null
           next_step?: string | null
           project_track?: string | null
           summary?: string | null
@@ -372,6 +374,7 @@ export type Database = {
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
+          next_check_date?: string | null
           next_step?: string | null
           project_track?: string | null
           summary?: string | null
@@ -501,6 +504,19 @@ export type Database = {
             }
             Returns: unknown
           }
+      get_projects_due_for_check: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          company_id: string | null
+          crm_id: string | null
+          id: string
+          last_action_check: string | null
+          next_check_date: string | null
+          next_step: string | null
+          project_track: string | null
+          summary: string | null
+        }[]
+      }
       halfvec_avg: {
         Args: {
           "": number[]

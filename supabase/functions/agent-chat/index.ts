@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -209,6 +208,9 @@ and provide a JSON block that will be processed automatically.`;
 respond with what you know based on the search results I provide to you. If no knowledge base results are provided, tell the user that you don't have that information 
 in your knowledge base.`;
 
+    systemPromptWithActions += `\n\nYou can set reminders to check on projects at a future date. If a user asks to "remind me in 2 weeks about this project" or 
+"check this project again in 30 days", offer to set a reminder and respond with a JSON block in the format shown below.`;
+
     if (notionIntegrationRequest) {
       systemPromptWithActions += `\n\nIMPORTANT: The user is asking about integrating with Notion. Inform them that they can connect their Notion workspace by going to the Company Settings page and selecting the Knowledge Base tab.
 Let them know that they don't need to provide their credentials through the chat - they can do it securely through the dedicated settings page.`;
@@ -237,6 +239,19 @@ For message sending requests (like "send a message to the customer"), reply with
   "recipient": "the intended recipient (e.g. 'customer', 'team', etc.)",
   "message_content": "the suggested content of the message",
   "description": "A brief description of what the message is about"
+}
+\`\`\`
+
+For setting reminders to check a project at a future date, reply with:
+1. A normal conversational response confirming the reminder will be set
+2. A JSON block in this format:
+
+\`\`\`json
+{
+  "action_type": "set_future_reminder",
+  "days_until_check": 14, // number of days until the check should happen
+  "check_reason": "Follow up on project progress",
+  "description": "A brief description of why we're setting a reminder"
 }
 \`\`\`
 
@@ -408,6 +423,32 @@ The JSON block MUST be properly formatted as it will be automatically processed.
             } else {
               actionRecordId = actionRecord.id;
               console.log('Created message action record:', actionRecord);
+              
+              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+            }
+          } else if (actionData.action_type === "set_future_reminder" && actionData.days_until_check) {
+            const { data: actionRecord, error: actionError } = await supabase
+              .from('action_records')
+              .insert({
+                prompt_run_id: promptRunId,
+                project_id: projectData.id,
+                action_type: 'set_future_reminder',
+                action_payload: {
+                  days_until_check: actionData.days_until_check,
+                  check_reason: actionData.check_reason || 'Follow-up check',
+                  description: actionData.description || `Check project in ${actionData.days_until_check} days`
+                },
+                requires_approval: true,
+                status: 'pending'
+              })
+              .select()
+              .single();
+            
+            if (actionError) {
+              console.error('Error creating reminder action record:', actionError);
+            } else {
+              actionRecordId = actionRecord.id;
+              console.log('Created reminder action record:', actionRecord);
               
               aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }

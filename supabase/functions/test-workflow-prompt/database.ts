@@ -141,6 +141,53 @@ export async function createActionRecord(
       
       console.log("Action record created successfully:", data);
       return data.id;
+    } 
+    // Handle SET_FUTURE_REMINDER action type specially
+    else if (decision === "SET_FUTURE_REMINDER" || actionData.action_type === "set_future_reminder") {
+      // Calculate the next check date
+      const daysToAdd = actionData.days_until_check || 7; // Default to 7 days if not specified
+      const nextCheckDate = new Date();
+      nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+      
+      // Update the project with the next check date
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+          next_check_date: nextCheckDate.toISOString()
+        })
+        .eq('id', projectId);
+        
+      if (updateError) {
+        console.error("Error setting next check date:", updateError);
+        return null;
+      }
+      
+      // Create an action record to document the reminder setting
+      const { data, error } = await supabase
+        .from('action_records')
+        .insert({
+          prompt_run_id: promptRunId,
+          project_id: projectId,
+          action_type: 'set_future_reminder',
+          action_payload: {
+            days_until_check: daysToAdd,
+            check_reason: actionData.check_reason || 'Follow-up check',
+            description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`
+          },
+          requires_approval: false,
+          status: 'executed',
+          executed_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error creating reminder action record:", error);
+        return null;
+      }
+      
+      console.log("Reminder action record created successfully:", data);
+      return data.id;
     } else {
       console.log("No action needed based on AI decision:", decision);
       return null;

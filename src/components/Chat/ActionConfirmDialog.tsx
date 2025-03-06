@@ -9,7 +9,7 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, AlertCircle, Mail, Database } from "lucide-react";
+import { Check, AlertCircle, Mail, Database, Calendar } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "./types";
@@ -70,6 +70,52 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           });
         }
       } 
+      // If approved and it's a SET_FUTURE_REMINDER action
+      else if (approve && action.action_type === 'set_future_reminder' && action.project_id) {
+        // Calculate the next check date based on days_until_check
+        const daysToAdd = action.action_payload.days_until_check || 7; // Default to 7 days if not specified
+        const nextCheckDate = new Date();
+        nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+        
+        // Update the project with the next check date
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update({
+            next_check_date: nextCheckDate.toISOString()
+          })
+          .eq('id', action.project_id);
+          
+        if (updateError) {
+          console.error('Error setting next check date:', updateError);
+          toast({
+            title: "Error",
+            description: "Failed to set the reminder",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Reminder Set",
+            description: `Reminder set to check this project again in ${daysToAdd} days`,
+          });
+          
+          // Record the execution result
+          const { error: executionError } = await supabase
+            .from('action_records')
+            .update({
+              execution_result: {
+                status: 'reminder_set',
+                timestamp: new Date().toISOString(),
+                next_check_date: nextCheckDate.toISOString(),
+                details: `Reminder set to check in ${daysToAdd} days: ${action.action_payload.check_reason || 'No reason provided'}`
+              }
+            })
+            .eq('id', action.id);
+            
+          if (executionError) {
+            console.error('Error recording execution result:', executionError);
+          }
+        }
+      }
       // If approved and it's a message, handle the message sending action
       else if (approve && action.action_type === 'message') {
         // In a real implementation, this would connect to an email/messaging service
@@ -185,6 +231,18 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
               <p className="text-sm text-muted-foreground mb-1">
                 <span className="font-medium">New Value:</span> {action.action_payload.value}
               </p>
+            </>
+          )}
+          
+          {action.action_type === 'set_future_reminder' && (
+            <>
+              <p className="text-sm text-muted-foreground mb-1">
+                <span className="font-medium">Check in:</span> {action.action_payload.days_until_check} days
+              </p>
+              <div className="mt-2 p-3 bg-muted rounded-md">
+                <p className="text-sm font-medium mb-1">Reason:</p>
+                <p className="text-sm">{action.action_payload.check_reason}</p>
+              </div>
             </>
           )}
           
