@@ -1,3 +1,4 @@
+
 import { ParsedProjectData } from './types.ts';
 
 export async function handleCompany(supabase: any, projectData: ParsedProjectData, rawData: any) {
@@ -33,20 +34,20 @@ export async function handleCompany(supabase: any, projectData: ParsedProjectDat
     console.log('Company already exists:', existingCompany);
   }
 
-  // Fetch the default project track for the company
-  let { data: defaultTrack, error: trackError } = await supabase
-    .from('project_tracks')
-    .select('id')
-    .eq('company_id', existingCompany.id)
-    .eq('is_default', true)
+  // Fetch the default project track for the company using default_project_track field
+  const { data: defaultTrack, error: trackError } = await supabase
+    .from('companies')
+    .select('default_project_track')
+    .eq('id', existingCompany.id)
     .single();
-
-  if (trackError && trackError.status !== 404) {
-    console.error('Error fetching default track:', trackError);
-    throw new Error('Failed to fetch default track');
+    
+  if (trackError) {
+    console.error('Error fetching default track from companies table:', trackError);
   }
 
-  const defaultTrackId = defaultTrack ? defaultTrack.id : null;
+  // Use the default_project_track directly from the company record
+  const defaultTrackId = defaultTrack?.default_project_track || null;
+  console.log('Default track ID from company record:', defaultTrackId);
 
   return {
     id: existingCompany.id,
