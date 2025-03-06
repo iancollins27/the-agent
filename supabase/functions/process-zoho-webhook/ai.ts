@@ -1,9 +1,15 @@
 
-import { supabase } from './database.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 export async function generateSummary(prompt: string, apiKey: string, provider: string = 'openai', model: string = 'gpt-4o') {
   console.log(`Generating summary using ${provider} model: ${model}`);
   let promptRunId: string | null = null;
+  
+  // Create a Supabase client for this function
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
   
   try {
     // Log the prompt run
