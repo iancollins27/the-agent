@@ -10,7 +10,8 @@ export async function logPromptRun(
   workflowPromptId: string | null, 
   promptInput: string,
   aiProvider: string,
-  aiModel: string
+  aiModel: string,
+  initiatedBy: string | null = null
 ) {
   try {
     const { data, error } = await supabase
@@ -21,7 +22,8 @@ export async function logPromptRun(
         prompt_input: promptInput,
         status: 'PENDING',
         ai_provider: aiProvider,
-        ai_model: aiModel
+        ai_model: aiModel,
+        initiated_by: initiatedBy
       })
       .select()
       .single();

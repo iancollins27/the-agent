@@ -22,10 +22,11 @@ serve(async (req) => {
   }
   
   try {
-    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId } = await req.json();
+    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId, initiatedBy } = await req.json();
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
     console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
+    console.log(`Initiated by: ${initiatedBy || 'System'}`);
     console.log("Context data provided:", contextData);
     console.log("Milestone instructions:", contextData.milestone_instructions);
     
@@ -37,7 +38,7 @@ serve(async (req) => {
     const finalPrompt = replaceVariables(promptText, contextData);
     
     // Log the prompt run with AI provider and model information
-    const promptRunId = await logPromptRun(supabase, projectId, workflowPromptId, finalPrompt, aiProvider, aiModel);
+    const promptRunId = await logPromptRun(supabase, projectId, workflowPromptId, finalPrompt, aiProvider, aiModel, initiatedBy);
     
     let result: string;
     let actionRecordId: string | null = null;
@@ -58,7 +59,7 @@ serve(async (req) => {
           const actionData = extractJsonFromResponse(result);
           console.log("Parsed action data:", actionData);
           
-          if (actionData && actionData.decision === "ACTION_NEEDED") {
+          if (actionData && (actionData.decision === "ACTION_NEEDED" || actionData.decision === "SET_FUTURE_REMINDER")) {
             actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
             console.log("Created action record:", actionRecordId);
           } else {
@@ -88,7 +89,8 @@ serve(async (req) => {
         aiProvider,
         aiModel,
         promptRunId,
-        actionRecordId
+        actionRecordId,
+        initiatedBy
       }),
       {
         headers: {

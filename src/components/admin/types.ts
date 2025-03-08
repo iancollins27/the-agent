@@ -16,6 +16,7 @@ export type PromptRun = {
   workflow_prompt_type?: string;
   ai_provider?: string | null;
   ai_model?: string | null;
+  initiated_by?: string | null;
 };
 
 export type ActionRecord = {

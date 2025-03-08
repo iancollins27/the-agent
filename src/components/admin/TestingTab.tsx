@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +29,10 @@ const TestingTab = () => {
     setTestResults(null);
     
     try {
+      // Get current user information
+      const { data: userData } = await supabase.auth.getUser();
+      const userEmail = userData?.user?.email || 'unknown';
+      
       // Get AI configuration
       const { data: aiConfig, error: aiConfigError } = await supabase
         .from('ai_config')
@@ -109,7 +112,8 @@ const TestingTab = () => {
               contextData: contextData,
               aiProvider: aiProvider,
               aiModel: aiModel,
-              workflowPromptId: promptData.id
+              workflowPromptId: promptData.id,
+              initiatedBy: userEmail
             }
           });
           
