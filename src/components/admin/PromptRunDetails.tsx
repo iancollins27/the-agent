@@ -111,10 +111,10 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
             </CardContent>
           </Card>
 
-          {/* Prompt Details */}
+          {/* Prompt Details with improved formatting */}
           <div>
             <h3 className="font-medium mb-2">Prompt Input</h3>
-            <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm">
+            <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
               {promptRun.prompt_input}
             </pre>
           </div>
@@ -122,7 +122,7 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           {promptRun.prompt_output && (
             <div>
               <h3 className="font-medium mb-2">Prompt Output</h3>
-              <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm">
+              <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
                 {promptRun.prompt_output}
               </pre>
             </div>
@@ -131,7 +131,7 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           {promptRun.error_message && (
             <div>
               <h3 className="font-medium mb-2 text-red-500">Error</h3>
-              <pre className="bg-red-50 p-4 rounded overflow-auto max-h-60 text-sm text-red-500">
+              <pre className="bg-red-50 p-4 rounded overflow-auto max-h-60 text-sm text-red-500 whitespace-pre-wrap break-words">
                 {promptRun.error_message}
               </pre>
             </div>
