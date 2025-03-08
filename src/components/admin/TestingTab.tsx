@@ -150,24 +150,25 @@ const TestingTab = () => {
           <CardTitle>Test Workflow Prompts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-lg font-medium mb-2">Select Prompts</h3>
-              <div className="border rounded-md p-4 max-h-[300px] overflow-y-auto">
-                <PromptSelector 
-                  selectedPromptIds={selectedPromptIds} 
-                  setSelectedPromptIds={setSelectedPromptIds} 
-                />
-              </div>
+          {/* Prompt Selection */}
+          <div>
+            <h3 className="text-lg font-medium mb-2">Select Prompts</h3>
+            <div className="border rounded-md p-4">
+              <PromptSelector 
+                selectedPromptIds={selectedPromptIds} 
+                setSelectedPromptIds={setSelectedPromptIds} 
+              />
             </div>
-            <div>
-              <h3 className="text-lg font-medium mb-2">Select Projects</h3>
-              <div className="border rounded-md p-4 max-h-[300px] overflow-y-auto">
-                <ProjectSelector 
-                  selectedProjectIds={selectedProjectIds} 
-                  setSelectedProjectIds={setSelectedProjectIds} 
-                />
-              </div>
+          </div>
+          
+          {/* Project Selection Table */}
+          <div>
+            <h3 className="text-lg font-medium mb-2">Select Projects</h3>
+            <div className="border rounded-md">
+              <ProjectSelector 
+                selectedProjectIds={selectedProjectIds} 
+                setSelectedProjectIds={setSelectedProjectIds} 
+              />
             </div>
           </div>
           
