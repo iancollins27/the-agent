@@ -127,7 +127,7 @@ const ActionRecordEdit = ({ record, field, onSuccess }: ActionRecordEditProps) =
               <FormField
                 control={form.control}
                 name="value"
-                render={({ field }) => (
+                render={({ field: formField }) => (
                   <FormItem>
                     <FormLabel>
                       {field === 'message' ? 'Message Content' : 'Recipient Name'}
@@ -135,13 +135,13 @@ const ActionRecordEdit = ({ record, field, onSuccess }: ActionRecordEditProps) =
                     <FormControl>
                       {field === 'message' ? (
                         <Textarea 
-                          {...field} 
+                          {...formField} 
                           rows={4} 
                           placeholder="Enter message content" 
                         />
                       ) : (
                         <Input 
-                          {...field} 
+                          {...formField} 
                           placeholder="Enter recipient name" 
                         />
                       )}
