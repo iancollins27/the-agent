@@ -401,6 +401,21 @@ The JSON block MUST be properly formatted as it will be automatically processed.
               aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }
           } else if (actionData.action_type === "message" && actionData.recipient && actionData.message_content) {
+            let recipientId = null;
+            const recipientName = actionData.recipient.trim();
+            
+            if (recipientName.length > 3 && !["team", "customer", "client", "user"].includes(recipientName.toLowerCase())) {
+              const { data: contacts } = await supabase
+                .from('contacts')
+                .select('id, full_name')
+                .ilike('full_name', `%${recipientName}%`);
+                
+              if (contacts && contacts.length > 0) {
+                recipientId = contacts[0].id;
+                console.log(`Found contact match for "${recipientName}": ${contacts[0].full_name} (${recipientId})`);
+              }
+            }
+            
             const { data: actionRecord, error: actionError } = await supabase
               .from('action_records')
               .insert({
@@ -412,6 +427,8 @@ The JSON block MUST be properly formatted as it will be automatically processed.
                   message_content: actionData.message_content,
                   description: actionData.description || `Send message to ${actionData.recipient}`
                 },
+                message: actionData.message_content,
+                recipient_id: recipientId,
                 requires_approval: true,
                 status: 'pending'
               })

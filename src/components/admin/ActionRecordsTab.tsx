@@ -32,7 +32,8 @@ const ActionRecordsTab = () => {
         .from('action_records')
         .select(`
           *,
-          projects(id, crm_id)
+          projects(id, crm_id),
+          recipient:recipient_id(id, full_name)
         `)
         .eq('status', 'pending')
         .eq('requires_approval', true)
@@ -43,7 +44,8 @@ const ActionRecordsTab = () => {
       // Format and add project name
       return data.map(record => ({
         ...record,
-        project_name: record.projects?.crm_id || 'Unknown Project'
+        project_name: record.projects?.crm_id || 'Unknown Project',
+        recipient_name: record.recipient?.full_name || record.action_payload?.recipient || 'No Recipient'
       })) as ActionRecord[];
     },
   });
@@ -81,7 +83,8 @@ const ActionRecordsTab = () => {
     },
     onSuccess: (actionId) => {
       const action = actionRecords?.find(a => a.id === actionId);
-      const recipient = action?.action_payload?.recipient || 'the recipient';
+      const recipient = action?.recipient_name || action?.action_payload?.recipient || 'the recipient';
+      const messageText = action?.message || 'Message';
       
       toast({
         title: "Action Approved & Executed",
@@ -167,6 +170,7 @@ const ActionRecordsTab = () => {
               <TableHead>Description</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Recipient</TableHead>
+              <TableHead>Message</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -177,11 +181,13 @@ const ActionRecordsTab = () => {
                 <TableCell>{action.project_name}</TableCell>
                 <TableCell className="max-w-xs truncate">
                   {action.action_payload.description || 
-                   action.action_payload.message_text || 
                    'No description provided'}
                 </TableCell>
                 <TableCell>{formatDate(action.created_at)}</TableCell>
-                <TableCell>{action.action_payload.recipient || 'N/A'}</TableCell>
+                <TableCell>{action.recipient_name}</TableCell>
+                <TableCell className="max-w-xs truncate">
+                  {action.message || action.action_payload.message_content || 'N/A'}
+                </TableCell>
                 <TableCell className="text-right">
                   <Button 
                     onClick={() => handleApprove(action.id)}

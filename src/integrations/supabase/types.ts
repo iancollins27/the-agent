@@ -18,8 +18,10 @@ export type Database = {
           executed_at: string | null
           execution_result: Json | null
           id: string
+          message: string | null
           project_id: string | null
           prompt_run_id: string | null
+          recipient_id: string | null
           requires_approval: boolean
           status: string
         }
@@ -31,8 +33,10 @@ export type Database = {
           executed_at?: string | null
           execution_result?: Json | null
           id?: string
+          message?: string | null
           project_id?: string | null
           prompt_run_id?: string | null
+          recipient_id?: string | null
           requires_approval?: boolean
           status?: string
         }
@@ -44,8 +48,10 @@ export type Database = {
           executed_at?: string | null
           execution_result?: Json | null
           id?: string
+          message?: string | null
           project_id?: string | null
           prompt_run_id?: string | null
+          recipient_id?: string | null
           requires_approval?: boolean
           status?: string
         }
@@ -69,6 +75,13 @@ export type Database = {
             columns: ["prompt_run_id"]
             isOneToOne: false
             referencedRelation: "prompt_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_records_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]

@@ -30,4 +30,8 @@ export type ActionRecord = {
   project_id?: string | null;
   prompt_run_id?: string | null;
   requires_approval?: boolean;
+  message?: string | null;
+  recipient_id?: string | null;
+  recipient?: { id: string, full_name: string } | null;
+  recipient_name?: string;
 };

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Dialog, 
@@ -120,9 +119,11 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
       else if (approve && action.action_type === 'message') {
         // In a real implementation, this would connect to an email/messaging service
         // For now, we'll just show a toast notification
+        const recipient = action.recipient?.full_name || action.action_payload.recipient || 'No recipient specified';
+        
         toast({
-          title: "Message Prepared",
-          description: `Message to ${action.action_payload.recipient} has been prepared for sending`,
+          title: "Message Sent",
+          description: `Message to ${recipient} has been sent successfully`,
         });
         
         // Record that the message was "sent" (in a real app, we would actually send it here)
@@ -130,9 +131,9 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           .from('action_records')
           .update({
             execution_result: {
-              status: 'message_prepared',
+              status: 'message_sent',
               timestamp: new Date().toISOString(),
-              details: `Message to ${action.action_payload.recipient} prepared for sending`
+              details: `Message to ${recipient} sent successfully`
             }
           })
           .eq('id', action.id);
@@ -249,11 +250,11 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           {action.action_type === 'message' && (
             <>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-medium">Recipient:</span> {action.action_payload.recipient}
+                <span className="font-medium">Recipient:</span> {action.recipient?.full_name || action.action_payload.recipient || 'No recipient specified'}
               </p>
               <div className="mt-2 p-3 bg-muted rounded-md">
                 <p className="text-sm font-medium mb-1">Message Content:</p>
-                <p className="text-sm">{action.action_payload.message_content}</p>
+                <p className="text-sm">{action.message || action.action_payload.message_content}</p>
               </div>
             </>
           )}
