@@ -165,17 +165,17 @@ const ActionRecordsTab = () => {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Project</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Recipient</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[100px]">Type</TableHead>
+              <TableHead className="w-[150px]">Project</TableHead>
+              <TableHead className="w-[200px]">Description</TableHead>
+              <TableHead className="w-[150px]">Created</TableHead>
+              <TableHead className="w-[150px]">Recipient</TableHead>
+              <TableHead className="max-w-[250px]">Message</TableHead>
+              <TableHead className="w-[120px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -183,18 +183,18 @@ const ActionRecordsTab = () => {
               <TableRow key={action.id}>
                 <TableCell>{getActionTypeDisplay(action.action_type)}</TableCell>
                 <TableCell>{action.project_name}</TableCell>
-                <TableCell className="max-w-xs truncate">
+                <TableCell>
                   {action.action_payload && typeof action.action_payload === 'object' && 'description' in action.action_payload ? 
                    action.action_payload.description : 'No description provided'}
                 </TableCell>
                 <TableCell>{action.created_at ? formatDate(action.created_at) : 'Unknown'}</TableCell>
                 <TableCell>{action.recipient_name || 'No Recipient'}</TableCell>
-                <TableCell className="max-w-xs truncate">
+                <TableCell className="max-w-[250px]">
                   {action.message || 
                    (action.action_payload && typeof action.action_payload === 'object' && 'message_content' in action.action_payload ? 
                    action.action_payload.message_content : 'N/A')}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right whitespace-nowrap">
                   <Button 
                     onClick={() => handleApprove(action.id)}
                     disabled={processingAction === action.id}
