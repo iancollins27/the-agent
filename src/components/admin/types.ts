@@ -33,4 +33,8 @@ export type ActionRecord = {
   status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
   project_name?: string;
   approver_name?: string;
+  message?: string | null;
+  recipient_id?: string | null;
+  recipient?: { id: string, full_name: string } | null;
+  recipient_name?: string;
 };
