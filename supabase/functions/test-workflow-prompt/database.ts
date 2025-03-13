@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 /**
@@ -85,7 +86,7 @@ export async function createActionRecord(
   actionData: any
 ) {
   try {
-    console.log("Creating action record with data:", actionData);
+    console.log("Creating action record with data:", JSON.stringify(actionData, null, 2));
     
     // Parse the decision and other data from the AI response
     const decision = actionData.decision;
@@ -109,21 +110,22 @@ export async function createActionRecord(
       
       // Handle different action types and formats
       if (actionType === "message") {
-        // Check for message content in different possible locations
+        // Extract message content with fallbacks
         const messageContent = 
           actionData.message_content || 
           actionData.message_text || 
+          (actionData.action_payload && actionData.action_payload.message_content) ||
+          (actionData.action_payload && actionData.action_payload.message_text) ||
           (actionData.action_payload && actionData.action_payload.message) ||
-          (actionData.action_payload && actionData.action_payload.message_content) || 
           "Follow up on project status";
         
-        // Check for recipient in different possible locations
+        // Extract recipient with fallbacks
         const recipient = 
           actionData.recipient || 
           (actionData.action_payload && actionData.action_payload.recipient) || 
           "Project team";
         
-        // Check for description in different possible locations
+        // Extract description with fallbacks
         const description = 
           actionData.description || 
           (actionData.action_payload && actionData.action_payload.description) ||
@@ -170,12 +172,16 @@ export async function createActionRecord(
           description: actionData.description || actionData.reason || "Project action required"
         };
         
+        // Ensure the action_payload has a description field
+        if (!actionPayload.description) {
+          actionPayload.description = actionPayload.reason || actionData.reason || "Project action required";
+        }
+        
         console.log("Creating action record with payload:", {
           prompt_run_id: promptRunId,
           project_id: projectId,
           action_type: actionType,
           action_payload: actionPayload,
-          requires_approval: true,
         });
         
         const { data, error } = await supabase

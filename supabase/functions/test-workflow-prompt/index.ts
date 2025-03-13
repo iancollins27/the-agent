@@ -28,7 +28,6 @@ serve(async (req) => {
     console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
     console.log(`Initiated by: ${initiatedBy || 'System'}`);
     console.log("Context data provided:", contextData);
-    console.log("Milestone instructions:", contextData.milestone_instructions);
     
     if (!promptText) {
       throw new Error("Prompt text is required");
@@ -39,6 +38,7 @@ serve(async (req) => {
     
     // Log the prompt run with AI provider and model information
     const promptRunId = await logPromptRun(supabase, projectId, workflowPromptId, finalPrompt, aiProvider, aiModel, initiatedBy);
+    console.log("Created prompt run with ID:", promptRunId);
     
     let result: string;
     let actionRecordId: string | null = null;
@@ -57,16 +57,20 @@ serve(async (req) => {
           console.log("Checking for action data in result");
           // Try to parse the result as JSON using our improved extractor
           const actionData = extractJsonFromResponse(result);
-          console.log("Parsed action data:", actionData);
+          console.log("Parsed action data:", JSON.stringify(actionData, null, 2));
           
-          if (actionData && (actionData.decision === "ACTION_NEEDED" || actionData.decision === "SET_FUTURE_REMINDER")) {
-            actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
-            console.log("Created action record:", actionRecordId);
+          if (actionData) {
+            if (actionData.decision === "ACTION_NEEDED" || actionData.decision === "SET_FUTURE_REMINDER") {
+              actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
+              console.log("Created action record:", actionRecordId);
+            } else {
+              console.log("No action needed based on decision:", actionData.decision);
+            }
           } else {
-            console.log("No action needed or invalid action data format");
+            console.log("No action data found or invalid format");
           }
         } catch (parseError) {
-          console.error("Error parsing action data:", parseError);
+          console.error("Error parsing or processing action data:", parseError);
           // If parsing fails, we don't create an action record
         }
       }
