@@ -7,6 +7,7 @@ import PromptsTab from "@/components/admin/PromptsTab";
 import TestingTab from "@/components/admin/TestingTab";
 import AIProviderConfig from "@/components/admin/AIProviderConfig";
 import PromptRunsTab from "@/components/admin/PromptRunsTab";
+import ActionRecordsTab from "@/components/admin/ActionRecordsTab";
 
 const AdminConsole = () => {
   return (
@@ -36,6 +37,7 @@ const AdminConsole = () => {
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
           <TabsTrigger value="runs">Prompt Runs</TabsTrigger>
+          <TabsTrigger value="actions">Action Approval</TabsTrigger>
           <TabsTrigger value="ai-provider">AI Provider</TabsTrigger>
         </TabsList>
 
@@ -49,6 +51,10 @@ const AdminConsole = () => {
 
         <TabsContent value="runs" className="space-y-6">
           <PromptRunsTab />
+        </TabsContent>
+
+        <TabsContent value="actions" className="space-y-6">
+          <ActionRecordsTab />
         </TabsContent>
 
         <TabsContent value="ai-provider" className="space-y-6">
