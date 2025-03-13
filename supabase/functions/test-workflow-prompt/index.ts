@@ -22,7 +22,17 @@ serve(async (req) => {
   }
   
   try {
-    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId, initiatedBy } = await req.json();
+    // Parse request body
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("Received request with body:", JSON.stringify(requestBody, null, 2).substring(0, 500) + "...");
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error("Invalid JSON in request body");
+    }
+    
+    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId, initiatedBy } = requestBody;
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
     console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
@@ -38,6 +48,8 @@ serve(async (req) => {
     console.log("Final prompt after variable replacement:", finalPrompt);
     
     // Log the prompt run with AI provider and model information
+    let promptRunId = null;
+    
     try {
       // Validate required fields for prompt_runs table
       if (!projectId) {
@@ -55,8 +67,14 @@ serve(async (req) => {
       };
       
       console.log("Creating prompt run with data:", promptRunData);
-      const promptRunId = await logPromptRun(supabase, projectId, workflowPromptId, finalPrompt, aiProvider, aiModel, initiatedBy);
-      console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
+      
+      try {
+        promptRunId = await logPromptRun(supabase, projectId, workflowPromptId, finalPrompt, aiProvider, aiModel, initiatedBy);
+        console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
+      } catch (promptRunError) {
+        console.error("Error creating prompt run:", promptRunError);
+        // Continue execution even if logging fails
+      }
       
       let result: string;
       let actionRecordId: string | null = null;
@@ -68,14 +86,18 @@ serve(async (req) => {
         
         // Update the prompt run with the result
         if (promptRunId) {
-          await updatePromptRunWithResult(supabase, promptRunId, result);
-          console.log("Updated prompt run with result");
+          try {
+            await updatePromptRunWithResult(supabase, promptRunId, result);
+            console.log("Updated prompt run with result");
+          } catch (updateError) {
+            console.error("Error updating prompt run:", updateError);
+          }
         } else {
           console.warn("Could not update prompt run with result because promptRunId is null");
         }
         
         // For action detection+execution prompt, create an action record if applicable
-        if (promptType === "action_detection_execution" && promptRunId && projectId) {
+        if (promptType === "action_detection_execution" && projectId) {
           try {
             console.log("Checking for action data in result");
             // Try to parse the result as JSON using our improved extractor
@@ -84,8 +106,12 @@ serve(async (req) => {
             
             if (actionData) {
               if (actionData.decision === "ACTION_NEEDED" || actionData.decision === "SET_FUTURE_REMINDER") {
-                actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionData);
-                console.log("Created action record:", actionRecordId || "Failed to create action record");
+                try {
+                  actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
+                  console.log("Created action record:", actionRecordId || "Failed to create action record");
+                } catch (createActionError) {
+                  console.error("Error creating action record:", createActionError);
+                }
               } else {
                 console.log("No action needed based on decision:", actionData.decision);
               }
@@ -105,7 +131,11 @@ serve(async (req) => {
         
         // Update the prompt run with the error
         if (promptRunId) {
-          await updatePromptRunWithResult(supabase, promptRunId, error.message, true);
+          try {
+            await updatePromptRunWithResult(supabase, promptRunId, error.message, true);
+          } catch (updateError) {
+            console.error("Error updating prompt run with error:", updateError);
+          }
         }
       }
       

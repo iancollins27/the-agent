@@ -23,17 +23,47 @@ export async function logPromptRun(
       initiated_by: initiatedBy
     });
 
+    // Create base insert object without the initiatedBy field in case it doesn't exist
+    const insertData: any = {
+      project_id: projectId,
+      workflow_prompt_id: workflowPromptId,
+      prompt_input: promptInput,
+      status: 'PENDING',
+      ai_provider: aiProvider,
+      ai_model: aiModel,
+    };
+
+    // Only add initiated_by if provided (this helps avoid DB errors if column doesn't exist)
+    if (initiatedBy) {
+      // Check if initiatedBy column exists before adding it
+      try {
+        // Get column information from the table
+        const { data: columns, error: columnsError } = await supabase
+          .from('prompt_runs')
+          .select('*')
+          .limit(1);
+      
+        // If there's a test row and it has the initiated_by property, we can use it
+        if (!columnsError && columns && columns.length > 0) {
+          const testRow = columns[0];
+          const hasInitiatedBy = 'initiated_by' in testRow;
+          
+          if (hasInitiatedBy) {
+            insertData.initiated_by = initiatedBy;
+          } else {
+            console.log("'initiated_by' column doesn't exist in prompt_runs table, skipping this field");
+          }
+        }
+      } catch (columnCheckError) {
+        console.error("Error checking for initiated_by column:", columnCheckError);
+        // Continue without adding the field
+      }
+    }
+
+    // Insert the prompt run record
     const { data, error } = await supabase
       .from('prompt_runs')
-      .insert({
-        project_id: projectId,
-        workflow_prompt_id: workflowPromptId,
-        prompt_input: promptInput,
-        status: 'PENDING',
-        ai_provider: aiProvider,
-        ai_model: aiModel,
-        initiated_by: initiatedBy
-      })
+      .insert(insertData)
       .select()
       .single();
       
@@ -58,7 +88,10 @@ export async function updatePromptRunWithResult(
   result: string, 
   isError: boolean = false
 ) {
-  if (!promptRunId) return;
+  if (!promptRunId) {
+    console.log("Cannot update prompt run: promptRunId is null");
+    return;
+  }
   
   try {
     const updateData: any = {
@@ -80,6 +113,8 @@ export async function updatePromptRunWithResult(
     if (error) {
       console.error("Error updating prompt run:", error);
       throw new Error(`Failed to update prompt run: ${error.message}`);
+    } else {
+      console.log("Successfully updated prompt run with ID:", promptRunId);
     }
   } catch (error) {
     console.error("Error updating prompt run:", error);
@@ -121,6 +156,7 @@ export async function createActionRecord(
           console.error("Error fetching project:", projectError);
         } else {
           companyId = projectData.company_id;
+          console.log("Found company ID:", companyId);
         }
       } catch (error) {
         console.error("Error getting company ID:", error);
@@ -128,30 +164,47 @@ export async function createActionRecord(
       
       // Handle different action types and formats
       if (actionType === "message") {
-        // Extract message content from all possible locations
+        // Extract message content from all possible locations with detailed logging
         let messageContent = null;
-        if (actionData.message_content) {
-          messageContent = actionData.message_content;
-        } else if (actionData.message_text) {
+        
+        console.log("Looking for message content in various fields");
+        
+        if (actionData.message_text) {
+          console.log("Found message_text at top level");
           messageContent = actionData.message_text;
+        } else if (actionData.message) {
+          console.log("Found message at top level");
+          messageContent = actionData.message;
+        } else if (actionData.message_content) {
+          console.log("Found message_content at top level");
+          messageContent = actionData.message_content;
         } else if (actionData.action_payload) {
-          if (actionData.action_payload.message_content) {
-            messageContent = actionData.action_payload.message_content;
-          } else if (actionData.action_payload.message_text) {
+          console.log("Checking action_payload for message");
+          if (actionData.action_payload.message_text) {
+            console.log("Found message_text in action_payload");
             messageContent = actionData.action_payload.message_text;
           } else if (actionData.action_payload.message) {
+            console.log("Found message in action_payload");
             messageContent = actionData.action_payload.message;
+          } else if (actionData.action_payload.message_content) {
+            console.log("Found message_content in action_payload");
+            messageContent = actionData.action_payload.message_content;
           }
         }
         
         if (!messageContent) {
+          console.log("No message content found, using default");
           messageContent = "Follow up on project status";
+        } else {
+          console.log("Final message content:", messageContent);
         }
         
         // Extract recipient
         const recipient = actionData.recipient || 
           (actionData.action_payload && actionData.action_payload.recipient) || 
           "Project team";
+        
+        console.log("Recipient:", recipient);
         
         // Extract or create description
         let description = null;
@@ -171,11 +224,7 @@ export async function createActionRecord(
           description = `Send message to ${recipient}`;
         }
         
-        console.log("Creating message action with:", {
-          message: messageContent,
-          recipient: recipient,
-          description: description
-        });
+        console.log("Description:", description);
         
         // Prepare the action payload
         const actionPayload = {
@@ -184,27 +233,34 @@ export async function createActionRecord(
           description: description
         };
         
-        const { data, error } = await supabase
-          .from('action_records')
-          .insert({
-            prompt_run_id: promptRunId,
-            project_id: projectId,
-            action_type: 'message',
-            action_payload: actionPayload,
-            message: messageContent,
-            requires_approval: true,
-            status: 'pending'
-          })
-          .select()
-          .single();
+        console.log("Creating message action with payload:", actionPayload);
         
-        if (error) {
-          console.error("Error creating message action record:", error);
-          throw new Error(`Failed to create action record: ${error.message}`);
+        try {
+          const { data, error } = await supabase
+            .from('action_records')
+            .insert({
+              prompt_run_id: promptRunId,
+              project_id: projectId,
+              action_type: 'message',
+              action_payload: actionPayload,
+              message: messageContent,
+              requires_approval: true,
+              status: 'pending'
+            })
+            .select()
+            .single();
+          
+          if (error) {
+            console.error("Error creating message action record:", error);
+            throw new Error(`Failed to create action record: ${error.message}`);
+          }
+          
+          console.log("Message action record created successfully:", data);
+          return data.id;
+        } catch (insertError) {
+          console.error("Exception during action record insert:", insertError);
+          return null;
         }
-        
-        console.log("Message action record created successfully:", data);
-        return data.id;
       } else {
         // For other action types
         
@@ -236,26 +292,31 @@ export async function createActionRecord(
           action_payload: actionPayload,
         });
         
-        const { data, error } = await supabase
-          .from('action_records')
-          .insert({
-            prompt_run_id: promptRunId,
-            project_id: projectId,
-            action_type: actionType,
-            action_payload: actionPayload,
-            requires_approval: true,
-            status: 'pending'
-          })
-          .select()
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('action_records')
+            .insert({
+              prompt_run_id: promptRunId,
+              project_id: projectId,
+              action_type: actionType,
+              action_payload: actionPayload,
+              requires_approval: true,
+              status: 'pending'
+            })
+            .select()
+            .single();
+            
+          if (error) {
+            console.error("Error creating action record:", error);
+            throw new Error(`Failed to create action record: ${error.message}`);
+          }
           
-        if (error) {
-          console.error("Error creating action record:", error);
-          throw new Error(`Failed to create action record: ${error.message}`);
+          console.log("Action record created successfully:", data);
+          return data.id;
+        } catch (insertError) {
+          console.error("Exception during action record insert:", insertError);
+          return null;
         }
-        
-        console.log("Action record created successfully:", data);
-        return data.id;
       }
     } 
     // Handle SET_FUTURE_REMINDER action type specially
