@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ActionRecord } from '@/components/Chat/types';
+import { ActionRecord } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -33,7 +33,7 @@ const ActionRecordsTab = () => {
         .select(`
           *,
           projects(id, crm_id),
-          recipient:recipient_id(id, full_name)
+          recipient:contacts!recipient_id(id, full_name)
         `)
         .eq('status', 'pending')
         .eq('requires_approval', true)
@@ -41,11 +41,13 @@ const ActionRecordsTab = () => {
       
       if (error) throw error;
       
-      // Format and add project name
+      // Format and add project name and recipient name
       return data.map(record => ({
         ...record,
         project_name: record.projects?.crm_id || 'Unknown Project',
-        recipient_name: record.recipient?.full_name || record.action_payload?.recipient || 'No Recipient'
+        recipient_name: record.recipient?.full_name || 
+                        (record.action_payload && typeof record.action_payload === 'object' && 'recipient' in record.action_payload ? 
+                        record.action_payload.recipient : 'No Recipient')
       })) as ActionRecord[];
     },
   });
@@ -83,7 +85,9 @@ const ActionRecordsTab = () => {
     },
     onSuccess: (actionId) => {
       const action = actionRecords?.find(a => a.id === actionId);
-      const recipient = action?.recipient_name || action?.action_payload?.recipient || 'the recipient';
+      const recipient = action?.recipient_name || 
+                       (action?.action_payload && typeof action.action_payload === 'object' && 'recipient' in action.action_payload ? 
+                       action.action_payload.recipient : 'the recipient');
       const messageText = action?.message || 'Message';
       
       toast({
@@ -180,13 +184,15 @@ const ActionRecordsTab = () => {
                 <TableCell>{getActionTypeDisplay(action.action_type)}</TableCell>
                 <TableCell>{action.project_name}</TableCell>
                 <TableCell className="max-w-xs truncate">
-                  {action.action_payload.description || 
-                   'No description provided'}
+                  {action.action_payload && typeof action.action_payload === 'object' && 'description' in action.action_payload ? 
+                   action.action_payload.description : 'No description provided'}
                 </TableCell>
-                <TableCell>{formatDate(action.created_at)}</TableCell>
-                <TableCell>{action.recipient_name}</TableCell>
+                <TableCell>{action.created_at ? formatDate(action.created_at) : 'Unknown'}</TableCell>
+                <TableCell>{action.recipient_name || 'No Recipient'}</TableCell>
                 <TableCell className="max-w-xs truncate">
-                  {action.message || action.action_payload.message_content || 'N/A'}
+                  {action.message || 
+                   (action.action_payload && typeof action.action_payload === 'object' && 'message_content' in action.action_payload ? 
+                   action.action_payload.message_content : 'N/A')}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button 

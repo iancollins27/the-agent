@@ -34,4 +34,5 @@ export type ActionRecord = {
   recipient_id?: string | null;
   recipient?: { id: string, full_name: string } | null;
   recipient_name?: string;
+  project_name?: string;
 };
