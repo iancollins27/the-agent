@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 /**
@@ -108,41 +107,98 @@ export async function createActionRecord(
         return null;
       }
       
-      // Use provided action_payload or build a default one
-      const actionPayload = actionData.action_payload || {
-        message_text: actionData.message_text || "Follow up on project status",
-        reason: actionData.reason || "No specific reason provided"
-      };
-      
-      console.log("Creating action record with payload:", {
-        prompt_run_id: promptRunId,
-        project_id: projectId,
-        action_type: actionType,
-        action_payload: actionPayload,
-        requires_approval: true,
-        company_id: projectData.company_id
-      });
-      
-      const { data, error } = await supabase
-        .from('action_records')
-        .insert({
+      // Handle different action types and formats
+      if (actionType === "message") {
+        // Check for message content in different possible locations
+        const messageContent = 
+          actionData.message_content || 
+          actionData.message_text || 
+          (actionData.action_payload && actionData.action_payload.message) ||
+          (actionData.action_payload && actionData.action_payload.message_content) || 
+          "Follow up on project status";
+        
+        // Check for recipient in different possible locations
+        const recipient = 
+          actionData.recipient || 
+          (actionData.action_payload && actionData.action_payload.recipient) || 
+          "Project team";
+        
+        // Check for description in different possible locations
+        const description = 
+          actionData.description || 
+          (actionData.action_payload && actionData.action_payload.description) ||
+          (actionData.action_payload && actionData.action_payload.reason) ||
+          actionData.reason ||
+          `Send message to ${recipient}`;
+        
+        console.log("Creating message action with:", {
+          message: messageContent,
+          recipient: recipient,
+          description: description
+        });
+        
+        const { data, error } = await supabase
+          .from('action_records')
+          .insert({
+            prompt_run_id: promptRunId,
+            project_id: projectId,
+            action_type: 'message',
+            action_payload: {
+              recipient: recipient,
+              message_content: messageContent,
+              description: description
+            },
+            message: messageContent,
+            requires_approval: true,
+            status: 'pending'
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          console.error("Error creating message action record:", error);
+          return null;
+        }
+        
+        console.log("Message action record created successfully:", data);
+        return data.id;
+      } else {
+        // Use provided action_payload or build a default one
+        const actionPayload = actionData.action_payload || {
+          message_text: actionData.message_text || "Follow up on project status",
+          reason: actionData.reason || "No specific reason provided",
+          description: actionData.description || actionData.reason || "Project action required"
+        };
+        
+        console.log("Creating action record with payload:", {
           prompt_run_id: promptRunId,
           project_id: projectId,
           action_type: actionType,
           action_payload: actionPayload,
           requires_approval: true,
-          status: 'pending'
-        })
-        .select()
-        .single();
+        });
         
-      if (error) {
-        console.error("Error creating action record:", error);
-        return null;
+        const { data, error } = await supabase
+          .from('action_records')
+          .insert({
+            prompt_run_id: promptRunId,
+            project_id: projectId,
+            action_type: actionType,
+            action_payload: actionPayload,
+            requires_approval: true,
+            status: 'pending'
+          })
+          .select()
+          .single();
+          
+        if (error) {
+          console.error("Error creating action record:", error);
+          return null;
+        }
+        
+        console.log("Action record created successfully:", data);
+        return data.id;
       }
-      
-      console.log("Action record created successfully:", data);
-      return data.id;
     } 
     // Handle SET_FUTURE_REMINDER action type specially
     else if (decision === "SET_FUTURE_REMINDER" || actionData.action_type === "set_future_reminder") {
