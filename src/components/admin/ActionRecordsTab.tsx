@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { addHours, subHours, format } from 'date-fns';
+import ActionRecordEdit from './ActionRecordEdit';
 
 const TIME_FILTERS = {
   LAST_HOUR: 'last_hour',
@@ -143,6 +145,14 @@ const ActionRecordsTab = () => {
     approveActionMutation.mutate(actionId);
   };
 
+  const handleEditSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['actionRecords'] });
+    toast({
+      title: "Update applied",
+      description: "The action record has been updated successfully."
+    });
+  };
+
   const getActionTypeDisplay = (type: string) => {
     switch (type) {
       case 'message':
@@ -253,11 +263,19 @@ const ActionRecordsTab = () => {
                      action.action_payload.description : 'No description provided'}
                   </TableCell>
                   <TableCell>{action.created_at ? formatDate(action.created_at) : 'Unknown'}</TableCell>
-                  <TableCell>{action.recipient_name || 'No Recipient'}</TableCell>
+                  <TableCell>
+                    <ActionRecordEdit 
+                      record={action}
+                      field="recipient_name"
+                      onSuccess={handleEditSuccess}
+                    />
+                  </TableCell>
                   <TableCell className="max-w-[250px]">
-                    {action.message || 
-                     (action.action_payload && typeof action.action_payload === 'object' && 'message_content' in action.action_payload ? 
-                     action.action_payload.message_content : 'N/A')}
+                    <ActionRecordEdit 
+                      record={action}
+                      field="message"
+                      onSuccess={handleEditSuccess}
+                    />
                   </TableCell>
                   <TableCell className="text-right whitespace-nowrap">
                     <Button 
