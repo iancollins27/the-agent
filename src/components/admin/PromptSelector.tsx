@@ -3,13 +3,16 @@ import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { workflowTitles } from "@/types/workflow";
+import { workflowTitles, WorkflowType } from "@/types/workflow";
 import { Loader2 } from "lucide-react";
 
 type PromptSelectorProps = {
   selectedPromptIds: string[];
   setSelectedPromptIds: (ids: string[]) => void;
 };
+
+// Define prompt types to exclude from testing
+const EXCLUDED_PROMPT_TYPES: WorkflowType[] = ['action_detection', 'action_execution'];
 
 const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelectorProps) => {
   const [prompts, setPrompts] = useState<any[]>([]);
@@ -21,6 +24,7 @@ const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelec
       const { data, error } = await supabase
         .from('workflow_prompts')
         .select('id, type')
+        .not('type', 'in', `(${EXCLUDED_PROMPT_TYPES.join(',')})`) // Filter out excluded prompt types
         .order('type');
         
       if (error) {
