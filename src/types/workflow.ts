@@ -17,13 +17,7 @@ export type Project = {
 
 export type TestResult = {
   projectId: string;
-  results: {
-    type: WorkflowType;
-    output: string;
-    finalPrompt: string;
-    promptRunId?: string;
-    actionRecordId?: string;
-  }[];
+  results: PromptResult[];
 };
 
 export interface PromptResult {

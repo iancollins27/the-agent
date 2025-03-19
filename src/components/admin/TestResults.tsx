@@ -81,7 +81,7 @@ const TestResults = ({ results }: TestResultsProps) => {
                   </div>
                   
                   {/* Show reminder updates if found */}
-                  {promptResult.reminderSet && promptResult.nextCheckDateInfo && (
+                  {promptResult.reminderSet && (
                     <div className="mt-4 bg-blue-50 p-4 rounded-md border border-blue-200">
                       <div className="mb-2 flex items-center gap-2">
                         <Badge variant="outline" className="bg-blue-100 text-blue-800 px-3 py-1 text-sm font-medium">
@@ -90,14 +90,8 @@ const TestResults = ({ results }: TestResultsProps) => {
                       </div>
                       <p className="text-sm">
                         <span className="font-medium">Next check date:</span>{' '}
-                        {new Date(promptResult.nextCheckDateInfo.newValue).toLocaleString()}
+                        {promptResult.nextCheckDateInfo?.newValue && new Date(promptResult.nextCheckDateInfo.newValue).toLocaleString()}
                       </p>
-                      {promptResult.nextCheckDateInfo.currentValue && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          <span className="font-medium">Previous:</span>{' '}
-                          {new Date(promptResult.nextCheckDateInfo.currentValue).toLocaleString()}
-                        </p>
-                      )}
                     </div>
                   )}
                   
