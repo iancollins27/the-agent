@@ -1,3 +1,4 @@
+
 import { ParsedProjectData } from './types.ts';
 
 export async function handleCompany(supabase: any, projectData: ParsedProjectData, rawData: any) {

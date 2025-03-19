@@ -13,6 +13,7 @@ export type Project = {
   project_track: string | null;
   track_name?: string | null;
   next_step?: string | null;  // Added this field to match the database schema
+  next_check_date?: string | null; // Date when the project should be checked again
 };
 
 export type TestResult = {
@@ -66,6 +67,7 @@ export const availableVariables = {
     { name: "track_name", description: "The name of the project track" },
     { name: "current_date", description: "Today's date" },
     { name: "next_step", description: "The current next step in the project" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
+    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" },
+    { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" }
   ]
 };

@@ -122,6 +122,40 @@ export async function updatePromptRunWithResult(
 }
 
 /**
+ * Sets the next check date for a project
+ */
+export async function setProjectNextCheckDate(
+  supabase: SupabaseClient,
+  projectId: string,
+  daysUntilCheck: number
+) {
+  try {
+    // Calculate the next check date
+    const nextCheckDate = new Date();
+    nextCheckDate.setDate(nextCheckDate.getDate() + daysUntilCheck);
+    
+    console.log(`Setting next check date for project ${projectId} to ${nextCheckDate.toISOString()} (${daysUntilCheck} days from now)`);
+    
+    const { error } = await supabase
+      .from('projects')
+      .update({
+        next_check_date: nextCheckDate.toISOString()
+      })
+      .eq('id', projectId);
+      
+    if (error) {
+      console.error("Error setting next check date:", error);
+      throw new Error(`Failed to set next check date: ${error.message}`);
+    }
+    
+    return nextCheckDate.toISOString();
+  } catch (error) {
+    console.error("Error setting project next check date:", error);
+    return null;
+  }
+}
+
+/**
  * Creates an action record from action detection+execution results
  */
 export async function createActionRecord(
@@ -323,20 +357,11 @@ export async function createActionRecord(
     else if (decision === "SET_FUTURE_REMINDER" || actionData.action_type === "set_future_reminder") {
       // Calculate the next check date
       const daysToAdd = actionData.days_until_check || 7; // Default to 7 days if not specified
-      const nextCheckDate = new Date();
-      nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+      const nextCheckDate = await setProjectNextCheckDate(supabase, projectId, daysToAdd);
       
-      // Update the project with the next check date
-      const { error: updateError } = await supabase
-        .from('projects')
-        .update({
-          next_check_date: nextCheckDate.toISOString()
-        })
-        .eq('id', projectId);
-        
-      if (updateError) {
-        console.error("Error setting next check date:", updateError);
-        throw new Error(`Failed to set next check date: ${updateError.message}`);
+      if (!nextCheckDate) {
+        console.error("Failed to set next check date for project", projectId);
+        return null;
       }
       
       // Create an action record to document the reminder setting

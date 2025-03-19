@@ -1,12 +1,60 @@
-
 /**
  * Replaces variables in a text with values from a variables object
  */
-export function replaceVariables(text: string, variables: Record<string, any>): string {
-  return text.replace(/\{\{([^}]+)\}\}/g, (match, variable) => {
-    const trimmedVar = variable.trim();
-    return variables[trimmedVar] !== undefined ? variables[trimmedVar] : match;
-  });
+export function replaceVariables(promptText: string, contextData: any) {
+  if (!promptText) return "";
+  
+  let updatedPrompt = promptText;
+  
+  // Add reminder guidance if this is an action detection + execution prompt
+  if (promptText.includes("{{action_type}}") || 
+      promptText.includes("SET_FUTURE_REMINDER") ||
+      (contextData && contextData.is_reminder_check)) {
+    
+    // Add enhanced reminder guidance if not already present
+    if (!promptText.includes("SET_FUTURE_REMINDER")) {
+      const reminderGuidance = `
+If no immediate action is needed but you believe the project should be checked again after a certain period, you MUST:
+1. Return a decision of "SET_FUTURE_REMINDER"
+2. Specify "days_until_check" (number of days until the next check)
+3. Provide a "check_reason" explaining why this future check is important
+
+Example JSON response for setting a reminder:
+
+\`\`\`json
+{
+  "decision": "SET_FUTURE_REMINDER",
+  "action_type": "set_future_reminder",
+  "days_until_check": 7,
+  "check_reason": "Follow up on site visit scheduling if not confirmed by then"
+}
+\`\`\`
+`;
+      
+      // Append the guidance before the end of the prompt
+      const lastInstructionPos = updatedPrompt.lastIndexOf("\n\n");
+      if (lastInstructionPos > 0) {
+        updatedPrompt = 
+          updatedPrompt.substring(0, lastInstructionPos) + 
+          "\n\n" + reminderGuidance + 
+          updatedPrompt.substring(lastInstructionPos);
+      } else {
+        updatedPrompt += "\n\n" + reminderGuidance;
+      }
+    }
+  }
+  
+  // Replace standard variables
+  for (const key in contextData) {
+    if (contextData.hasOwnProperty(key)) {
+      const value = contextData[key] !== null && contextData[key] !== undefined 
+        ? contextData[key] 
+        : "";
+      updatedPrompt = updatedPrompt.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    }
+  }
+  
+  return updatedPrompt;
 }
 
 /**
