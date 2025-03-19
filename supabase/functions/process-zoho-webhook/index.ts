@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { parseZohoData } from './parser.ts'
@@ -7,6 +6,7 @@ import {
   getExistingProject, 
   getMilestoneInstructions,
   getWorkflowPrompt,
+  getActionDetectionPrompt,
   updateProject,
   createProject,
   createMilestoneActionRecord,
