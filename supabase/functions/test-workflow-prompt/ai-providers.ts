@@ -70,7 +70,7 @@ async function callOpenAI(prompt: string, model: string = "gpt-4o-mini") {
 /**
  * Calls the Claude API with the given prompt and model
  */
-async function callClaude(prompt: string, model: string = "claude-3-haiku-20240307") {
+async function callClaude(prompt: string, model: string = "claude-3-5-haiku-20241022") {
   if (!claudeApiKey) {
     throw new Error("Claude API key is not set");
   }

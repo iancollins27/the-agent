@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 export async function generateSummary(prompt: string, apiKey: string, provider: string = 'openai', model: string = 'gpt-4o') {
@@ -101,7 +100,7 @@ async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-4
   return data.choices[0].message.content;
 }
 
-async function callClaude(prompt: string, apiKey: string, model: string = 'claude-3-haiku-20240307') {
+async function callClaude(prompt: string, apiKey: string, model: string = 'claude-3-5-haiku-20241022') {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
