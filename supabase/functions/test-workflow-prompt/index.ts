@@ -109,9 +109,7 @@ serve(async (req) => {
             console.log("Parsed action data:", actionData ? JSON.stringify(actionData, null, 2) : "No action data found");
             
             if (actionData) {
-              if (actionData.decision === "ACTION_NEEDED" || 
-                  actionData.decision === "SET_FUTURE_REMINDER" || 
-                  actionData.action_type === "set_future_reminder") {
+              if (actionData.decision === "ACTION_NEEDED" || actionData.decision === "SET_FUTURE_REMINDER") {
                 try {
                   actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
                   console.log("Created action record:", actionRecordId || "Failed to create action record");
