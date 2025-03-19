@@ -9,8 +9,7 @@ import {
   getWorkflowPrompt,
   updateProject,
   createProject,
-  createMilestoneActionRecord,
-  setNextCheckDate
+  createMilestoneActionRecord
 } from './database.ts'
 import { generateSummary } from './ai.ts'
 
