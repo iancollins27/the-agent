@@ -1,3 +1,4 @@
+
 export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution';
 
 export type WorkflowPrompt = {

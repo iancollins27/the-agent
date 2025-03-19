@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,7 +125,9 @@ const TestingTab = () => {
             output: data.output,
             finalPrompt: data.finalPrompt,
             promptRunId: data.promptRunId,
-            actionRecordId: data.actionRecordId
+            actionRecordId: data.actionRecordId,
+            reminderSet: data.reminderSet || false,
+            nextCheckDateInfo: data.nextCheckDateInfo
           });
         }
         
