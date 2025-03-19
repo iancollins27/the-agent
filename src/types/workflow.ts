@@ -1,4 +1,3 @@
-
 export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution';
 
 export type WorkflowPrompt = {
@@ -26,6 +25,19 @@ export type TestResult = {
     actionRecordId?: string;
   }[];
 };
+
+export interface PromptResult {
+  type: WorkflowType;
+  output: string;
+  finalPrompt: string;
+  promptRunId?: string;
+  actionRecordId?: string;
+  reminderSet?: boolean;
+  nextCheckDateInfo?: {
+    currentValue: string | null;
+    newValue: string | null;
+  };
+}
 
 export const workflowTitles: Record<WorkflowType, string> = {
   summary_generation: "Summary Generation",

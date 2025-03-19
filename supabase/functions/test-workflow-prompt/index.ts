@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { callAIProvider } from "./ai-providers.ts";
@@ -72,6 +73,7 @@ serve(async (req) => {
       let result: string;
       let actionRecordId: string | null = null;
       let reminderSet: boolean = false;
+      let nextCheckDateInfo = null;
       
       try {
         result = await callAIProvider(aiProvider, aiModel, finalPrompt);
@@ -107,9 +109,13 @@ serve(async (req) => {
                 const nextCheckDate = new Date();
                 nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
                 
-                await setNextCheckDate(supabase, projectId, nextCheckDate.toISOString());
-                reminderSet = true;
-                console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
+                try {
+                  nextCheckDateInfo = await setNextCheckDate(supabase, projectId, nextCheckDate.toISOString());
+                  reminderSet = true;
+                  console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
+                } catch (setDateError) {
+                  console.error("Error setting next check date:", setDateError);
+                }
                 
                 try {
                   actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
@@ -155,7 +161,8 @@ serve(async (req) => {
           promptRunId,
           actionRecordId,
           initiatedBy,
-          reminderSet
+          reminderSet,
+          nextCheckDateInfo
         }),
         {
           headers: {
