@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -11,6 +10,12 @@ import PromptEditor from "./PromptEditor";
 const PromptsTab = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
+
+  const allowedPromptTypes = [
+    'summary_generation', 
+    'summary_update', 
+    'action_detection_execution'
+  ];
 
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
     queryKey: ['workflow-prompts'],
@@ -25,8 +30,13 @@ const PromptsTab = () => {
         console.error('Error fetching prompts:', error);
         throw error;
       }
-      console.log('Fetched prompts:', data);
-      return data as WorkflowPrompt[];
+      
+      const filteredPrompts = data?.filter(prompt => 
+        allowedPromptTypes.includes(prompt.type)
+      ) || [];
+      
+      console.log('Fetched prompts:', filteredPrompts);
+      return filteredPrompts as WorkflowPrompt[];
     }
   });
 
