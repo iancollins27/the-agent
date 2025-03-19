@@ -134,6 +134,69 @@ export type Database = {
         }
         Relationships: []
       }
+      communications: {
+        Row: {
+          content: string | null
+          created_at: string
+          direction: string
+          duration: number | null
+          id: string
+          participants: Json
+          processed_for_summary: boolean | null
+          project_id: string | null
+          raw_webhook_id: string | null
+          recording_url: string | null
+          subtype: string
+          timestamp: string
+          type: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          direction: string
+          duration?: number | null
+          id?: string
+          participants: Json
+          processed_for_summary?: boolean | null
+          project_id?: string | null
+          raw_webhook_id?: string | null
+          recording_url?: string | null
+          subtype: string
+          timestamp: string
+          type: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          direction?: string
+          duration?: number | null
+          id?: string
+          participants?: Json
+          processed_for_summary?: boolean | null
+          project_id?: string | null
+          raw_webhook_id?: string | null
+          recording_url?: string | null
+          subtype?: string
+          timestamp?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communications_raw_webhook_id_fkey"
+            columns: ["raw_webhook_id"]
+            isOneToOne: false
+            referencedRelation: "raw_comms_webhooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           action_approval_settings: Json | null
@@ -474,6 +537,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      raw_comms_webhooks: {
+        Row: {
+          created_at: string
+          id: string
+          processed: boolean | null
+          processing_error: string | null
+          raw_payload: Json
+          service_name: string
+          signature: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          processed?: boolean | null
+          processing_error?: string | null
+          raw_payload: Json
+          service_name: string
+          signature?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          processed?: boolean | null
+          processing_error?: string | null
+          raw_payload?: Json
+          service_name?: string
+          signature?: string | null
+          webhook_id?: string | null
+        }
+        Relationships: []
       }
       workflow_prompts: {
         Row: {
