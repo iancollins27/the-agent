@@ -52,12 +52,15 @@ Today's Date: {{current_date}}
 Milestone Instructions:
 {{milestone_instructions}}
 
+Is this a reminder check? {{is_reminder_check}}
+
 Instructions:
 1. Review the current project summary and next step information
 2. Determine if any action should be taken based on the project status
 3. Your response must be a JSON object in one of these formats:
 
 IF ACTION IS NEEDED:
+\`\`\`json
 {
   "decision": "ACTION_NEEDED",
   "reason": "Explanation for your decision",
@@ -67,26 +70,39 @@ IF ACTION IS NEEDED:
     // Additional data needed for the action, including the message and reason if action type is message
   }
 }
+\`\`\`
 
 IF NO IMMEDIATE ACTION BUT FUTURE CHECK NEEDED:
+\`\`\`json
 {
   "decision": "SET_FUTURE_REMINDER",
-  "reason": "Explanation why a future check is needed",
   "action_type": "set_future_reminder",
   "days_until_check": 7, // Number of days until the next check (adjust as needed)
-  "check_reason": "Reason to check again in the future",
+  "check_reason": "Detailed reason why a future check is needed",
   "action_payload": {
     "description": "Set reminder to check in X days: reason"
   }
 }
+\`\`\`
 
 IF NO ACTION IS NEEDED:
+\`\`\`json
 {
   "decision": "NO_ACTION",
   "reason": "Explanation why no action is needed"
 }
+\`\`\`
 
-The system will automatically execute your decision. If you choose ACTION_NEEDED, action records will be created. If you choose SET_FUTURE_REMINDER, the project's next_check_date will be updated.`;
+REMINDER GUIDELINES:
+- If you're evaluating time-sensitive milestones (e.g., site visits, permit applications), always consider setting a future reminder.
+- Common scenarios for reminders include:
+  * Checking if a site visit was scheduled within 3 days of contract signing
+  * Following up on permit applications after 7-10 days
+  * Checking on contractor selection within 5 days of receiving multiple quotes
+  * Verifying project start date is confirmed 7 days before scheduled start
+- When setting a reminder, be specific about the exact expectation you're checking for
+- The system will automatically execute your decision. If you choose SET_FUTURE_REMINDER, the project's next_check_date will be updated.
+- If this is already a reminder check (is_reminder_check is true), evaluate if the expected action occurred or if further action is now needed.`;
     }
     return null;
   };
