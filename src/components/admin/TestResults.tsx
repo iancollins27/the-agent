@@ -12,6 +12,10 @@ type TestResultsProps = {
 
 const TestResults = ({ results }: TestResultsProps) => {
   const [actionRecords, setActionRecords] = useState<Record<string, ActionRecord>>({});
+  const [projectUpdates, setProjectUpdates] = useState<Record<string, { 
+    next_check_date: string | null,
+    previous_next_check_date: string | null 
+  }>>({});
   
   useEffect(() => {
     // Collect all action record IDs
@@ -23,25 +27,57 @@ const TestResults = ({ results }: TestResultsProps) => {
       )
       .filter(Boolean) as string[];
       
-    if (actionRecordIds.length === 0) return;
+    if (actionRecordIds.length > 0) {
+      // Fetch action record details
+      const fetchActionRecords = async () => {
+        const { data, error } = await supabase
+          .from('action_records')
+          .select('*')
+          .in('id', actionRecordIds);
+          
+        if (!error && data) {
+          const records: Record<string, ActionRecord> = {};
+          data.forEach(record => {
+            records[record.id] = record as ActionRecord;
+          });
+          setActionRecords(records);
+        }
+      };
+      
+      fetchActionRecords();
+    }
     
-    // Fetch action record details
-    const fetchActionRecords = async () => {
-      const { data, error } = await supabase
-        .from('action_records')
-        .select('*')
-        .in('id', actionRecordIds);
+    // Check for next_check_date updates
+    const projectIds = results.map(result => result.projectId);
+    
+    if (projectIds.length > 0) {
+      const fetchProjectUpdates = async () => {
+        // For each project in the results, get its current next_check_date
+        const updates: Record<string, { 
+          next_check_date: string | null,
+          previous_next_check_date: string | null 
+        }> = {};
         
-      if (!error && data) {
-        const records: Record<string, ActionRecord> = {};
-        data.forEach(record => {
-          records[record.id] = record as ActionRecord;
-        });
-        setActionRecords(records);
-      }
-    };
-    
-    fetchActionRecords();
+        for (const projectId of projectIds) {
+          const { data, error } = await supabase
+            .from('projects')
+            .select('id, next_check_date, previous_next_check_date')
+            .eq('id', projectId)
+            .single();
+            
+          if (!error && data) {
+            updates[projectId] = {
+              next_check_date: data.next_check_date,
+              previous_next_check_date: data.previous_next_check_date
+            };
+          }
+        }
+        
+        setProjectUpdates(updates);
+      };
+      
+      fetchProjectUpdates();
+    }
   }, [results]);
 
   if (!results.length) return null;
@@ -79,6 +115,30 @@ const TestResults = ({ results }: TestResultsProps) => {
                       </pre>
                     </div>
                   </div>
+                  
+                  {/* Show reminder updates if found */}
+                  {projectUpdates[result.projectId] && 
+                   projectUpdates[result.projectId].next_check_date && 
+                   (promptResult.type === 'action_detection_execution' || 
+                    promptResult.reminderSet) && (
+                    <div className="mt-4 bg-blue-50 p-4 rounded-md border border-blue-200">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 px-3 py-1 text-sm font-medium">
+                          Reminder Set
+                        </Badge>
+                      </div>
+                      <p className="text-sm">
+                        <span className="font-medium">Next check date:</span>{' '}
+                        {new Date(projectUpdates[result.projectId].next_check_date!).toLocaleString()}
+                      </p>
+                      {projectUpdates[result.projectId].previous_next_check_date && (
+                        <p className="text-sm text-gray-500 mt-1">
+                          <span className="font-medium">Previous:</span>{' '}
+                          {new Date(projectUpdates[result.projectId].previous_next_check_date).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Show action record details if one was created */}
                   {promptResult.actionRecordId && (

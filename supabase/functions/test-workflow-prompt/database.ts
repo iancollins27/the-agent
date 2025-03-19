@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 /**
@@ -152,6 +151,50 @@ export async function setProjectNextCheckDate(
   } catch (error) {
     console.error("Error setting project next check date:", error);
     return null;
+  }
+}
+
+/**
+ * Updates a project's next_check_date
+ */
+export async function setNextCheckDate(
+  supabase: any,
+  projectId: string,
+  nextCheckDate: string | null
+) {
+  try {
+    console.log(`Setting next_check_date for project ${projectId} to ${nextCheckDate}`);
+    
+    // First, get the current next_check_date
+    const { data: currentData, error: fetchError } = await supabase
+      .from('projects')
+      .select('next_check_date')
+      .eq('id', projectId)
+      .single();
+      
+    if (fetchError) {
+      console.error("Error fetching current next_check_date:", fetchError);
+      throw fetchError;
+    }
+    
+    // Update with new next_check_date and store previous value
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ 
+        next_check_date: nextCheckDate,
+        previous_next_check_date: currentData?.next_check_date || null
+      })
+      .eq('id', projectId);
+      
+    if (error) {
+      console.error("Error setting next_check_date:", error);
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Error in setNextCheckDate:", error);
+    throw error;
   }
 }
 
