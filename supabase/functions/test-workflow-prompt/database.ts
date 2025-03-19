@@ -326,6 +326,8 @@ export async function createActionRecord(
       const nextCheckDate = new Date();
       nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
       
+      console.log(`Setting reminder to check in ${daysToAdd} days on ${nextCheckDate.toISOString()}`);
+      
       // Update the project with the next check date
       const { error: updateError } = await supabase
         .from('projects')
@@ -351,9 +353,54 @@ export async function createActionRecord(
             check_reason: actionData.check_reason || 'Follow-up check',
             description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`
           },
-          requires_approval: false,
-          status: 'executed',
-          executed_at: new Date().toISOString()
+          requires_approval: true, // Changed to true so users can approve/reject reminders
+          status: 'pending'
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error creating reminder action record:", error);
+        throw new Error(`Failed to create reminder action record: ${error.message}`);
+      }
+      
+      console.log("Reminder action record created successfully:", data);
+      return data.id;
+    } else if (decision === "NO_ACTION_NEEDED" && actionData.set_reminder) {
+      // If no immediate action is needed but a reminder should be set
+      const daysToAdd = actionData.days_until_check || 7;
+      const nextCheckDate = new Date();
+      nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+      
+      console.log(`No action needed now, but setting reminder to check in ${daysToAdd} days on ${nextCheckDate.toISOString()}`);
+      
+      // Update the project with the next check date
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({
+          next_check_date: nextCheckDate.toISOString()
+        })
+        .eq('id', projectId);
+        
+      if (updateError) {
+        console.error("Error setting next check date:", updateError);
+        throw new Error(`Failed to set next check date: ${updateError.message}`);
+      }
+      
+      // Create an action record for the reminder
+      const { data, error } = await supabase
+        .from('action_records')
+        .insert({
+          prompt_run_id: promptRunId,
+          project_id: projectId,
+          action_type: 'set_future_reminder',
+          action_payload: {
+            days_until_check: daysToAdd,
+            check_reason: actionData.check_reason || 'Automatic follow-up check',
+            description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Automatic follow-up check'}`
+          },
+          requires_approval: true,
+          status: 'pending'
         })
         .select()
         .single();

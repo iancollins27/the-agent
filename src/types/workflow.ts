@@ -1,5 +1,5 @@
 
-export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution';
+export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection_execution';
 
 export type WorkflowPrompt = {
   id: string;
@@ -29,8 +29,6 @@ export type TestResult = {
 export const workflowTitles: Record<WorkflowType, string> = {
   summary_generation: "Summary Generation",
   summary_update: "Summary Update",
-  action_detection: "Action Detection",
-  action_execution: "Action Execution",
   action_detection_execution: "Action Detection & Execution"
 };
 
@@ -48,24 +46,13 @@ export const availableVariables = {
     { name: "current_date", description: "Today's date" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
   ],
-  action_detection: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
-    { name: "current_date", description: "Today's date" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
-  ],
-  action_execution: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
-    { name: "action_description", description: "The description of the action to be executed" },
-    { name: "current_date", description: "Today's date" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
-  ],
   action_detection_execution: [
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "current_date", description: "Today's date" },
     { name: "next_step", description: "The current next step in the project" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
+    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" },
+    { name: "next_check_date", description: "The date when this project should be checked next (if set)" },
+    { name: "days_since_last_check", description: "Number of days since the last action check" }
   ]
 };
