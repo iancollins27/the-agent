@@ -12,12 +12,6 @@ const PromptDisplay = ({ promptText, onEdit }: PromptDisplayProps) => {
       <pre className="whitespace-pre-wrap bg-muted p-4 rounded-md text-sm overflow-auto">
         {promptText}
       </pre>
-      <Button 
-        variant="outline"
-        onClick={onEdit}
-      >
-        Edit Prompt
-      </Button>
     </div>
   );
 };

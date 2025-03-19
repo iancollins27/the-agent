@@ -6,6 +6,7 @@ import { UseMutationResult } from "@tanstack/react-query";
 import PromptVariablesReference from "./PromptVariablesReference";
 import PromptEditingForm from "./PromptEditingForm";
 import PromptDisplay from "./PromptDisplay";
+import { Button } from "@/components/ui/button";
 
 type PromptEditorProps = {
   prompt: WorkflowPrompt;
@@ -65,8 +66,16 @@ const PromptEditor = ({
 
   return (
     <Card key={prompt.id}>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{workflowTitles[prompt.type]}</CardTitle>
+        {!isEditing && (
+          <Button 
+            variant="outline"
+            onClick={handleEdit}
+          >
+            Edit Prompt
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
