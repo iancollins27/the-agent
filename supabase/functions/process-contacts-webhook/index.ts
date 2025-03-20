@@ -33,17 +33,26 @@ serve(async (req) => {
     );
 
     // Log the raw request body for debugging
-    const requestBody = await req.json();
-    console.log('Received contacts webhook payload:', requestBody);
-
-    // Validate the payload
-    const payload = requestBody as WebhookPayload;
+    const requestText = await req.text();
+    console.log('Raw request body:', requestText);
     
+    // Parse JSON safely
+    let payload: WebhookPayload;
+    try {
+      payload = JSON.parse(requestText);
+      console.log('Parsed webhook payload:', payload);
+    } catch (parseError) {
+      console.error('Error parsing JSON:', parseError);
+      throw new Error(`Invalid JSON in webhook payload: ${parseError.message}`);
+    }
+    
+    // Validate the payload
     if (!payload.contacts || !Array.isArray(payload.contacts) || !payload.Bid_ID) {
       throw new Error('Invalid webhook payload: missing contacts array or Bid_ID');
     }
 
     // Get the project by CRM ID (Bid_ID)
+    console.log(`Looking for project with CRM ID: ${payload.Bid_ID}`);
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id')
@@ -52,7 +61,7 @@ serve(async (req) => {
 
     if (projectError) {
       console.error('Error finding project:', projectError);
-      throw new Error(`Project with Bid_ID ${payload.Bid_ID} not found`);
+      throw new Error(`Project with Bid_ID ${payload.Bid_ID} not found: ${projectError.message}`);
     }
 
     console.log(`Found project with ID: ${project.id} for Bid_ID: ${payload.Bid_ID}`);
@@ -61,16 +70,19 @@ serve(async (req) => {
     const results = await Promise.all(
       payload.contacts.map(async (contact) => {
         try {
+          console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
+          
           // Validate role
           const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
           // Check if role is valid, default to 'BidList Project Manager' if not
           const role = validRoles.includes(contact.role) ? contact.role : 'BidList Project Manager';
           
           // Check if contact already exists with this email or phone number
+          // Use parameterized queries for safety and correctness
           const { data: existingContacts, error: lookupError } = await supabase
             .from('contacts')
             .select('id')
-            .or(`email.eq.${contact.email},phone_number.eq.${contact.number}`);
+            .or(`email.eq."${contact.email}",phone_number.eq."${contact.number}"`);
             
           if (lookupError) {
             console.error('Error looking up existing contact:', lookupError);
@@ -85,6 +97,7 @@ serve(async (req) => {
             console.log(`Using existing contact with ID: ${contactId}`);
           } else {
             // Create new contact
+            console.log(`Creating new contact: ${contact.name}`);
             const { data: newContact, error: createError } = await supabase
               .from('contacts')
               .insert({
@@ -105,17 +118,33 @@ serve(async (req) => {
             console.log(`Created new contact with ID: ${contactId}`);
           }
 
-          // Link contact to project
-          const { error: linkError } = await supabase
+          // Check if contact is already linked to project
+          const { data: existingLink, error: linkCheckError } = await supabase
             .from('project_contacts')
-            .insert({
-              project_id: project.id,
-              contact_id: contactId
-            });
+            .select('*')
+            .eq('project_id', project.id)
+            .eq('contact_id', contactId);
             
-          if (linkError) {
-            console.error('Error linking contact to project:', linkError);
-            return { status: 'error', message: `Error linking contact to project: ${linkError.message}`, contact };
+          if (linkCheckError) {
+            console.error('Error checking existing project-contact link:', linkCheckError);
+          } 
+          
+          // Only create the link if it doesn't already exist
+          if (!existingLink || existingLink.length === 0) {
+            console.log(`Linking contact ${contactId} to project ${project.id}`);
+            const { error: linkError } = await supabase
+              .from('project_contacts')
+              .insert({
+                project_id: project.id,
+                contact_id: contactId
+              });
+              
+            if (linkError) {
+              console.error('Error linking contact to project:', linkError);
+              return { status: 'error', message: `Error linking contact to project: ${linkError.message}`, contact };
+            }
+          } else {
+            console.log(`Contact ${contactId} already linked to project ${project.id}`);
           }
 
           return { status: 'success', contactId, contact };

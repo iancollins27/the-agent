@@ -37,7 +37,8 @@ This edge function processes a webhook payload containing contacts for a new or 
    - Checks if the contact already exists in the system by email or phone number
    - If it exists, uses the existing contact ID
    - If not, creates a new contact record
-   - Links the contact to the project through the `project_contacts` junction table
+   - Checks if the contact is already linked to the project
+   - Links the contact to the project through the `project_contacts` junction table if not already linked
 
 ## Valid Roles
 
@@ -45,3 +46,11 @@ This edge function processes a webhook payload containing contacts for a new or 
 - "HO" - For homeowners
 - "BidList Project Manager" - For BidList staff
 - "Solar" - For solar sales representatives
+
+## Notes for Zoho Integration
+
+When calling from Zoho, make sure to:
+
+1. Use the correct URL: `https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/process-contacts-webhook`
+2. Set the Authorization header correctly: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aWZzeHNyYmx1ZWhvcGFtcXB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4MzA0NjIsImV4cCI6MjA1NTQwNjQ2Mn0.3MYZOhz5kH71qxniwzHDzVzF3PKCulkvACDc8R1pI6I`
+3. Send the payload as JSON with the proper Content-Type header: `Content-Type: application/json`
