@@ -9,6 +9,10 @@ This edge function processes a webhook payload containing contacts for a new or 
 
 ## Payload Format
 
+The webhook accepts both JSON and form-encoded data formats:
+
+### JSON Format (Preferred)
+
 ```json
 {
   "contacts": [
@@ -28,6 +32,13 @@ This edge function processes a webhook payload containing contacts for a new or 
   "Bid_ID": 12345
 }
 ```
+
+### Form-encoded Format
+
+The function can also accept form-encoded data with either:
+- A JSON string in a field named `payload`
+- Individual form fields for contacts (e.g., `contacts[0][name]`, `contacts[0][email]`, etc.)
+- The Bid_ID as a separate field
 
 ## Process
 
@@ -53,4 +64,6 @@ When calling from Zoho, make sure to:
 
 1. Use the correct URL: `https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/process-contacts-webhook`
 2. Set the Authorization header correctly: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aWZzeHNyYmx1ZWhvcGFtcXB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4MzA0NjIsImV4cCI6MjA1NTQwNjQ2Mn0.3MYZOhz5kH71qxniwzHDzVzF3PKCulkvACDc8R1pI6I`
-3. Send the payload as JSON with the proper Content-Type header: `Content-Type: application/json`
+3. If using JSON format, send with Content-Type: `application/json`
+4. If using form data, make sure to properly structure the contacts data
+5. **Important**: Remove any test URL overrides in your Zoho code

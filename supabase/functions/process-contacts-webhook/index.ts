@@ -32,18 +32,83 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Log the raw request body for debugging
+    // Get content type to determine how to parse the body
+    const contentType = req.headers.get('content-type') || '';
+    console.log('Content-Type:', contentType);
+
+    // Get the raw request body
     const requestText = await req.text();
     console.log('Raw request body:', requestText);
     
-    // Parse JSON safely
+    // Parse payload based on content type
     let payload: WebhookPayload;
     try {
-      payload = JSON.parse(requestText);
+      if (contentType.includes('application/json')) {
+        // Parse as JSON
+        payload = JSON.parse(requestText);
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
+        // Parse as form data
+        const formData = new URLSearchParams(requestText);
+        
+        // Check if the entire payload is in a single form field (Zoho might do this)
+        if (formData.has('payload')) {
+          payload = JSON.parse(formData.get('payload') || '{}');
+        } else if (formData.has('contacts')) {
+          // Try to parse contacts as JSON if it's in a single parameter
+          try {
+            const contacts = JSON.parse(formData.get('contacts') || '[]');
+            const bidId = formData.get('Bid_ID') || '';
+            payload = {
+              contacts: Array.isArray(contacts) ? contacts : [],
+              Bid_ID: parseInt(bidId, 10)
+            };
+          } catch {
+            // If contacts can't be parsed as JSON, try to reconstruct from form data
+            console.log('Reconstructing payload from form data');
+            payload = {
+              contacts: [],
+              Bid_ID: parseInt(formData.get('Bid_ID') || '0', 10)
+            };
+            
+            // Zoho might send data with indices like contacts[0][name], contacts[0][email], etc.
+            // We need to reconstruct the contacts array
+            const contactIndices = new Set<number>();
+            for (const [key, value] of formData.entries()) {
+              const match = key.match(/contacts\[(\d+)\]\[(\w+)\]/);
+              if (match) {
+                const index = parseInt(match[1], 10);
+                contactIndices.add(index);
+              }
+            }
+            
+            if (contactIndices.size > 0) {
+              for (const index of contactIndices) {
+                const contact: ContactPayload = {
+                  name: formData.get(`contacts[${index}][name]`) || '',
+                  number: formData.get(`contacts[${index}][number]`) || '',
+                  email: formData.get(`contacts[${index}][email]`) || '',
+                  role: formData.get(`contacts[${index}][role]`) || ''
+                };
+                payload.contacts.push(contact);
+              }
+            }
+          }
+        } else {
+          throw new Error('Unable to find contacts or payload in form data');
+        }
+      } else {
+        // Try JSON parse as fallback
+        try {
+          payload = JSON.parse(requestText);
+        } catch {
+          throw new Error(`Unsupported content type: ${contentType}`);
+        }
+      }
+      
       console.log('Parsed webhook payload:', payload);
     } catch (parseError) {
-      console.error('Error parsing JSON:', parseError);
-      throw new Error(`Invalid JSON in webhook payload: ${parseError.message}`);
+      console.error('Error parsing request body:', parseError);
+      throw new Error(`Invalid request body format: ${parseError.message}`);
     }
     
     // Validate the payload
@@ -78,11 +143,10 @@ serve(async (req) => {
           const role = validRoles.includes(contact.role) ? contact.role : 'BidList Project Manager';
           
           // Check if contact already exists with this email or phone number
-          // Use parameterized queries for safety and correctness
           const { data: existingContacts, error: lookupError } = await supabase
             .from('contacts')
             .select('id')
-            .or(`email.eq."${contact.email}",phone_number.eq."${contact.number}"`);
+            .or(`email.eq.${contact.email},phone_number.eq.${contact.number}`);
             
           if (lookupError) {
             console.error('Error looking up existing contact:', lookupError);
