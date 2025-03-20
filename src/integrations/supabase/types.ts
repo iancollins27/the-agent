@@ -235,23 +235,26 @@ export type Database = {
       contacts: {
         Row: {
           comms_preferences: string | null
-          contact_info: string | null
+          email: string | null
           full_name: string
           id: string
+          phone_numberer: string | null
           role: Database["public"]["Enums"]["contact_role"]
         }
         Insert: {
           comms_preferences?: string | null
-          contact_info?: string | null
+          email?: string | null
           full_name: string
           id?: string
+          phone_numberer?: string | null
           role: Database["public"]["Enums"]["contact_role"]
         }
         Update: {
           comms_preferences?: string | null
-          contact_info?: string | null
+          email?: string | null
           full_name?: string
           id?: string
+          phone_numberer?: string | null
           role?: Database["public"]["Enums"]["contact_role"]
         }
         Relationships: []
