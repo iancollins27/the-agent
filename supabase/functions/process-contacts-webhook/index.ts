@@ -70,7 +70,7 @@ serve(async (req) => {
           const { data: existingContacts, error: lookupError } = await supabase
             .from('contacts')
             .select('id')
-            .or(`email.eq.${contact.email},phone_numberer.eq.${contact.number}`);
+            .or(`email.eq.${contact.email},phone_number.eq.${contact.number}`);
             
           if (lookupError) {
             console.error('Error looking up existing contact:', lookupError);
@@ -89,7 +89,7 @@ serve(async (req) => {
               .from('contacts')
               .insert({
                 full_name: contact.name,
-                phone_numberer: contact.number,
+                phone_number: contact.number,
                 email: contact.email,
                 role: role
               })
