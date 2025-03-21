@@ -59,17 +59,19 @@ serve(async (req) => {
       projectTrackId
     )
     
-    // Get track roles if the project track exists
+    // Get track roles and base prompt if the project track exists
     let trackRoles = '';
+    let trackBasePrompt = '';
     if (projectTrackId) {
       const { data: trackData, error: trackError } = await supabase
         .from('project_tracks')
-        .select('Roles')
+        .select('Roles, "track base prompt"')
         .eq('id', projectTrackId)
         .single();
         
       if (!trackError && trackData) {
         trackRoles = trackData.Roles || '';
+        trackBasePrompt = trackData['track base prompt'] || '';
       }
     }
 
@@ -81,6 +83,7 @@ serve(async (req) => {
       .replace('{{current_date}}', new Date().toISOString().split('T')[0])
       .replace('{{next_step_instructions}}', nextStepInstructions || '')
       .replace('{{track_roles}}', trackRoles || '')
+      .replace('{{track_base_prompt}}', trackBasePrompt || '')
 
     // Get AI configuration
     const { data: aiConfig, error: aiConfigError } = await supabase

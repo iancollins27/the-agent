@@ -65,6 +65,7 @@ export const availableVariables = {
   summary_generation: [
     { name: "track_name", description: "The name of the project track" },
     { name: "track_roles", description: "Roles defined for the project track" },
+    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
     { name: "new_data", description: "The data received from CRM" },
     { name: "current_date", description: "Today's date" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
@@ -73,6 +74,7 @@ export const availableVariables = {
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "track_roles", description: "Roles defined for the project track" },
+    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
     { name: "new_data", description: "The data received from CRM" },
     { name: "current_date", description: "Today's date" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
@@ -81,6 +83,7 @@ export const availableVariables = {
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "track_roles", description: "Roles defined for the project track" },
+    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
     { name: "current_date", description: "Today's date" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
   ],
@@ -88,6 +91,7 @@ export const availableVariables = {
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "track_roles", description: "Roles defined for the project track" },
+    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
     { name: "action_description", description: "The description of the action to be executed" },
     { name: "current_date", description: "Today's date" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
@@ -96,6 +100,7 @@ export const availableVariables = {
     { name: "summary", description: "The current project summary" },
     { name: "track_name", description: "The name of the project track" },
     { name: "track_roles", description: "Roles defined for the project track" },
+    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
     { name: "current_date", description: "Today's date" },
     { name: "next_step", description: "The current next step in the project" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" },

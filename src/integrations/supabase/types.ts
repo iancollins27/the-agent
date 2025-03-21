@@ -411,24 +411,24 @@ export type Database = {
       project_tracks: {
         Row: {
           company_id: string
-          description: string | null
           id: string
           name: string
           Roles: string | null
+          "track base prompt": string | null
         }
         Insert: {
           company_id: string
-          description?: string | null
           id?: string
           name?: string
           Roles?: string | null
+          "track base prompt"?: string | null
         }
         Update: {
           company_id?: string
-          description?: string | null
           id?: string
           name?: string
           Roles?: string | null
+          "track base prompt"?: string | null
         }
         Relationships: [
           {
