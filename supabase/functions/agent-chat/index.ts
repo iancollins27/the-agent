@@ -122,7 +122,7 @@ serve(async (req) => {
     if (projectData?.project_track) {
       const { data: track, error: trackError } = await supabase
         .from('project_tracks')
-        .select('id, name, description')
+        .select('id, name, description, Roles')
         .eq('id', projectData.project_track)
         .single();
       
@@ -269,7 +269,8 @@ The JSON block MUST be properly formatted as it will be automatically processed.
         - Summary: ${projectData.summary || 'No summary available'}
         - Next Step: ${projectData.next_step || 'No next step defined'}
         ${trackData ? `- Project Track: ${trackData.name}
-        - Track Description: ${trackData.description || 'No description available'}` : ''}
+        - Track Description: ${trackData.description || 'No description available'}
+        - Track Roles: ${trackData.Roles || 'No roles defined'}` : ''}
       ` : 'No specific project context is loaded.'}`
     }
 

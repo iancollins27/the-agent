@@ -63,14 +63,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           console.log('Fetched action record:', actionRecordData);
           
           // Convert the database record to our ActionRecord type
+          const actionPayload = typeof actionRecordData.action_payload === 'object' 
+            ? actionRecordData.action_payload 
+            : {};
+            
           const actionRecord: ActionRecord = {
             ...actionRecordData,
+            action_payload: {
+              description: actionPayload.description || '',
+              field: actionPayload.field,
+              value: actionPayload.value,
+              recipient: actionPayload.recipient,
+              sender: actionPayload.sender,
+              message_content: actionPayload.message_content,
+              notion_token: actionPayload.notion_token,
+              notion_database_id: actionPayload.notion_database_id,
+              notion_page_id: actionPayload.notion_page_id,
+              days_until_check: actionPayload.days_until_check,
+              check_reason: actionPayload.check_reason,
+              date: actionPayload.date
+            },
             recipient_name: actionRecordData.recipient?.full_name || 
-              (actionRecordData.action_payload && typeof actionRecordData.action_payload === 'object' ? 
-                actionRecordData.action_payload.recipient : null),
+              (typeof actionPayload === 'object' ? actionPayload.recipient : null),
             sender_name: actionRecordData.sender?.full_name || 
-              (actionRecordData.action_payload && typeof actionRecordData.action_payload === 'object' ? 
-                actionRecordData.action_payload.sender : null)
+              (typeof actionPayload === 'object' ? actionPayload.sender : null)
           };
           
           setPendingAction(actionRecord);

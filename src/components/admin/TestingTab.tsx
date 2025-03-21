@@ -59,7 +59,7 @@ const TestingTab = () => {
             company_id,
             project_track,
             companies(name),
-            project_tracks(name, description)
+            project_tracks(name, description, Roles)
           `)
           .eq('id', projectId)
           .single();
@@ -73,6 +73,7 @@ const TestingTab = () => {
           company_name: projectData.companies?.name || 'Unknown Company',
           track_name: projectData.project_tracks?.name || 'Default Track',
           track_description: projectData.project_tracks?.description || '',
+          track_roles: projectData.project_tracks?.Roles || '',
           current_date: new Date().toISOString().split('T')[0],
           milestone_instructions: '',
           action_description: 'Sample action for testing'

@@ -414,18 +414,21 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          Roles: string | null
         }
         Insert: {
           company_id: string
           description?: string | null
           id?: string
           name?: string
+          Roles?: string | null
         }
         Update: {
           company_id?: string
           description?: string | null
           id?: string
           name?: string
+          Roles?: string | null
         }
         Relationships: [
           {

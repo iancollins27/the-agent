@@ -58,6 +58,20 @@ serve(async (req) => {
       projectData.nextStep,
       projectTrackId
     )
+    
+    // Get track roles if the project track exists
+    let trackRoles = '';
+    if (projectTrackId) {
+      const { data: trackData, error: trackError } = await supabase
+        .from('project_tracks')
+        .select('Roles')
+        .eq('id', projectTrackId)
+        .single();
+        
+      if (!trackError && trackData) {
+        trackRoles = trackData.Roles || '';
+      }
+    }
 
     // Get and format the workflow prompt
     const promptTemplate = await getWorkflowPrompt(supabase, !!existingProject)
@@ -66,6 +80,7 @@ serve(async (req) => {
       .replace('{{new_data}}', JSON.stringify(projectData))
       .replace('{{current_date}}', new Date().toISOString().split('T')[0])
       .replace('{{next_step_instructions}}', nextStepInstructions || '')
+      .replace('{{track_roles}}', trackRoles || '')
 
     // Get AI configuration
     const { data: aiConfig, error: aiConfigError } = await supabase
