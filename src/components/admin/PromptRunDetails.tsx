@@ -115,15 +115,15 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           <div>
             <h3 className="font-medium mb-2">Prompt Input</h3>
             <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
-              {promptRun.prompt_input}
+              {promptRun.prompt_input || promptRun.prompt_text || 'No input available'}
             </pre>
           </div>
           
-          {promptRun.prompt_output && (
+          {(promptRun.prompt_output || promptRun.result) && (
             <div>
               <h3 className="font-medium mb-2">Prompt Output</h3>
               <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
-                {promptRun.prompt_output}
+                {promptRun.prompt_output || promptRun.result}
               </pre>
             </div>
           )}

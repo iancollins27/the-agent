@@ -10,11 +10,11 @@ export interface ActionRecord {
   sender_ID?: string;
   approver_id?: string;
   action_type: string;
-  message: string;
+  message: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
   requires_approval: boolean;
   created_at: string;
-  executed_at?: string;
+  executed_at?: string | null;
   action_payload: {
     description?: string;
     field?: string;
@@ -34,31 +34,39 @@ export interface ActionRecord {
     success: boolean;
     message: string;
     [key: string]: any;
-  };
+  } | null;
   // UI-only properties
   recipient_name?: string;
   sender_name?: string;
   approver_name?: string;
   project_name?: string;
-  recipient?: { id: string; full_name: string };
-  sender?: { id: string; full_name: string };
+  recipient?: { id: string; full_name: string } | null;
+  sender?: { id: string; full_name: string } | null;
 }
 
 export type PromptRun = {
   id: string;
-  project_id: string;
-  workflow_type: string;
-  prompt_text: string;
-  result: string;
+  project_id: string | null;
+  workflow_type?: string;
+  prompt_text?: string;
+  result?: string;
+  prompt_input?: string;
+  prompt_output?: string | null;
   created_at: string;
-  status: 'success' | 'error' | 'pending';
-  error_message?: string;
+  status: string;
+  error_message?: string | null;
   rating?: number;
   feedback?: string;
-  ai_provider?: string;
-  model?: string;
+  ai_provider?: string | null;
+  ai_model?: string | null;
   project_name?: string;
   action_record_id?: string;
+  workflow_prompt_type?: string;
+  feedback_rating?: number | null;
+  feedback_description?: string | null;
+  feedback_tags?: string[] | null;
+  completed_at?: string | null;
+  initiated_by?: string;
 };
 
 export type TimeFilterOption = 'all' | 'today' | 'week' | 'month';

@@ -42,7 +42,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                   {new Date(run.created_at).toLocaleString()}
                 </TableCell>
                 <TableCell>{run.project_name}</TableCell>
-                <TableCell>{run.workflow_prompt_type}</TableCell>
+                <TableCell>{run.workflow_prompt_type || run.workflow_type || 'Unknown'}</TableCell>
                 <TableCell>{run.ai_provider || 'Not specified'}</TableCell>
                 <TableCell>{run.ai_model || 'Not specified'}</TableCell>
                 <TableCell>{run.initiated_by || 'System'}</TableCell>
@@ -51,7 +51,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 </TableCell>
                 <TableCell>
                   <PromptRunRating 
-                    rating={run.feedback_rating} 
+                    rating={run.feedback_rating || run.rating || null} 
                     onRatingChange={(rating) => onRatingChange(run.id, rating)}
                   />
                 </TableCell>

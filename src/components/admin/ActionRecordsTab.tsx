@@ -42,13 +42,17 @@ const ActionRecordsTab = () => {
       
       if (error) throw error;
       
-      return data.map(record => ({
-        ...record,
-        project_name: record.projects?.crm_id || 'Unknown Project',
-        recipient_name: record.recipient?.full_name || 
+      // Properly cast the data to match our ActionRecord type
+      return data.map(record => {
+        const result = {
+          ...record,
+          project_name: record.projects?.crm_id || 'Unknown Project',
+          recipient_name: record.recipient?.full_name || 
                         (record.action_payload && typeof record.action_payload === 'object' && 'recipient' in record.action_payload ? 
-                        record.action_payload.recipient : 'No Recipient')
-      })) as ActionRecord[];
+                        String(record.action_payload.recipient) : 'No Recipient')
+        };
+        return result as unknown as ActionRecord;
+      });
     },
   });
 

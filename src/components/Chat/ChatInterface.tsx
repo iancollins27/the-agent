@@ -52,7 +52,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           .select(`
             *,
             recipient:contacts!recipient_id(id, full_name),
-            sender:sender_ID(id, full_name)
+            sender:contacts!sender_ID(id, full_name)
           `)
           .eq('id', data.actionRecordId)
           .single();
@@ -62,9 +62,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         } else if (actionRecordData) {
           console.log('Fetched action record:', actionRecordData);
           
-          // Convert the database record to our ActionRecord type
+          // Convert the database record to our ActionRecord type with proper type safety
           const payload = typeof actionRecordData.action_payload === 'object' 
-            ? actionRecordData.action_payload 
+            ? actionRecordData.action_payload as Record<string, any>
             : {};
             
           const actionRecord: ActionRecord = {
@@ -94,10 +94,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
               date: payload.date || ''
             },
             execution_result: actionRecordData.execution_result,
+            recipient: actionRecordData.recipient,
             recipient_name: actionRecordData.recipient?.full_name || 
-              (typeof payload === 'object' && payload ? payload.recipient : ''),
+              (typeof payload === 'object' ? payload.recipient : ''),
+            sender: actionRecordData.sender,
             sender_name: actionRecordData.sender?.full_name || 
-              (typeof payload === 'object' && payload ? payload.sender : '')
+              (typeof payload === 'object' ? payload.sender : '')
           };
           
           setPendingAction(actionRecord);

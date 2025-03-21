@@ -15,13 +15,14 @@ export type ActionRecord = {
     recipient?: string;
     sender?: string;
     message_content?: string;
-    description: string;
+    description?: string;
     notion_token?: string;
     notion_database_id?: string;
     notion_page_id?: string;
     days_until_check?: number;
     check_reason?: string;
     date?: string;
+    [key: string]: any;
   };
   status: string;
   approver_id?: string | null;

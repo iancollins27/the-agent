@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,12 +43,18 @@ const PromptRunsTab: React.FC = () => {
         throw error;
       }
 
-      // Format data to include project and workflow information
-      const formattedData = data.map(run => ({
-        ...run,
-        project_name: run.projects?.crm_id || 'Unknown Project',
-        workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type'
-      }));
+      // Format data to include project and workflow information and properly cast to PromptRun type
+      const formattedData = data.map(run => {
+        return {
+          ...run,
+          project_name: run.projects?.crm_id || 'Unknown Project',
+          workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
+          // Make sure it matches our PromptRun type
+          workflow_type: run.workflow_prompts?.type,
+          prompt_text: run.prompt_input,
+          result: run.prompt_output
+        } as unknown as PromptRun;
+      });
 
       setPromptRuns(formattedData);
     } catch (error) {
