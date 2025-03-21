@@ -22,7 +22,20 @@ serve(async (req) => {
     );
 
     // Get request body
-    const requestBody = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (error) {
+      console.error("Error parsing request body:", error);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const { webhookId, service } = requestBody;
 
     if (!webhookId || !service) {
@@ -47,13 +60,15 @@ serve(async (req) => {
     if (fetchError || !webhook) {
       console.error('Error fetching webhook:', fetchError);
       return new Response(
-        JSON.stringify({ error: 'Webhook not found' }),
+        JSON.stringify({ error: 'Webhook not found', details: fetchError }),
         { 
           status: 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
+
+    console.log(`Processing webhook ${webhookId} with raw payload:`, JSON.stringify(webhook.raw_payload, null, 2).substring(0, 1000));
 
     // Parse the webhook based on service
     let normalizedData;
@@ -71,6 +86,11 @@ serve(async (req) => {
       }
       
       console.log('Normalized data:', JSON.stringify(normalizedData, null, 2));
+
+      // Validate the normalized data structure
+      if (!normalizedData.type || !normalizedData.subtype || !normalizedData.participants || !normalizedData.timestamp || !normalizedData.direction) {
+        throw new Error(`Invalid normalized data structure: ${JSON.stringify(normalizedData)}`);
+      }
 
       // Save normalized data to communications table
       const { data: communication, error: insertError } = await supabase
@@ -95,6 +115,8 @@ serve(async (req) => {
         throw insertError;
       }
 
+      console.log('Saved communication with ID:', communication.id);
+
       // Mark the webhook as processed
       await supabase
         .from('raw_comms_webhooks')
@@ -102,20 +124,25 @@ serve(async (req) => {
         .eq('id', webhook.id);
 
       // Call the business logic handler with the normalized data
-      const { data: businessLogicResponse, error: businessLogicError } = await supabase.functions.invoke(
-        'comms-business-logic',
-        {
-          body: {
-            communicationId: communication.id
+      try {
+        const { data: businessLogicResponse, error: businessLogicError } = await supabase.functions.invoke(
+          'comms-business-logic',
+          {
+            body: {
+              communicationId: communication.id
+            }
           }
-        }
-      );
+        );
 
-      if (businessLogicError) {
-        console.error('Error calling business logic handler:', businessLogicError);
-        // We continue even if business logic has an error
-      } else {
-        console.log('Business logic processed communication successfully:', businessLogicResponse);
+        if (businessLogicError) {
+          console.error('Error calling business logic handler:', businessLogicError);
+          // We continue even if business logic has an error
+        } else {
+          console.log('Business logic processed communication successfully:', businessLogicResponse);
+        }
+      } catch (businessError) {
+        console.error('Exception in business logic handler:', businessError);
+        // Continue despite business logic errors
       }
 
       return new Response(
@@ -129,6 +156,7 @@ serve(async (req) => {
       );
     } catch (parseError) {
       console.error('Error parsing webhook:', parseError);
+      console.error('Error stack:', parseError.stack);
       
       // Mark the webhook as failed
       await supabase
@@ -140,7 +168,10 @@ serve(async (req) => {
         .eq('id', webhook.id);
         
       return new Response(
-        JSON.stringify({ error: `Parser error: ${parseError.message}` }),
+        JSON.stringify({ 
+          error: `Parser error: ${parseError.message}`,
+          details: parseError.stack
+        }),
         { 
           status: 422, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -149,9 +180,13 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error in normalizer:', error);
+    console.error('Error stack:', error.stack);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
