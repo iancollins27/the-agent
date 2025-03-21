@@ -36,7 +36,12 @@ const ActionRecordsTab = () => {
     try {
       const { data, error } = await supabase
         .from('action_records')
-        .select('*')
+        .select(`
+          *,
+          recipient:contacts!recipient_id(id, full_name),
+          sender:contacts!sender_ID(id, full_name),
+          projects:projects!project_id(id, crm_id)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -47,8 +52,20 @@ const ActionRecordsTab = () => {
           description: "Failed to fetch action records."
         });
       } else {
+        // Process the data to include recipient_name and sender_name
+        const processedData = data.map(record => ({
+          ...record,
+          recipient_name: record.recipient?.full_name || 
+            (record.action_payload && record.action_payload.recipient ? 
+              record.action_payload.recipient : null),
+          sender_name: record.sender?.full_name || 
+            (record.action_payload && record.action_payload.sender ? 
+              record.action_payload.sender : null),
+          project_name: record.projects?.crm_id || null
+        }));
+        
         // Cast data to ActionRecord[] type after ensuring it's compatible
-        setActions(data as unknown as ActionRecord[]);
+        setActions(processedData as unknown as ActionRecord[]);
       }
     } finally {
       setIsLoading(false);

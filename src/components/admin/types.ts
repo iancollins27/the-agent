@@ -7,7 +7,7 @@ export interface ActionRecord {
   id: string;
   project_id?: string;
   recipient_id?: string;
-  sender_ID?: string;
+  sender_ID?: string; // Note the capital ID to match database column
   approver_id?: string;
   action_type: string;
   message: string | null;
