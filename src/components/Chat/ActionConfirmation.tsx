@@ -71,6 +71,17 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
     }
   };
 
+  const renderSenderRecipient = () => {
+    if (action.sender_name && action.recipient_name) {
+      return `From ${action.sender_name} to ${action.recipient_name}`;
+    } else if (action.sender_name) {
+      return `From ${action.sender_name}`;
+    } else if (action.recipient_name) {
+      return `To ${action.recipient_name}`;
+    }
+    return '';
+  };
+
   return (
     <div className="bg-amber-50 border-y border-amber-200 p-3">
       <div className="flex items-start gap-3">
@@ -81,6 +92,11 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
             {action.action_payload.description || 
               `Update ${action.action_payload.field} to ${action.action_payload.value}`}
           </p>
+          {renderSenderRecipient() && (
+            <p className="text-xs text-amber-600 mt-1">
+              {renderSenderRecipient()}
+            </p>
+          )}
           <div className="flex gap-2 mt-2">
             <Button 
               size="sm" 

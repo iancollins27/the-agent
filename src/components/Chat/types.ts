@@ -13,6 +13,7 @@ export type ActionRecord = {
     field?: string;
     value?: string;
     recipient?: string;
+    sender?: string;
     message_content?: string;
     description: string;
     notion_token?: string;
@@ -35,4 +36,7 @@ export type ActionRecord = {
   recipient?: { id: string, full_name: string } | null;
   recipient_name?: string;
   project_name?: string;
+  sender_id?: string | null;
+  sender?: { id: string, full_name: string } | null;
+  sender_name?: string;
 };

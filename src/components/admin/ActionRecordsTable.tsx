@@ -40,7 +40,8 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
             <TableHead className="w-[150px]">Project</TableHead>
             <TableHead className="w-[200px]">Description</TableHead>
             <TableHead className="w-[150px]">Created</TableHead>
-            <TableHead className="w-[150px]">Recipient</TableHead>
+            <TableHead className="w-[150px]">From</TableHead>
+            <TableHead className="w-[150px]">To</TableHead>
             <TableHead className="max-w-[250px]">Message</TableHead>
             <TableHead className="w-[120px] text-right">Actions</TableHead>
           </TableRow>
@@ -55,6 +56,13 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
                  action.action_payload.description : 'No description provided'}
               </TableCell>
               <TableCell>{action.created_at ? formatDate(action.created_at) : 'Unknown'}</TableCell>
+              <TableCell>
+                <ActionRecordEdit 
+                  record={action}
+                  field="sender_name"
+                  onSuccess={onEditSuccess}
+                />
+              </TableCell>
               <TableCell>
                 <ActionRecordEdit 
                   record={action}

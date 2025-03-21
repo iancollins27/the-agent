@@ -49,7 +49,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         // Fetch action record details
         const { data: actionRecordData, error: actionError } = await supabase
           .from('action_records')
-          .select('*')
+          .select('*, recipient:recipient_id(*), sender:sender_id(*)')
           .eq('id', data.actionRecordId)
           .single();
           
@@ -69,7 +69,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
             execution_result: actionRecordData.execution_result,
             project_id: actionRecordData.project_id,
             prompt_run_id: actionRecordData.prompt_run_id,
-            requires_approval: actionRecordData.requires_approval
+            requires_approval: actionRecordData.requires_approval,
+            message: actionRecordData.message,
+            recipient_id: actionRecordData.recipient_id,
+            recipient: actionRecordData.recipient,
+            recipient_name: actionRecordData.recipient?.full_name || actionRecordData.action_payload?.recipient || null,
+            sender_id: actionRecordData.sender_id,
+            sender: actionRecordData.sender,
+            sender_name: actionRecordData.sender?.full_name || actionRecordData.action_payload?.sender || null
           };
           setPendingAction(actionRecord);
           setActionDialogOpen(true);

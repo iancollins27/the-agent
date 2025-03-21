@@ -23,6 +23,7 @@ export type Database = {
           prompt_run_id: string | null
           recipient_id: string | null
           requires_approval: boolean
+          sender_ID: string | null
           status: string
         }
         Insert: {
@@ -38,6 +39,7 @@ export type Database = {
           prompt_run_id?: string | null
           recipient_id?: string | null
           requires_approval?: boolean
+          sender_ID?: string | null
           status?: string
         }
         Update: {
@@ -53,6 +55,7 @@ export type Database = {
           prompt_run_id?: string | null
           recipient_id?: string | null
           requires_approval?: boolean
+          sender_ID?: string | null
           status?: string
         }
         Relationships: [
@@ -80,6 +83,13 @@ export type Database = {
           {
             foreignKeyName: "action_records_recipient_id_fkey"
             columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "action_records_sender_ID_fkey"
+            columns: ["sender_ID"]
             isOneToOne: false
             referencedRelation: "contacts"
             referencedColumns: ["id"]
@@ -238,7 +248,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
-          phone_numberer: string | null
+          phone_number: string | null
           role: Database["public"]["Enums"]["contact_role"]
         }
         Insert: {
@@ -246,7 +256,7 @@ export type Database = {
           email?: string | null
           full_name: string
           id?: string
-          phone_numberer?: string | null
+          phone_number?: string | null
           role: Database["public"]["Enums"]["contact_role"]
         }
         Update: {
@@ -254,7 +264,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
-          phone_numberer?: string | null
+          phone_number?: string | null
           role?: Database["public"]["Enums"]["contact_role"]
         }
         Relationships: []
