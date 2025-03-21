@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-justcall-api-key',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 serve(async (req) => {
@@ -14,32 +14,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify API key
-    const apiKey = req.headers.get('x-justcall-api-key');
-    const expectedApiKey = Deno.env.get('JUSTCALL_API_KEY');
-    
-    if (!expectedApiKey) {
-      console.error('JUSTCALL_API_KEY is not set in environment variables');
-      return new Response(
-        JSON.stringify({ error: 'Server configuration error' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    if (!apiKey || apiKey !== expectedApiKey) {
-      console.error('Invalid or missing API key');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -60,6 +34,9 @@ serve(async (req) => {
         }
       );
     }
+
+    // TODO: Implement JustCall signature validation if they provide one
+    // For now, we'll log the webhook and pass it to the normalizer
 
     // Save raw webhook to database
     const { data: savedWebhook, error: saveError } = await supabase
