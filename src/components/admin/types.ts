@@ -30,11 +30,7 @@ export interface ActionRecord {
     date?: string;
     [key: string]: any;
   };
-  execution_result?: {
-    success: boolean;
-    message: string;
-    [key: string]: any;
-  } | null;
+  execution_result?: Json | null; // Changed to accept any Json structure
   // UI-only properties
   recipient_name?: string;
   sender_name?: string;

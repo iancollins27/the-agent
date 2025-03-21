@@ -47,8 +47,8 @@ const ActionRecordsTab = () => {
           description: "Failed to fetch action records."
         });
       } else {
-        // Safely cast the data to ActionRecord[] since we've updated the type
-        setActions(data as ActionRecord[] || []);
+        // Cast data to ActionRecord[] type after ensuring it's compatible
+        setActions(data as unknown as ActionRecord[]);
       }
     } finally {
       setIsLoading(false);
