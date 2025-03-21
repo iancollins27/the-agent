@@ -137,26 +137,16 @@ serve(async (req) => {
         try {
           console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
           
-          // Validate role - Note we're fixing "Roofing Contractor" to "Roofer" to match enum
-          let role = contact.role;
-          if (role === "Roofing Contractor") {
-            role = "Roofer";
-          } else if (role === "Solar Sales Rep") {
-            role = "Solar";
-          }
-          
+          // Validate role
           const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
           // Check if role is valid, default to 'BidList Project Manager' if not
-          if (!validRoles.includes(role)) {
-            role = 'BidList Project Manager';
-          }
+          const role = validRoles.includes(contact.role) ? contact.role : 'BidList Project Manager';
           
           // Check if contact already exists with this email or phone number
-          // Using the correct column name 'phone_numberer' instead of 'phone_number'
           const { data: existingContacts, error: lookupError } = await supabase
             .from('contacts')
             .select('id')
-            .or(`email.eq.${contact.email},phone_numberer.eq.${contact.number}`);
+            .or(`email.eq.${contact.email},phone_number.eq.${contact.number}`);
             
           if (lookupError) {
             console.error('Error looking up existing contact:', lookupError);
@@ -170,13 +160,13 @@ serve(async (req) => {
             contactId = existingContacts[0].id;
             console.log(`Using existing contact with ID: ${contactId}`);
           } else {
-            // Create new contact with the correct column name
+            // Create new contact
             console.log(`Creating new contact: ${contact.name}`);
             const { data: newContact, error: createError } = await supabase
               .from('contacts')
               .insert({
                 full_name: contact.name,
-                phone_numberer: contact.number, // Using the correct column name
+                phone_number: contact.number,
                 email: contact.email,
                 role: role
               })
