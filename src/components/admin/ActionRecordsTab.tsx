@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,97 +26,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import { ActionRecord, Tables } from "@/integrations/supabase/types";
-
-interface ActionRecordsTableProps {
-  data: ActionRecord[];
-  rowSelection: Record<string, boolean>;
-  setRowSelection: (selection: Record<string, boolean>) => void;
-}
-
-const ActionStatusCell = ({ status }: { status: string }) => {
-  const getStatusVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'executed':
-        return {
-          variant: "outline" as const,
-          className: "bg-green-100 text-green-800 border-green-200"
-        };
-      case 'failed':
-        return {
-          variant: "destructive" as const
-        };
-      case 'pending':
-      default:
-        return {
-          variant: "outline" as const
-        };
-    }
-  };
-
-  return <Badge {...getStatusVariant(status)}>{status}</Badge>;
-};
-
-const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({ data, rowSelection, setRowSelection }) => {
-  const toggleRowSelection = (id: string) => {
-    setRowSelection(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const allRowsSelected = Object.keys(rowSelection).length > 0 && data.every(item => rowSelection[item.id]);
-
-  const toggleSelectAllRows = () => {
-    const newSelectionState = {};
-    if (allRowsSelected) {
-      data.forEach(item => newSelectionState[item.id] = false);
-    } else {
-      data.forEach(item => newSelectionState[item.id] = true);
-    }
-    setRowSelection(newSelectionState);
-  };
-
-  return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[50px]">
-              <Checkbox
-                checked={allRowsSelected}
-                onCheckedChange={toggleSelectAllRows}
-                aria-label="Select all"
-              />
-            </TableHead>
-            <TableHead>Action Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Project ID</TableHead>
-            <TableHead>Created At</TableHead>
-            <TableHead>Executed At</TableHead>
-            <TableHead>Message</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map(record => (
-            <TableRow key={record.id}>
-              <TableCell className="w-[50px]">
-                <Checkbox
-                  checked={!!rowSelection[record.id]}
-                  onCheckedChange={() => toggleRowSelection(record.id)}
-                  aria-label={`Select row ${record.id}`}
-                />
-              </TableCell>
-              <TableCell>{record.action_type}</TableCell>
-              <TableCell><ActionStatusCell status={record.status} /></TableCell>
-              <TableCell>{record.project_id}</TableCell>
-              <TableCell>{record.created_at}</TableCell>
-              <TableCell>{record.executed_at || 'N/A'}</TableCell>
-              <TableCell>{record.message || 'N/A'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
+import { Json } from "@/integrations/supabase/types";
+import { ActionRecord } from "@/components/admin/types";
+import ActionRecordsTable from "./ActionRecordsTable";
 
 const ActionRecordsTab = () => {
   const [actions, setActions] = useState<ActionRecord[]>([]);
@@ -163,6 +76,11 @@ const ActionRecordsTab = () => {
       (action.message && action.message.toLowerCase().includes(term))
     );
   });
+
+  // Fix the type issue with setRowSelection
+  const handleRowSelectionChange = (newSelection: Record<string, boolean>) => {
+    setRowSelection(newSelection);
+  };
 
   const selectedActionIds = Object.keys(rowSelection).filter(id => rowSelection[id]);
 
@@ -291,7 +209,7 @@ const ActionRecordsTab = () => {
           <ActionRecordsTable
             data={filteredActions}
             rowSelection={rowSelection}
-            setRowSelection={setRowSelection}
+            setRowSelection={handleRowSelectionChange}
           />
           <div className="flex justify-between items-center">
             <Button

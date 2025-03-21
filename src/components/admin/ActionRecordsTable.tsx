@@ -1,4 +1,4 @@
-// Just fixing the Badge variant error for action status
+
 import {
   ColumnDef,
   flexRender,
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ActionRecord } from "@/integrations/supabase/types"
+import { ActionRecord } from "@/components/admin/types"
 import { Badge } from "@/components/ui/badge"
 import { MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -67,6 +67,10 @@ export const columns: ColumnDef<ActionRecord>[] = [
       <Checkbox
         checked={
           table.getIsAllPageRowsSelected()
+            ? true
+            : table.getIsSomePageRowsSelected()
+            ? "indeterminate"
+            : false
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
