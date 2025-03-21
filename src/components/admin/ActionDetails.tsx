@@ -15,6 +15,21 @@ const ActionDetails: React.FC<ActionDetailsProps> = ({ action }) => {
     ? formatDistanceToNow(new Date(action.created_at), { addSuffix: true })
     : "Unknown";
 
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "executed":
+        return "default";
+      case "approved":
+        return "default";
+      case "rejected":
+        return "destructive";
+      case "failed":
+        return "destructive";
+      default:
+        return "secondary";
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -22,13 +37,7 @@ const ActionDetails: React.FC<ActionDetailsProps> = ({ action }) => {
           <InfoItem label="Type" value={<Badge variant="outline" className="capitalize">{action.action_type?.replace(/_/g, ' ') || 'Unknown'}</Badge>} />
           <InfoItem label="Status" value={
             <Badge 
-              variant={
-                action.status === "executed" ? "default" : 
-                action.status === "approved" ? "default" :
-                action.status === "rejected" ? "destructive" :
-                action.status === "failed" ? "destructive" :
-                "secondary"
-              }
+              variant={getStatusBadgeVariant(action.status) as any}
               className="capitalize"
             >
               {action.status}

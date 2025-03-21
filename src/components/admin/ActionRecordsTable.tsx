@@ -1,4 +1,3 @@
-
 import {
   ColumnDef,
   flexRender,
@@ -38,7 +37,6 @@ const ActionStatusCell = ({ status }: { status: string }) => {
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
       case 'executed':
-        // Change from 'success' to 'default' with custom styling
         return {
           variant: "outline" as const,
           className: "bg-green-100 text-green-800 border-green-200"
@@ -48,6 +46,17 @@ const ActionStatusCell = ({ status }: { status: string }) => {
           variant: "destructive" as const
         };
       case 'pending':
+        return {
+          variant: "outline" as const
+        };
+      case 'approved':
+        return {
+          variant: "default" as const
+        };
+      case 'rejected':
+        return {
+          variant: "destructive" as const
+        };
       default:
         return {
           variant: "outline" as const

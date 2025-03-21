@@ -11,7 +11,7 @@ export interface ActionRecord {
   approver_id?: string;
   action_type: string;
   message: string | null;
-  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
+  status: string; // Changed from union type to string to match database
   requires_approval: boolean;
   created_at: string;
   executed_at?: string | null;

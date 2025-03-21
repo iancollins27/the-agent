@@ -2,16 +2,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,7 +16,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import { Json } from "@/integrations/supabase/types";
 import { ActionRecord } from "@/components/admin/types";
 import ActionRecordsTable from "./ActionRecordsTable";
 
@@ -56,7 +45,8 @@ const ActionRecordsTab = () => {
           description: "Failed to fetch action records."
         });
       } else {
-        setActions(data || []);
+        // Safely cast the data to ActionRecord[] since we've updated the type
+        setActions(data as ActionRecord[] || []);
       }
     } finally {
       setIsLoading(false);
@@ -139,7 +129,7 @@ const ActionRecordsTab = () => {
           fetchActions();
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error executing action:", err);
       toast({
         variant: "destructive",
