@@ -1,4 +1,5 @@
 
+
 # Process Contacts Webhook
 
 This edge function processes a webhook payload containing contacts for a new or existing project.
@@ -53,10 +54,10 @@ The function can also accept form-encoded data with either:
 
 ## Valid Roles
 
-- "Roofer" - For roofing contractors
+- "Roofer" - For roofing contractors (automatically converts "Roofing Contractor" to "Roofer")
 - "HO" - For homeowners
 - "BidList Project Manager" - For BidList staff
-- "Solar" - For solar sales representatives
+- "Solar" - For solar sales representatives (automatically converts "Solar Sales Rep" to "Solar")
 
 ## Notes for Zoho Integration
 
@@ -67,3 +68,4 @@ When calling from Zoho, make sure to:
 3. If using JSON format, send with Content-Type: `application/json`
 4. If using form data, make sure to properly structure the contacts data
 5. **Important**: Remove any test URL overrides in your Zoho code
+
