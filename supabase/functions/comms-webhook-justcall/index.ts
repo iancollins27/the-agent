@@ -9,6 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-justcall-signature, x-justcall-request-timestamp',
 };
 
+// This makes the function publicly accessible without authentication
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
