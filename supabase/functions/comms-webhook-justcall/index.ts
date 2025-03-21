@@ -15,27 +15,50 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Reject non-POST requests
+  if (req.method !== 'POST') {
+    console.log(`Received ${req.method} request, expected POST`);
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { 
+        status: 405, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+
   try {
+    // Log all headers for debugging
+    const headersObj = {};
+    req.headers.forEach((value, key) => {
+      headersObj[key] = value;
+    });
+    console.log('Received headers:', headersObj);
+    
     // Extract JustCall signature headers
     const justcallSignature = req.headers.get('x-justcall-signature');
     const justcallTimestamp = req.headers.get('x-justcall-request-timestamp');
 
-    // Validate required headers
+    // Clone request to get the raw body (since we need to read it twice)
+    const clonedReq = req.clone();
+    const rawBody = await clonedReq.text();
+    console.log('Received raw body:', rawBody.substring(0, 500) + (rawBody.length > 500 ? '...' : ''));
+
+    // First handle verification requests (no signature headers)
     if (!justcallSignature || !justcallTimestamp) {
-      console.error('Missing required JustCall signature headers');
+      console.log('Received verification request (no signature headers)');
       return new Response(
-        JSON.stringify({ error: 'Missing signature headers' }),
+        JSON.stringify({ status: 'verification ok' }),
         { 
-          status: 401, 
+          status: 200, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
     }
 
-    // Clone request to get the raw body (since we need to read it twice)
-    const clonedReq = req.clone();
-    const rawBody = await clonedReq.text();
-
+    // For requests with signature headers, validate them
+    console.log('Validating webhook signature...');
+    
     // Check for timestamp validity (prevent replay attacks)
     const timestampMs = parseInt(justcallTimestamp);
     const currentTime = Date.now();
@@ -111,12 +134,12 @@ serve(async (req) => {
     // Parse the webhook body for processing
     let requestBody;
     try {
-      requestBody = JSON.parse(rawBody);
-      console.log('Received JustCall webhook:', JSON.stringify(requestBody, null, 2));
+      requestBody = rawBody ? JSON.parse(rawBody) : {};
+      console.log('Processed webhook payload:', JSON.stringify(requestBody, null, 2).substring(0, 500) + '...');
     } catch (error) {
       console.error('Error parsing webhook payload:', error);
       return new Response(
-        JSON.stringify({ error: 'Invalid JSON' }),
+        JSON.stringify({ error: 'Invalid JSON', status: 'error' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -135,7 +158,7 @@ serve(async (req) => {
       .from('raw_comms_webhooks')
       .insert({
         service_name: 'justcall',
-        webhook_id: requestBody.webhook_id || requestBody.call_id || requestBody.message_id,
+        webhook_id: requestBody.webhook_id || requestBody.call_id || requestBody.message_id || 'verification_test',
         raw_payload: requestBody,
       })
       .select()
@@ -168,7 +191,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, webhook_id: savedWebhook.id }),
+      JSON.stringify({ status: 'webhook received', success: true, webhook_id: savedWebhook.id }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
@@ -177,7 +200,7 @@ serve(async (req) => {
     console.error('Error processing JustCall webhook:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, status: 'error' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
