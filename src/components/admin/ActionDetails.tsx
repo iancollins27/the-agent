@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { formatDistanceToNow } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { ActionRecord } from './types';
 
 interface ActionDetailsProps {
@@ -11,9 +11,18 @@ interface ActionDetailsProps {
 }
 
 const ActionDetails: React.FC<ActionDetailsProps> = ({ action }) => {
-  const timestamp = action.created_at 
-    ? formatDistanceToNow(new Date(action.created_at), { addSuffix: true })
-    : "Unknown";
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "Unknown";
+    try {
+      const date = parseISO(dateString);
+      if (!isValid(date)) return 'Unknown';
+      return format(date, 'MMM d, yyyy h:mm a');
+    } catch (error) {
+      return 'Unknown';
+    }
+  };
+
+  const timestamp = formatDate(action.created_at);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {

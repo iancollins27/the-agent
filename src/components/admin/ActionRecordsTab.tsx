@@ -28,6 +28,8 @@ const ActionRecordsTab = () => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [selectedAction, setSelectedAction] = useState<ActionRecord | null>(null);
   const [executionNotes, setExecutionNotes] = useState("");
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
   const fetchActions = useCallback(async () => {
     setIsLoading(true);
@@ -63,7 +65,9 @@ const ActionRecordsTab = () => {
       action.action_type.toLowerCase().includes(term) ||
       (action.status && action.status.toLowerCase().includes(term)) ||
       (action.project_id && action.project_id.toLowerCase().includes(term)) ||
-      (action.message && action.message.toLowerCase().includes(term))
+      (action.message && action.message.toLowerCase().includes(term)) ||
+      (action.sender_name && action.sender_name.toLowerCase().includes(term)) ||
+      (action.recipient_name && action.recipient_name.toLowerCase().includes(term))
     );
   });
 
@@ -76,6 +80,71 @@ const ActionRecordsTab = () => {
 
   const handleExecuteAction = async (record: ActionRecord) => {
     setSelectedAction(record);
+  };
+
+  const handleApproveAction = async (action: ActionRecord) => {
+    setIsApproving(true);
+    try {
+      const { error } = await supabase
+        .from('action_records')
+        .update({
+          status: 'approved',
+          executed_at: new Date().toISOString()
+        })
+        .eq('id', action.id);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Action Approved",
+        description: "The action has been approved successfully."
+      });
+
+      fetchActions();
+    } catch (err: any) {
+      console.error("Error approving action:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to approve action: ${err.message}`
+      });
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleRejectAction = async (action: ActionRecord) => {
+    setIsRejecting(true);
+    try {
+      const { error } = await supabase
+        .from('action_records')
+        .update({
+          status: 'rejected'
+        })
+        .eq('id', action.id);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Action Rejected",
+        description: "The action has been rejected successfully."
+      });
+
+      fetchActions();
+    } catch (err: any) {
+      console.error("Error rejecting action:", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to reject action: ${err.message}`
+      });
+    } finally {
+      setIsRejecting(false);
+    }
   };
 
   const confirmExecuteAction = async () => {
@@ -200,6 +269,8 @@ const ActionRecordsTab = () => {
             data={filteredActions}
             rowSelection={rowSelection}
             setRowSelection={handleRowSelectionChange}
+            onApprove={handleApproveAction}
+            onReject={handleRejectAction}
           />
           <div className="flex justify-between items-center">
             <Button

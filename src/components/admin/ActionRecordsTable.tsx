@@ -1,3 +1,4 @@
+
 import {
   ColumnDef,
   flexRender,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/table"
 import { ActionRecord } from "@/components/admin/types"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal } from "lucide-react"
+import { Check, X, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -25,12 +26,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState } from "react"
+import { format, isValid, parseISO } from "date-fns"
 
 interface ActionRecordsTableProps {
   data: ActionRecord[]
   rowSelection: any
   setRowSelection: (rowSelection: any) => void
+  onApprove?: (action: ActionRecord) => void
+  onReject?: (action: ActionRecord) => void
 }
 
 const ActionStatusCell = ({ status }: { status: string }) => {
@@ -69,84 +72,142 @@ const ActionStatusCell = ({ status }: { status: string }) => {
   return <Badge {...statusVariant}>{status}</Badge>;
 };
 
-export const columns: ColumnDef<ActionRecord>[] = [
-  {
-    id: "select",
-    header: ({ table }) => (
-      <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected()
-            ? true
-            : table.getIsSomePageRowsSelected()
-            ? "indeterminate"
-            : false
-        }
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-        className="translate-y-[2px]"
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-        className="translate-y-[2px]"
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "created_at",
-    header: "Created At",
-  },
-  {
-    accessorKey: "action_type",
-    header: "Action Type",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <ActionStatusCell status={row.original.status} />
-    ),
-  },
-  {
-    accessorKey: "message",
-    header: "Message",
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    cell: ({ row }) => {
-      const action = row.original
+const formatDate = (dateString: string) => {
+  try {
+    const date = parseISO(dateString);
+    if (!isValid(date)) return 'Invalid date';
+    return format(date, 'MMM d, yyyy h:mm a');
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
 
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(action.id)}
-            >
-              Copy action ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>View details</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({ 
+  data, 
+  rowSelection, 
+  setRowSelection,
+  onApprove,
+  onReject
+}) => {
+  const columns: ColumnDef<ActionRecord>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+              ? "indeterminate"
+              : false
+          }
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="translate-y-[2px]"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="translate-y-[2px]"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "created_at",
+      header: "Created At",
+      cell: ({ row }) => formatDate(row.original.created_at)
+    },
+    {
+      accessorKey: "action_type",
+      header: "Action Type",
+      cell: ({ row }) => (
+        <span className="capitalize">{row.original.action_type.replace(/_/g, ' ')}</span>
       )
     },
-  },
-]
+    {
+      accessorKey: "sender_name",
+      header: "Sender",
+      cell: ({ row }) => row.original.sender_name || 'System'
+    },
+    {
+      accessorKey: "recipient_name",
+      header: "Recipient",
+      cell: ({ row }) => row.original.recipient_name || 'N/A'
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <ActionStatusCell status={row.original.status} />
+      ),
+    },
+    {
+      accessorKey: "message",
+      header: "Message",
+      cell: ({ row }) => (
+        <div className="max-w-xs truncate">
+          {row.original.message || 'No message'}
+        </div>
+      )
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const action = row.original;
+        const isPending = action.status.toLowerCase() === 'pending';
 
-const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({ data, rowSelection, setRowSelection }) => {
+        return (
+          <div className="flex gap-2">
+            {isPending && onApprove && onReject && (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-green-50 text-green-600 border-green-200 hover:bg-green-100 hover:text-green-700"
+                  onClick={() => onApprove(action)}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-700"
+                  onClick={() => onReject(action)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => navigator.clipboard.writeText(action.id)}
+                >
+                  Copy action ID
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>View details</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      },
+    },
+  ];
+
   const table = useReactTable({
     data,
     columns,
