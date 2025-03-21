@@ -44,14 +44,24 @@ const ActionRecordsTab = () => {
       
       // Properly cast the data to match our ActionRecord type
       return data.map(record => {
-        const result = {
+        const actionPayload = typeof record.action_payload === 'object' ? record.action_payload : {};
+        const executionResult = record.execution_result 
+          ? {
+              success: Boolean(record.execution_result.success),
+              message: String(record.execution_result.message || ''),
+              ...record.execution_result
+            }
+          : null;
+          
+        return {
           ...record,
+          action_payload: actionPayload,
+          execution_result: executionResult,
           project_name: record.projects?.crm_id || 'Unknown Project',
           recipient_name: record.recipient?.full_name || 
-                        (record.action_payload && typeof record.action_payload === 'object' && 'recipient' in record.action_payload ? 
-                        String(record.action_payload.recipient) : 'No Recipient')
-        };
-        return result as unknown as ActionRecord;
+                        (actionPayload && 'recipient' in actionPayload ? 
+                        String(actionPayload.recipient) : 'No Recipient')
+        } as ActionRecord;
       });
     },
   });

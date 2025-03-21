@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable } from "@tanstack/react-table";
+import { 
+  ColumnDef, 
+  ColumnFiltersState,
+  SortingState, 
+  VisibilityState,
+  flexRender, 
+  getCoreRowModel, 
+  getFilteredRowModel, 
+  getPaginationRowModel, 
+  getSortedRowModel, 
+  useReactTable 
+} from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ActionDetails from "./ActionDetails";
+import { ActionRecord } from "./types";
 
 export const columns: ColumnDef<ActionRecord>[] = [
   {
@@ -18,7 +30,7 @@ export const columns: ColumnDef<ActionRecord>[] = [
       <Checkbox
         checked={
           table.getIsAllPageRowsSelected() || 
-          (table.getIsSomePageRowsSelected() ? "indeterminate" : false)
+          (table.getIsSomePageRowsSelected() && "indeterminate")
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
@@ -307,5 +319,3 @@ export function ActionRecordsTable({ data }: ActionRecordsTableProps) {
     </div>
   );
 }
-
-export { ActionRecordsTable };
