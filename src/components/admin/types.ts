@@ -1,4 +1,3 @@
-
 import { Database } from "@/integrations/supabase/types";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -15,27 +14,13 @@ export interface ActionRecord {
   requires_approval: boolean;
   created_at: string;
   executed_at?: string | null;
-  action_payload: {
-    description?: string;
-    field?: string;
-    value?: string;
-    recipient?: string;
-    sender?: string;
-    message_content?: string;
-    notion_token?: string;
-    notion_database_id?: string;
-    notion_page_id?: string;
-    days_until_check?: number;
-    check_reason?: string;
-    date?: string;
-    [key: string]: any;
-  };
+  action_payload: Json;
   execution_result?: Json | null; // Changed to accept any Json structure
   // UI-only properties
-  recipient_name?: string;
-  sender_name?: string;
+  recipient_name?: string | null;
+  sender_name?: string | null;
   approver_name?: string;
-  project_name?: string;
+  project_name?: string | null;
   recipient?: { id: string; full_name: string } | null;
   sender?: { id: string; full_name: string } | null;
   projects?: { id: string; crm_id: string } | null;

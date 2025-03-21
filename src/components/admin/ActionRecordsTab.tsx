@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { ActionRecord } from "@/components/admin/types";
 import ActionRecordsTable from "./ActionRecordsTable";
+import { Json } from "@/integrations/supabase/types";
 
 type JoinedActionRecord = {
   id: string;
@@ -30,22 +31,8 @@ type JoinedActionRecord = {
   requires_approval: boolean;
   created_at: string;
   executed_at?: string | null;
-  action_payload: {
-    description?: string;
-    field?: string;
-    value?: string;
-    recipient?: string;
-    sender?: string;
-    message_content?: string;
-    notion_token?: string;
-    notion_database_id?: string;
-    notion_page_id?: string;
-    days_until_check?: number;
-    check_reason?: string;
-    date?: string;
-    [key: string]: any;
-  };
-  execution_result?: any | null;
+  action_payload: Json;
+  execution_result?: Json | null;
   recipient?: { id: string; full_name: string } | null;
   sender?: { id: string; full_name: string } | null;
   projects?: { id: string; crm_id: string } | null;
@@ -84,16 +71,22 @@ const ActionRecordsTab = () => {
           description: "Failed to fetch action records."
         });
       } else {
-        const processedData = data.map((record: JoinedActionRecord) => ({
-          ...record,
-          recipient_name: record.recipient?.full_name || 
-            (record.action_payload && typeof record.action_payload === 'object' && 'recipient' in record.action_payload ? 
-              record.action_payload.recipient : null),
-          sender_name: record.sender?.full_name || 
-            (record.action_payload && typeof record.action_payload === 'object' && 'sender' in record.action_payload ? 
-              record.action_payload.sender : null),
-          project_name: record.projects?.crm_id || null
-        }));
+        const processedData = data.map((record: JoinedActionRecord) => {
+          const actionPayload = typeof record.action_payload === 'object' && record.action_payload !== null 
+            ? record.action_payload 
+            : {};
+            
+          return {
+            ...record,
+            recipient_name: record.recipient?.full_name || 
+              (actionPayload && 'recipient' in actionPayload ? 
+                actionPayload.recipient as string : null),
+            sender_name: record.sender?.full_name || 
+              (actionPayload && 'sender' in actionPayload ? 
+                actionPayload.sender as string : null),
+            project_name: record.projects?.crm_id || null
+          };
+        });
         
         setActions(processedData as unknown as ActionRecord[]);
       }

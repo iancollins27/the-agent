@@ -9,21 +9,7 @@ export type Message = {
 export type ActionRecord = {
   id: string;
   action_type: string;
-  action_payload: {
-    field?: string;
-    value?: string;
-    recipient?: string;
-    sender?: string;
-    message_content?: string;
-    description?: string;
-    notion_token?: string;
-    notion_database_id?: string;
-    notion_page_id?: string;
-    days_until_check?: number;
-    check_reason?: string;
-    date?: string;
-    [key: string]: any;
-  };
+  action_payload: Json;
   status: string;
   approver_id?: string | null;
   created_at?: string;
@@ -35,9 +21,9 @@ export type ActionRecord = {
   message?: string | null;
   recipient_id?: string | null;
   recipient?: { id: string, full_name: string } | null;
-  recipient_name?: string;
-  project_name?: string;
+  recipient_name?: string | null;
+  project_name?: string | null;
   sender_ID?: string | null; // Note the capitalized ID to match the database column
   sender?: { id: string, full_name: string } | null;
-  sender_name?: string;
+  sender_name?: string | null;
 };
