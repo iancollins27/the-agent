@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +17,39 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 import { ActionRecord } from "@/components/admin/types";
 import ActionRecordsTable from "./ActionRecordsTable";
+
+type JoinedActionRecord = {
+  id: string;
+  project_id?: string;
+  recipient_id?: string;
+  sender_ID?: string;
+  approver_id?: string;
+  action_type: string;
+  message: string | null;
+  status: string;
+  requires_approval: boolean;
+  created_at: string;
+  executed_at?: string | null;
+  action_payload: {
+    description?: string;
+    field?: string;
+    value?: string;
+    recipient?: string;
+    sender?: string;
+    message_content?: string;
+    notion_token?: string;
+    notion_database_id?: string;
+    notion_page_id?: string;
+    days_until_check?: number;
+    check_reason?: string;
+    date?: string;
+    [key: string]: any;
+  };
+  execution_result?: any | null;
+  recipient?: { id: string; full_name: string } | null;
+  sender?: { id: string; full_name: string } | null;
+  projects?: { id: string; crm_id: string } | null;
+}
 
 const ActionRecordsTab = () => {
   const [actions, setActions] = useState<ActionRecord[]>([]);
@@ -52,19 +84,17 @@ const ActionRecordsTab = () => {
           description: "Failed to fetch action records."
         });
       } else {
-        // Process the data to include recipient_name and sender_name
-        const processedData = data.map(record => ({
+        const processedData = data.map((record: JoinedActionRecord) => ({
           ...record,
           recipient_name: record.recipient?.full_name || 
-            (record.action_payload && record.action_payload.recipient ? 
+            (record.action_payload && typeof record.action_payload === 'object' && 'recipient' in record.action_payload ? 
               record.action_payload.recipient : null),
           sender_name: record.sender?.full_name || 
-            (record.action_payload && record.action_payload.sender ? 
+            (record.action_payload && typeof record.action_payload === 'object' && 'sender' in record.action_payload ? 
               record.action_payload.sender : null),
           project_name: record.projects?.crm_id || null
         }));
         
-        // Cast data to ActionRecord[] type after ensuring it's compatible
         setActions(processedData as unknown as ActionRecord[]);
       }
     } finally {
@@ -88,7 +118,6 @@ const ActionRecordsTab = () => {
     );
   });
 
-  // Fix the type issue with setRowSelection
   const handleRowSelectionChange = (newSelection: Record<string, boolean>) => {
     setRowSelection(newSelection);
   };
