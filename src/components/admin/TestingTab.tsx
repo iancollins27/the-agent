@@ -59,7 +59,7 @@ const TestingTab = () => {
             company_id,
             project_track,
             companies(name),
-            project_tracks(name, description, Roles)
+            project_tracks(name, "track base prompt", Roles)
           `)
           .eq('id', projectId)
           .single();
@@ -72,7 +72,7 @@ const TestingTab = () => {
           next_step: projectData.next_step || '',
           company_name: projectData.companies?.name || 'Unknown Company',
           track_name: projectData.project_tracks?.name || 'Default Track',
-          track_description: projectData.project_tracks?.description || '',
+          track_base_prompt: projectData.project_tracks?.["track base prompt"] || '',
           track_roles: projectData.project_tracks?.Roles || '',
           current_date: new Date().toISOString().split('T')[0],
           milestone_instructions: '',
