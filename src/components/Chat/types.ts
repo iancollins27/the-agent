@@ -36,7 +36,7 @@ export type ActionRecord = {
   recipient?: { id: string, full_name: string } | null;
   recipient_name?: string;
   project_name?: string;
-  sender_id?: string | null;
+  sender_ID?: string | null; // Note the capitalized ID to match the database column
   sender?: { id: string, full_name: string } | null;
   sender_name?: string;
 };

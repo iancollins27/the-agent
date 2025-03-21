@@ -46,10 +46,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
       if (data.actionRecordId) {
         console.log('Action record created:', data.actionRecordId);
         
-        // Fetch action record details
+        // Fetch action record details with explicit specification of relationships
         const { data: actionRecordData, error: actionError } = await supabase
           .from('action_records')
-          .select('*, recipient:recipient_id(*), sender:sender_id(*)')
+          .select(`
+            *,
+            recipient:recipient_id(id, full_name),
+            sender:sender_ID(id, full_name)
+          `)
           .eq('id', data.actionRecordId)
           .single();
           
@@ -57,27 +61,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           console.error('Error fetching action record:', actionError);
         } else if (actionRecordData) {
           console.log('Fetched action record:', actionRecordData);
+          
           // Convert the database record to our ActionRecord type
           const actionRecord: ActionRecord = {
-            id: actionRecordData.id,
-            action_type: actionRecordData.action_type,
-            action_payload: actionRecordData.action_payload as ActionRecord['action_payload'],
-            status: actionRecordData.status,
-            approver_id: actionRecordData.approver_id,
-            created_at: actionRecordData.created_at,
-            executed_at: actionRecordData.executed_at,
-            execution_result: actionRecordData.execution_result,
-            project_id: actionRecordData.project_id,
-            prompt_run_id: actionRecordData.prompt_run_id,
-            requires_approval: actionRecordData.requires_approval,
-            message: actionRecordData.message,
-            recipient_id: actionRecordData.recipient_id,
-            recipient: actionRecordData.recipient,
-            recipient_name: actionRecordData.recipient?.full_name || actionRecordData.action_payload?.recipient || null,
-            sender_id: actionRecordData.sender_id,
-            sender: actionRecordData.sender,
-            sender_name: actionRecordData.sender?.full_name || actionRecordData.action_payload?.sender || null
+            ...actionRecordData,
+            recipient_name: actionRecordData.recipient?.full_name || 
+              (actionRecordData.action_payload && typeof actionRecordData.action_payload === 'object' ? 
+                actionRecordData.action_payload.recipient : null),
+            sender_name: actionRecordData.sender?.full_name || 
+              (actionRecordData.action_payload && typeof actionRecordData.action_payload === 'object' ? 
+                actionRecordData.action_payload.sender : null)
           };
+          
           setPendingAction(actionRecord);
           setActionDialogOpen(true);
         }
