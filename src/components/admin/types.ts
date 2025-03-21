@@ -1,43 +1,64 @@
 
+import { Database } from "@/integrations/supabase/types";
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export interface ActionRecord {
+  id: string;
+  project_id?: string;
+  recipient_id?: string;
+  sender_ID?: string;
+  approver_id?: string;
+  action_type: string;
+  message: string;
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
+  requires_approval: boolean;
+  created_at: string;
+  executed_at?: string;
+  action_payload: {
+    description?: string;
+    field?: string;
+    value?: string;
+    recipient?: string;
+    sender?: string;
+    message_content?: string;
+    notion_token?: string;
+    notion_database_id?: string;
+    notion_page_id?: string;
+    days_until_check?: number;
+    check_reason?: string;
+    date?: string;
+    [key: string]: any;
+  };
+  execution_result?: {
+    success: boolean;
+    message: string;
+    [key: string]: any;
+  };
+  // UI-only properties
+  recipient_name?: string;
+  sender_name?: string;
+  approver_name?: string;
+  project_name?: string;
+  recipient?: { id: string; full_name: string };
+  sender?: { id: string; full_name: string };
+}
+
 export type PromptRun = {
   id: string;
-  project_id: string | null;
-  workflow_prompt_id: string | null;
-  prompt_input: string;
-  prompt_output: string | null;
-  feedback_description: string | null;
-  feedback_tags: string[] | null;
-  feedback_rating: number | null;
-  status: string;
+  project_id: string;
+  workflow_type: string;
+  prompt_text: string;
+  result: string;
   created_at: string;
-  completed_at: string | null;
-  error_message: string | null;
+  status: 'success' | 'error' | 'pending';
+  error_message?: string;
+  rating?: number;
+  feedback?: string;
+  ai_provider?: string;
+  model?: string;
   project_name?: string;
-  workflow_prompt_type?: string;
-  ai_provider?: string | null;
-  ai_model?: string | null;
-  initiated_by?: string | null;
+  action_record_id?: string;
 };
 
-export type ActionRecord = {
-  id: string;
-  prompt_run_id: string;
-  project_id: string;
-  action_type: 'message' | 'data_update' | 'request_for_data_update';
-  action_payload: Record<string, any>;
-  created_at: string;
-  executed_at: string | null;
-  approver_id: string | null;
-  requires_approval: boolean;
-  execution_result: Record<string, any> | null;
-  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
-  project_name?: string;
-  approver_name?: string;
-  message?: string | null;
-  recipient_id?: string | null;
-  recipient?: { id: string, full_name: string } | null;
-  recipient_name?: string;
-  sender_ID?: string | null; // Note the capitalized ID to match the database column
-  sender?: { id: string, full_name: string } | null;
-  sender_name?: string;
-};
+export type TimeFilterOption = 'all' | 'today' | 'week' | 'month';

@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useTimeFilter } from '@/hooks/useTimeFilter';
 import TimeFilterSelect from './TimeFilterSelect';
-import ActionRecordsTable from './ActionRecordsTable';
+import { ActionRecordsTable } from './ActionRecordsTable';
 import EmptyStateMessage from './EmptyStateMessage';
 
 const ActionRecordsTab = () => {
@@ -150,12 +150,7 @@ const ActionRecordsTab = () => {
             `in the ${getTimeFilterLabel(timeFilter).toLowerCase()}` : ''}.`} 
         />
       ) : (
-        <ActionRecordsTable 
-          actionRecords={actionRecords}
-          processingAction={processingAction}
-          onApprove={handleApprove}
-          onEditSuccess={handleEditSuccess}
-        />
+        <ActionRecordsTable data={actionRecords} />
       )}
     </div>
   );

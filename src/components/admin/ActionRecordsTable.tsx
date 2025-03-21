@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   ColumnDef,
@@ -33,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ActionRecord } from "@/components/Chat/types";
+import { ActionRecord } from "./types";
 import { formatDistanceToNow } from "date-fns";
 import { 
   Dialog, 
@@ -115,7 +116,7 @@ export const columns: ColumnDef<ActionRecord>[] = [
       return (
         <Badge 
           variant={
-            status === "executed" ? "success" : 
+            status === "executed" ? "default" : 
             status === "approved" ? "default" :
             status === "rejected" ? "destructive" :
             status === "failed" ? "destructive" :

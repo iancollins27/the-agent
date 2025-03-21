@@ -51,7 +51,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           .from('action_records')
           .select(`
             *,
-            recipient:recipient_id(id, full_name),
+            recipient:contacts!recipient_id(id, full_name),
             sender:sender_ID(id, full_name)
           `)
           .eq('id', data.actionRecordId)
@@ -63,30 +63,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
           console.log('Fetched action record:', actionRecordData);
           
           // Convert the database record to our ActionRecord type
-          const actionPayload = typeof actionRecordData.action_payload === 'object' 
+          const payload = typeof actionRecordData.action_payload === 'object' 
             ? actionRecordData.action_payload 
             : {};
             
           const actionRecord: ActionRecord = {
-            ...actionRecordData,
+            id: actionRecordData.id,
+            action_type: actionRecordData.action_type,
+            message: actionRecordData.message,
+            status: actionRecordData.status,
+            requires_approval: actionRecordData.requires_approval,
+            created_at: actionRecordData.created_at,
+            executed_at: actionRecordData.executed_at,
+            project_id: actionRecordData.project_id,
+            recipient_id: actionRecordData.recipient_id,
+            sender_ID: actionRecordData.sender_ID,
+            approver_id: actionRecordData.approver_id,
             action_payload: {
-              description: actionPayload.description || '',
-              field: actionPayload.field,
-              value: actionPayload.value,
-              recipient: actionPayload.recipient,
-              sender: actionPayload.sender,
-              message_content: actionPayload.message_content,
-              notion_token: actionPayload.notion_token,
-              notion_database_id: actionPayload.notion_database_id,
-              notion_page_id: actionPayload.notion_page_id,
-              days_until_check: actionPayload.days_until_check,
-              check_reason: actionPayload.check_reason,
-              date: actionPayload.date
+              description: payload.description || '',
+              field: payload.field || '',
+              value: payload.value || '',
+              recipient: payload.recipient || '',
+              sender: payload.sender || '',
+              message_content: payload.message_content || '',
+              notion_token: payload.notion_token || '',
+              notion_database_id: payload.notion_database_id || '',
+              notion_page_id: payload.notion_page_id || '',
+              days_until_check: payload.days_until_check || 0,
+              check_reason: payload.check_reason || '',
+              date: payload.date || ''
             },
+            execution_result: actionRecordData.execution_result,
             recipient_name: actionRecordData.recipient?.full_name || 
-              (typeof actionPayload === 'object' ? actionPayload.recipient : null),
+              (typeof payload === 'object' && payload ? payload.recipient : ''),
             sender_name: actionRecordData.sender?.full_name || 
-              (typeof actionPayload === 'object' ? actionPayload.sender : null)
+              (typeof payload === 'object' && payload ? payload.sender : '')
           };
           
           setPendingAction(actionRecord);
