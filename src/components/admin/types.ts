@@ -42,7 +42,10 @@ export interface ActionRecord {
   project_name?: string;
   recipient?: { id: string; full_name: string } | null;
   sender?: { id: string; full_name: string } | null;
+  projects?: { id: string; crm_id: string } | null;
 }
+
+export type TimeFilterOption = 'all' | 'today' | 'week' | 'month';
 
 export type PromptRun = {
   id: string;
@@ -61,6 +64,7 @@ export type PromptRun = {
   ai_model?: string | null;
   project_name?: string;
   action_record_id?: string;
+  workflow_prompt_id?: string | null;
   workflow_prompt_type?: string;
   feedback_rating?: number | null;
   feedback_description?: string | null;
@@ -68,5 +72,3 @@ export type PromptRun = {
   completed_at?: string | null;
   initiated_by?: string;
 };
-
-export type TimeFilterOption = 'all' | 'today' | 'week' | 'month';

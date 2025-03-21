@@ -82,17 +82,21 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
     );
   }
 
-  // Convert the action record to our expected format (for backward compatibility)
+  // Convert the action record to our expected format
   const actionRecord = actionData ? {
     ...actionData,
     action_payload: typeof actionData.action_payload === 'object' ? actionData.action_payload : {},
-    execution_result: typeof actionData.execution_result === 'object' ? 
-      {
-        success: Boolean(actionData.execution_result?.success),
-        message: String(actionData.execution_result?.message || ''),
-        ...actionData.execution_result
-      } : null
-  } as unknown as ActionRecord : null;
+    execution_result: actionData.execution_result ? (
+      typeof actionData.execution_result === 'object' ? {
+        success: Boolean('success' in actionData.execution_result ? actionData.execution_result.success : false),
+        message: String('message' in actionData.execution_result ? actionData.execution_result.message || '' : ''),
+        ...(Array.isArray(actionData.execution_result) ? {} : actionData.execution_result)
+      } : {
+        success: false,
+        message: String(actionData.execution_result || '')
+      }
+    ) : null
+  } as ActionRecord : null;
 
   return (
     <div>

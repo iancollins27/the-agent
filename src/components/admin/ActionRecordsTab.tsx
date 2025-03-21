@@ -45,13 +45,29 @@ const ActionRecordsTab = () => {
       // Properly cast the data to match our ActionRecord type
       return data.map(record => {
         const actionPayload = typeof record.action_payload === 'object' ? record.action_payload : {};
-        const executionResult = record.execution_result 
-          ? {
-              success: Boolean(record.execution_result.success),
-              message: String(record.execution_result.message || ''),
-              ...record.execution_result
-            }
-          : null;
+        
+        // Safely handle execution_result which might be null or various types
+        let executionResult = null;
+        if (record.execution_result) {
+          // Check if execution_result is an object before accessing properties
+          if (typeof record.execution_result === 'object') {
+            const success = 'success' in record.execution_result ? Boolean(record.execution_result.success) : false;
+            const message = 'message' in record.execution_result ? String(record.execution_result.message || '') : '';
+            
+            executionResult = {
+              success,
+              message,
+              // Only spread if it's a non-array object
+              ...(Array.isArray(record.execution_result) ? {} : record.execution_result)
+            };
+          } else {
+            // If it's not an object, create a default structure
+            executionResult = {
+              success: false,
+              message: String(record.execution_result || '')
+            };
+          }
+        }
           
         return {
           ...record,
