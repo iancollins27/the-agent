@@ -1,3 +1,4 @@
+
 import { BATCH_CONFIG } from "../utils/config.ts";
 
 /**
@@ -29,6 +30,7 @@ export async function shouldBatchMessage(supabase: any, communication: any, proj
   if (batchStatus) {
     // There's already a batch in progress
     console.log('Found existing batch in progress:', batchStatus.id);
+    console.log('Scheduled processing time:', batchStatus.scheduled_processing_time);
     
     // Check if we've reached the maximum batch size
     const { count, error: countError } = await supabase
@@ -103,14 +105,18 @@ export async function markMessageForBatch(supabase: any, communicationId: string
   
   if (existingBatch) {
     batchId = existingBatch.id;
+    console.log(`Using existing batch ${batchId} for project ${projectId}`);
   } else {
     // Create a new batch
+    const scheduledTime = new Date(Date.now() + BATCH_CONFIG.TIME_WINDOW_MINUTES * 60 * 1000);
+    console.log(`Creating new batch for project ${projectId} with scheduled processing at ${scheduledTime.toISOString()}`);
+    
     const { data: newBatch, error: createError } = await supabase
       .from('comms_batch_status')
       .insert({
         project_id: projectId,
         batch_status: 'in_progress',
-        scheduled_processing_time: new Date(Date.now() + BATCH_CONFIG.TIME_WINDOW_MINUTES * 60 * 1000).toISOString()
+        scheduled_processing_time: scheduledTime.toISOString()
       })
       .select()
       .single();
@@ -121,6 +127,7 @@ export async function markMessageForBatch(supabase: any, communicationId: string
     }
     
     batchId = newBatch.id;
+    console.log(`Created new batch ${batchId} for project ${projectId}`);
   }
   
   // Update the communication to mark it as part of the batch
@@ -131,5 +138,7 @@ export async function markMessageForBatch(supabase: any, communicationId: string
     
   if (updateError) {
     console.error('Error marking message for batch:', updateError);
+  } else {
+    console.log(`Added communication ${communicationId} to batch ${batchId}`);
   }
 }

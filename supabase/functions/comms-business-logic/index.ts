@@ -16,6 +16,7 @@ import {
   processMultiProjectCommunication, 
   processMultiProjectMessages 
 } from "./services/multiProjectProcessor.ts";
+import { processDueBatches } from "./services/batchProcessor.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -29,9 +30,28 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Check for any due batches and process them first
+    // We do this on every invocation to ensure batches don't get "stuck"
+    const processedBatches = await processDueBatches(supabase);
+    console.log(`Processed ${processedBatches} due batches during function invocation`);
+    
     // Get request body
     const requestBody = await req.json();
-    const { communicationId } = requestBody;
+    const { communicationId, processBatchesOnly } = requestBody;
+
+    // If this is just a batch processing request, return early
+    if (processBatchesOnly) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          processed_batches: processedBatches,
+          message: "Processed due batches successfully"
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
     if (!communicationId) {
       return new Response(
@@ -91,7 +111,19 @@ serve(async (req) => {
     const isMultiProjectCommunication = await isPotentialMultiProjectComm(supabase, communication);
     console.log(`Is potential multi-project communication: ${isMultiProjectCommunication}`);
     
-    // If we have a project_id, determine if we should process this communication now or batch it
+    if (isMultiProjectCommunication) {
+      // Update the communication to mark it as multi-project
+      const { error: updateError } = await supabase
+        .from('communications')
+        .update({ multi_project_potential: true })
+        .eq('id', communicationId);
+        
+      if (updateError) {
+        console.error('Error marking communication as multi-project:', updateError);
+      }
+    }
+    
+    // If we have a project_id or this is a multi-project communication, determine if we should process this communication now or batch it
     if (projectId || isMultiProjectCommunication) {
       // For multi-project communications or if it's SMS
       if (communication.type === 'SMS') {
@@ -139,7 +171,8 @@ serve(async (req) => {
         success: true, 
         project_id: projectId,
         batched: false,
-        multi_project: isMultiProjectCommunication
+        multi_project: isMultiProjectCommunication,
+        processed_batches: processedBatches
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
