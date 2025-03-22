@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { parseZohoData } from './parser.ts'
@@ -115,13 +116,14 @@ serve(async (req) => {
     const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
 
     // Prepare project data using the company UUID from Supabase
-    // Remove the notes field since it doesn't exist in the projects table
+    // Include the Address field from the property address
     const projectUpdateData = {
       summary,
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
       company_id: companyUuid,  // Use the UUID we got from handleCompany
-      project_track: projectTrackId  // Add project track ID
+      project_track: projectTrackId,  // Add project track ID
+      Address: projectData.propertyAddress // Add the Address field from projectData
     }
 
     // Update or create project

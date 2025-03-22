@@ -442,6 +442,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          Address: string | null
           company_id: string | null
           crm_id: string | null
           id: string
@@ -452,6 +453,7 @@ export type Database = {
           summary: string | null
         }
         Insert: {
+          Address?: string | null
           company_id?: string | null
           crm_id?: string | null
           id?: string
@@ -462,6 +464,7 @@ export type Database = {
           summary?: string | null
         }
         Update: {
+          Address?: string | null
           company_id?: string | null
           crm_id?: string | null
           id?: string
@@ -632,6 +635,7 @@ export type Database = {
       get_projects_due_for_check: {
         Args: Record<PropertyKey, never>
         Returns: {
+          Address: string | null
           company_id: string | null
           crm_id: string | null
           id: string

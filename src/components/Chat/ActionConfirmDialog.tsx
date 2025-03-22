@@ -9,7 +9,7 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, AlertCircle, Mail, Database, Calendar } from "lucide-react";
+import { Check, AlertCircle, Mail, Database, Calendar, MapPin } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "./types";
@@ -236,6 +236,12 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
               <p className="text-sm text-muted-foreground mb-1">
                 <span className="font-medium">New Value:</span> {actionPayload.value}
               </p>
+              {actionPayload.field === 'Address' && (
+                <div className="flex items-start mt-1 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                  <span>{actionPayload.value}</span>
+                </div>
+              )}
             </>
           )}
           

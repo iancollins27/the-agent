@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Check, X, AlertCircle } from "lucide-react";
+import { Check, X, AlertCircle, MapPin } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "./types";
@@ -86,6 +86,9 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
   // Cast action_payload to a proper type for safe access
   const actionPayload = action.action_payload as Record<string, any>;
 
+  // Check if this is an address update
+  const isAddressUpdate = action.action_type === 'data_update' && actionPayload.field === 'Address';
+
   return (
     <div className="bg-amber-50 border-y border-amber-200 p-3">
       <div className="flex items-start gap-3">
@@ -96,6 +99,12 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
             {actionPayload.description || 
               `Update ${actionPayload.field || ''} to ${String(actionPayload.value || '')}`}
           </p>
+          {isAddressUpdate && (
+            <div className="flex items-center mt-1 text-xs text-amber-700">
+              <MapPin className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
+              <span className="truncate">{actionPayload.value}</span>
+            </div>
+          )}
           {renderSenderRecipient() && (
             <p className="text-xs text-amber-600 mt-1">
               {renderSenderRecipient()}

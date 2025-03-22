@@ -30,6 +30,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   
   // Log the notes data for debugging
   console.log('Notes from Zoho:', data.Notes || 'No notes provided');
+  console.log('Address from Zoho:', data.Property_Address || 'No address provided');
   
   const result = {
     crmId: idValue, // Using the string version of the ID
