@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +36,7 @@ type JoinedActionRecord = {
   execution_result?: Json | null;
   recipient?: { id: string; full_name: string } | null;
   sender?: { id: string; full_name: string } | null;
-  projects?: { id: string; crm_id: string } | null;
+  projects?: { id: string; crm_id: string; Address: string } | null;
 }
 
 const ActionRecordsTab = () => {
@@ -59,7 +60,7 @@ const ActionRecordsTab = () => {
           *,
           recipient:contacts!recipient_id(id, full_name),
           sender:contacts!sender_ID(id, full_name),
-          projects:projects!project_id(id, crm_id)
+          projects:projects!project_id(id, crm_id, Address)
         `)
         .order('created_at', { ascending: false });
 
@@ -84,7 +85,8 @@ const ActionRecordsTab = () => {
             sender_name: record.sender?.full_name || 
               (actionPayload && 'sender' in actionPayload ? 
                 actionPayload.sender as string : null),
-            project_name: record.projects?.crm_id || null
+            project_name: record.projects?.crm_id || null,
+            project_address: record.projects?.Address || null
           };
         });
         
@@ -107,7 +109,8 @@ const ActionRecordsTab = () => {
       (action.project_id && action.project_id.toLowerCase().includes(term)) ||
       (action.message && action.message.toLowerCase().includes(term)) ||
       (action.sender_name && action.sender_name.toLowerCase().includes(term)) ||
-      (action.recipient_name && action.recipient_name.toLowerCase().includes(term))
+      (action.recipient_name && action.recipient_name.toLowerCase().includes(term)) ||
+      (action.project_address && action.project_address.toLowerCase().includes(term))
     );
   });
 

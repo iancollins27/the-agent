@@ -86,8 +86,13 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
   // Cast action_payload to a proper type for safe access
   const actionPayload = action.action_payload as Record<string, any>;
 
-  // Check if this is an address update
-  const isAddressUpdate = action.action_type === 'data_update' && actionPayload.field === 'Address';
+  // Check if this is an address update or if address is available from project
+  const isAddressUpdate = action.action_type === 'data_update' && 
+    (actionPayload.field === 'Address' || actionPayload.field === 'project_address');
+    
+  const addressToShow = isAddressUpdate ? 
+    actionPayload.value : 
+    (action.project_address || (actionPayload && 'address' in actionPayload ? actionPayload.address : null));
 
   return (
     <div className="bg-amber-50 border-y border-amber-200 p-3">
@@ -99,10 +104,10 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
             {actionPayload.description || 
               `Update ${actionPayload.field || ''} to ${String(actionPayload.value || '')}`}
           </p>
-          {isAddressUpdate && (
+          {addressToShow && (
             <div className="flex items-center mt-1 text-xs text-amber-700">
               <MapPin className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
-              <span className="truncate">{actionPayload.value}</span>
+              <span className="truncate">{addressToShow}</span>
             </div>
           )}
           {renderSenderRecipient() && (

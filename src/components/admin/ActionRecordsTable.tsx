@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table"
 import { ActionRecord } from "@/components/admin/types"
 import { Badge } from "@/components/ui/badge"
-import { Check, X, MoreHorizontal } from "lucide-react"
+import { Check, X, MoreHorizontal, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -138,6 +138,25 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
       accessorKey: "recipient_name",
       header: "Recipient",
       cell: ({ row }) => row.original.recipient_name || 'N/A'
+    },
+    {
+      accessorKey: "project_address",
+      header: "Address",
+      cell: ({ row }) => {
+        const address = row.original.project_address || 
+                       (row.original.action_payload && typeof row.original.action_payload === 'object' && 
+                        'address' in row.original.action_payload ? 
+                        row.original.action_payload.address as string : null);
+                        
+        return address ? (
+          <div className="flex items-center max-w-xs">
+            <MapPin className="h-4 w-4 mr-1 flex-shrink-0 text-slate-400" />
+            <span className="truncate">{address}</span>
+          </div>
+        ) : (
+          <span className="text-slate-400">No address</span>
+        );
+      }
     },
     {
       accessorKey: "status",

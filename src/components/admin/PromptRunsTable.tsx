@@ -3,6 +3,7 @@ import React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { MapPin } from "lucide-react";
 import PromptRunStatusBadge from './PromptRunStatusBadge';
 import PromptRunRating from './PromptRunRating';
 import { PromptRun } from './types';
@@ -25,7 +26,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
           <TableHeader>
             <TableRow>
               <TableHead>Created</TableHead>
-              <TableHead>Project</TableHead>
+              <TableHead>Address</TableHead>
               <TableHead>Workflow Type</TableHead>
               <TableHead>AI Provider</TableHead>
               <TableHead>AI Model</TableHead>
@@ -41,7 +42,16 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 <TableCell>
                   {new Date(run.created_at).toLocaleString()}
                 </TableCell>
-                <TableCell>{run.project_name}</TableCell>
+                <TableCell>
+                  {run.project_address ? (
+                    <div className="flex items-center max-w-xs">
+                      <MapPin className="h-4 w-4 mr-1 flex-shrink-0 text-slate-400" />
+                      <span className="truncate">{run.project_address}</span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400">{run.project_name || 'No address'}</span>
+                  )}
+                </TableCell>
                 <TableCell>{run.workflow_prompt_type || run.workflow_type || 'Unknown'}</TableCell>
                 <TableCell>{run.ai_provider || 'Not specified'}</TableCell>
                 <TableCell>{run.ai_model || 'Not specified'}</TableCell>

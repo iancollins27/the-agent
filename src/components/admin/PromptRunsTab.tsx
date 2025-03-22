@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ const PromptRunsTab: React.FC = () => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (crm_id),
+          projects:project_id (crm_id, Address),
           workflow_prompts:workflow_prompt_id (type)
         `)
         .order('created_at', { ascending: false });
@@ -48,6 +49,7 @@ const PromptRunsTab: React.FC = () => {
         return {
           ...run,
           project_name: run.projects?.crm_id || 'Unknown Project',
+          project_address: run.projects?.Address || null,
           workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
           // Make sure it matches our PromptRun type
           workflow_type: run.workflow_prompts?.type,

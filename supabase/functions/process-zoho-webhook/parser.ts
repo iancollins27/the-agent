@@ -28,7 +28,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
   
-  // Log the notes data for debugging
+  // Log the notes and address data for debugging
   console.log('Notes from Zoho:', data.Notes || 'No notes provided');
   console.log('Address from Zoho:', data.Property_Address || 'No address provided');
   
