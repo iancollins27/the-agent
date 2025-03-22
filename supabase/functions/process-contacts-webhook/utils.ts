@@ -18,19 +18,65 @@ export function initSupabaseClient() {
 // Valid roles for normalization
 export const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
 
-// Normalize role to ensure consistent casing
+// Role mapping to handle common variations
+export const roleMapping: Record<string, string> = {
+  // Homeowner variations
+  'homeowner': 'HO',
+  'home owner': 'HO',
+  'ho': 'HO',
+  'customer': 'HO',
+  'client': 'HO',
+  
+  // Roofer variations
+  'roofer': 'Roofer',
+  'roofing contractor': 'Roofer',
+  'roofing': 'Roofer',
+  'contractor': 'Roofer',
+  
+  // Solar variations
+  'solar': 'Solar',
+  'solar sales rep': 'Solar',
+  'solar rep': 'Solar',
+  'solar consultant': 'Solar',
+  'solar installer': 'Solar',
+  
+  // Project Manager variations
+  'bidlist project manager': 'BidList Project Manager',
+  'project manager': 'BidList Project Manager',
+  'pm': 'BidList Project Manager',
+  'manager': 'BidList Project Manager',
+  'bidlist': 'BidList Project Manager',
+};
+
+// Normalize role to ensure consistent casing and handle variations
 export function normalizeRole(role: string): string {
   if (!role || role.trim() === '') {
     return 'Role Unknown';
   }
   
-  // Check for case-insensitive matches and normalize to correct casing
+  // Convert to lowercase for case-insensitive matching
+  const roleLower = role.toLowerCase().trim();
+  
+  // Check for exact matches in our mapping
+  if (roleMapping[roleLower]) {
+    return roleMapping[roleLower];
+  }
+  
+  // Check for partial matches in our mapping
+  for (const [key, value] of Object.entries(roleMapping)) {
+    if (roleLower.includes(key)) {
+      return value;
+    }
+  }
+  
+  // Check for case-insensitive matches with validRoles
   for (const validRole of validRoles) {
-    if (validRole.toLowerCase() === role.toLowerCase()) {
+    if (validRole.toLowerCase() === roleLower) {
       return validRole; // Use the properly cased version
     }
   }
   
   // Return original role if it doesn't match any known roles
-  return role;
+  console.log(`Role not mapped: "${role}", using default`);
+  return 'Role Unknown';
 }

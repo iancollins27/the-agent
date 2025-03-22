@@ -32,8 +32,9 @@ export async function processContact(
     console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
     
     // Normalize the role
+    const originalRole = contact.role;
     const role = normalizeRole(contact.role);
-    console.log(`Using role: ${role} (original: ${contact.role})`);
+    console.log(`Normalized role: "${role}" (original: "${originalRole}")`);
     
     // Check if contact already exists with this email or phone number
     let contactQueryCondition = '';
