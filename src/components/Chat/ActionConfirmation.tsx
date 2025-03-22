@@ -30,8 +30,9 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
 
       // If approved and it's a data update, update the project data
       if (approve && action.action_type === 'data_update' && action.project_id) {
+        const actionPayload = action.action_payload as Record<string, any>;
         const updateData = {
-          [action.action_payload.field]: action.action_payload.value
+          [actionPayload.field]: actionPayload.value
         };
         
         const { error: updateError } = await supabase
@@ -43,13 +44,13 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
           console.error('Error updating project:', updateError);
           toast({
             title: "Error",
-            description: `Failed to update ${action.action_payload.field}`,
+            description: `Failed to update ${actionPayload.field}`,
             variant: "destructive",
           });
         } else {
           toast({
             title: "Success",
-            description: action.action_payload.description || "Project updated successfully",
+            description: actionPayload.description || "Project updated successfully",
           });
         }
       } else if (!approve) {
@@ -82,6 +83,9 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
     return '';
   };
 
+  // Cast action_payload to a proper type for safe access
+  const actionPayload = action.action_payload as Record<string, any>;
+
   return (
     <div className="bg-amber-50 border-y border-amber-200 p-3">
       <div className="flex items-start gap-3">
@@ -89,8 +93,8 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
         <div className="flex-1">
           <h4 className="text-sm font-medium text-amber-800">Confirm Action</h4>
           <p className="text-sm text-amber-700 mt-1">
-            {action.action_payload.description || 
-              `Update ${action.action_payload.field} to ${action.action_payload.value}`}
+            {actionPayload.description || 
+              `Update ${actionPayload.field} to ${actionPayload.value}`}
           </p>
           {renderSenderRecipient() && (
             <p className="text-xs text-amber-600 mt-1">

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   Dialog, 
@@ -30,6 +31,9 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
 
   if (!action) return null;
 
+  // Cast action_payload to a proper type for safe access
+  const actionPayload = action.action_payload as Record<string, any>;
+
   const handleActionResponse = async (approve: boolean) => {
     try {
       const { error } = await supabase
@@ -47,7 +51,7 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
       // If approved and it's a data update, update the project data
       if (approve && action.action_type === 'data_update' && action.project_id) {
         const updateData = {
-          [action.action_payload.field]: action.action_payload.value
+          [actionPayload.field]: actionPayload.value
         };
         
         const { error: updateError } = await supabase
@@ -59,20 +63,20 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           console.error('Error updating project:', updateError);
           toast({
             title: "Error",
-            description: `Failed to update ${action.action_payload.field}`,
+            description: `Failed to update ${actionPayload.field}`,
             variant: "destructive",
           });
         } else {
           toast({
             title: "Success",
-            description: action.action_payload.description || "Project updated successfully",
+            description: actionPayload.description || "Project updated successfully",
           });
         }
       } 
       // If approved and it's a SET_FUTURE_REMINDER action
       else if (approve && action.action_type === 'set_future_reminder' && action.project_id) {
         // Calculate the next check date based on days_until_check
-        const daysToAdd = action.action_payload.days_until_check || 7; // Default to 7 days if not specified
+        const daysToAdd = actionPayload.days_until_check || 7; // Default to 7 days if not specified
         const nextCheckDate = new Date();
         nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
         
@@ -105,7 +109,7 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
                 status: 'reminder_set',
                 timestamp: new Date().toISOString(),
                 next_check_date: nextCheckDate.toISOString(),
-                details: `Reminder set to check in ${daysToAdd} days: ${action.action_payload.check_reason || 'No reason provided'}`
+                details: `Reminder set to check in ${daysToAdd} days: ${actionPayload.check_reason || 'No reason provided'}`
               }
             })
             .eq('id', action.id);
@@ -119,7 +123,7 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
       else if (approve && action.action_type === 'message') {
         // In a real implementation, this would connect to an email/messaging service
         // For now, we'll just show a toast notification
-        const recipient = action.recipient?.full_name || action.action_payload.recipient || 'No recipient specified';
+        const recipient = action.recipient?.full_name || actionPayload.recipient || 'No recipient specified';
         
         toast({
           title: "Message Sent",
@@ -150,9 +154,9 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
             companyId: action.project_id ? 
               (await supabase.from('projects').select('company_id').eq('id', action.project_id).single()).data?.company_id : 
               null,
-            notionToken: action.action_payload.notion_token,
-            notionDatabaseId: action.action_payload.notion_database_id,
-            notionPageId: action.action_payload.notion_page_id
+            notionToken: actionPayload.notion_token,
+            notionDatabaseId: actionPayload.notion_database_id,
+            notionPageId: actionPayload.notion_page_id
           }
         });
         
@@ -227,10 +231,10 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           {action.action_type === 'data_update' && (
             <>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-medium">Field:</span> {action.action_payload.field}
+                <span className="font-medium">Field:</span> {actionPayload.field}
               </p>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-medium">New Value:</span> {action.action_payload.value}
+                <span className="font-medium">New Value:</span> {actionPayload.value}
               </p>
             </>
           )}
@@ -238,11 +242,11 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           {action.action_type === 'set_future_reminder' && (
             <>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-medium">Check in:</span> {action.action_payload.days_until_check} days
+                <span className="font-medium">Check in:</span> {actionPayload.days_until_check} days
               </p>
               <div className="mt-2 p-3 bg-muted rounded-md">
                 <p className="text-sm font-medium mb-1">Reason:</p>
-                <p className="text-sm">{action.action_payload.check_reason}</p>
+                <p className="text-sm">{actionPayload.check_reason}</p>
               </div>
             </>
           )}
@@ -250,11 +254,11 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           {action.action_type === 'message' && (
             <>
               <p className="text-sm text-muted-foreground mb-1">
-                <span className="font-medium">Recipient:</span> {action.recipient?.full_name || action.action_payload.recipient || 'No recipient specified'}
+                <span className="font-medium">Recipient:</span> {action.recipient?.full_name || actionPayload.recipient || 'No recipient specified'}
               </p>
               <div className="mt-2 p-3 bg-muted rounded-md">
                 <p className="text-sm font-medium mb-1">Message Content:</p>
-                <p className="text-sm">{action.message || action.action_payload.message_content}</p>
+                <p className="text-sm">{action.message || actionPayload.message_content}</p>
               </div>
             </>
           )}
@@ -264,14 +268,14 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
               <p className="text-sm text-muted-foreground mb-1">
                 <span className="font-medium">Integration Type:</span> Notion
               </p>
-              {action.action_payload.notion_database_id && (
+              {actionPayload.notion_database_id && (
                 <p className="text-sm text-muted-foreground mb-1">
-                  <span className="font-medium">Database ID:</span> {action.action_payload.notion_database_id}
+                  <span className="font-medium">Database ID:</span> {actionPayload.notion_database_id}
                 </p>
               )}
-              {action.action_payload.notion_page_id && (
+              {actionPayload.notion_page_id && (
                 <p className="text-sm text-muted-foreground mb-1">
-                  <span className="font-medium">Page ID:</span> {action.action_payload.notion_page_id}
+                  <span className="font-medium">Page ID:</span> {actionPayload.notion_page_id}
                 </p>
               )}
               <div className="mt-2 p-3 bg-muted rounded-md">
@@ -285,7 +289,7 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
           )}
           
           <p className="text-sm mt-2 p-3 bg-muted rounded-md">
-            {action.action_payload.description}
+            {actionPayload.description}
           </p>
         </div>
         
