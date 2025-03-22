@@ -28,16 +28,32 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   // Handle both direct fields and nested rawData fields
   const data = rawData.rawData || rawData;
   
-  // Log the notes and address data for debugging
+  // Log the data to help with debugging
+  console.log('Processing data object:', data);
   console.log('Notes from Zoho:', data.Notes || 'No notes provided');
-  console.log('Address from Zoho:', data.Property_Address || 'No address provided');
+  console.log('Property Address from Zoho:', data.Property_Address || 'No address provided');
+  
+  // Check for Address field in various formats and log it
+  if (data.Address) {
+    console.log('Found Address field:', data.Address);
+  }
+  if (data.Property_Address) {
+    console.log('Found Property_Address field:', data.Property_Address);
+  }
+  if (data.property_address) {
+    console.log('Found property_address field:', data.property_address);
+  }
+  
+  // Enhanced address extraction
+  const propertyAddress = data.Property_Address || data.Address || data.property_address || '';
+  console.log('Final extracted property address:', propertyAddress);
   
   const result = {
     crmId: idValue, // Using the string version of the ID
     zohoCompanyId: companyIdFromZoho,
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
-    propertyAddress: data.Property_Address || '',
+    propertyAddress: propertyAddress, // Enhanced address extraction
     notes: data.Notes || '', // Adding the notes field
     timeline: {
       contractSigned: String(data.Contract_Signed || ''),

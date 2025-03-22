@@ -116,15 +116,19 @@ serve(async (req) => {
     const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
 
     // Prepare project data using the company UUID from Supabase
-    // Include the Address field from the property address
+    // Log the address being saved to help with debugging
+    console.log('Address being saved to project:', projectData.propertyAddress);
+    
     const projectUpdateData = {
       summary,
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
       company_id: companyUuid,  // Use the UUID we got from handleCompany
       project_track: projectTrackId,  // Add project track ID
-      Address: projectData.propertyAddress // Add the Address field from projectData
+      Address: projectData.propertyAddress // Make sure Address field is correctly capitalized
     }
+
+    console.log('Project update data:', projectUpdateData);
 
     // Update or create project
     if (existingProject) {
