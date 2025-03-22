@@ -94,7 +94,7 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
           <h4 className="text-sm font-medium text-amber-800">Confirm Action</h4>
           <p className="text-sm text-amber-700 mt-1">
             {actionPayload.description || 
-              `Update ${actionPayload.field} to ${actionPayload.value}`}
+              `Update ${actionPayload.field || ''} to ${String(actionPayload.value || '')}`}
           </p>
           {renderSenderRecipient() && (
             <p className="text-xs text-amber-600 mt-1">

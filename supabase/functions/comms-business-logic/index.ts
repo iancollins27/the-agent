@@ -7,6 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Function to format phone numbers consistently for comparison
+function formatPhoneNumber(phoneNumber: string): string {
+  // Remove all non-digit characters
+  let cleaned = phoneNumber.replace(/\D/g, '');
+  
+  // Handle international format (e.g., +1234567890)
+  // If it doesn't start with country code, we'll assume it's a US number
+  if (cleaned.length === 10) {
+    // Add US country code if it's a 10-digit number
+    cleaned = '1' + cleaned;
+  } else if (cleaned.length > 10 && cleaned.startsWith('1')) {
+    // Already has country code
+    cleaned = cleaned;
+  }
+  
+  return cleaned;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -188,8 +206,8 @@ async function findProjectByPhoneNumber(supabase: any, communication: any): Prom
   try {
     // Extract phone numbers from the communication
     const phoneNumbers = communication.participants
-      .filter(p => p.type === 'phone')
-      .map(p => p.value);
+      .filter((p: any) => p.type === 'phone')
+      .map((p: any) => p.value);
       
     if (phoneNumbers.length === 0) {
       return null;
@@ -197,14 +215,23 @@ async function findProjectByPhoneNumber(supabase: any, communication: any): Prom
     
     console.log('Searching for project match using phone numbers:', phoneNumbers);
     
-    // Query project_contacts and contacts tables to find a match
-    // This is a simplified example - in reality, phone numbers might need normalization
-    // for proper matching (removing +, country codes, spaces, etc.)
+    // Format the phone numbers for consistent comparison
+    const formattedPhoneNumbers = phoneNumbers.map(formatPhoneNumber);
+    console.log('Formatted phone numbers for search:', formattedPhoneNumbers);
     
+    // Build a query to search for contacts with matching phone numbers
+    // This uses LIKE queries for flexibility in matching different phone number formats
+    const searchQuery = formattedPhoneNumbers.map((phone: string, index: number) => {
+      return `phone_number.ilike.%${phone.substring(Math.max(0, phone.length - 10))}%`;
+    }).join(',');
+    
+    console.log('Using search query:', searchQuery);
+    
+    // Query contacts table directly with the phone numbers
     const { data: matchingContacts, error: contactsError } = await supabase
       .from('contacts')
       .select('id')
-      .or(phoneNumbers.map(phone => `contact_info.ilike.%${phone}%`).join(','));
+      .or(searchQuery);
       
     if (contactsError) {
       console.error('Error searching contacts:', contactsError);
@@ -216,7 +243,9 @@ async function findProjectByPhoneNumber(supabase: any, communication: any): Prom
       return null;
     }
     
-    const contactIds = matchingContacts.map(c => c.id);
+    console.log('Found matching contacts:', matchingContacts);
+    
+    const contactIds = matchingContacts.map((c: any) => c.id);
     
     // Find projects associated with these contacts
     const { data: projectContacts, error: projectContactsError } = await supabase
@@ -235,6 +264,7 @@ async function findProjectByPhoneNumber(supabase: any, communication: any): Prom
       return null;
     }
     
+    console.log('Found matching project:', projectContacts[0].project_id);
     return projectContacts[0].project_id;
   } catch (error) {
     console.error('Error in findProjectByPhoneNumber:', error);
