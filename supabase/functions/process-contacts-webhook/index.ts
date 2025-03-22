@@ -1,23 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface ContactPayload {
-  name: string;
-  number: string;
-  email: string;
-  role: string;
-}
-
-interface WebhookPayload {
-  contacts: ContactPayload[];
-  Bid_ID: number;
-}
+import { corsHeaders, initSupabaseClient } from './utils.ts';
+import { parseWebhookPayload } from './parser.ts';
+import { getProjectByCrmId, processContact } from './contactService.ts';
+import { WebhookPayload, ProcessResult } from './types.ts';
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -27,89 +13,11 @@ serve(async (req) => {
 
   try {
     // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabase = initSupabaseClient();
 
-    // Get content type to determine how to parse the body
-    const contentType = req.headers.get('content-type') || '';
-    console.log('Content-Type:', contentType);
-
-    // Get the raw request body
-    const requestText = await req.text();
-    console.log('Raw request body:', requestText);
-    
-    // Parse payload based on content type
-    let payload: WebhookPayload;
-    try {
-      if (contentType.includes('application/json')) {
-        // Parse as JSON
-        payload = JSON.parse(requestText);
-      } else if (contentType.includes('application/x-www-form-urlencoded')) {
-        // Parse as form data
-        const formData = new URLSearchParams(requestText);
-        
-        // Check if the entire payload is in a single form field (Zoho might do this)
-        if (formData.has('payload')) {
-          payload = JSON.parse(formData.get('payload') || '{}');
-        } else if (formData.has('contacts')) {
-          // Try to parse contacts as JSON if it's in a single parameter
-          try {
-            const contacts = JSON.parse(formData.get('contacts') || '[]');
-            const bidId = formData.get('Bid_ID') || '';
-            payload = {
-              contacts: Array.isArray(contacts) ? contacts : [],
-              Bid_ID: parseInt(bidId, 10)
-            };
-          } catch {
-            // If contacts can't be parsed as JSON, try to reconstruct from form data
-            console.log('Reconstructing payload from form data');
-            payload = {
-              contacts: [],
-              Bid_ID: parseInt(formData.get('Bid_ID') || '0', 10)
-            };
-            
-            // Zoho might send data with indices like contacts[0][name], contacts[0][email], etc.
-            // We need to reconstruct the contacts array
-            const contactIndices = new Set<number>();
-            for (const [key, value] of formData.entries()) {
-              const match = key.match(/contacts\[(\d+)\]\[(\w+)\]/);
-              if (match) {
-                const index = parseInt(match[1], 10);
-                contactIndices.add(index);
-              }
-            }
-            
-            if (contactIndices.size > 0) {
-              for (const index of contactIndices) {
-                const contact: ContactPayload = {
-                  name: formData.get(`contacts[${index}][name]`) || '',
-                  number: formData.get(`contacts[${index}][number]`) || '',
-                  email: formData.get(`contacts[${index}][email]`) || '',
-                  role: formData.get(`contacts[${index}][role]`) || ''
-                };
-                payload.contacts.push(contact);
-              }
-            }
-          }
-        } else {
-          throw new Error('Unable to find contacts or payload in form data');
-        }
-      } else {
-        // Try JSON parse as fallback
-        try {
-          payload = JSON.parse(requestText);
-        } catch {
-          throw new Error(`Unsupported content type: ${contentType}`);
-        }
-      }
-      
-      console.log('Parsed webhook payload:', payload);
-    } catch (parseError) {
-      console.error('Error parsing request body:', parseError);
-      throw new Error(`Invalid request body format: ${parseError.message}`);
-    }
+    // Parse webhook payload
+    const payload: WebhookPayload = await parseWebhookPayload(req);
+    console.log('Parsed webhook payload:', payload);
     
     // Validate the payload
     if (!payload.contacts || !Array.isArray(payload.contacts) || !payload.Bid_ID) {
@@ -117,179 +25,23 @@ serve(async (req) => {
     }
 
     // Get the project by CRM ID (Bid_ID)
-    console.log(`Looking for project with CRM ID: ${payload.Bid_ID}`);
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('crm_id', payload.Bid_ID.toString())
-      .single();
-
-    if (projectError) {
-      console.error('Error finding project:', projectError);
-      throw new Error(`Project with Bid_ID ${payload.Bid_ID} not found: ${projectError.message}`);
-    }
-
-    console.log(`Found project with ID: ${project.id} for Bid_ID: ${payload.Bid_ID}`);
+    const project = await getProjectByCrmId(supabase, payload.Bid_ID);
 
     // Process each contact
     const results = await Promise.all(
-      payload.contacts.map(async (contact) => {
-        try {
-          console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
-          
-          // Check if role is valid, but don't default to anything specific
-          // Only normalize known roles to ensure consistent casing
-          const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
-          
-          // Normalize the role if it's a known role, otherwise keep the original role
-          let role = contact.role;
-          
-          // Check for case-insensitive matches and normalize to correct casing
-          for (const validRole of validRoles) {
-            if (validRole.toLowerCase() === contact.role.toLowerCase()) {
-              role = validRole; // Use the properly cased version
-              break;
-            }
-          }
-          
-          // If role is empty, use "Role Unknown"
-          if (!role || role.trim() === '') {
-            console.log('Empty role detected, using: Role Unknown');
-            role = 'Role Unknown';
-          }
-          
-          console.log(`Using role: ${role} (original: ${contact.role})`);
-          
-          // Check if contact already exists with this email or phone number
-          let contactQueryCondition = '';
-          
-          // Build the query condition based on available contact details
-          if (contact.email && contact.number) {
-            contactQueryCondition = `email.eq.${contact.email},phone_number.eq.${contact.number}`;
-          } else if (contact.email) {
-            contactQueryCondition = `email.eq.${contact.email}`;
-          } else if (contact.number) {
-            contactQueryCondition = `phone_number.eq.${contact.number}`;
-          } else {
-            // If no email or phone, we can't reliably find the contact
-            console.log('No email or phone provided, treating as new contact');
-            contactQueryCondition = 'id.eq.00000000-0000-0000-0000-000000000000'; // Will not match anything
-          }
-          
-          const { data: existingContacts, error: lookupError } = await supabase
-            .from('contacts')
-            .select('id, full_name, email, phone_number, role')
-            .or(contactQueryCondition);
-            
-          if (lookupError) {
-            console.error('Error looking up existing contact:', lookupError);
-            return { status: 'error', message: `Error looking up contact: ${lookupError.message}`, contact };
-          }
-
-          let contactId;
-          
-          if (existingContacts && existingContacts.length > 0) {
-            // Use existing contact but update its information
-            contactId = existingContacts[0].id;
-            console.log(`Updating existing contact with ID: ${contactId}`);
-            
-            // Only update non-empty fields
-            const updateData: {
-              full_name?: string;
-              phone_number?: string;
-              email?: string;
-              role?: string;
-            } = {};
-            
-            if (contact.name && contact.name.trim() !== '') updateData.full_name = contact.name;
-            if (contact.number && contact.number.trim() !== '') updateData.phone_number = contact.number;
-            if (contact.email && contact.email.trim() !== '') updateData.email = contact.email;
-            if (role && role.trim() !== '') updateData.role = role;
-            
-            // Only update if there are changes
-            if (Object.keys(updateData).length > 0) {
-              const { error: updateError } = await supabase
-                .from('contacts')
-                .update(updateData)
-                .eq('id', contactId);
-                
-              if (updateError) {
-                console.error('Error updating contact:', updateError);
-                return { status: 'error', message: `Error updating contact: ${updateError.message}`, contact };
-              }
-              
-              console.log(`Successfully updated contact information for ID: ${contactId}`, updateData);
-            } else {
-              console.log(`No changes needed for contact ID: ${contactId}`);
-            }
-          } else {
-            // Create new contact
-            console.log(`Creating new contact: ${contact.name} with role: ${role}`);
-            const { data: newContact, error: createError } = await supabase
-              .from('contacts')
-              .insert({
-                full_name: contact.name,
-                phone_number: contact.number,
-                email: contact.email,
-                role: role
-              })
-              .select('id')
-              .single();
-              
-            if (createError) {
-              console.error('Error creating contact:', createError);
-              return { status: 'error', message: `Error creating contact: ${createError.message}`, contact };
-            }
-            
-            contactId = newContact.id;
-            console.log(`Created new contact with ID: ${contactId}`);
-          }
-
-          // Check if contact is already linked to project
-          const { data: existingLink, error: linkCheckError } = await supabase
-            .from('project_contacts')
-            .select('*')
-            .eq('project_id', project.id)
-            .eq('contact_id', contactId);
-            
-          if (linkCheckError) {
-            console.error('Error checking existing project-contact link:', linkCheckError);
-          } 
-          
-          // Only create the link if it doesn't already exist
-          if (!existingLink || existingLink.length === 0) {
-            console.log(`Linking contact ${contactId} to project ${project.id}`);
-            const { error: linkError } = await supabase
-              .from('project_contacts')
-              .insert({
-                project_id: project.id,
-                contact_id: contactId
-              });
-              
-            if (linkError) {
-              console.error('Error linking contact to project:', linkError);
-              return { status: 'error', message: `Error linking contact to project: ${linkError.message}`, contact };
-            }
-          } else {
-            console.log(`Contact ${contactId} already linked to project ${project.id}`);
-          }
-
-          return { status: 'success', contactId, contact };
-        } catch (error) {
-          console.error(`Error processing contact ${contact.name}:`, error);
-          return { status: 'error', message: error.message, contact };
-        }
-      })
+      payload.contacts.map(contact => processContact(supabase, contact, project.id))
     );
 
-    // Return the results
+    // Prepare the response
+    const response: ProcessResult = {
+      success: true,
+      message: `Processed ${results.filter(r => r.status === 'success').length} of ${payload.contacts.length} contacts`,
+      projectId: project.id,
+      results
+    };
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: `Processed ${results.filter(r => r.status === 'success').length} of ${payload.contacts.length} contacts`,
-        projectId: project.id,
-        results
-      }),
+      JSON.stringify(response),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
@@ -298,11 +50,14 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing contacts webhook:', error);
     
+    const errorResponse: ProcessResult = {
+      success: false,
+      message: 'Error processing contacts webhook',
+      error: error.message
+    };
+
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
+      JSON.stringify(errorResponse),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500

@@ -46,7 +46,7 @@ The function can also accept form-encoded data with either:
 2. Looks up the project by `Bid_ID` (which is stored as `crm_id` in the projects table)
 3. For each contact:
    - Checks if the contact already exists in the system by email or phone number
-   - If it exists, uses the existing contact ID
+   - If it exists, uses the existing contact ID and updates any changed information
    - If not, creates a new contact record
    - Checks if the contact is already linked to the project
    - Links the contact to the project through the `project_contacts` junction table if not already linked
@@ -57,6 +57,7 @@ The function can also accept form-encoded data with either:
 - "HO" - For homeowners
 - "BidList Project Manager" - For BidList staff
 - "Solar" - For solar sales representatives
+- "Role Unknown" - Default for empty roles
 
 ## Notes for Zoho Integration
 
