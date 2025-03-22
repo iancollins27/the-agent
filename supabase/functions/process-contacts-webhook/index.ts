@@ -161,10 +161,25 @@ serve(async (req) => {
           console.log(`Using role: ${role} (original: ${contact.role})`);
           
           // Check if contact already exists with this email or phone number
+          let contactQueryCondition = '';
+          
+          // Build the query condition based on available contact details
+          if (contact.email && contact.number) {
+            contactQueryCondition = `email.eq.${contact.email},phone_number.eq.${contact.number}`;
+          } else if (contact.email) {
+            contactQueryCondition = `email.eq.${contact.email}`;
+          } else if (contact.number) {
+            contactQueryCondition = `phone_number.eq.${contact.number}`;
+          } else {
+            // If no email or phone, we can't reliably find the contact
+            console.log('No email or phone provided, treating as new contact');
+            contactQueryCondition = 'id.eq.00000000-0000-0000-0000-000000000000'; // Will not match anything
+          }
+          
           const { data: existingContacts, error: lookupError } = await supabase
             .from('contacts')
-            .select('id')
-            .or(`email.eq.${contact.email},phone_number.eq.${contact.number}`);
+            .select('id, full_name, email, phone_number, role')
+            .or(contactQueryCondition);
             
           if (lookupError) {
             console.error('Error looking up existing contact:', lookupError);
@@ -174,9 +189,39 @@ serve(async (req) => {
           let contactId;
           
           if (existingContacts && existingContacts.length > 0) {
-            // Use existing contact
+            // Use existing contact but update its information
             contactId = existingContacts[0].id;
-            console.log(`Using existing contact with ID: ${contactId}`);
+            console.log(`Updating existing contact with ID: ${contactId}`);
+            
+            // Only update non-empty fields
+            const updateData: {
+              full_name?: string;
+              phone_number?: string;
+              email?: string;
+              role?: string;
+            } = {};
+            
+            if (contact.name && contact.name.trim() !== '') updateData.full_name = contact.name;
+            if (contact.number && contact.number.trim() !== '') updateData.phone_number = contact.number;
+            if (contact.email && contact.email.trim() !== '') updateData.email = contact.email;
+            if (role && role.trim() !== '') updateData.role = role;
+            
+            // Only update if there are changes
+            if (Object.keys(updateData).length > 0) {
+              const { error: updateError } = await supabase
+                .from('contacts')
+                .update(updateData)
+                .eq('id', contactId);
+                
+              if (updateError) {
+                console.error('Error updating contact:', updateError);
+                return { status: 'error', message: `Error updating contact: ${updateError.message}`, contact };
+              }
+              
+              console.log(`Successfully updated contact information for ID: ${contactId}`, updateData);
+            } else {
+              console.log(`No changes needed for contact ID: ${contactId}`);
+            }
           } else {
             // Create new contact
             console.log(`Creating new contact: ${contact.name} with role: ${role}`);
