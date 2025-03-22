@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -31,6 +31,7 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
           id,
           crm_id,
           next_step,
+          Address,
           companies(name),
           project_tracks(name)
         `)
@@ -71,7 +72,7 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
           <TableRow>
             <TableHead className="w-[50px]"></TableHead>
             <TableHead>Company</TableHead>
-            <TableHead>Project ID</TableHead>
+            <TableHead>Address</TableHead>
             <TableHead>Track</TableHead>
             <TableHead>Current Step</TableHead>
           </TableRow>
@@ -95,7 +96,16 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
                   />
                 </TableCell>
                 <TableCell className="font-medium">{project.companies?.name || 'Unknown'}</TableCell>
-                <TableCell className="text-muted-foreground">{project.crm_id || project.id.substring(0, 8)}</TableCell>
+                <TableCell className="max-w-xs">
+                  {project.Address ? (
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 mr-1 flex-shrink-0 text-slate-400" />
+                      <span className="truncate">{project.Address}</span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">{project.crm_id || project.id.substring(0, 8)}</span>
+                  )}
+                </TableCell>
                 <TableCell>{project.project_tracks?.name || '-'}</TableCell>
                 <TableCell>
                   {project.next_step ? (
