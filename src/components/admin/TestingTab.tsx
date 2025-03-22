@@ -8,6 +8,7 @@ const TestingTab = () => {
   const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [testResults, setTestResults] = useState<any>(null);
+  const [isMultiProjectTest, setIsMultiProjectTest] = useState(false);
   
   return (
     <div className="space-y-6">
@@ -16,12 +17,15 @@ const TestingTab = () => {
         setSelectedPromptIds={setSelectedPromptIds}
         selectedProjectIds={selectedProjectIds}
         setSelectedProjectIds={setSelectedProjectIds}
+        isMultiProjectTest={isMultiProjectTest}
+        setIsMultiProjectTest={setIsMultiProjectTest}
       />
       
       <TestRunner
         selectedPromptIds={selectedPromptIds}
         selectedProjectIds={selectedProjectIds}
         onTestComplete={setTestResults}
+        isMultiProjectTest={isMultiProjectTest}
       />
       
       {testResults && (

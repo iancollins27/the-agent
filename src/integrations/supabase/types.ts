@@ -144,8 +144,44 @@ export type Database = {
         }
         Relationships: []
       }
+      comms_batch_status: {
+        Row: {
+          batch_status: string
+          created_at: string
+          id: string
+          processed_at: string | null
+          project_id: string
+          scheduled_processing_time: string | null
+        }
+        Insert: {
+          batch_status: string
+          created_at?: string
+          id?: string
+          processed_at?: string | null
+          project_id: string
+          scheduled_processing_time?: string | null
+        }
+        Update: {
+          batch_status?: string
+          created_at?: string
+          id?: string
+          processed_at?: string | null
+          project_id?: string
+          scheduled_processing_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comms_batch_status_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       communications: {
         Row: {
+          batch_id: string | null
           content: string | null
           created_at: string
           direction: string
@@ -161,6 +197,7 @@ export type Database = {
           type: string
         }
         Insert: {
+          batch_id?: string | null
           content?: string | null
           created_at?: string
           direction: string
@@ -176,6 +213,7 @@ export type Database = {
           type: string
         }
         Update: {
+          batch_id?: string | null
           content?: string | null
           created_at?: string
           direction?: string
@@ -191,6 +229,13 @@ export type Database = {
           type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "communications_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "comms_batch_status"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "communications_project_id_fkey"
             columns: ["project_id"]

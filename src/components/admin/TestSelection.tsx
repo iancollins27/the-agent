@@ -2,19 +2,25 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ProjectSelector from "@/components/admin/ProjectSelector";
 import PromptSelector from "@/components/admin/PromptSelector";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type TestSelectionProps = {
   selectedPromptIds: string[];
   setSelectedPromptIds: (ids: string[]) => void;
   selectedProjectIds: string[];
   setSelectedProjectIds: (ids: string[]) => void;
+  isMultiProjectTest?: boolean;
+  setIsMultiProjectTest?: (value: boolean) => void;
 };
 
 const TestSelection = ({ 
   selectedPromptIds, 
   setSelectedPromptIds, 
   selectedProjectIds, 
-  setSelectedProjectIds 
+  setSelectedProjectIds,
+  isMultiProjectTest = false,
+  setIsMultiProjectTest
 }: TestSelectionProps) => {
   return (
     <Card>
@@ -43,6 +49,20 @@ const TestSelection = ({
             />
           </div>
         </div>
+        
+        {/* Multi-Project Test Option */}
+        {setIsMultiProjectTest && (
+          <div className="flex items-center space-x-2 pt-2">
+            <Switch 
+              id="multi-project-mode" 
+              checked={isMultiProjectTest}
+              onCheckedChange={setIsMultiProjectTest}
+            />
+            <Label htmlFor="multi-project-mode" className="cursor-pointer">
+              Test Multi-Project Communication Analysis
+            </Label>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
