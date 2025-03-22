@@ -23,6 +23,7 @@ export type ActionRecord = {
   recipient?: { id: string, full_name: string } | null;
   recipient_name?: string | null;
   project_name?: string | null;
+  project_address?: string | null; // Added this property
   sender_ID?: string | null; // Note the capitalized ID to match the database column
   sender?: { id: string, full_name: string } | null;
   sender_name?: string | null;

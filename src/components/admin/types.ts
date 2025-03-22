@@ -1,3 +1,4 @@
+
 import { Database } from "@/integrations/supabase/types";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -21,6 +22,7 @@ export interface ActionRecord {
   sender_name?: string | null;
   approver_name?: string;
   project_name?: string | null;
+  project_address?: string | null; // Added this property
   recipient?: { id: string; full_name: string } | null;
   sender?: { id: string; full_name: string } | null;
   projects?: { id: string; crm_id: string } | null;
@@ -44,6 +46,7 @@ export type PromptRun = {
   ai_provider?: string | null;
   ai_model?: string | null;
   project_name?: string;
+  project_address?: string | null; // Added this property
   action_record_id?: string;
   workflow_prompt_id?: string | null;
   workflow_prompt_type?: string;
