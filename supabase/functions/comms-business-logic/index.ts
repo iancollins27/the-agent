@@ -102,8 +102,13 @@ serve(async (req) => {
       }
     }
     
+    // Determine if this is potentially a multi-project communication
+    const isMultiProjectCommunication = await isPotentialMultiProjectComm(supabase, communication);
+    console.log(`Is potential multi-project communication: ${isMultiProjectCommunication}`);
+    
     // If we have a project_id, determine if we should process this communication now or batch it
-    if (projectId) {
+    if (projectId || isMultiProjectCommunication) {
+      // For multi-project communications or if it's SMS
       if (communication.type === 'SMS') {
         // Check if this SMS should be batched
         const shouldBatch = await shouldBatchMessage(supabase, communication, projectId);
@@ -117,6 +122,7 @@ serve(async (req) => {
               success: true, 
               project_id: projectId,
               batched: true,
+              multi_project: isMultiProjectCommunication,
               message: 'SMS message batched for later processing'
             }),
             { 
@@ -125,11 +131,21 @@ serve(async (req) => {
           );
         } else {
           // If we shouldn't batch or the batch criteria is met, process all recent messages
-          await processMessagesForProject(supabase, projectId);
+          if (isMultiProjectCommunication) {
+            await processMultiProjectMessages(supabase, projectId, communication.batch_id);
+          } else {
+            await processMessagesForProject(supabase, projectId);
+          }
         }
       } else {
-        // For non-SMS (e.g., CALL), process immediately
-        await processCommunicationForProject(supabase, communication, projectId);
+        // For non-SMS (e.g., CALL)
+        if (isMultiProjectCommunication) {
+          // Process as multi-project communication
+          await processMultiProjectCommunication(supabase, communication);
+        } else {
+          // Process for single project
+          await processCommunicationForProject(supabase, communication, projectId);
+        }
       }
     }
 
@@ -137,7 +153,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         project_id: projectId,
-        batched: false
+        batched: false,
+        multi_project: isMultiProjectCommunication
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -155,6 +172,65 @@ serve(async (req) => {
     );
   }
 });
+
+// Check if this communication is potentially related to multiple projects
+// (e.g., between a project manager and a roofer)
+async function isPotentialMultiProjectComm(supabase: any, communication: any): Promise<boolean> {
+  try {
+    // Extract participant information
+    const participants = communication.participants || [];
+    
+    // Check if we have at least 2 participants (sender and receiver)
+    if (participants.length < 2) {
+      return false;
+    }
+    
+    // Track if we found a project manager and a roofer
+    let foundProjectManager = false;
+    let foundRoofer = false;
+    
+    // Get phone numbers from participants
+    const phoneNumbers = participants
+      .filter((p: any) => p.type === 'phone')
+      .map((p: any) => p.value);
+      
+    if (phoneNumbers.length < 2) {
+      return false;
+    }
+    
+    // Look up contacts associated with these phone numbers
+    for (const phone of phoneNumbers) {
+      const formattedPhone = formatPhoneNumber(phone);
+      
+      // Query to find this contact
+      const { data: contacts, error } = await supabase
+        .from('contacts')
+        .select('role')
+        .ilike('phone_number', `%${formattedPhone.slice(-10)}%`)
+        .limit(1);
+        
+      if (error) {
+        console.error('Error looking up contact role:', error);
+        continue;
+      }
+      
+      if (contacts && contacts.length > 0) {
+        const role = contacts[0].role;
+        if (role === 'project_manager' || role === 'ProjectManager' || role === 'PM' || role === 'bidlist_pm') {
+          foundProjectManager = true;
+        } else if (role === 'roofer' || role === 'contractor' || role === 'vendor') {
+          foundRoofer = true;
+        }
+      }
+    }
+    
+    // If we found both a project manager and a roofer, this might be a multi-project communication
+    return foundProjectManager && foundRoofer;
+  } catch (error) {
+    console.error('Error determining multi-project status:', error);
+    return false;
+  }
+}
 
 // Determines if an SMS message should be batched based on recent activity
 async function shouldBatchMessage(supabase: any, communication: any, projectId: string): Promise<boolean> {
@@ -379,7 +455,7 @@ async function updateProjectWithAI(supabase: any, projectId: string, contextData
         summary, 
         next_step, 
         project_track, 
-        project_tracks(name, description)
+        project_tracks(name, description, Roles, "track base prompt")
       `)
       .eq('id', projectId)
       .single();
@@ -585,5 +661,409 @@ async function findProjectByPhoneNumber(supabase: any, communication: any): Prom
   } catch (error) {
     console.error('Error in findProjectByPhoneNumber:', error);
     return null;
+  }
+}
+
+// Process a communication that might reference multiple projects
+async function processMultiProjectCommunication(supabase: any, communication: any): Promise<void> {
+  console.log(`Processing multi-project communication ${communication.id}`);
+  
+  try {
+    // Get all active projects to check against
+    const { data: allProjects, error: projectsError } = await supabase
+      .from('projects')
+      .select(`
+        id,
+        summary,
+        Address,
+        crm_id,
+        next_step,
+        company_id,
+        project_track,
+        project_tracks(name, description, Roles, "track base prompt")
+      `)
+      .is('next_check_date', null) // Only consider active projects
+      .order('created_at', { ascending: false })
+      .limit(100); // Reasonable limit to check against
+      
+    if (projectsError) {
+      console.error('Error fetching projects for multi-project analysis:', projectsError);
+      return;
+    }
+    
+    if (!allProjects || allProjects.length === 0) {
+      console.log('No active projects found for multi-project analysis');
+      return;
+    }
+    
+    // Convert the communication into context for the AI
+    const commContent = communication.content || 
+      (communication.recording_url ? `[Recording available at: ${communication.recording_url}]` : 'No content available');
+    
+    const contextData = {
+      communication_type: communication.type,
+      communication_subtype: communication.subtype,
+      communication_direction: communication.direction,
+      communication_content: commContent,
+      communication_participants: communication.participants,
+      communication_timestamp: communication.timestamp,
+      communication_duration: communication.duration,
+      projects_data: allProjects.map(p => ({
+        id: p.id,
+        summary: p.summary || '',
+        address: p.Address || '',
+        next_step: p.next_step || '',
+      })),
+      multi_project_analysis: true
+    };
+    
+    // Get latest workflow prompt for multi-project analysis
+    const { data: multiProjectPrompt, error: promptError } = await supabase
+      .from('workflow_prompts')
+      .select('*')
+      .eq('type', 'multi_project_analysis')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (promptError && promptError.code !== 'PGRST116') {
+      console.error('Error fetching multi-project analysis prompt:', promptError);
+      
+      // Fall back to summary_update prompt
+      const { data: fallbackPrompt, error: fallbackError } = await supabase
+        .from('workflow_prompts')
+        .select('*')
+        .eq('type', 'summary_update')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (fallbackError) {
+        console.error('Error fetching fallback prompt:', fallbackError);
+        return;
+      }
+      
+      contextData.multi_project_analysis_instruction = `
+        IMPORTANT: This communication appears to be between a project manager and a roofer/contractor.
+        It may contain information about multiple projects. Please analyze the content and determine
+        which information is relevant to THIS specific project. Only include information that is directly
+        relevant to the current project in your summary update.
+      `;
+    }
+    
+    // Get AI configuration
+    const { data: aiConfig, error: aiConfigError } = await supabase
+      .from('ai_config')
+      .select('provider, model')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+      
+    const aiProvider = aiConfig?.provider || 'openai';
+    const aiModel = aiConfig?.model || 'gpt-4o';
+    
+    // If we have a dedicated multi-project analysis prompt, use it
+    if (multiProjectPrompt) {
+      console.log('Using dedicated multi-project analysis prompt');
+      
+      // Call the AI to analyze multiple projects
+      const { data: analysisResult, error: analysisError } = await supabase.functions.invoke(
+        'test-workflow-prompt',
+        {
+          body: {
+            promptType: 'multi_project_analysis',
+            promptText: multiProjectPrompt.prompt_text,
+            projectId: null, // No specific project
+            contextData: contextData,
+            aiProvider: aiProvider,
+            aiModel: aiModel,
+            workflowPromptId: multiProjectPrompt.id,
+            initiatedBy: 'communications-webhook',
+            isMultiProjectTest: true
+          }
+        }
+      );
+      
+      if (analysisError) {
+        console.error('Error calling multi-project analysis:', analysisError);
+        return;
+      }
+      
+      // Parse results to get project-specific information
+      try {
+        const parsedResult = JSON.parse(analysisResult.output);
+        
+        if (!parsedResult.projects || !Array.isArray(parsedResult.projects)) {
+          console.error('Invalid analysis result format:', analysisResult.output);
+          return;
+        }
+        
+        // Process each project update
+        for (const projectUpdate of parsedResult.projects) {
+          if (!projectUpdate.projectId || !projectUpdate.relevantContent) {
+            continue;
+          }
+          
+          // Update each relevant project with its specific info
+          await updateProjectWithSpecificInfo(
+            supabase, 
+            projectUpdate.projectId, 
+            projectUpdate.relevantContent,
+            communication,
+            aiProvider,
+            aiModel
+          );
+        }
+        
+        console.log(`Successfully processed updates for ${parsedResult.projects.length} projects`);
+      } catch (parseError) {
+        console.error('Error parsing multi-project analysis result:', parseError);
+      }
+    } else {
+      // Fallback: Process updates for each project individually
+      console.log('No multi-project analysis prompt found, processing projects individually');
+      
+      for (const project of allProjects) {
+        await updateProjectWithAI(supabase, project.id, {
+          ...contextData,
+          multi_project_analysis_instruction: `
+            IMPORTANT: This communication appears to be between a project manager and a roofer/contractor.
+            It may contain information about multiple projects. Please analyze the content and determine
+            which information is relevant to THIS specific project (ID: ${project.id}, Address: ${project.Address || 'Unknown'}).
+            Only include information that is directly relevant to the current project in your summary update.
+          `
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error in processMultiProjectCommunication:', error);
+  }
+}
+
+// Process all messages in a batch for multiple projects
+async function processMultiProjectMessages(supabase: any, projectId: string, batchId: string): Promise<void> {
+  console.log(`Processing multi-project batch for batch ${batchId}`);
+  
+  try {
+    // Get all messages in this batch
+    const { data: batchMessages, error: batchError } = await supabase
+      .from('communications')
+      .select('*')
+      .eq('batch_id', batchId)
+      .order('timestamp', { ascending: true });
+      
+    if (batchError) {
+      console.error('Error fetching batch messages:', batchError);
+      return;
+    }
+    
+    if (!batchMessages || batchMessages.length === 0) {
+      console.log('No batched messages found to process');
+      return;
+    }
+    
+    // Mark batch as processing
+    const { error: updateError } = await supabase
+      .from('comms_batch_status')
+      .update({ batch_status: 'processing' })
+      .eq('id', batchId);
+      
+    if (updateError) {
+      console.error(`Error updating batch ${batchId} status:`, updateError);
+    }
+    
+    // Combine the messages
+    const combinedContent = batchMessages.map(msg => 
+      `[${new Date(msg.timestamp).toLocaleString()}] ${msg.direction}: ${msg.content}`
+    ).join('\n\n');
+    
+    // Create a synthetic communication object to represent the batch
+    const batchCommunication = {
+      id: batchId,
+      type: 'SMS',
+      subtype: 'batch',
+      direction: 'mixed',
+      content: combinedContent,
+      participants: batchMessages[0].participants,
+      timestamp: new Date().toISOString(),
+      duration: null,
+      batch_id: batchId
+    };
+    
+    // Use the multi-project processing function
+    await processMultiProjectCommunication(supabase, batchCommunication);
+    
+    // Mark batch as completed
+    const { error: completeError } = await supabase
+      .from('comms_batch_status')
+      .update({ 
+        batch_status: 'completed',
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', batchId);
+      
+    if (completeError) {
+      console.error(`Error marking batch ${batchId} as completed:`, completeError);
+    }
+    
+    console.log(`Successfully processed multi-project batch ${batchId}`);
+  } catch (error) {
+    console.error('Error in processMultiProjectMessages:', error);
+  }
+}
+
+// Update a specific project with its relevant information extracted from a multi-project communication
+async function updateProjectWithSpecificInfo(
+  supabase: any, 
+  projectId: string, 
+  relevantContent: string,
+  communication: any,
+  aiProvider: string,
+  aiModel: string
+): Promise<void> {
+  try {
+    // Get the project details
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select(`
+        id, 
+        summary, 
+        next_step, 
+        project_track, 
+        project_tracks(name, description, Roles, "track base prompt")
+      `)
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError) {
+      console.error(`Error fetching project ${projectId}:`, projectError);
+      return;
+    }
+    
+    // Get latest workflow prompt for summary_update
+    const { data: summaryPrompt, error: summaryPromptError } = await supabase
+      .from('workflow_prompts')
+      .select('*')
+      .eq('type', 'summary_update')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (summaryPromptError) {
+      console.error('Error fetching summary workflow prompt:', summaryPromptError);
+      return;
+    }
+    
+    // Prepare context data with the relevant content for this specific project
+    const contextData = {
+      summary: project.summary || '',
+      track_name: project.project_tracks?.name || 'Default Track',
+      track_roles: project.project_tracks?.Roles || '',
+      track_base_prompt: project.project_tracks?.["track base prompt"] || '',
+      current_date: new Date().toISOString().split('T')[0],
+      new_data: {
+        communication_type: communication.type,
+        communication_subtype: communication.subtype || 'multi_project',
+        communication_direction: communication.direction,
+        communication_content: relevantContent, // Only the relevant content for this project
+        communication_timestamp: communication.timestamp,
+        extracted_from_multi_project: true
+      }
+    };
+    
+    // Call the AI to update the summary
+    console.log(`Updating project ${projectId} with its relevant content`);
+    const { data: summaryResult, error: summaryWorkflowError } = await supabase.functions.invoke(
+      'test-workflow-prompt',
+      {
+        body: {
+          promptType: 'summary_update',
+          promptText: summaryPrompt.prompt_text,
+          projectId: projectId,
+          contextData: contextData,
+          aiProvider: aiProvider,
+          aiModel: aiModel,
+          workflowPromptId: summaryPrompt.id,
+          initiatedBy: 'communications-webhook'
+        }
+      }
+    );
+    
+    if (summaryWorkflowError) {
+      console.error(`Error updating summary for project ${projectId}:`, summaryWorkflowError);
+      return;
+    }
+    
+    console.log(`Successfully updated project ${projectId} with its relevant content`);
+    
+    // Now run action detection and execution as usual
+    const { data: actionPrompt, error: actionPromptError } = await supabase
+      .from('workflow_prompts')
+      .select('*')
+      .eq('type', 'action_detection_execution')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (actionPromptError) {
+      console.error('Error fetching action workflow prompt:', actionPromptError);
+      return;
+    }
+    
+    // Get updated project data with the new summary
+    const { data: updatedProject, error: updatedProjectError } = await supabase
+      .from('projects')
+      .select(`
+        id, 
+        summary, 
+        next_step, 
+        project_track, 
+        project_tracks(name, description, Roles, "track base prompt")
+      `)
+      .eq('id', projectId)
+      .single();
+      
+    if (updatedProjectError) {
+      console.error(`Error fetching updated project ${projectId}:`, updatedProjectError);
+      return;
+    }
+    
+    // Call the AI to detect and execute actions
+    console.log(`Running action detection for project ${projectId}`);
+    const actionContext = {
+      summary: updatedProject.summary || '',
+      track_name: updatedProject.project_tracks?.name || 'Default Track',
+      track_roles: updatedProject.project_tracks?.Roles || '',
+      track_base_prompt: updatedProject.project_tracks?.["track base prompt"] || '',
+      current_date: new Date().toISOString().split('T')[0],
+      next_step: updatedProject.next_step || '',
+      new_data: contextData.new_data,
+      is_reminder_check: false
+    };
+    
+    const { data: actionResult, error: actionWorkflowError } = await supabase.functions.invoke(
+      'test-workflow-prompt',
+      {
+        body: {
+          promptType: 'action_detection_execution',
+          promptText: actionPrompt.prompt_text,
+          projectId: projectId,
+          contextData: actionContext,
+          aiProvider: aiProvider,
+          aiModel: aiModel,
+          workflowPromptId: actionPrompt.id,
+          initiatedBy: 'communications-webhook'
+        }
+      }
+    );
+    
+    if (actionWorkflowError) {
+      console.error(`Error running action detection for project ${projectId}:`, actionWorkflowError);
+      return;
+    }
+    
+    console.log(`Successfully completed action detection for project ${projectId}`);
+  } catch (error) {
+    console.error(`Error in updateProjectWithSpecificInfo for project ${projectId}:`, error);
   }
 }

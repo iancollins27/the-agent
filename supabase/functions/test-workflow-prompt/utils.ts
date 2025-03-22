@@ -7,6 +7,46 @@ export function replaceVariables(promptText: string, contextData: any) {
   
   let updatedPrompt = promptText;
   
+  // Add multi-project analysis guidance if this is a multi-project test
+  if (contextData && (contextData.isMultiProjectTest || contextData.multi_project_analysis)) {
+    if (!promptText.includes("multi-project analysis")) {
+      const multiProjectGuidance = `
+IMPORTANT: This analysis requires you to identify information relevant to multiple projects.
+
+Your task is to:
+1. Analyze the communication content 
+2. Identify which parts are relevant to which projects
+3. Return a JSON response with project-specific information
+
+Expected JSON format:
+\`\`\`json
+{
+  "projects": [
+    {
+      "projectId": "[project id]",
+      "relevantContent": "Content specifically relevant to this project"
+    },
+    {
+      "projectId": "[another project id]", 
+      "relevantContent": "Content specifically relevant to this other project"
+    }
+  ]
+}
+\`\`\`
+`;
+      // Append the guidance near the beginning of the prompt
+      const firstLineBreak = updatedPrompt.indexOf("\n\n");
+      if (firstLineBreak > 0) {
+        updatedPrompt = 
+          updatedPrompt.substring(0, firstLineBreak) + 
+          "\n\n" + multiProjectGuidance + 
+          updatedPrompt.substring(firstLineBreak);
+      } else {
+        updatedPrompt = multiProjectGuidance + "\n\n" + updatedPrompt;
+      }
+    }
+  }
+  
   // Add reminder guidance if this is an action detection + execution prompt
   if (promptText.includes("{{action_type}}") || 
       promptText.includes("SET_FUTURE_REMINDER") ||
@@ -89,6 +129,19 @@ export function generateMockResult(promptType: string, contextData: any): string
           message_text: 'This is a mock message for testing purposes',
           reason: 'This is a mock action detection and execution result',
         }
+      }, null, 2);
+    case 'multi_project_analysis':
+      return JSON.stringify({
+        projects: [
+          {
+            projectId: contextData.projects_data?.[0]?.id || "project-1",
+            relevantContent: "This is a mock relevance analysis for the first project."
+          },
+          {
+            projectId: contextData.projects_data?.[1]?.id || "project-2",
+            relevantContent: "This is a mock relevance analysis for the second project."
+          }
+        ]
       }, null, 2);
     default:
       return 'Mock result for unknown prompt type';
