@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
@@ -137,10 +136,28 @@ serve(async (req) => {
         try {
           console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
           
-          // Validate role
+          // Check if role is valid, but DON'T default to 'BidList Project Manager' automatically
+          // Only normalize known roles to ensure consistent casing
           const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
-          // Check if role is valid, default to 'BidList Project Manager' if not
-          const role = validRoles.includes(contact.role) ? contact.role : 'BidList Project Manager';
+          
+          // Normalize the role if it's a known role, otherwise keep the original role
+          let role = contact.role;
+          
+          // Check for case-insensitive matches and normalize to correct casing
+          for (const validRole of validRoles) {
+            if (validRole.toLowerCase() === contact.role.toLowerCase()) {
+              role = validRole; // Use the properly cased version
+              break;
+            }
+          }
+          
+          // If role is empty, only then use a default
+          if (!role || role.trim() === '') {
+            console.log('Empty role detected, using default: BidList Project Manager');
+            role = 'BidList Project Manager';
+          }
+          
+          console.log(`Using role: ${role} (original: ${contact.role})`);
           
           // Check if contact already exists with this email or phone number
           const { data: existingContacts, error: lookupError } = await supabase
@@ -161,7 +178,7 @@ serve(async (req) => {
             console.log(`Using existing contact with ID: ${contactId}`);
           } else {
             // Create new contact
-            console.log(`Creating new contact: ${contact.name}`);
+            console.log(`Creating new contact: ${contact.name} with role: ${role}`);
             const { data: newContact, error: createError } = await supabase
               .from('contacts')
               .insert({

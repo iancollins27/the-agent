@@ -1,176 +1,164 @@
 
-import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ActionRecord } from './types';
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from '@/components/ui/popover';
-import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
-import { X, Save, Edit2 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import ActionTypeBadge from "./ActionTypeBadge";
+import { ActionRecord } from "@/components/Chat/types";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ActionRecordEditProps {
-  record: ActionRecord;
-  field: 'message' | 'recipient_name';
-  onSuccess: () => void;
+  action: ActionRecord;
+  onActionUpdated: () => void;
 }
 
-interface FormValues {
-  value: string;
-}
+const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpdated }) => {
+  const [status, setStatus] = React.useState(action.status);
+  const [message, setMessage] = React.useState(action.message || '');
 
-const ActionRecordEdit = ({ record, field, onSuccess }: ActionRecordEditProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
-  
-  const form = useForm<FormValues>({
-    defaultValues: {
-      value: field === 'message' 
-        ? record.message || 
-          (record.action_payload && typeof record.action_payload === 'object' && 'message' in record.action_payload 
-            ? record.action_payload.message 
-            : '')
-        : record.recipient_name || ''
+  // Safely convert actionPayload fields to strings for display purposes
+  const getActionFieldString = (field: any): string => {
+    if (field === null || field === undefined) {
+      return '';
     }
-  });
+    return String(field);
+  };
 
-  const handleSubmit = async (data: FormValues) => {
-    setIsSubmitting(true);
-    
+  // Parse action_payload for data_update actions
+  const actionPayload = action.action_payload as Record<string, any>;
+  const field = actionPayload?.field ? getActionFieldString(actionPayload.field) : '';
+  const value = actionPayload?.value ? getActionFieldString(actionPayload.value) : '';
+  const description = actionPayload?.description ? getActionFieldString(actionPayload.description) : '';
+
+  const handleSave = async () => {
     try {
-      let updateData: any = {};
-      
-      if (field === 'message') {
-        updateData.message = data.value;
-        
-        // Also update in action_payload if it exists
-        if (record.action_payload && typeof record.action_payload === 'object') {
-          const updatedPayload = { ...record.action_payload, message: data.value };
-          updateData.action_payload = updatedPayload;
-        }
-      } else if (field === 'recipient_name') {
-        // For recipient, we can only update the display value since the actual
-        // recipient ID is stored elsewhere - this is for display purposes
-        // In a real implementation, you might need to update related tables
-        
-        // If the action_payload contains a recipient field, update it
-        if (record.action_payload && typeof record.action_payload === 'object') {
-          const updatedPayload = { ...record.action_payload, recipient: data.value };
-          updateData.action_payload = updatedPayload;
-        }
-      }
-      
       const { error } = await supabase
         .from('action_records')
-        .update(updateData)
-        .eq('id', record.id);
-        
+        .update({
+          status,
+          message,
+          executed_at: status === 'approved' ? new Date().toISOString() : null
+        })
+        .eq('id', action.id);
+
       if (error) throw error;
-      
-      toast({
-        title: "Updated successfully",
-        description: `The ${field === 'message' ? 'message' : 'recipient'} has been updated.`,
-      });
-      
-      setIsOpen(false);
-      onSuccess();
+
+      // If approved and it's a data update, update the project data
+      if (status === 'approved' && action.action_type === 'data_update' && action.project_id) {
+        const updateData: Record<string, any> = {
+          [field]: actionPayload.value
+        };
+        
+        const { error: updateError } = await supabase
+          .from('projects')
+          .update(updateData)
+          .eq('id', action.project_id);
+          
+        if (updateError) {
+          console.error('Error updating project:', updateError);
+          toast.error(`Failed to update ${field}`);
+        } else {
+          toast.success(description || "Project updated successfully");
+        }
+      }
+
+      toast.success("Action record updated successfully");
+      onActionUpdated();
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Update failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-      });
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error updating action record:', error);
+      toast.error("Failed to update action record");
     }
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <div className="group relative cursor-pointer flex items-center">
-          <span className="mr-2 truncate">
-            {field === 'message' 
-              ? (record.message || 
-                (record.action_payload && typeof record.action_payload === 'object' && 'message' in record.action_payload 
-                  ? record.action_payload.message 
-                  : 'N/A'))
-              : (record.recipient_name || 'No Recipient')}
-          </span>
-          <Edit2 className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-4">
+    <Card>
+      <CardContent className="pt-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="font-medium">
-              Edit {field === 'message' ? 'Message' : 'Recipient'}
-            </h4>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <ActionTypeBadge type={action.action_type} />
+            <span className="text-sm text-gray-500">{new Date(action.created_at).toLocaleString()}</span>
           </div>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="value"
-                render={({ field: formField }) => (
-                  <FormItem>
-                    <FormLabel>
-                      {field === 'message' ? 'Message Content' : 'Recipient Name'}
-                    </FormLabel>
-                    <FormControl>
-                      {field === 'message' ? (
-                        <Textarea 
-                          {...formField} 
-                          rows={4} 
-                          placeholder="Enter message content" 
-                        />
-                      ) : (
-                        <Input 
-                          {...formField} 
-                          placeholder="Enter recipient name" 
-                        />
-                      )}
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              
-              <div className="flex justify-end">
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  size="sm"
-                >
-                  {isSubmitting ? (
-                    <>Saving...</>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
+
+          {action.action_type === 'data_update' && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Field</Label>
+                  <Input value={field} readOnly />
+                </div>
+                <div>
+                  <Label>Value</Label>
+                  <Input value={value} readOnly />
+                </div>
               </div>
-            </form>
-          </Form>
+              {description && (
+                <div>
+                  <Label>Description</Label>
+                  <Input value={description} readOnly />
+                </div>
+              )}
+            </div>
+          )}
+
+          {action.action_type === 'message' && actionPayload?.content && (
+            <div>
+              <Label>Message</Label>
+              <div className="border p-3 rounded-md bg-gray-50">
+                {String(actionPayload.content)}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                    <span>Pending</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="approved">
+                  <div className="flex items-center">
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                    <span>Approved</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="rejected">
+                  <div className="flex items-center">
+                    <XCircle className="h-4 w-4 mr-2 text-red-500" />
+                    <span>Rejected</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="notes">Admin Notes</Label>
+            <Textarea
+              value={message || ''}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Add any notes about this action"
+              className="min-h-[100px]"
+            />
+          </div>
+
+          <Button onClick={handleSave} className="w-full">
+            Save Changes
+          </Button>
         </div>
-      </PopoverContent>
-    </Popover>
+      </CardContent>
+    </Card>
   );
 };
 
