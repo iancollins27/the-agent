@@ -9,9 +9,10 @@ type TestRunnerProps = {
   selectedPromptIds: string[];
   selectedProjectIds: string[];
   onTestComplete: (results: any) => void;
+  isMultiProjectTest?: boolean;
 };
 
-const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete }: TestRunnerProps) => {
+const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete, isMultiProjectTest = false }: TestRunnerProps) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { toast } = useToast();
   
@@ -74,7 +75,8 @@ const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete }: T
           track_roles: projectData.project_tracks?.Roles || '',
           current_date: new Date().toISOString().split('T')[0],
           milestone_instructions: '',
-          action_description: 'Sample action for testing'
+          action_description: 'Sample action for testing',
+          isMultiProjectTest: isMultiProjectTest // Add this flag to the context data
         };
         
         // Get milestone instructions if this is a next step
@@ -113,7 +115,8 @@ const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete }: T
               aiProvider: aiProvider,
               aiModel: aiModel,
               workflowPromptId: promptData.id,
-              initiatedBy: userEmail
+              initiatedBy: userEmail,
+              isMultiProjectTest: isMultiProjectTest // Pass the flag to the edge function
             }
           });
           
@@ -160,7 +163,7 @@ const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete }: T
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Testing...
           </>
-        ) : "Run Test"}
+        ) : isMultiProjectTest ? "Run Multi-Project Test" : "Run Test"}
       </Button>
     </div>
   );
