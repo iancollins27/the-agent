@@ -1,5 +1,8 @@
 
-import { processMessagesForProject, processMultiProjectMessages } from "./messageProcessor.ts";
+import { 
+  processMessagesForProject, 
+  processMultiProjectMessages 
+} from "./messageProcessor.ts";
 
 /**
  * Find and process all batches that are due for processing

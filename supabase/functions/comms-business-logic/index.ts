@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/config.ts";
@@ -10,11 +9,11 @@ import {
 } from "./services/messageBatcher.ts";
 import { 
   processMessagesForProject, 
-  processCommunicationForProject 
+  processCommunicationForProject,
+  processMultiProjectMessages
 } from "./services/messageProcessor.ts";
 import { 
-  processMultiProjectCommunication, 
-  processMultiProjectMessages 
+  processMultiProjectCommunication
 } from "./services/multiProjectProcessor.ts";
 import { processDueBatches } from "./services/batchProcessor.ts";
 
