@@ -62,16 +62,18 @@ serve(async (req) => {
     // Get track roles and base prompt if the project track exists
     let trackRoles = '';
     let trackBasePrompt = '';
+    let trackName = '';
     if (projectTrackId) {
       const { data: trackData, error: trackError } = await supabase
         .from('project_tracks')
-        .select('Roles, "track base prompt"')
+        .select('Roles, "track base prompt", name')
         .eq('id', projectTrackId)
         .single();
         
       if (!trackError && trackData) {
         trackRoles = trackData.Roles || '';
         trackBasePrompt = trackData['track base prompt'] || '';
+        trackName = trackData.name || '';
       }
     }
 
@@ -84,6 +86,7 @@ serve(async (req) => {
       .replace('{{next_step_instructions}}', nextStepInstructions || '')
       .replace('{{track_roles}}', trackRoles || '')
       .replace('{{track_base_prompt}}', trackBasePrompt || '')
+      .replace('{{track_name}}', trackName || '')
 
     // Get AI configuration
     const { data: aiConfig, error: aiConfigError } = await supabase
@@ -130,18 +133,36 @@ serve(async (req) => {
 
     console.log('Project update data:', projectUpdateData);
 
+    let projectId;
     // Update or create project
     if (existingProject) {
       await updateProject(supabase, existingProject.id, projectUpdateData)
+      projectId = existingProject.id;
     } else {
-      await createProject(supabase, {
-        ...projectUpdateData,
-        crm_id: projectData.crmId
-      })
+      const { data: newProject, error } = await supabase
+        .from('projects')
+        .insert({
+          ...projectUpdateData,
+          crm_id: projectData.crmId
+        })
+        .select('id')
+        .single();
+        
+      if (error) {
+        throw new Error(`Failed to create project: ${error.message}`);
+      }
+      
+      projectId = newProject.id;
+      console.log(`Created new project with ID: ${projectId}`);
     }
 
     // Log milestone updates using the new action_records table
-    await createMilestoneActionRecord(supabase, existingProject?.id, projectData.timeline)
+    try {
+      await createMilestoneActionRecord(supabase, projectId, projectData.timeline)
+    } catch (error) {
+      console.error('Error creating milestone action records, but continuing:', error);
+      // We continue processing even if action records fail
+    }
 
     return new Response(
       JSON.stringify({ 
@@ -153,7 +174,8 @@ serve(async (req) => {
         companyUuid,
         projectTrackId,
         aiProvider,
-        aiModel
+        aiModel,
+        projectId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

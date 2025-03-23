@@ -123,6 +123,7 @@ export async function updateProject(
     company_id: string;
     project_track?: string | null;
     next_check_date?: string | null;
+    Address?: string;
   }
 ) {
   const { error } = await supabase
@@ -146,6 +147,7 @@ export async function createProject(
     crm_id: string;
     project_track?: string | null;
     next_check_date?: string | null;
+    Address?: string;
   }
 ) {
   const { error } = await supabase
@@ -165,20 +167,42 @@ export async function createMilestoneActionRecord(supabase: any, projectId: stri
     return
   }
 
-  const actions = Object.entries(timeline).map(([milestone, date]) => ({
-    project_id: projectId,
-    milestone: milestone,
-    action_date: date,
-    action_type: 'timeline_update',
-    description: `Timeline updated for ${milestone} on ${date}`
-  }))
+  try {
+    // Validate timeline data before processing
+    if (!timeline || typeof timeline !== 'object' || Object.keys(timeline).length === 0) {
+      console.log('No timeline data to process for action records. Skipping.')
+      return
+    }
 
-  const { error } = await supabase
-    .from('action_records')
-    .insert(actions)
+    // Filter out empty timeline values and create action records only for milestones with dates
+    const filteredTimeline = Object.entries(timeline).filter(([_, date]) => date && String(date).trim() !== '')
+    
+    if (filteredTimeline.length === 0) {
+      console.log('No valid timeline entries with dates to record. Skipping.')
+      return
+    }
 
-  if (error) {
-    console.error('Error creating milestone action records:', error)
+    console.log(`Creating ${filteredTimeline.length} milestone action records for project ${projectId}`)
+    
+    const actions = filteredTimeline.map(([milestone, date]) => ({
+      project_id: projectId,
+      milestone: milestone,
+      action_date: date,
+      action_type: 'timeline_update',
+      description: `Timeline updated for ${milestone} on ${date}`
+    }))
+
+    const { data, error } = await supabase
+      .from('action_records')
+      .insert(actions)
+
+    if (error) {
+      console.error('Error creating milestone action records:', error)
+    } else {
+      console.log(`Successfully created ${actions.length} milestone action records`)
+    }
+  } catch (error) {
+    console.error('Exception in createMilestoneActionRecord:', error)
   }
 }
 
