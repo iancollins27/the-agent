@@ -860,6 +860,7 @@ export type Database = {
         | "action_detection"
         | "action_execution"
         | "action_detection_execution"
+        | "multi_project_analysis"
     }
     CompositeTypes: {
       [_ in never]: never
