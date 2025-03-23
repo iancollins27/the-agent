@@ -30,13 +30,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check for any due batches and process them first
-    // We do this on every invocation to ensure batches don't get "stuck"
-    const processedBatches = await processDueBatches(supabase);
-    console.log(`Processed ${processedBatches} due batches during function invocation`);
+    let processedBatches = 0;
+    
+    try {
+      // Check for any due batches and process them first
+      // We do this on every invocation to ensure batches don't get "stuck"
+      processedBatches = await processDueBatches(supabase);
+      console.log(`Processed ${processedBatches} due batches during function invocation`);
+    } catch (batchError) {
+      console.error('Error processing batches, but continuing:', batchError);
+      // Continue with other processing even if batch processing fails
+    }
     
     // Get request body
-    const requestBody = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
     const { communicationId, processBatchesOnly } = requestBody;
 
     // If this is just a batch processing request, return early
@@ -75,7 +95,7 @@ serve(async (req) => {
     if (fetchError || !communication) {
       console.error('Error fetching communication:', fetchError);
       return new Response(
-        JSON.stringify({ error: 'Communication not found' }),
+        JSON.stringify({ error: 'Communication not found', details: fetchError }),
         { 
           status: 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -97,93 +117,131 @@ serve(async (req) => {
     
     // If no project is assigned, try to find a match based on phone number
     if (!projectId) {
-      console.log('No project ID assigned, attempting to find match based on phone number');
-      projectId = await findProjectByPhoneNumber(supabase, communication);
-      
-      if (projectId) {
-        // Update the communication with the project_id
-        const { error: updateError } = await supabase
-          .from('communications')
-          .update({ project_id: projectId })
-          .eq('id', communicationId);
-          
-        if (updateError) {
-          console.error('Error updating communication with project ID:', updateError);
+      try {
+        console.log('No project ID assigned, attempting to find match based on phone number');
+        projectId = await findProjectByPhoneNumber(supabase, communication);
+        
+        if (projectId) {
+          // Update the communication with the project_id
+          const { error: updateError } = await supabase
+            .from('communications')
+            .update({ project_id: projectId })
+            .eq('id', communicationId);
+            
+          if (updateError) {
+            console.error('Error updating communication with project ID:', updateError);
+          } else {
+            console.log(`Associated communication with project ID: ${projectId}`);
+          }
         } else {
-          console.log(`Associated communication with project ID: ${projectId}`);
+          console.log('No project match found for this communication');
         }
-      } else {
-        console.log('No project match found for this communication');
+      } catch (projectFindError) {
+        console.error('Error finding project by phone number:', projectFindError);
+        // Continue processing even if project finding fails
       }
     } else {
       console.log(`Communication already has project ID: ${projectId}`);
     }
     
     // Determine if this is potentially a multi-project communication
-    const isMultiProjectCommunication = await isPotentialMultiProjectComm(supabase, communication);
-    console.log(`Is potential multi-project communication: ${isMultiProjectCommunication}`);
-    
-    if (isMultiProjectCommunication) {
-      // Update the communication to mark it as multi-project
-      const { error: updateError } = await supabase
-        .from('communications')
-        .update({ multi_project_potential: true })
-        .eq('id', communicationId);
-        
-      if (updateError) {
-        console.error('Error marking communication as multi-project:', updateError);
+    let isMultiProjectCommunication = false;
+    try {
+      isMultiProjectCommunication = await isPotentialMultiProjectComm(supabase, communication);
+      console.log(`Is potential multi-project communication: ${isMultiProjectCommunication}`);
+      
+      if (isMultiProjectCommunication) {
+        // Update the communication to mark it as multi-project
+        const { error: updateError } = await supabase
+          .from('communications')
+          .update({ multi_project_potential: true })
+          .eq('id', communicationId);
+          
+        if (updateError) {
+          console.error('Error marking communication as multi-project:', updateError);
+        }
       }
+    } catch (multiProjectError) {
+      console.error('Error determining multi-project status:', multiProjectError);
+      // Continue with normal processing if multi-project detection fails
     }
     
     // If we have a project_id or this is a multi-project communication, determine if we should process this communication now or batch it
     if (projectId || isMultiProjectCommunication) {
-      // For multi-project communications or if it's SMS
-      if (communication.type === 'SMS') {
-        console.log('Processing SMS message, checking if it should be batched');
-        
-        // Check if this SMS should be batched
-        const shouldBatch = projectId ? await shouldBatchMessage(supabase, communication, projectId) : false;
-        
-        if (shouldBatch) {
-          console.log('Batching SMS message for later processing');
+      try {
+        // For multi-project communications or if it's SMS
+        if (communication.type === 'SMS') {
+          console.log('Processing SMS message, checking if it should be batched');
+          
+          let shouldBatch = false;
+          
           try {
-            await markMessageForBatch(supabase, communicationId, projectId);
-            
-            return new Response(
-              JSON.stringify({ 
-                success: true, 
-                project_id: projectId,
-                batched: true,
-                multi_project: isMultiProjectCommunication,
-                message: 'SMS message batched for later processing'
-              }),
-              { 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-              }
-            );
-          } catch (batchError) {
-            console.error('Error during batch assignment:', batchError);
-            // Continue with processing if batching fails
+            // Check if this SMS should be batched
+            shouldBatch = projectId ? await shouldBatchMessage(supabase, communication, projectId) : false;
+          } catch (batchCheckError) {
+            console.error('Error checking batch status:', batchCheckError);
+            // Default to not batching if batch check fails
+            shouldBatch = false;
           }
-        } else {
-          // If we shouldn't batch or the batch criteria is met, process all recent messages
-          console.log('Processing SMS now without batching');
-          if (isMultiProjectCommunication) {
-            await processMultiProjectMessages(supabase, projectId, communication.batch_id);
+          
+          if (shouldBatch) {
+            console.log('Batching SMS message for later processing');
+            try {
+              await markMessageForBatch(supabase, communicationId, projectId);
+              
+              return new Response(
+                JSON.stringify({ 
+                  success: true, 
+                  project_id: projectId,
+                  batched: true,
+                  multi_project: isMultiProjectCommunication,
+                  message: 'SMS message batched for later processing'
+                }),
+                { 
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+                }
+              );
+            } catch (batchError) {
+              console.error('Error during batch assignment:', batchError);
+              // Continue with processing if batching fails
+            }
           } else {
-            await processMessagesForProject(supabase, projectId);
+            // If we shouldn't batch or the batch criteria is met, process all recent messages
+            console.log('Processing SMS now without batching');
+            if (isMultiProjectCommunication) {
+              await processMultiProjectMessages(supabase, projectId, communication.batch_id);
+            } else {
+              await processMessagesForProject(supabase, projectId);
+            }
+          }
+        } else {
+          // For non-SMS (e.g., CALL)
+          console.log(`Processing non-SMS communication of type: ${communication.type}`);
+          if (isMultiProjectCommunication) {
+            // Process as multi-project communication
+            await processMultiProjectCommunication(supabase, communication);
+          } else {
+            // Process for single project
+            await processCommunicationForProject(supabase, communication, projectId);
           }
         }
-      } else {
-        // For non-SMS (e.g., CALL)
-        console.log(`Processing non-SMS communication of type: ${communication.type}`);
-        if (isMultiProjectCommunication) {
-          // Process as multi-project communication
-          await processMultiProjectCommunication(supabase, communication);
-        } else {
-          // Process for single project
-          await processCommunicationForProject(supabase, communication, projectId);
-        }
+      } catch (processingError) {
+        console.error('Error during communication processing:', processingError);
+        // Return a success response even if processing fails to prevent retries
+        // The error is logged and can be handled through monitoring
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            project_id: projectId,
+            batched: false,
+            multi_project: isMultiProjectCommunication,
+            processed_batches: processedBatches,
+            error: processingError.message
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
     }
 
@@ -203,7 +261,7 @@ serve(async (req) => {
     console.error('Error in business logic handler:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, stack: error.stack }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500

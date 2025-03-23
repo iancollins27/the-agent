@@ -4,14 +4,58 @@ import { NormalizedCommunication } from "./types.ts";
 export function parseTwilioWebhook(payload: any): NormalizedCommunication {
   console.log('Parsing Twilio webhook payload:', JSON.stringify(payload, null, 2).substring(0, 1000));
   
-  // Determine the type of webhook
-  if (payload.CallSid || payload.CallStatus) {
-    return parseTwilioCallWebhook(payload);
-  } else if (payload.MessageSid || payload.SmsSid || payload.Body) {
-    return parseTwilioSmsWebhook(payload);
-  } else {
-    throw new Error("Unknown Twilio webhook type: " + JSON.stringify(payload).substring(0, 200));
+  try {
+    // Determine the type of webhook
+    if (payload.CallSid || payload.CallStatus) {
+      return parseTwilioCallWebhook(payload);
+    } else if (payload.MessageSid || payload.SmsSid || payload.Body) {
+      return parseTwilioSmsWebhook(payload);
+    } else {
+      throw new Error("Unknown Twilio webhook type: " + JSON.stringify(payload).substring(0, 200));
+    }
+  } catch (error) {
+    console.error('Error in Twilio parser:', error);
+    // Always return a valid normalized communication structure even in error cases
+    // This prevents downstream 500/503 errors and allows for better error tracking
+    return {
+      type: payload.CallSid ? 'CALL' : 'SMS',
+      subtype: payload.CallSid ? 'CALL_OTHER' : 'SMS_MESSAGE',
+      participants: parseParticipants(payload),
+      timestamp: new Date().toISOString(),
+      direction: determineDirection(payload),
+      content: payload.Body || 'Error parsing webhook: ' + error.message,
+      error_details: error.message
+    };
   }
+}
+
+function parseParticipants(payload: any) {
+  const participants = [];
+  const isInbound = determineDirection(payload) === 'inbound';
+  
+  if (payload.From) {
+    participants.push({
+      type: 'phone',
+      value: payload.From,
+      role: isInbound ? (payload.CallSid ? 'caller' : 'sender') : (payload.CallSid ? 'recipient' : 'receiver')
+    });
+  }
+  
+  if (payload.To) {
+    participants.push({
+      type: 'phone',
+      value: payload.To,
+      role: isInbound ? (payload.CallSid ? 'recipient' : 'receiver') : (payload.CallSid ? 'caller' : 'sender')
+    });
+  }
+  
+  return participants;
+}
+
+function determineDirection(payload: any) {
+  return payload.Direction === "inbound" || 
+         payload.direction === "inbound" ? 
+         'inbound' : 'outbound';
 }
 
 function parseTwilioCallWebhook(payload: any): NormalizedCommunication {
