@@ -1,5 +1,5 @@
 
-import { updateProjectWithAI } from "./projectUpdater.ts";
+import { updateProjectWithAI } from "./singleProjectUpdater.ts";
 
 /**
  * Process all communications in a batch for a project

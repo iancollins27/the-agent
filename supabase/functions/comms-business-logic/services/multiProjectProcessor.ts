@@ -1,6 +1,6 @@
 
-import { updateProjectWithSpecificInfo } from "./projectUpdater.ts";
-import { updateProjectWithAI } from "./projectUpdater.ts";
+import { updateProjectWithSpecificInfo } from "./multiProjectUpdater.ts";
+import { updateProjectWithAI } from "./singleProjectUpdater.ts";
 
 /**
  * Process a communication that might reference multiple projects
