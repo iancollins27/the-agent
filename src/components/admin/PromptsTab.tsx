@@ -12,13 +12,6 @@ const PromptsTab = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
 
-  const allowedPromptTypes = [
-    'summary_generation', 
-    'summary_update', 
-    'action_detection_execution',
-    'multi_project_analysis'
-  ];
-
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
     queryKey: ['workflow-prompts'],
     queryFn: async () => {
@@ -33,12 +26,8 @@ const PromptsTab = () => {
         throw error;
       }
       
-      const filteredPrompts = data?.filter(prompt => 
-        allowedPromptTypes.includes(prompt.type)
-      ) || [];
-      
-      console.log('Fetched prompts:', filteredPrompts);
-      return filteredPrompts as WorkflowPrompt[];
+      console.log('Fetched prompts:', data);
+      return data as WorkflowPrompt[];
     }
   });
 

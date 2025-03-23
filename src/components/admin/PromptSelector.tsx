@@ -15,14 +15,6 @@ const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelec
   const [prompts, setPrompts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // List of allowed prompt types
-  const allowedPromptTypes = [
-    'summary_generation', 
-    'summary_update', 
-    'action_detection_execution',
-    'multi_project_analysis'
-  ];
-  
   useEffect(() => {
     const fetchPrompts = async () => {
       setIsLoading(true);
@@ -34,12 +26,8 @@ const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelec
       if (error) {
         console.error('Error fetching prompts:', error);
       } else {
-        // Filter prompts to only include allowed types
-        const filteredPrompts = data?.filter(prompt => 
-          allowedPromptTypes.includes(prompt.type)
-        ) || [];
-        
-        setPrompts(filteredPrompts);
+        // No filtering, show all prompt types
+        setPrompts(data || []);
       }
       setIsLoading(false);
     };
