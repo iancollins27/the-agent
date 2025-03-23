@@ -1,5 +1,6 @@
 
 import { updateProjectWithSpecificInfo } from "./projectUpdater.ts";
+import { updateProjectWithAI } from "./projectUpdater.ts";
 
 /**
  * Process a communication that might reference multiple projects
@@ -21,7 +22,7 @@ export async function processMultiProjectCommunication(supabase: any, communicat
         next_step,
         company_id,
         project_track,
-        project_tracks(name, description, Roles, "track base prompt")
+        project_tracks(name, Roles, "track base prompt")
       `)
       .is('next_check_date', null) // Only consider active projects
       .order('created_at', { ascending: false })
@@ -181,12 +182,8 @@ export async function processMultiProjectCommunication(supabase: any, communicat
   }
 }
 
-/**
- * Process all messages in a batch for multiple projects
- * @param supabase Supabase client
- * @param projectId Project ID
- * @param batchId Batch ID
- */
+// You can export this function directly, but we won't be importing it from batchProcessor
+// to avoid circular dependencies
 export async function processMultiProjectMessages(supabase: any, projectId: string, batchId: string): Promise<void> {
   console.log(`Processing multi-project batch for batch ${batchId}`);
   
