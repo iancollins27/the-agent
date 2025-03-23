@@ -61,13 +61,16 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
     const aiProvider = aiConfig?.provider || 'openai';
     const aiModel = aiConfig?.model || 'gpt-4o';
     
+    // Format the communication data into a string for better readability in prompts
+    const formattedCommunicationData = formatCommunicationData(contextData);
+    
     // Call the AI to update the summary
     console.log('Calling test-workflow-prompt for summary update');
     const summaryContext = {
       summary: project.summary || '',
       track_name: project.project_tracks?.name || 'Default Track',
       current_date: new Date().toISOString().split('T')[0],
-      new_data: contextData
+      new_data: formattedCommunicationData
     };
     
     // Log the actual inputs to the prompt
@@ -145,7 +148,7 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
       track_base_prompt: updatedProject.project_tracks?.["track base prompt"] || '',
       current_date: new Date().toISOString().split('T')[0],
       next_step: updatedProject.next_step || '',
-      new_data: contextData,
+      new_data: formattedCommunicationData,
       is_reminder_check: false
     };
     
@@ -174,6 +177,53 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
   } catch (error) {
     console.error('Error updating project with AI:', error);
   }
+}
+
+/**
+ * Format communication data into a structured string for better readability in prompts
+ */
+function formatCommunicationData(contextData: any): string {
+  // Create a structured, readable format for the communication data
+  let formattedData = "Communication Information:\n";
+  
+  // Add communication type
+  formattedData += `Type: ${contextData.communication_type || 'Unknown'}\n`;
+  
+  // Add communication subtype
+  if (contextData.communication_subtype) {
+    formattedData += `Subtype: ${contextData.communication_subtype}\n`;
+  }
+  
+  // Add direction
+  if (contextData.communication_direction) {
+    formattedData += `Direction: ${contextData.communication_direction}\n`;
+  }
+  
+  // Add timestamp
+  if (contextData.communication_timestamp) {
+    // Format date to be more readable
+    const date = new Date(contextData.communication_timestamp);
+    formattedData += `Time: ${date.toLocaleString()}\n`;
+  }
+  
+  // Add duration for calls
+  if (contextData.communication_type === 'CALL' && contextData.communication_duration) {
+    const minutes = Math.floor(contextData.communication_duration / 60);
+    const seconds = contextData.communication_duration % 60;
+    formattedData += `Duration: ${minutes}m ${seconds}s\n`;
+  }
+  
+  // Add content (message body or transcript)
+  if (contextData.communication_content) {
+    formattedData += `\nContent:\n${contextData.communication_content}\n`;
+  }
+  
+  // Add recording URL if available
+  if (contextData.communication_recording_url) {
+    formattedData += `\nRecording URL: ${contextData.communication_recording_url}\n`;
+  }
+  
+  return formattedData;
 }
 
 /**
@@ -220,6 +270,19 @@ export async function updateProjectWithSpecificInfo(
       return;
     }
     
+    // Create a formatted communication object with the relevant content
+    const communicationData = {
+      communication_type: communication.type,
+      communication_subtype: communication.subtype || 'multi_project',
+      communication_direction: communication.direction,
+      communication_content: relevantContent,
+      communication_timestamp: communication.timestamp,
+      extracted_from_multi_project: true
+    };
+    
+    // Format the communication data for the prompt
+    const formattedCommunicationData = formatCommunicationData(communicationData);
+    
     // Prepare context data with the relevant content for this specific project
     const contextData = {
       summary: project.summary || '',
@@ -227,14 +290,7 @@ export async function updateProjectWithSpecificInfo(
       track_roles: project.project_tracks?.Roles || '',
       track_base_prompt: project.project_tracks?.["track base prompt"] || '',
       current_date: new Date().toISOString().split('T')[0],
-      new_data: {
-        communication_type: communication.type,
-        communication_subtype: communication.subtype || 'multi_project',
-        communication_direction: communication.direction,
-        communication_content: relevantContent, // Only the relevant content for this project
-        communication_timestamp: communication.timestamp,
-        extracted_from_multi_project: true
-      }
+      new_data: formattedCommunicationData
     };
     
     // Call the AI to update the summary
@@ -303,7 +359,7 @@ export async function updateProjectWithSpecificInfo(
       track_base_prompt: updatedProject.project_tracks?.["track base prompt"] || '',
       current_date: new Date().toISOString().split('T')[0],
       next_step: updatedProject.next_step || '',
-      new_data: contextData.new_data,
+      new_data: formattedCommunicationData,
       is_reminder_check: false
     };
     
