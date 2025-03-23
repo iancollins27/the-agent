@@ -9,6 +9,8 @@ import { BATCH_CONFIG } from "../utils/config.ts";
  * @returns Boolean indicating if the message should be batched
  */
 export async function shouldBatchMessage(supabase: any, communication: any, projectId: string): Promise<boolean> {
+  console.log(`Checking if message should be batched for project ${projectId}`);
+  
   // Get the timestamp for the cutoff window
   const cutoffTime = new Date();
   cutoffTime.setMinutes(cutoffTime.getMinutes() - BATCH_CONFIG.TIME_WINDOW_MINUTES);
@@ -87,6 +89,8 @@ export async function shouldBatchMessage(supabase: any, communication: any, proj
  * @param projectId Project ID
  */
 export async function markMessageForBatch(supabase: any, communicationId: string, projectId: string): Promise<void> {
+  console.log(`Marking message ${communicationId} for batch in project ${projectId}`);
+  
   // Get or create a batch for this project
   let batchId: string;
   
@@ -123,7 +127,12 @@ export async function markMessageForBatch(supabase: any, communicationId: string
       
     if (createError) {
       console.error('Error creating batch:', createError);
-      return;
+      throw new Error(`Failed to create batch: ${createError.message}`);
+    }
+    
+    if (!newBatch) {
+      console.error('No batch created despite no error');
+      throw new Error('Failed to create batch: No data returned');
     }
     
     batchId = newBatch.id;
@@ -138,6 +147,7 @@ export async function markMessageForBatch(supabase: any, communicationId: string
     
   if (updateError) {
     console.error('Error marking message for batch:', updateError);
+    throw new Error(`Failed to update communication batch: ${updateError.message}`);
   } else {
     console.log(`Added communication ${communicationId} to batch ${batchId}`);
   }

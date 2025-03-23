@@ -83,11 +83,21 @@ serve(async (req) => {
       );
     }
 
+    console.log('Communication details:', {
+      id: communication.id,
+      type: communication.type,
+      subtype: communication.subtype, 
+      content: communication.content ? communication.content.substring(0, 50) + '...' : null,
+      participantCount: communication.participants?.length || 0,
+      project_id: communication.project_id,
+    });
+
     // Check if a project_id is already assigned
     let projectId = communication.project_id;
     
     // If no project is assigned, try to find a match based on phone number
     if (!projectId) {
+      console.log('No project ID assigned, attempting to find match based on phone number');
       projectId = await findProjectByPhoneNumber(supabase, communication);
       
       if (projectId) {
@@ -105,6 +115,8 @@ serve(async (req) => {
       } else {
         console.log('No project match found for this communication');
       }
+    } else {
+      console.log(`Communication already has project ID: ${projectId}`);
     }
     
     // Determine if this is potentially a multi-project communication
@@ -127,27 +139,35 @@ serve(async (req) => {
     if (projectId || isMultiProjectCommunication) {
       // For multi-project communications or if it's SMS
       if (communication.type === 'SMS') {
+        console.log('Processing SMS message, checking if it should be batched');
+        
         // Check if this SMS should be batched
-        const shouldBatch = await shouldBatchMessage(supabase, communication, projectId);
+        const shouldBatch = projectId ? await shouldBatchMessage(supabase, communication, projectId) : false;
         
         if (shouldBatch) {
           console.log('Batching SMS message for later processing');
-          await markMessageForBatch(supabase, communicationId, projectId);
-          
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              project_id: projectId,
-              batched: true,
-              multi_project: isMultiProjectCommunication,
-              message: 'SMS message batched for later processing'
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
+          try {
+            await markMessageForBatch(supabase, communicationId, projectId);
+            
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                project_id: projectId,
+                batched: true,
+                multi_project: isMultiProjectCommunication,
+                message: 'SMS message batched for later processing'
+              }),
+              { 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              }
+            );
+          } catch (batchError) {
+            console.error('Error during batch assignment:', batchError);
+            // Continue with processing if batching fails
+          }
         } else {
           // If we shouldn't batch or the batch criteria is met, process all recent messages
+          console.log('Processing SMS now without batching');
           if (isMultiProjectCommunication) {
             await processMultiProjectMessages(supabase, projectId, communication.batch_id);
           } else {
@@ -156,6 +176,7 @@ serve(async (req) => {
         }
       } else {
         // For non-SMS (e.g., CALL)
+        console.log(`Processing non-SMS communication of type: ${communication.type}`);
         if (isMultiProjectCommunication) {
           // Process as multi-project communication
           await processMultiProjectCommunication(supabase, communication);

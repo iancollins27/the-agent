@@ -2,17 +2,20 @@
 import { NormalizedCommunication } from "./types.ts";
 
 export function parseTwilioWebhook(payload: any): NormalizedCommunication {
+  console.log('Parsing Twilio webhook payload:', JSON.stringify(payload, null, 2).substring(0, 1000));
+  
   // Determine the type of webhook
   if (payload.CallSid || payload.CallStatus) {
     return parseTwilioCallWebhook(payload);
   } else if (payload.MessageSid || payload.SmsSid || payload.Body) {
     return parseTwilioSmsWebhook(payload);
   } else {
-    throw new Error("Unknown Twilio webhook type");
+    throw new Error("Unknown Twilio webhook type: " + JSON.stringify(payload).substring(0, 200));
   }
 }
 
 function parseTwilioCallWebhook(payload: any): NormalizedCommunication {
+  console.log('Parsing Twilio call webhook');
   const isInbound = payload.Direction === "inbound";
   
   // Extract participants
@@ -33,6 +36,8 @@ function parseTwilioCallWebhook(payload: any): NormalizedCommunication {
       role: isInbound ? 'recipient' : 'caller'
     });
   }
+  
+  console.log('Extracted participants:', participants);
   
   // Call status mapping to subtypes
   let subtype = 'CALL_OTHER';
@@ -82,6 +87,7 @@ function parseTwilioCallWebhook(payload: any): NormalizedCommunication {
 }
 
 function parseTwilioSmsWebhook(payload: any): NormalizedCommunication {
+  console.log('Parsing Twilio SMS webhook');
   const isInbound = payload.Direction === "inbound";
   
   // Extract participants
@@ -102,6 +108,8 @@ function parseTwilioSmsWebhook(payload: any): NormalizedCommunication {
       role: isInbound ? 'receiver' : 'sender'
     });
   }
+  
+  console.log('Extracted participants:', participants);
   
   // Convert Twilio's timestamp
   let timestamp = new Date().toISOString();

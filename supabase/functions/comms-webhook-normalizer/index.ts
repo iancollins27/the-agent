@@ -92,6 +92,12 @@ serve(async (req) => {
         throw new Error(`Invalid normalized data structure: ${JSON.stringify(normalizedData)}`);
       }
 
+      // Extract phone numbers for improved logging
+      const phoneNumbers = normalizedData.participants
+        .filter((p: any) => p.type === 'phone')
+        .map((p: any) => p.value);
+      console.log('Phone numbers in communication:', phoneNumbers);
+
       // Save normalized data to communications table
       const { data: communication, error: insertError } = await supabase
         .from('communications')
@@ -125,6 +131,7 @@ serve(async (req) => {
 
       // Call the business logic handler with the normalized data
       try {
+        console.log('Calling business logic handler with communication ID:', communication.id);
         const { data: businessLogicResponse, error: businessLogicError } = await supabase.functions.invoke(
           'comms-business-logic',
           {
