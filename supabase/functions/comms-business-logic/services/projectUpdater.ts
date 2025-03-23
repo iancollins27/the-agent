@@ -26,7 +26,7 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
         summary, 
         next_step, 
         project_track, 
-        project_tracks(name, description, Roles, "track base prompt")
+        project_tracks(name, Roles, "track base prompt")
       `)
       .eq('id', projectId)
       .single();
@@ -126,7 +126,7 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
         summary, 
         next_step, 
         project_track, 
-        project_tracks(name, description, Roles, "track base prompt")
+        project_tracks(name, Roles, "track base prompt")
       `)
       .eq('id', projectId)
       .single();
@@ -196,7 +196,7 @@ export async function updateProjectWithSpecificInfo(
         summary, 
         next_step, 
         project_track, 
-        project_tracks(name, description, Roles, "track base prompt")
+        project_tracks(name, Roles, "track base prompt")
       `)
       .eq('id', projectId)
       .single();
@@ -284,7 +284,7 @@ export async function updateProjectWithSpecificInfo(
         summary, 
         next_step, 
         project_track, 
-        project_tracks(name, description, Roles, "track base prompt")
+        project_tracks(name, Roles, "track base prompt")
       `)
       .eq('id', projectId)
       .single();
