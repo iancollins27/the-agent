@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -14,7 +15,8 @@ const PromptsTab = () => {
   const allowedPromptTypes = [
     'summary_generation', 
     'summary_update', 
-    'action_detection_execution'
+    'action_detection_execution',
+    'multi_project_analysis'
   ];
 
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({

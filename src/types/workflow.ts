@@ -1,5 +1,4 @@
-
-export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution';
+export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution' | 'multi_project_analysis';
 
 export type WorkflowPrompt = {
   id: string;
@@ -58,7 +57,8 @@ export const workflowTitles: Record<WorkflowType, string> = {
   summary_update: "Summary Update",
   action_detection: "Action Detection",
   action_execution: "Action Execution",
-  action_detection_execution: "Action Detection & Execution"
+  action_detection_execution: "Action Detection & Execution",
+  multi_project_analysis: "Multi-Project Analysis"
 };
 
 export const availableVariables = {
@@ -105,5 +105,12 @@ export const availableVariables = {
     { name: "next_step", description: "The current next step in the project" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" },
     { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" }
+  ],
+  multi_project_analysis: [
+    { name: "communication_type", description: "Type of communication (SMS, CALL, etc.)" },
+    { name: "communication_content", description: "Content of the communication" },
+    { name: "communication_participants", description: "Participants in the communication" },
+    { name: "projects_data", description: "List of projects to analyze against" },
+    { name: "current_date", description: "Today's date" }
   ]
 };
