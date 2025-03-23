@@ -110,6 +110,8 @@ serve(async (req) => {
       content: communication.content ? communication.content.substring(0, 50) + '...' : null,
       participantCount: communication.participants?.length || 0,
       project_id: communication.project_id,
+      is_call: communication.type === 'CALL',
+      has_recording: !!communication.recording_url
     });
 
     // Check if a project_id is already assigned
@@ -169,8 +171,17 @@ serve(async (req) => {
     // If we have a project_id or this is a multi-project communication, determine if we should process this communication now or batch it
     if (projectId || isMultiProjectCommunication) {
       try {
-        // For multi-project communications or if it's SMS
-        if (communication.type === 'SMS') {
+        // Special handling for CALL type communications - always process them immediately without batching
+        if (communication.type === 'CALL') {
+          console.log('Processing CALL immediately without batching');
+          if (isMultiProjectCommunication) {
+            await processMultiProjectCommunication(supabase, communication);
+          } else {
+            await processCommunicationForProject(supabase, communication, projectId);
+          }
+        }
+        // For SMS or other communication types
+        else if (communication.type === 'SMS') {
           console.log('Processing SMS message, checking if it should be batched');
           
           let shouldBatch = false;
@@ -215,8 +226,8 @@ serve(async (req) => {
             }
           }
         } else {
-          // For non-SMS (e.g., CALL)
-          console.log(`Processing non-SMS communication of type: ${communication.type}`);
+          // For other communication types (not CALL or SMS)
+          console.log(`Processing non-SMS/non-CALL communication of type: ${communication.type}`);
           if (isMultiProjectCommunication) {
             // Process as multi-project communication
             await processMultiProjectCommunication(supabase, communication);

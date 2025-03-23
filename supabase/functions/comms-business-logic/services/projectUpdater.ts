@@ -7,6 +7,17 @@
  */
 export async function updateProjectWithAI(supabase: any, projectId: string, contextData: any): Promise<void> {
   try {
+    // Log the context data to help with debugging
+    console.log(`Updating project ${projectId} with new communication data:`, {
+      type: contextData.communication_type,
+      subtype: contextData.communication_subtype,
+      direction: contextData.communication_direction,
+      timestamp: contextData.communication_timestamp,
+      content_length: (contextData.communication_content || '').length,
+      is_call: contextData.communication_type === 'CALL',
+      has_recording: !!contextData.communication_recording_url
+    });
+    
     // Prepare the data for AI processing
     const { data: project, error: projectError } = await supabase
       .from('projects')
@@ -58,6 +69,17 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
       current_date: new Date().toISOString().split('T')[0],
       new_data: contextData
     };
+    
+    // Log the actual inputs to the prompt
+    console.log('Summary update context data:', {
+      summary_length: (summaryContext.summary || '').length > 50 
+        ? `${summaryContext.summary.substring(0, 50)}...` 
+        : summaryContext.summary,
+      track_name: summaryContext.track_name,
+      current_date: summaryContext.current_date,
+      communication_type: contextData.communication_type,
+      prompt_id: summaryPrompt.id
+    });
     
     const { data: summaryResult, error: summaryWorkflowError } = await supabase.functions.invoke(
       'test-workflow-prompt',

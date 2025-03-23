@@ -87,16 +87,46 @@ export async function processMessagesForProject(supabase: any, projectId: string
 export async function processCommunicationForProject(supabase: any, communication: any, projectId: string): Promise<void> {
   console.log(`Processing individual communication ${communication.id} for project ${projectId}`);
   
-  const contextData = {
-    communication_type: communication.type,
-    communication_subtype: communication.subtype,
-    communication_direction: communication.direction,
-    communication_content: communication.content || '',
-    communication_participants: communication.participants,
-    communication_timestamp: communication.timestamp
-  };
-  
-  await updateProjectWithAI(supabase, projectId, contextData);
+  try {
+    // Add detailed logging for call communications
+    if (communication.type === 'CALL') {
+      console.log('Processing a CALL communication:', {
+        id: communication.id,
+        timestamp: communication.timestamp,
+        duration: communication.duration,
+        recording_url: communication.recording_url,
+        participants: communication.participants
+      });
+    }
+    
+    const contextData = {
+      communication_type: communication.type,
+      communication_subtype: communication.subtype,
+      communication_direction: communication.direction,
+      communication_content: communication.content || '',
+      communication_participants: communication.participants,
+      communication_timestamp: communication.timestamp,
+      communication_duration: communication.duration || null,
+      communication_recording_url: communication.recording_url || null
+    };
+    
+    console.log(`Preparing to update project ${projectId} with communication data:`, {
+      type: contextData.communication_type,
+      subtype: contextData.communication_subtype,
+      direction: contextData.communication_direction,
+      content_length: (contextData.communication_content || '').length,
+      timestamp: contextData.communication_timestamp,
+      has_recording: !!contextData.communication_recording_url
+    });
+    
+    // Call updateProjectWithAI to process this communication
+    await updateProjectWithAI(supabase, projectId, contextData);
+    
+    console.log(`Successfully processed communication ${communication.id} for project ${projectId}`);
+  } catch (error) {
+    console.error(`Error processing communication ${communication.id} for project ${projectId}:`, error);
+    throw error; // Re-throw to allow the parent function to handle it
+  }
 }
 
 /**
