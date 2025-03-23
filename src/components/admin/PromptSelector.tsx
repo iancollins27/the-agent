@@ -19,7 +19,8 @@ const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelec
   const allowedPromptTypes = [
     'summary_generation', 
     'summary_update', 
-    'action_detection_execution'
+    'action_detection_execution',
+    'multi_project_analysis'
   ];
   
   useEffect(() => {
