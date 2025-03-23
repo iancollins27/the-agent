@@ -88,16 +88,15 @@ export async function processCommunicationForProject(supabase: any, communicatio
   console.log(`Processing individual communication ${communication.id} for project ${projectId}`);
   
   try {
-    // Add detailed logging for call communications
-    if (communication.type === 'CALL') {
-      console.log('Processing a CALL communication:', {
-        id: communication.id,
-        timestamp: communication.timestamp,
-        duration: communication.duration,
-        recording_url: communication.recording_url,
-        participants: communication.participants
-      });
-    }
+    // Add detailed logging for communications
+    console.log('Processing communication:', {
+      id: communication.id,
+      type: communication.type,
+      subtype: communication.subtype,
+      direction: communication.direction,
+      content_length: communication.content ? communication.content.length : 0,
+      has_recording: !!communication.recording_url
+    });
     
     const contextData = {
       communication_type: communication.type,
