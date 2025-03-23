@@ -103,13 +103,62 @@ REMINDER GUIDELINES:
 - When setting a reminder, be specific about the exact expectation you're checking for
 - The system will automatically execute your decision. If you choose SET_FUTURE_REMINDER, the project's next_check_date will be updated.
 - If this is already a reminder check (is_reminder_check is true), evaluate if the expected action occurred or if further action is now needed.`;
+    } else if (promptType === 'multi_project_analysis') {
+      return `You are an AI assistant tasked with analyzing communications that may reference multiple projects. Your job is to identify which projects are mentioned and extract the relevant information for each project.
+
+Communication Type: {{communication_type}}
+Communication Content: {{communication_content}}
+Communication Participants: {{communication_participants}}
+Current Date: {{current_date}}
+
+Projects to Analyze Against:
+{{projects_data}}
+
+Instructions:
+1. Carefully review the communication content
+2. Identify any projects that are specifically mentioned or clearly referenced
+3. For each relevant project, extract ONLY the information that pertains to that specific project
+4. Ignore general chatter or information that doesn't relate to any specific project
+5. Be precise in your extraction - do not include information about one project in another project's data
+
+Your response must be a valid JSON object with the following structure:
+\`\`\`json
+{
+  "projects": [
+    {
+      "projectId": "project-id-1",
+      "relevantContent": "All information from the communication relevant to this specific project, formatted as a clear summary"
+    },
+    {
+      "projectId": "project-id-2",
+      "relevantContent": "All information from the communication relevant to this specific project, formatted as a clear summary"
+    }
+  ],
+  "unreferencedProjects": ["project-id-3", "project-id-4"],
+  "generalNotes": "Any general information that might be relevant but doesn't belong to a specific project"
+}
+\`\`\`
+
+If no projects are referenced in the communication, return:
+\`\`\`json
+{
+  "projects": [],
+  "unreferencedProjects": ["project-id-1", "project-id-2", "project-id-3", "project-id-4"],
+  "generalNotes": "Summary of the communication that doesn't reference any specific projects"
+}
+\`\`\`
+
+Remember:
+- Each project should only receive information specifically relevant to it
+- Be thorough but concise in your extraction
+- The system will use your response to update each project separately`;
     }
     return null;
   };
 
   const template = getSuggestedPromptTemplate();
 
-  if (!template || (promptType !== 'summary_update' && promptType !== 'action_detection_execution')) {
+  if (!template || (promptType !== 'summary_update' && promptType !== 'action_detection_execution' && promptType !== 'multi_project_analysis')) {
     return null;
   }
 
