@@ -255,6 +255,8 @@ export type Database = {
       companies: {
         Row: {
           action_approval_settings: Json | null
+          default_email_provider: string | null
+          default_phone_provider: string | null
           default_project_track: string | null
           id: string
           knowledge_base_settings: Json | null
@@ -263,6 +265,8 @@ export type Database = {
         }
         Insert: {
           action_approval_settings?: Json | null
+          default_email_provider?: string | null
+          default_phone_provider?: string | null
           default_project_track?: string | null
           id?: string
           knowledge_base_settings?: Json | null
@@ -271,6 +275,8 @@ export type Database = {
         }
         Update: {
           action_approval_settings?: Json | null
+          default_email_provider?: string | null
+          default_phone_provider?: string | null
           default_project_track?: string | null
           id?: string
           knowledge_base_settings?: Json | null
@@ -279,10 +285,85 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "companies_default_email_provider_fkey"
+            columns: ["default_email_provider"]
+            isOneToOne: false
+            referencedRelation: "company_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_default_email_provider_fkey"
+            columns: ["default_email_provider"]
+            isOneToOne: false
+            referencedRelation: "company_integrations_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_default_phone_provider_fkey"
+            columns: ["default_phone_provider"]
+            isOneToOne: false
+            referencedRelation: "company_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "companies_default_phone_provider_fkey"
+            columns: ["default_phone_provider"]
+            isOneToOne: false
+            referencedRelation: "company_integrations_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "companies_default_project_track_fkey"
             columns: ["default_project_track"]
             isOneToOne: false
             referencedRelation: "project_tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_integrations: {
+        Row: {
+          account_id: string | null
+          api_key: string
+          api_secret: string | null
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          provider_name: string
+          provider_type: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          api_key: string
+          api_secret?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          provider_name: string
+          provider_type: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          api_key?: string
+          api_secret?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          provider_name?: string
+          provider_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -321,6 +402,48 @@ export type Database = {
             columns: ["associated_profile"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integration_key_access_logs: {
+        Row: {
+          access_reason: string | null
+          accessed_at: string
+          accessed_by: string | null
+          id: string
+          integration_id: string
+          source_ip: string | null
+        }
+        Insert: {
+          access_reason?: string | null
+          accessed_at?: string
+          accessed_by?: string | null
+          id?: string
+          integration_id: string
+          source_ip?: string | null
+        }
+        Update: {
+          access_reason?: string | null
+          accessed_at?: string
+          accessed_by?: string | null
+          id?: string
+          integration_id?: string
+          source_ip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_key_access_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "company_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_key_access_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "company_integrations_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -691,7 +814,53 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      company_integrations_secure: {
+        Row: {
+          account_id: string | null
+          api_key: string | null
+          api_secret: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          provider_name: string | null
+          provider_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          api_key?: never
+          api_secret?: never
+          company_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          provider_name?: string | null
+          provider_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          api_key?: never
+          api_secret?: never
+          company_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          provider_name?: string | null
+          provider_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       binary_quantize:
@@ -707,6 +876,16 @@ export type Database = {
             }
             Returns: unknown
           }
+      get_company_integration_keys: {
+        Args: {
+          integration_id: string
+        }
+        Returns: {
+          api_key: string
+          api_secret: string
+          account_id: string
+        }[]
+      }
       get_projects_due_for_check: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -820,6 +999,15 @@ export type Database = {
             }
             Returns: unknown
           }
+      log_integration_key_access: {
+        Args: {
+          p_integration_id: string
+          p_accessed_by: string
+          p_access_reason: string
+          p_source_ip: string
+        }
+        Returns: undefined
+      }
       sparsevec_out: {
         Args: {
           "": unknown

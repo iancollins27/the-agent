@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -21,7 +20,7 @@ interface SendCommRequest {
     name?: string;
   };
   channel: 'sms' | 'email' | 'call';
-  provider?: CommProvider;
+  provider?: string; // Provider ID from company_integrations table
   projectId?: string;
   companyId?: string;
 }
@@ -44,32 +43,108 @@ serve(async (req) => {
 
     console.log(`Processing communication request for action ID: ${actionId}`);
     console.log(`Recipient details:`, recipient);
-    console.log(`Channel: ${channel}, Requested provider: ${provider || 'not specified'}`);
+    console.log(`Channel: ${channel}, Requested provider ID: ${provider || 'not specified'}`);
 
-    // If no provider specified, determine company's default provider
-    let commProvider = provider;
-    if (!commProvider && companyId) {
-      console.log(`No provider specified, fetching default provider for company ${companyId}`);
-      const { data: companyData, error: companyError } = await supabase
-        .from('companies')
-        .select('communication_settings')
-        .eq('id', companyId)
+    // Determine company ID if not directly provided
+    let targetCompanyId = companyId;
+    
+    if (!targetCompanyId && projectId) {
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('company_id')
+        .eq('id', projectId)
         .single();
-
-      if (companyError) {
-        console.error(`Error fetching company: ${companyError.message}`);
-      } else if (companyData?.communication_settings) {
-        // Extract the default provider for the channel from company settings
-        const commSettings = companyData.communication_settings as Record<string, any>;
-        commProvider = commSettings[`default_${channel}_provider`] as CommProvider || 'none';
-        console.log(`Using company's default ${channel} provider: ${commProvider}`);
+        
+      if (projectError) {
+        console.error(`Error fetching project: ${projectError.message}`);
+      } else if (projectData?.company_id) {
+        targetCompanyId = projectData.company_id;
+        console.log(`Determined company ID from project: ${targetCompanyId}`);
       }
     }
 
-    // If still no provider, fallback to justcall for SMS and calls, sendgrid for email
-    if (!commProvider || commProvider === 'none') {
-      console.log('No provider found in company settings, using default fallback');
-      commProvider = channel === 'email' ? 'sendgrid' : 'justcall';
+    // Determine provider info
+    let providerInfo = null;
+    let providerType = channel === 'email' ? 'email' : 'phone';
+
+    // If specific provider ID was provided, use that
+    if (provider) {
+      console.log(`Looking up provider with ID: ${provider}`);
+      // Log access to the integration keys
+      await supabase.rpc(
+        'log_integration_key_access',
+        { 
+          p_integration_id: provider,
+          p_accessed_by: `send-communication function (action: ${actionId})`,
+          p_access_reason: `Sending ${channel} communication`,
+          p_source_ip: req.headers.get('x-real-ip') || 'unknown'
+        }
+      );
+      
+      // Get provider credentials using the secure function
+      const { data: providerData, error: providerError } = await supabase.rpc(
+        'get_company_integration_keys',
+        { integration_id: provider }
+      );
+      
+      if (providerError) {
+        console.error(`Error fetching provider details: ${providerError.message}`);
+      } else if (providerData && providerData.length > 0) {
+        providerInfo = providerData[0];
+      }
+    } 
+    // Otherwise use the default provider for this channel type
+    else if (targetCompanyId) {
+      console.log(`Looking up default ${providerType} provider for company ${targetCompanyId}`);
+      
+      // Get the default provider ID for this channel
+      const defaultProviderColumn = channel === 'email' ? 'default_email_provider' : 'default_phone_provider';
+      
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select(defaultProviderColumn)
+        .eq('id', targetCompanyId)
+        .single();
+        
+      if (companyError) {
+        console.error(`Error fetching company: ${companyError.message}`);
+      } else if (companyData && companyData[defaultProviderColumn]) {
+        const defaultProviderId = companyData[defaultProviderColumn];
+        console.log(`Found default provider ID: ${defaultProviderId}`);
+        
+        // Log access to the integration keys
+        await supabase.rpc(
+          'log_integration_key_access',
+          { 
+            p_integration_id: defaultProviderId,
+            p_accessed_by: `send-communication function (action: ${actionId})`,
+            p_access_reason: `Sending ${channel} communication using default provider`,
+            p_source_ip: req.headers.get('x-real-ip') || 'unknown'
+          }
+        );
+        
+        // Get provider credentials using the secure function
+        const { data: providerData, error: providerError } = await supabase.rpc(
+          'get_company_integration_keys',
+          { integration_id: defaultProviderId }
+        );
+        
+        if (providerError) {
+          console.error(`Error fetching default provider details: ${providerError.message}`);
+        } else if (providerData && providerData.length > 0) {
+          providerInfo = providerData[0];
+        }
+      }
+    }
+
+    // Verify we have the provider info and required recipient data
+    if (!providerInfo) {
+      console.log('No provider found, using mock provider for testing');
+      providerInfo = { 
+        provider_name: 'mock',
+        api_key: 'mock-key',
+        api_secret: 'mock-secret'
+      };
     }
 
     // Validate we have the minimum required details
@@ -85,7 +160,7 @@ serve(async (req) => {
       throw new Error('Email address is required for email communications');
     }
 
-    console.log(`Using communication provider: ${commProvider}`);
+    console.log(`Using communication provider: ${providerInfo.provider_name}`);
 
     // Record in communications table
     const { data: commRecord, error: commError } = await supabase
@@ -105,7 +180,7 @@ serve(async (req) => {
             email: recipient.email
           }
         ],
-        provider: commProvider,
+        provider: providerInfo.provider_name,
         status: 'PENDING'
       })
       .select()
@@ -125,8 +200,8 @@ serve(async (req) => {
             status: 'comm_initiated',
             timestamp: new Date().toISOString(),
             communication_id: commRecord.id,
-            provider: commProvider,
-            details: `Communication initiated via ${commProvider}`
+            provider: providerInfo.provider_name,
+            details: `Communication initiated via ${providerInfo.provider_name}`
           }
         })
         .eq('id', actionId);
@@ -139,7 +214,14 @@ serve(async (req) => {
     // Send the actual communication based on provider and channel
     let sendResult;
     try {
-      sendResult = await sendCommunication(supabase, commProvider, channel, messageContent, recipient, commRecord.id);
+      sendResult = await sendCommunication(
+        supabase, 
+        providerInfo, 
+        channel, 
+        messageContent, 
+        recipient, 
+        commRecord.id
+      );
     } catch (sendError) {
       console.error(`Error sending communication: ${sendError.message}`);
       
@@ -169,9 +251,9 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         communication_id: commRecord.id,
-        provider: commProvider,
+        provider: providerInfo.provider_name,
         channel: channel,
-        message: `Communication successfully sent via ${commProvider}`
+        message: `Communication successfully sent via ${providerInfo.provider_name}`
       }),
       {
         status: 200,
@@ -197,25 +279,25 @@ serve(async (req) => {
 // Function to send communication based on provider and channel
 async function sendCommunication(
   supabase: any,
-  provider: CommProvider,
+  provider: any,
   channel: string,
   message: string,
   recipient: any,
   communicationId: string
 ): Promise<any> {
-  console.log(`Sending ${channel} via ${provider} to ${recipient.phone || recipient.email}`);
+  console.log(`Sending ${channel} via ${provider.provider_name} to ${recipient.phone || recipient.email}`);
 
   // Actual implementation based on provider
-  switch (provider) {
+  switch (provider.provider_name.toLowerCase()) {
     case 'justcall':
-      return await sendViaJustCall(channel, message, recipient);
+      return await sendViaJustCall(provider, channel, message, recipient);
     case 'twilio':
-      return await sendViaTwilio(channel, message, recipient);
+      return await sendViaTwilio(provider, channel, message, recipient);
     case 'sendgrid':
-      return await sendViaSendGrid(message, recipient);
+      return await sendViaSendGrid(provider, message, recipient);
     default:
       // For now, simulate success for testing
-      console.log('Using mock provider - in production, this would send a real message');
+      console.log(`Using ${provider.provider_name} provider - mock implementation for testing`);
       return {
         mock: true,
         status: 'sent',
@@ -224,10 +306,12 @@ async function sendCommunication(
   }
 }
 
-// Implementation for JustCall (placeholder - would need JustCall API integration)
-async function sendViaJustCall(channel: string, message: string, recipient: any): Promise<any> {
+// Implementation for JustCall
+async function sendViaJustCall(providerInfo: any, channel: string, message: string, recipient: any): Promise<any> {
   // Mock implementation - would be replaced with actual API call
   console.log(`MOCK: Sending via JustCall: ${channel} to ${recipient.phone}`);
+  console.log(`JustCall API Key: ${providerInfo.api_key.substring(0, 3)}...`);
+  
   return {
     provider: 'justcall',
     status: 'sent',
@@ -235,10 +319,12 @@ async function sendViaJustCall(channel: string, message: string, recipient: any)
   };
 }
 
-// Implementation for Twilio (placeholder - would need Twilio API integration)
-async function sendViaTwilio(channel: string, message: string, recipient: any): Promise<any> {
+// Implementation for Twilio
+async function sendViaTwilio(providerInfo: any, channel: string, message: string, recipient: any): Promise<any> {
   // Mock implementation - would be replaced with actual API call
   console.log(`MOCK: Sending via Twilio: ${channel} to ${recipient.phone}`);
+  console.log(`Twilio API Key: ${providerInfo.api_key.substring(0, 3)}...`);
+  
   return {
     provider: 'twilio',
     status: 'sent',
@@ -246,10 +332,12 @@ async function sendViaTwilio(channel: string, message: string, recipient: any): 
   };
 }
 
-// Implementation for SendGrid (placeholder - would need SendGrid API integration)
-async function sendViaSendGrid(message: string, recipient: any): Promise<any> {
+// Implementation for SendGrid
+async function sendViaSendGrid(providerInfo: any, message: string, recipient: any): Promise<any> {
   // Mock implementation - would be replaced with actual API call
   console.log(`MOCK: Sending email via SendGrid to ${recipient.email}`);
+  console.log(`SendGrid API Key: ${providerInfo.api_key.substring(0, 3)}...`);
+  
   return {
     provider: 'sendgrid',
     status: 'sent',

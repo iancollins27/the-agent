@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProjectManagerNav from "../components/ProjectManagerNav";
 import KnowledgeBaseSettings from "../components/Settings/KnowledgeBaseSettings";
+import CommunicationSettings from "../components/Settings/CommunicationSettings";
 import { supabase } from "@/integrations/supabase/client";
 
 const CompanySettings: React.FC = () => {
@@ -77,8 +78,9 @@ const CompanySettings: React.FC = () => {
         <h1 className="text-3xl font-bold mb-6">Company Settings</h1>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-1 w-full sm:w-[200px]">
+          <TabsList className="grid grid-cols-2 w-full sm:w-[400px]">
             <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
+            <TabsTrigger value="communications">Communication</TabsTrigger>
           </TabsList>
           
           <TabsContent value="knowledge-base">
@@ -86,6 +88,15 @@ const CompanySettings: React.FC = () => {
               <KnowledgeBaseSettings 
                 company={company} 
                 onUpdate={handleCompanyUpdate} 
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="communications">
+            {company && (
+              <CommunicationSettings
+                company={company}
+                onUpdate={handleCompanyUpdate}
               />
             )}
           </TabsContent>
