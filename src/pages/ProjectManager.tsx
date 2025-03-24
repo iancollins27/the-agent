@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ProjectManagerNav from "../components/ProjectManagerNav";
@@ -11,6 +12,12 @@ import PromptRunsTable from '../components/admin/PromptRunsTable';
 import PromptRunDetails from '../components/admin/PromptRunDetails';
 import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem
+} from "@/components/ui/dropdown-menu";
 
 const ProjectManager: React.FC = () => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
@@ -19,6 +26,7 @@ const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [onlyShowMyProjects, setOnlyShowMyProjects] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -38,25 +46,27 @@ const ProjectManager: React.FC = () => {
           console.error('Error fetching user profile:', error);
         } else {
           setUserProfile(data);
+          setLoading(false); // Move this here to ensure it only gets set after profile is fetched
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
+        setLoading(false); // Also set loading to false in case of error
       }
     };
     
     fetchUserProfile();
   }, [user]);
 
-  // Fetch prompt runs based on user profile and status filter
+  // Fetch prompt runs based on user profile, status filter, and project filter
   useEffect(() => {
     if (userProfile) {
       fetchPromptRuns();
     }
-  }, [statusFilter, userProfile]);
+  }, [statusFilter, userProfile, onlyShowMyProjects]);
 
   const fetchPromptRuns = async () => {
-    if (!userProfile || !userProfile.profile_crm_id) {
-      // If no user profile or CRM ID, show no data
+    if (!user) {
+      // If no user is logged in, show no data
       setPromptRuns([]);
       setLoading(false);
       return;
@@ -64,18 +74,24 @@ const ProjectManager: React.FC = () => {
 
     setLoading(true);
     try {
-      // First, find projects where this user is the project manager
-      const { data: projectsData, error: projectsError } = await supabase
+      // Build the query to find projects
+      let projectQuery = supabase
         .from('projects')
-        .select('id')
-        .eq('project_manager', userProfile.id);
+        .select('id');
+      
+      // Apply filter to only show projects where user is project manager if that filter is selected
+      if (onlyShowMyProjects) {
+        projectQuery = projectQuery.eq('project_manager', userProfile.id);
+      }
+
+      const { data: projectsData, error: projectsError } = await projectQuery;
 
       if (projectsError) {
         throw projectsError;
       }
 
       if (!projectsData || projectsData.length === 0) {
-        // No projects for this project manager
+        // No projects found with the current filters
         setPromptRuns([]);
         setLoading(false);
         return;
@@ -245,6 +261,23 @@ const ProjectManager: React.FC = () => {
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Project Manager Dashboard</h2>
           <div className="flex space-x-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px]">
+                <DropdownMenuCheckboxItem
+                  checked={onlyShowMyProjects}
+                  onCheckedChange={setOnlyShowMyProjects}
+                >
+                  Only My Projects
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
             <Select 
               value={statusFilter || "all"} 
               onValueChange={(value) => setStatusFilter(value === "all" ? null : value)}
@@ -271,8 +304,8 @@ const ProjectManager: React.FC = () => {
           <Card>
             <CardContent className="py-8">
               <p className="text-center text-muted-foreground">
-                {userProfile ? 
-                  "No prompt runs found for your projects" : 
+                {user ? 
+                  "No prompt runs found with the current filters" : 
                   "Please log in to view your project data"}
               </p>
             </CardContent>
