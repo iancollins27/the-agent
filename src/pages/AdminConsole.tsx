@@ -2,7 +2,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, GitBranch } from "lucide-react";
 import PromptsTab from "@/components/admin/PromptsTab";
 import TestingTab from "@/components/admin/TestingTab";
 import AIProviderConfig from "@/components/admin/AIProviderConfig";
@@ -27,6 +27,12 @@ const AdminConsole = () => {
           <Button variant="outline" asChild>
             <Link to="/chatbot-config">
               Configure Chatbot
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/system-diagrams">
+              <GitBranch className="h-4 w-4 mr-2" />
+              System Diagrams
             </Link>
           </Button>
         </div>
