@@ -72,19 +72,26 @@ const ProjectManager: React.FC = () => {
       return;
     }
 
+    // Only proceed if we have the user profile with company_id
+    if (!userProfile?.company_id) {
+      console.warn('User has no company_id in profile, cannot fetch projects');
+      setPromptRuns([]);
+      setLoading(false);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Your user profile is not associated with a company",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Build the query to find projects
       let projectQuery = supabase
         .from('projects')
-        .select('id');
-      
-      // Filter projects by user's company ID if available
-      if (userProfile?.company_id) {
-        projectQuery = projectQuery.eq('company_id', userProfile.company_id);
-      } else {
-        console.warn('User has no company_id in profile, might see projects from all companies');
-      }
+        .select('id')
+        .eq('company_id', userProfile.company_id); // Always filter by company_id
       
       // Apply filter to only show projects where user is project manager if that filter is selected
       if (onlyShowMyProjects) {
@@ -299,7 +306,7 @@ const ProjectManager: React.FC = () => {
                 <SelectItem value="ERROR">Error</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={() => fetchPromptRuns()}>Refresh</Button>
+            <Button onClick={fetchPromptRuns}>Refresh</Button>
           </div>
         </div>
 
