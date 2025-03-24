@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, SendHorizonal } from "lucide-react";
 import ActionTypeBadge from "./ActionTypeBadge";
 import { ActionRecord } from "@/components/Chat/types";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ interface ActionRecordEditProps {
 const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpdated }) => {
   const [status, setStatus] = React.useState(action.status);
   const [message, setMessage] = React.useState(action.message || '');
+  const [isSending, setIsSending] = React.useState(false);
 
   // Safely convert actionPayload fields to strings for display purposes
   const getActionFieldString = (field: any): string => {
@@ -72,6 +73,72 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
     } catch (error) {
       console.error('Error updating action record:', error);
       toast.error("Failed to update action record");
+    }
+  };
+
+  const handleSendCommunication = async () => {
+    if (action.action_type !== 'message') {
+      toast.error("Only message actions can be sent as communications");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      // Prepare recipient data
+      const recipient = {
+        id: action.recipient_id,
+        name: action.recipient_name,
+        // Extract phone and email from action payload if available
+        phone: actionPayload.recipient_phone || actionPayload.phone,
+        email: actionPayload.recipient_email || actionPayload.email
+      };
+
+      // Determine communication channel based on available recipient data
+      let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+      if (actionPayload.channel) {
+        channel = actionPayload.channel as 'sms' | 'email' | 'call';
+      } else if (recipient.email && !recipient.phone) {
+        channel = 'email';
+      }
+
+      // Get message content from appropriate field
+      const messageContent = action.message || 
+                            actionPayload.message_content || 
+                            actionPayload.content || 
+                            '';
+
+      toast.info("Initiating communication...");
+
+      const { data, error } = await supabase.functions.invoke('send-communication', {
+        body: {
+          actionId: action.id,
+          messageContent,
+          recipient,
+          channel,
+          projectId: action.project_id
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Also update the action status to approved
+      await supabase
+        .from('action_records')
+        .update({
+          status: 'approved',
+          executed_at: new Date().toISOString()
+        })
+        .eq('id', action.id);
+      
+      toast.success("Communication sent successfully");
+      onActionUpdated();
+    } catch (error) {
+      console.error('Error sending communication:', error);
+      toast.error("Failed to send communication");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -153,9 +220,21 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
             />
           </div>
 
-          <Button onClick={handleSave} className="w-full">
-            Save Changes
-          </Button>
+          <div className="flex gap-2">
+            {action.action_type === 'message' && (
+              <Button 
+                onClick={handleSendCommunication} 
+                className="bg-blue-600 hover:bg-blue-700 flex-1"
+                disabled={isSending}
+              >
+                <SendHorizonal className="h-4 w-4 mr-2" />
+                {isSending ? "Sending..." : "Send Communication"}
+              </Button>
+            )}
+            <Button onClick={handleSave} className="flex-1">
+              Save Changes
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -53,6 +53,67 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
             description: actionPayload.description || "Project updated successfully",
           });
         }
+      } 
+      // If approved and it's a message, handle sending the message
+      else if (approve && action.action_type === 'message') {
+        const actionPayload = action.action_payload as Record<string, any>;
+        
+        // Prepare recipient data
+        const recipient = {
+          id: action.recipient_id,
+          name: action.recipient_name || actionPayload.recipient,
+          // Extract phone and email from action payload if available
+          phone: actionPayload.recipient_phone || actionPayload.phone,
+          email: actionPayload.recipient_email || actionPayload.email
+        };
+
+        // Determine communication channel based on available recipient data
+        let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+        if (actionPayload.channel) {
+          channel = actionPayload.channel as 'sms' | 'email' | 'call';
+        } else if (recipient.email && !recipient.phone) {
+          channel = 'email';
+        }
+
+        // Get message content from appropriate field
+        const messageContent = action.message || 
+                              actionPayload.message_content || 
+                              actionPayload.content || 
+                              '';
+
+        toast({
+          title: "Sending Message",
+          description: "Initiating communication...",
+        });
+
+        try {
+          const { data, error } = await supabase.functions.invoke('send-communication', {
+            body: {
+              actionId: action.id,
+              messageContent,
+              recipient,
+              channel,
+              projectId: action.project_id
+            }
+          });
+          
+          if (error) {
+            throw new Error(`Communication error: ${error.message}`);
+          }
+          
+          toast({
+            title: "Message Sent",
+            description: `Communication successfully initiated`,
+          });
+          
+        } catch (commError: any) {
+          console.error('Error sending communication:', commError);
+          toast({
+            title: "Communication Failed",
+            description: commError.message || "Failed to send the message",
+            variant: "destructive",
+          });
+        }
       } else if (!approve) {
         toast({
           title: "Action Rejected",

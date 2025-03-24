@@ -121,29 +121,80 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
       }
       // If approved and it's a message, handle the message sending action
       else if (approve && action.action_type === 'message') {
-        // In a real implementation, this would connect to an email/messaging service
-        // For now, we'll just show a toast notification
-        const recipient = action.recipient?.full_name || actionPayload.recipient || 'No recipient specified';
-        
+        // Call the edge function to send the communication
         toast({
-          title: "Message Sent",
-          description: `Message to ${recipient} has been sent successfully`,
+          title: "Sending Message",
+          description: "Initiating communication...",
         });
         
-        // Record that the message was "sent" (in a real app, we would actually send it here)
-        const { error: executionError } = await supabase
-          .from('action_records')
-          .update({
-            execution_result: {
-              status: 'message_sent',
-              timestamp: new Date().toISOString(),
-              details: `Message to ${recipient} sent successfully`
+        // Prepare recipient data
+        const recipient = {
+          id: action.recipient_id,
+          name: action.recipient_name,
+          // Extract phone and email from action payload if available
+          phone: actionPayload.recipient_phone || actionPayload.phone,
+          email: actionPayload.recipient_email || actionPayload.email
+        };
+
+        // Determine communication channel based on available recipient data
+        let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+        if (actionPayload.channel) {
+          channel = actionPayload.channel as 'sms' | 'email' | 'call';
+        } else if (recipient.email && !recipient.phone) {
+          channel = 'email';
+        }
+
+        // Get message content from appropriate field
+        const messageContent = action.message || 
+                              actionPayload.message_content || 
+                              actionPayload.content || 
+                              '';
+
+        try {
+          const { data, error } = await supabase.functions.invoke('send-communication', {
+            body: {
+              actionId: action.id,
+              messageContent,
+              recipient,
+              channel,
+              projectId: action.project_id,
+              // If we have company ID (perhaps via project), send it to determine provider
+              companyId: actionPayload.company_id
             }
-          })
-          .eq('id', action.id);
+          });
           
-        if (executionError) {
-          console.error('Error recording execution result:', executionError);
+          if (error) {
+            throw new Error(`Communication error: ${error.message}`);
+          }
+          
+          toast({
+            title: "Message Sent",
+            description: `Communication successfully initiated`,
+          });
+          
+        } catch (commError: any) {
+          console.error('Error sending communication:', commError);
+          toast({
+            title: "Communication Failed",
+            description: commError.message || "Failed to send the message",
+            variant: "destructive",
+          });
+          
+          // Record the execution failure
+          const { error: executionError } = await supabase
+            .from('action_records')
+            .update({
+              execution_result: {
+                status: 'communication_failed',
+                timestamp: new Date().toISOString(),
+                error: commError.message
+              }
+            })
+            .eq('id', action.id);
+            
+          if (executionError) {
+            console.error('Error recording execution result:', executionError);
+          }
         }
       }
       // If approved and it's a notion integration
