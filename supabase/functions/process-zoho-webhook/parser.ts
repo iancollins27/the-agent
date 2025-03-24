@@ -9,13 +9,14 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   }
   
   // Handle both direct ID field and nested ID field cases
-  // Convert to string immediately to preserve precision
-  const idValue = String(rawData.ID || (rawData.rawData && rawData.rawData.ID));
+  // Ensure IDs are always treated as strings to preserve precision
+  const idValue = rawData.ID || (rawData.rawData && rawData.rawData.ID);
+  const idValueString = String(idValue); // Explicitly convert to string
   const companyIdFromZoho = String(rawData.Company_ID || (rawData.rawData && rawData.rawData.Company_ID));
   
   // Log the raw ID value for debugging
-  console.log('Raw ID from Zoho:', rawData.ID || (rawData.rawData && rawData.rawData.ID));
-  console.log('Converted ID:', idValue);
+  console.log('Raw ID from Zoho:', idValue);
+  console.log('Converted ID (string):', idValueString);
   
   if (!idValue) {
     throw new Error('Project ID is missing in the Zoho data');
@@ -49,12 +50,12 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   const propertyAddress = data.Property_Address || data.Address || data.property_address || '';
   console.log('Final extracted property address:', propertyAddress);
   
-  // Extract project manager ID
-  const projectManagerId = data.Project_Manager_ID || '';
+  // Extract project manager ID and ensure it's a string
+  const projectManagerId = data.Project_Manager_ID ? String(data.Project_Manager_ID) : '';
   console.log('Extracted project manager ID:', projectManagerId);
   
   const result = {
-    crmId: idValue, // Using the string version of the ID
+    crmId: idValueString, // Using the string version of the ID
     zohoCompanyId: companyIdFromZoho,
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',

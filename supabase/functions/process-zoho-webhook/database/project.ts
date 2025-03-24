@@ -6,6 +6,8 @@
  * @returns Project object if found, null otherwise
  */
 export async function getExistingProject(supabase: any, crmId: string) {
+  console.log('Looking for project with CRM ID:', crmId);
+  
   const { data: projects, error } = await supabase
     .from('projects')
     .select(`
@@ -21,6 +23,7 @@ export async function getExistingProject(supabase: any, crmId: string) {
     console.error('Error fetching project:', error)
   }
 
+  console.log('Found projects:', projects ? projects.length : 0);
   return projects && projects.length > 0 ? projects[0] : null
 }
 
@@ -74,6 +77,8 @@ export async function createProject(
     project_manager?: string | null; // Added project_manager field
   }
 ) {
+  console.log('Creating new project with CRM ID:', data.crm_id);
+  
   const { error } = await supabase
     .from('projects')
     .insert(data)
