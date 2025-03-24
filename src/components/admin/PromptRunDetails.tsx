@@ -66,6 +66,14 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           <DialogDescription>
             Created at {new Date(promptRun.created_at).toLocaleString()}
           </DialogDescription>
+          {/* Add project address display */}
+          {promptRun.project_address && (
+            <div className="mt-2 text-sm">
+              <Badge variant="outline" className="font-normal">
+                {promptRun.project_address}
+              </Badge>
+            </div>
+          )}
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
