@@ -89,7 +89,15 @@ const ProjectManager: React.FC = () => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (crm_id, Address),
+          projects:project_id (
+            id,
+            crm_id, 
+            Address,
+            company_id,
+            companies:company_id (
+              company_project_base_URL
+            )
+          ),
           workflow_prompts:workflow_prompt_id (type)
         `)
         .in('project_id', projectIds)
@@ -106,10 +114,16 @@ const ProjectManager: React.FC = () => {
       }
 
       const formattedData = data.map(run => {
+        // Construct the CRM URL by combining the base URL with the project's CRM ID
+        const baseUrl = run.projects?.companies?.company_project_base_URL || null;
+        const crmId = run.projects?.crm_id || null;
+        const crmUrl = baseUrl && crmId ? `${baseUrl}${crmId}` : null;
+        
         return {
           ...run,
           project_name: run.projects?.crm_id || 'Unknown Project',
           project_address: run.projects?.Address || null,
+          project_crm_url: crmUrl,
           workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
           workflow_type: run.workflow_prompts?.type,
           prompt_text: run.prompt_input,

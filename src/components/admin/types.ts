@@ -46,7 +46,8 @@ export type PromptRun = {
   ai_provider?: string | null;
   ai_model?: string | null;
   project_name?: string;
-  project_address?: string | null; // Added this property
+  project_address?: string | null;
+  project_crm_url?: string; // Added field for CRM URL
   action_record_id?: string;
   workflow_prompt_id?: string | null;
   workflow_prompt_type?: string;
