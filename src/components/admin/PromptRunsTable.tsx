@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Table, 
@@ -12,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Star, ExternalLink, Eye } from "lucide-react";
 import { PromptRun } from './types';
-import { PromptRunStatusBadge } from './PromptRunStatusBadge';
+import PromptRunStatusBadge from './PromptRunStatusBadge';
 import { formatDistanceToNow } from 'date-fns';
 
 interface PromptRunsTableProps {
