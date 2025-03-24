@@ -79,6 +79,13 @@ const ProjectManager: React.FC = () => {
         .from('projects')
         .select('id');
       
+      // Filter projects by user's company ID if available
+      if (userProfile?.company_id) {
+        projectQuery = projectQuery.eq('company_id', userProfile.company_id);
+      } else {
+        console.warn('User has no company_id in profile, might see projects from all companies');
+      }
+      
       // Apply filter to only show projects where user is project manager if that filter is selected
       if (onlyShowMyProjects) {
         projectQuery = projectQuery.eq('project_manager', userProfile.id);
