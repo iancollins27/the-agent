@@ -19,6 +19,7 @@ import { Loader2 } from "lucide-react";
 import { ActionRecord } from "@/components/admin/types";
 import ActionRecordsTable from "./ActionRecordsTable";
 import { Json } from "@/integrations/supabase/types";
+import ActionDetailModal from "./ActionDetailModal";
 
 type JoinedActionRecord = {
   id: string;
@@ -50,6 +51,7 @@ const ActionRecordsTab = () => {
   const [executionNotes, setExecutionNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [actionDetailOpen, setActionDetailOpen] = useState(false);
 
   const fetchActions = useCallback(async () => {
     setIsLoading(true);
@@ -122,6 +124,11 @@ const ActionRecordsTab = () => {
 
   const handleExecuteAction = async (record: ActionRecord) => {
     setSelectedAction(record);
+  };
+
+  const handleViewActionDetails = (action: ActionRecord) => {
+    setSelectedAction(action);
+    setActionDetailOpen(true);
   };
 
   const handleApproveAction = async (action: ActionRecord) => {
@@ -313,6 +320,7 @@ const ActionRecordsTab = () => {
             setRowSelection={handleRowSelectionChange}
             onApprove={handleApproveAction}
             onReject={handleRejectAction}
+            onViewDetails={handleViewActionDetails}
           />
           <div className="flex justify-between items-center">
             <Button
@@ -371,6 +379,14 @@ const ActionRecordsTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Action Detail Modal */}
+      <ActionDetailModal
+        action={selectedAction}
+        isOpen={actionDetailOpen}
+        onClose={() => setActionDetailOpen(false)}
+        onActionUpdated={fetchActions}
+      />
     </div>
   );
 };
