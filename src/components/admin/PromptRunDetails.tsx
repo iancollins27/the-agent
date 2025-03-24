@@ -11,6 +11,7 @@ import PromptRunRating from './PromptRunRating';
 import { PromptRun } from './types';
 import PromptRunActions from './PromptRunActions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExternalLink } from "lucide-react";
 
 type PromptRunDetailsProps = {
   promptRun: PromptRun | null;
@@ -67,13 +68,26 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
             Created at {new Date(promptRun.created_at).toLocaleString()}
           </DialogDescription>
           {/* Add project address display */}
-          {promptRun.project_address && (
-            <div className="mt-2 text-sm">
+          <div className="mt-2 text-sm flex items-center justify-between">
+            {promptRun.project_address && (
               <Badge variant="outline" className="font-normal">
                 {promptRun.project_address}
               </Badge>
-            </div>
-          )}
+            )}
+            
+            {/* Add CRM link button */}
+            {promptRun.project_crm_url && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(promptRun.project_crm_url, '_blank')}
+                className="ml-2"
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                CRM Record
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
