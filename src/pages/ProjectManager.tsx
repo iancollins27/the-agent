@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import ProjectManagerNav from "../components/ProjectManagerNav";
 import PromptRunsTable from '../components/admin/PromptRunsTable';
 import PromptRunDetails from '../components/admin/PromptRunDetails';
 import { PromptRun } from '../components/admin/types';
+import { useAuth } from "@/hooks/useAuth";
 
 const ProjectManager: React.FC = () => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
@@ -16,15 +18,73 @@ const ProjectManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
 
+  // Fetch user profile data
   useEffect(() => {
-    fetchPromptRuns();
-  }, [statusFilter]);
+    const fetchUserProfile = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching user profile:', error);
+        } else {
+          setUserProfile(data);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user]);
+
+  // Fetch prompt runs based on user profile and status filter
+  useEffect(() => {
+    if (userProfile) {
+      fetchPromptRuns();
+    }
+  }, [statusFilter, userProfile]);
 
   const fetchPromptRuns = async () => {
+    if (!userProfile || !userProfile.profile_crm_id) {
+      // If no user profile or CRM ID, show no data
+      setPromptRuns([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
+      // First, find projects where this user is the project manager
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_manager', userProfile.id);
+
+      if (projectsError) {
+        throw projectsError;
+      }
+
+      if (!projectsData || projectsData.length === 0) {
+        // No projects for this project manager
+        setPromptRuns([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get the project IDs
+      const projectIds = projectsData.map(project => project.id);
+
+      // Now fetch prompt runs for these projects
       let query = supabase
         .from('prompt_runs')
         .select(`
@@ -32,6 +92,7 @@ const ProjectManager: React.FC = () => {
           projects:project_id (crm_id, Address),
           workflow_prompts:workflow_prompt_id (type)
         `)
+        .in('project_id', projectIds)
         .order('created_at', { ascending: false });
 
       if (statusFilter) {
@@ -195,7 +256,11 @@ const ProjectManager: React.FC = () => {
         ) : promptRuns.length === 0 ? (
           <Card>
             <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">No prompt runs found</p>
+              <p className="text-center text-muted-foreground">
+                {userProfile ? 
+                  "No prompt runs found for your projects" : 
+                  "Please log in to view your project data"}
+              </p>
             </CardContent>
           </Card>
         ) : (
