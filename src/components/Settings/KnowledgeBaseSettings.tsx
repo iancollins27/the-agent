@@ -21,7 +21,7 @@ interface KnowledgeBaseSettingsProps {
       };
     };
   };
-  onUpdate: () => void;
+  onUpdate: (updates?: any) => void | Promise<void>;
 }
 
 const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, onUpdate }) => {

@@ -85,7 +85,7 @@ const CompanySettings: React.FC = () => {
             {company && (
               <KnowledgeBaseSettings 
                 company={company} 
-                onUpdate={(updates) => handleCompanyUpdate(updates)} 
+                onUpdate={handleCompanyUpdate} 
               />
             )}
           </TabsContent>
