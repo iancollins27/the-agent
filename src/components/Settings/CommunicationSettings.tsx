@@ -11,9 +11,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { AlertCircle, Check, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+type ProviderType = 'email' | 'phone';
+
 type Provider = {
   id: string;
-  provider_type: 'email' | 'phone';
+  provider_type: ProviderType;
   provider_name: string;
   api_key: string;
   api_secret?: string;
@@ -69,7 +71,13 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
         throw error;
       }
 
-      setProviders(data || []);
+      // Map and validate the provider_type from database to the expected union type
+      const validProviders = data?.map(provider => ({
+        ...provider,
+        provider_type: validateProviderType(provider.provider_type)
+      })) || [];
+      
+      setProviders(validProviders as Provider[]);
     } catch (error) {
       console.error('Error fetching providers:', error);
       toast({
@@ -80,6 +88,15 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Helper function to validate provider_type is one of the expected values
+  const validateProviderType = (type: string | null): ProviderType => {
+    if (type === 'email' || type === 'phone') {
+      return type;
+    }
+    // Default to 'phone' if type is invalid
+    return 'phone';
   };
 
   const handleNewProviderChange = (field: string, value: string | boolean) => {
