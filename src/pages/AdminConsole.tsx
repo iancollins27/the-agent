@@ -1,72 +1,47 @@
 
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { MessageCircle, GitBranch } from "lucide-react";
-import PromptsTab from "@/components/admin/PromptsTab";
-import TestingTab from "@/components/admin/TestingTab";
-import AIProviderConfig from "@/components/admin/AIProviderConfig";
-import PromptRunsTab from "@/components/admin/PromptRunsTab";
-import ActionRecordsTab from "@/components/admin/ActionRecordsTab";
+import ProjectManagerNav from "../components/ProjectManagerNav";
+import ActionRecordsTab from "../components/admin/ActionRecordsTab";
+import PromptsTab from "../components/admin/PromptsTab";
+import TestingTab from "../components/admin/TestingTab";
+import PromptRunsTab from "../components/admin/PromptRunsTab";
 
-const AdminConsole = () => {
+const AdminConsole: React.FC = () => {
+  const [activeTab, setActiveTab] = React.useState("prompt-runs");
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <header className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workflow Prompts Admin</h1>
-          <p className="text-muted-foreground">Manage and test AI workflow prompts</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" asChild>
-            <Link to="/chat">
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Open Chat
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/chatbot-config">
-              Configure Chatbot
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/system-diagrams">
-              <GitBranch className="h-4 w-4 mr-2" />
-              System Diagrams
-            </Link>
-          </Button>
-        </div>
-      </header>
-
-      <Tabs defaultValue="prompts">
-        <TabsList>
-          <TabsTrigger value="prompts">Prompts</TabsTrigger>
-          <TabsTrigger value="testing">Testing</TabsTrigger>
-          <TabsTrigger value="runs">Prompt Runs</TabsTrigger>
-          <TabsTrigger value="actions">Action Approval</TabsTrigger>
-          <TabsTrigger value="ai-provider">AI Provider</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="prompts" className="space-y-6">
-          <PromptsTab />
-        </TabsContent>
-
-        <TabsContent value="testing" className="space-y-6">
-          <TestingTab />
-        </TabsContent>
-
-        <TabsContent value="runs" className="space-y-6">
-          <PromptRunsTab />
-        </TabsContent>
-
-        <TabsContent value="actions" className="space-y-6">
-          <ActionRecordsTab />
-        </TabsContent>
-
-        <TabsContent value="ai-provider" className="space-y-6">
-          <AIProviderConfig />
-        </TabsContent>
-      </Tabs>
+    <div className="min-h-screen bg-slate-50">
+      <ProjectManagerNav />
+      
+      <div className="container mx-auto py-6">
+        <h1 className="text-3xl font-bold mb-6">Admin Console</h1>
+        
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid grid-cols-4 w-full sm:w-[600px]">
+            <TabsTrigger value="prompt-runs">Prompt Runs</TabsTrigger>
+            <TabsTrigger value="actions">Actions</TabsTrigger>
+            <TabsTrigger value="prompts">Prompts</TabsTrigger>
+            <TabsTrigger value="testing">Testing</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="prompt-runs">
+            <PromptRunsTab />
+          </TabsContent>
+          
+          <TabsContent value="actions">
+            <ActionRecordsTab />
+          </TabsContent>
+          
+          <TabsContent value="prompts">
+            <PromptsTab />
+          </TabsContent>
+          
+          <TabsContent value="testing">
+            <TestingTab />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 };

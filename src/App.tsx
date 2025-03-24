@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +11,7 @@ import AgentChat from "./pages/AgentChat";
 import ChatbotConfig from "./pages/ChatbotConfig";
 import CompanySettings from "./pages/CompanySettings";
 import MermaidDiagrams from "./pages/MermaidDiagrams";
+import ProjectManager from "./pages/ProjectManager";
 
 const queryClient = new QueryClient();
 
@@ -75,6 +75,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <MermaidDiagrams />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/project-manager"
+            element={
+              <ProtectedRoute>
+                <ProjectManager />
               </ProtectedRoute>
             }
           />
