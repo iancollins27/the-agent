@@ -41,6 +41,7 @@ export async function updateProject(
     project_track?: string | null;
     next_check_date?: string | null;
     Address?: string;
+    project_manager?: string | null; // Added project_manager field
   }
 ) {
   const { error } = await supabase
@@ -70,6 +71,7 @@ export async function createProject(
     project_track?: string | null;
     next_check_date?: string | null;
     Address?: string;
+    project_manager?: string | null; // Added project_manager field
   }
 ) {
   const { error } = await supabase
@@ -81,4 +83,38 @@ export async function createProject(
     console.error('Error creating project:', error)
     throw new Error('Failed to create project')
   }
+}
+
+/**
+ * Find a profile by CRM ID
+ * @param supabase Supabase client
+ * @param crmId CRM ID to search for
+ * @returns Profile ID if found, null otherwise
+ */
+export async function findProfileByCrmId(supabase: any, crmId: string) {
+  if (!crmId) {
+    console.log('No CRM ID provided to search for profile')
+    return null
+  }
+
+  console.log('Searching for profile with CRM ID:', crmId)
+  
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('profile_crm_id', crmId)
+    .limit(1)
+
+  if (error) {
+    console.error('Error finding profile by CRM ID:', error)
+    return null
+  }
+
+  if (profiles && profiles.length > 0) {
+    console.log('Found profile with ID:', profiles[0].id)
+    return profiles[0].id
+  }
+  
+  console.log('No profile found with CRM ID:', crmId)
+  return null
 }

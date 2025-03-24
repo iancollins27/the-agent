@@ -1,11 +1,12 @@
 
 export interface ParsedProjectData {
   crmId: string;
-  zohoCompanyId: string; // Changed from companyId to zohoCompanyId to be more explicit
+  zohoCompanyId: string;
   lastMilestone: string;
   nextStep: string;
   propertyAddress: string;
-  notes: string; // Added notes field
+  notes: string;
+  projectManagerId?: string; // Add the project manager ID field
   timeline: {
     contractSigned: string;
     siteVisitScheduled: string;
@@ -16,4 +17,15 @@ export interface ParsedProjectData {
     roofInstallComplete: string;
     roofInstallFinalized: string;
   };
+}
+
+export interface TimelineData {
+  contractSigned: string;
+  siteVisitScheduled: string;
+  workOrderConfirmed: string;
+  roofInstallApproved: string;
+  roofInstallScheduled: string;
+  installDateConfirmedByRoofer: string;
+  roofInstallComplete: string;
+  roofInstallFinalized: string;
 }

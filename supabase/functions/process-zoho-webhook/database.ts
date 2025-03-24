@@ -8,6 +8,7 @@ export {
   getExistingProject,
   createProject,
   updateProject,
+  findProfileByCrmId,
 } from './database/project.ts';
 
 export { 

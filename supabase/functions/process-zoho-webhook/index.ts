@@ -9,7 +9,8 @@ import {
   getWorkflowPrompt,
   updateProject,
   createProject,
-  createMilestoneActionRecord
+  createMilestoneActionRecord,
+  findProfileByCrmId
 } from './database.ts'
 import { generateSummary } from './ai.ts'
 
@@ -118,6 +119,13 @@ serve(async (req) => {
     // Generate summary using the configured AI provider
     const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
 
+    // Find the project manager profile using the CRM ID
+    let projectManagerId = null;
+    if (projectData.projectManagerId) {
+      projectManagerId = await findProfileByCrmId(supabase, projectData.projectManagerId);
+      console.log('Project manager profile ID:', projectManagerId);
+    }
+
     // Prepare project data using the company UUID from Supabase
     // Log the address being saved to help with debugging
     console.log('Address being saved to project:', projectData.propertyAddress);
@@ -128,7 +136,8 @@ serve(async (req) => {
       last_action_check: new Date().toISOString(),
       company_id: companyUuid,  // Use the UUID we got from handleCompany
       project_track: projectTrackId,  // Add project track ID
-      Address: projectData.propertyAddress // Make sure Address field is correctly capitalized
+      Address: projectData.propertyAddress, // Make sure Address field is correctly capitalized
+      project_manager: projectManagerId  // Associate the project manager
     }
 
     console.log('Project update data:', projectUpdateData);
@@ -175,7 +184,8 @@ serve(async (req) => {
         projectTrackId,
         aiProvider,
         aiModel,
-        projectId
+        projectId,
+        projectManagerId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

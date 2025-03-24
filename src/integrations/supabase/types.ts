@@ -289,6 +289,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          associated_profile: string | null
           comms_preferences: string | null
           email: string | null
           full_name: string
@@ -297,6 +298,7 @@ export type Database = {
           role: Database["public"]["Enums"]["contact_role"]
         }
         Insert: {
+          associated_profile?: string | null
           comms_preferences?: string | null
           email?: string | null
           full_name: string
@@ -305,6 +307,7 @@ export type Database = {
           role: Database["public"]["Enums"]["contact_role"]
         }
         Update: {
+          associated_profile?: string | null
           comms_preferences?: string | null
           email?: string | null
           full_name?: string
@@ -312,7 +315,15 @@ export type Database = {
           phone_number?: string | null
           role?: Database["public"]["Enums"]["contact_role"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_associated_profile_fkey"
+            columns: ["associated_profile"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       knowledge_base_embeddings: {
         Row: {
@@ -367,6 +378,9 @@ export type Database = {
           created_at: string | null
           id: string
           permission: Database["public"]["Enums"]["user_permission"]
+          profile_crm_id: string | null
+          profile_fname: string | null
+          profile_lname: string | null
           updated_at: string | null
         }
         Insert: {
@@ -374,6 +388,9 @@ export type Database = {
           created_at?: string | null
           id: string
           permission?: Database["public"]["Enums"]["user_permission"]
+          profile_crm_id?: string | null
+          profile_fname?: string | null
+          profile_lname?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -381,6 +398,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           permission?: Database["public"]["Enums"]["user_permission"]
+          profile_crm_id?: string | null
+          profile_fname?: string | null
+          profile_lname?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -494,6 +514,7 @@ export type Database = {
           last_action_check: string | null
           next_check_date: string | null
           next_step: string | null
+          project_manager: string | null
           project_track: string | null
           summary: string | null
         }
@@ -505,6 +526,7 @@ export type Database = {
           last_action_check?: string | null
           next_check_date?: string | null
           next_step?: string | null
+          project_manager?: string | null
           project_track?: string | null
           summary?: string | null
         }
@@ -516,6 +538,7 @@ export type Database = {
           last_action_check?: string | null
           next_check_date?: string | null
           next_step?: string | null
+          project_manager?: string | null
           project_track?: string | null
           summary?: string | null
         }
@@ -525,6 +548,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_project_manager_fkey"
+            columns: ["project_manager"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -687,6 +717,7 @@ export type Database = {
           last_action_check: string | null
           next_check_date: string | null
           next_step: string | null
+          project_manager: string | null
           project_track: string | null
           summary: string | null
         }[]

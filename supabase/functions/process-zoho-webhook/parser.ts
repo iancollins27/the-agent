@@ -32,6 +32,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   console.log('Processing data object:', data);
   console.log('Notes from Zoho:', data.Notes || 'No notes provided');
   console.log('Property Address from Zoho:', data.Property_Address || 'No address provided');
+  console.log('Project Manager ID from Zoho:', data.Project_Manager_ID || 'No project manager ID provided');
   
   // Check for Address field in various formats and log it
   if (data.Address) {
@@ -48,6 +49,10 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   const propertyAddress = data.Property_Address || data.Address || data.property_address || '';
   console.log('Final extracted property address:', propertyAddress);
   
+  // Extract project manager ID
+  const projectManagerId = data.Project_Manager_ID || '';
+  console.log('Extracted project manager ID:', projectManagerId);
+  
   const result = {
     crmId: idValue, // Using the string version of the ID
     zohoCompanyId: companyIdFromZoho,
@@ -55,6 +60,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
     nextStep: data.Next_Step || '',
     propertyAddress: propertyAddress, // Enhanced address extraction
     notes: data.Notes || '', // Adding the notes field
+    projectManagerId: projectManagerId, // Add the project manager ID from Zoho
     timeline: {
       contractSigned: String(data.Contract_Signed || ''),
       siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),
