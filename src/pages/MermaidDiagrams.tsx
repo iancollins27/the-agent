@@ -1,18 +1,29 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import mermaid from 'mermaid';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const MermaidDiagrams = () => {
+  const [activeTab, setActiveTab] = useState('communications');
+
+  // Initialize mermaid on first render
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: true,
       theme: 'neutral',
       flowchart: { useMaxWidth: false }
     });
-    mermaid.run();
   }, []);
+
+  // Re-run mermaid rendering when tab changes
+  useEffect(() => {
+    mermaid.run();
+  }, [activeTab]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -21,7 +32,7 @@ const MermaidDiagrams = () => {
         <p className="text-muted-foreground">Visual representation of prompt workflows in the system</p>
       </header>
 
-      <Tabs defaultValue="communications">
+      <Tabs defaultValue="communications" value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="mb-4">
           <TabsTrigger value="communications">Communications Flow</TabsTrigger>
           <TabsTrigger value="actions">Actions Flow</TabsTrigger>
