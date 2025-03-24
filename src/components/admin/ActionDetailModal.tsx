@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, MessageSquare, Database, Calendar, MapPin } from "lucide-react";
+import { Loader2, MessageSquare, Database, Calendar, MapPin, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "@/components/Chat/types";
@@ -137,6 +137,37 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
             <span className="text-sm text-gray-500">
               {new Date(action.created_at || '').toLocaleString()}
             </span>
+          </div>
+          
+          {/* Sender and Recipient Information */}
+          <div className="space-y-3 pt-2">
+            {(action.sender_name || action.recipient_name) && (
+              <div className="grid grid-cols-2 gap-3">
+                {action.sender_name && (
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-1">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      From
+                    </Label>
+                    <div className="text-sm bg-muted p-2 rounded-md">
+                      {action.sender_name}
+                    </div>
+                  </div>
+                )}
+                
+                {action.recipient_name && (
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-1">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      To
+                    </Label>
+                    <div className="text-sm bg-muted p-2 rounded-md">
+                      {action.recipient_name}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           {action.action_type === 'data_update' && (
