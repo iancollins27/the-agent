@@ -22,15 +22,26 @@ export const AuthForm = () => {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { error, data } = await supabase.auth.signUp({
           email,
           password,
         });
+        
         if (error) throw error;
-        toast({
-          title: "Check your email",
-          description: "We've sent you a confirmation link.",
-        });
+        
+        if (data.user && !data.user.identities?.length) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "User already exists. Please sign in instead.",
+          });
+        } else {
+          toast({
+            title: "Account created",
+            description: "You have been signed in automatically.",
+          });
+          navigate("/");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
