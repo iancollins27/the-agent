@@ -125,7 +125,7 @@ export async function handleZohoWebhook(req: Request) {
       console.log(`Created new project with ID: ${projectId}`);
     }
 
-    // Log milestone updates using the new action_records table
+    // Log milestone updates using the action_records table
     try {
       await createMilestoneActionRecord(supabase, projectId, projectData.timeline)
     } catch (error) {
