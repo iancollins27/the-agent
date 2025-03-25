@@ -1,9 +1,8 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -35,59 +34,61 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <AdminConsole />
-            </ProtectedRoute>
-          }
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute>
-              <AdminConsole />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/chat" 
-          element={
-            <ProtectedRoute>
-              <AgentChat />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/chatbot-config" 
-          element={
-            <ProtectedRoute>
-              <ChatbotConfig />
-            </ProtectedRoute>
-          } 
-        />
-        <Route path="/company-settings" element={<CompanySettings />} />
-        <Route
-          path="/system-diagrams"
-          element={
-            <ProtectedRoute>
-              <MermaidDiagrams />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project-manager"
-          element={
-            <ProtectedRoute>
-              <ProjectManager />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AdminConsole />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute>
+                <AdminConsole />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chat" 
+            element={
+              <ProtectedRoute>
+                <AgentChat />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chatbot-config" 
+            element={
+              <ProtectedRoute>
+                <ChatbotConfig />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="/company-settings" element={<CompanySettings />} />
+          <Route
+            path="/system-diagrams"
+            element={
+              <ProtectedRoute>
+                <MermaidDiagrams />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/project-manager"
+            element={
+              <ProtectedRoute>
+                <ProjectManager />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
