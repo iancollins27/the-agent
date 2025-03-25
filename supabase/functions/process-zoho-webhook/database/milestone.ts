@@ -15,7 +15,7 @@ export async function getMilestoneInstructions(supabase: any, nextStep: string, 
     .from('project_track_milestones')
     .select('prompt_instructions')
     .eq('track_id', projectTrackId)
-    .eq('name', nextStep)
+    .eq('step_title', nextStep)
     .single()
 
   if (error && error.status !== 404) {

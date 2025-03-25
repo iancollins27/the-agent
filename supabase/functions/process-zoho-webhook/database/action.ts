@@ -39,7 +39,7 @@ export async function createMilestoneActionRecord(supabase: any, projectId: stri
       status: 'executed',
       requires_approval: false,
       executed_at: new Date().toISOString(),
-      description: `Timeline updated for ${milestone} on ${date}`
+      message: `Timeline updated for ${milestone} on ${date}`
     }))
 
     const { data, error } = await supabase
