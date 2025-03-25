@@ -33,7 +33,10 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   console.log('Processing data object:', data);
   console.log('Notes from Zoho:', data.Notes || 'No notes provided');
   console.log('Property Address from Zoho:', data.Property_Address || 'No address provided');
-  console.log('Project Manager ID from Zoho:', data.Project_Manager_ID || 'No project manager ID provided');
+  
+  // Added logging for Project Manager ID from Zoho (checking both formats)
+  console.log('Project Manager ID from Zoho (with underscore):', data.Project_Manager_ID || 'Not found');
+  console.log('Project Manager ID from Zoho (with spaces):', data['Project Manager ID'] || 'Not found');
   
   // Check for Address field in various formats and log it
   if (data.Address) {
@@ -50,8 +53,12 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   const propertyAddress = data.Property_Address || data.Address || data.property_address || '';
   console.log('Final extracted property address:', propertyAddress);
   
-  // Extract project manager ID and ensure it's a string
-  const projectManagerId = data.Project_Manager_ID ? String(data.Project_Manager_ID) : '';
+  // Fix: Extract project manager ID checking both naming conventions (with spaces and with underscores)
+  const projectManagerId = String(
+    data.Project_Manager_ID || 
+    data['Project Manager ID'] || 
+    ''
+  );
   console.log('Extracted project manager ID:', projectManagerId);
   
   const result = {
@@ -61,7 +68,7 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
     nextStep: data.Next_Step || '',
     propertyAddress: propertyAddress, // Enhanced address extraction
     notes: data.Notes || '', // Adding the notes field
-    projectManagerId: projectManagerId, // Add the project manager ID from Zoho
+    projectManagerId: projectManagerId, // Fixed to get the ID from either format
     timeline: {
       contractSigned: String(data.Contract_Signed || ''),
       siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),
