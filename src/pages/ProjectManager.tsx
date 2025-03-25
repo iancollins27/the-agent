@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +29,6 @@ const ProjectManager: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Fetch user profile data
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
@@ -46,18 +44,17 @@ const ProjectManager: React.FC = () => {
           console.error('Error fetching user profile:', error);
         } else {
           setUserProfile(data);
-          setLoading(false); // Move this here to ensure it only gets set after profile is fetched
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        setLoading(false); // Also set loading to false in case of error
+        setLoading(false);
       }
     };
     
     fetchUserProfile();
   }, [user]);
 
-  // Fetch prompt runs based on user profile, status filter, and project filter
   useEffect(() => {
     if (userProfile) {
       fetchPromptRuns();
@@ -66,13 +63,11 @@ const ProjectManager: React.FC = () => {
 
   const fetchPromptRuns = async () => {
     if (!user) {
-      // If no user is logged in, show no data
       setPromptRuns([]);
       setLoading(false);
       return;
     }
 
-    // Only proceed if we have the user profile with profile_associated_company
     if (!userProfile?.profile_associated_company) {
       console.warn('User has no profile_associated_company in profile, cannot fetch projects');
       setPromptRuns([]);
@@ -87,14 +82,12 @@ const ProjectManager: React.FC = () => {
 
     setLoading(true);
     try {
-      // Build the query to find projects
       let projectQuery = supabase
         .from('projects')
         .select('id')
-        .eq('company_id', userProfile.profile_associated_company) // Use profile_associated_company instead of company_id
-        .neq('Project_status', 'archived'); // Filter out archived projects
-      
-      // Apply filter to only show projects where user is project manager if that filter is selected
+        .eq('company_id', userProfile.profile_associated_company)
+        .neq('Project_status', 'Archived');
+
       if (onlyShowMyProjects) {
         projectQuery = projectQuery.eq('project_manager', userProfile.id);
       }
@@ -106,16 +99,13 @@ const ProjectManager: React.FC = () => {
       }
 
       if (!projectsData || projectsData.length === 0) {
-        // No projects found with the current filters
         setPromptRuns([]);
         setLoading(false);
         return;
       }
 
-      // Get the project IDs
       const projectIds = projectsData.map(project => project.id);
 
-      // Now fetch prompt runs for these projects
       let query = supabase
         .from('prompt_runs')
         .select(`
@@ -145,7 +135,6 @@ const ProjectManager: React.FC = () => {
       }
 
       const formattedData = data.map(run => {
-        // Construct the CRM URL by combining the base URL with the project's CRM ID
         const baseUrl = run.projects?.companies?.company_project_base_URL || null;
         const crmId = run.projects?.crm_id || null;
         const crmUrl = baseUrl && crmId ? `${baseUrl}${crmId}` : null;
