@@ -500,44 +500,36 @@ export type Database = {
       }
       profiles: {
         Row: {
+          company_id: number | null
           created_at: string | null
           id: string
           permission: Database["public"]["Enums"]["user_permission"]
-          profile_associated_company: string | null
           profile_crm_id: string | null
           profile_fname: string | null
           profile_lname: string | null
           updated_at: string | null
         }
         Insert: {
+          company_id?: number | null
           created_at?: string | null
           id: string
           permission?: Database["public"]["Enums"]["user_permission"]
-          profile_associated_company?: string | null
           profile_crm_id?: string | null
           profile_fname?: string | null
           profile_lname?: string | null
           updated_at?: string | null
         }
         Update: {
+          company_id?: number | null
           created_at?: string | null
           id?: string
           permission?: Database["public"]["Enums"]["user_permission"]
-          profile_associated_company?: string | null
           profile_crm_id?: string | null
           profile_fname?: string | null
           profile_lname?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_profile_associated_company_fkey"
-            columns: ["profile_associated_company"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       project_contacts: {
         Row: {
