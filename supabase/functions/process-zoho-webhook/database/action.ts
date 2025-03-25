@@ -28,18 +28,17 @@ export async function createMilestoneActionRecord(supabase: any, projectId: stri
 
     console.log(`Creating ${filteredTimeline.length} milestone action records for project ${projectId}`)
     
-    const actions = filteredTimeline.map(([milestone, date]) => ({
+    const actions = filteredTimeline.map(([milestoneName, date]) => ({
       project_id: projectId,
-      milestone: milestone,
       action_type: 'timeline_update',
       action_payload: {
         date: date,
-        milestone: milestone
+        milestone: milestoneName
       },
       status: 'executed',
       requires_approval: false,
       executed_at: new Date().toISOString(),
-      message: `Timeline updated for ${milestone} on ${date}`
+      message: `Timeline updated for ${milestoneName} on ${date}`
     }))
 
     const { data, error } = await supabase
