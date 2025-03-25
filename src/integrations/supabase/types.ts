@@ -649,6 +649,7 @@ export type Database = {
           next_check_date: string | null
           next_step: string | null
           project_manager: string | null
+          Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
           summary: string | null
         }
@@ -661,6 +662,7 @@ export type Database = {
           next_check_date?: string | null
           next_step?: string | null
           project_manager?: string | null
+          Project_status?: Database["public"]["Enums"]["project_status"] | null
           project_track?: string | null
           summary?: string | null
         }
@@ -673,6 +675,7 @@ export type Database = {
           next_check_date?: string | null
           next_step?: string | null
           project_manager?: string | null
+          Project_status?: Database["public"]["Enums"]["project_status"] | null
           project_track?: string | null
           summary?: string | null
         }
@@ -908,6 +911,7 @@ export type Database = {
           next_check_date: string | null
           next_step: string | null
           project_manager: string | null
+          Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
           summary: string | null
         }[]
@@ -1083,6 +1087,7 @@ export type Database = {
     }
     Enums: {
       contact_role: "Roofer" | "HO" | "BidList Project Manager" | "Solar"
+      project_status: "Archived"
       user_permission: "read" | "update_settings"
       workflow_type:
         | "summary_generation"

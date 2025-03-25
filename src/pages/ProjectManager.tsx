@@ -91,7 +91,8 @@ const ProjectManager: React.FC = () => {
       let projectQuery = supabase
         .from('projects')
         .select('id')
-        .eq('company_id', userProfile.profile_associated_company); // Use profile_associated_company instead of company_id
+        .eq('company_id', userProfile.profile_associated_company) // Use profile_associated_company instead of company_id
+        .neq('Project_status', 'archived'); // Filter out archived projects
       
       // Apply filter to only show projects where user is project manager if that filter is selected
       if (onlyShowMyProjects) {
