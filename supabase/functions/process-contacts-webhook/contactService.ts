@@ -4,13 +4,13 @@ import { ContactPayload, ContactProcessResult } from './types.ts';
 import { normalizeRole } from './utils.ts';
 
 // Find or create project by CRM ID
-export async function getProjectByCrmId(supabase: SupabaseClient, crmId: string | number): Promise<{ id: string }> {
+export async function getProjectByCrmId(supabase: SupabaseClient, crmId: string): Promise<{ id: string }> {
   console.log(`Looking for project with CRM ID: ${crmId}`);
   
   const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('id')
-    .eq('crm_id', crmId.toString())
+    .eq('crm_id')
     .single();
 
   if (projectError) {
