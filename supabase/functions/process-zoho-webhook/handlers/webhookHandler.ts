@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { parseZohoData } from '../parser.ts'
 import { 
@@ -333,7 +332,7 @@ function formatWorkflowPrompt(
   trackBasePrompt: string,
   trackName: string
 ) {
-  return promptTemplate
+  const finalPrompt = promptTemplate
     .replace('{{summary}}', existingSummary)
     .replace('{{new_data}}', JSON.stringify(projectData))
     .replace('{{current_date}}', new Date().toISOString().split('T')[0])
@@ -341,4 +340,9 @@ function formatWorkflowPrompt(
     .replace('{{track_roles}}', trackRoles || '')
     .replace('{{track_base_prompt}}', trackBasePrompt || '')
     .replace('{{track_name}}', trackName || '');
+
+  // ADDED: Log the final prompt string
+  console.log('Final Workflow Prompt for Summary Generation:', finalPrompt);
+
+  return finalPrompt;
 }
