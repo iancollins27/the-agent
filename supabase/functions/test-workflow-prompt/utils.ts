@@ -1,101 +1,40 @@
-
 /**
  * Replaces variables in a text with values from a variables object
  */
-export function replaceVariables(promptText: string, contextData: any) {
-  if (!promptText) return "";
+export function replaceVariables(promptText: string, contextData: Record<string, any>): string {
+  let finalPrompt = promptText;
   
-  let updatedPrompt = promptText;
+  // Log the variables found in the template
+  const variables = (promptText.match(/\{\{([^}]+)\}\}/g) || [])
+    .map(v => v.slice(2, -2));
   
-  // Add multi-project analysis guidance if this is a multi-project test
-  if (contextData && (contextData.isMultiProjectTest || contextData.multi_project_analysis)) {
-    if (!promptText.includes("multi-project analysis")) {
-      const multiProjectGuidance = `
-IMPORTANT: This analysis requires you to identify information relevant to multiple projects.
-
-Your task is to:
-1. Analyze the communication content 
-2. Identify which parts are relevant to which projects
-3. Return a JSON response with project-specific information
-
-Expected JSON format:
-\`\`\`json
-{
-  "projects": [
-    {
-      "projectId": "[project id]",
-      "relevantContent": "Content specifically relevant to this project"
-    },
-    {
-      "projectId": "[another project id]", 
-      "relevantContent": "Content specifically relevant to this other project"
-    }
-  ]
-}
-\`\`\`
-`;
-      // Append the guidance near the beginning of the prompt
-      const firstLineBreak = updatedPrompt.indexOf("\n\n");
-      if (firstLineBreak > 0) {
-        updatedPrompt = 
-          updatedPrompt.substring(0, firstLineBreak) + 
-          "\n\n" + multiProjectGuidance + 
-          updatedPrompt.substring(firstLineBreak);
-      } else {
-        updatedPrompt = multiProjectGuidance + "\n\n" + updatedPrompt;
-      }
+  if (variables.length > 0) {
+    console.log('Variables found in template:', variables);
+  }
+  
+  // Log what context variables are available
+  console.log('Context variables available:', Object.keys(contextData));
+  
+  // Replace each variable with its value from contextData if available
+  for (const [key, value] of Object.entries(contextData)) {
+    const varPattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+    if (varPattern.test(finalPrompt)) {
+      // Check if the template actually contains this variable
+      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+      finalPrompt = finalPrompt.replace(varPattern, stringValue || '');
+      console.log(`Replaced {{${key}}} with value (length: ${stringValue?.length || 0})`);
     }
   }
   
-  // Add reminder guidance if this is an action detection + execution prompt
-  if (promptText.includes("{{action_type}}") || 
-      promptText.includes("SET_FUTURE_REMINDER") ||
-      (contextData && contextData.is_reminder_check)) {
-    
-    // Add enhanced reminder guidance if not already present
-    if (!promptText.includes("SET_FUTURE_REMINDER")) {
-      const reminderGuidance = `
-If no immediate action is needed but you believe the project should be checked again after a certain period, you MUST:
-1. Return a decision of "SET_FUTURE_REMINDER"
-2. Specify "days_until_check" (number of days until the next check)
-3. Provide a "check_reason" explaining why this future check is important
-
-Example JSON response for setting a reminder:
-
-\`\`\`json
-{
-  "decision": "SET_FUTURE_REMINDER",
-  "action_type": "set_future_reminder",
-  "days_until_check": 7,
-  "check_reason": "Follow up on site visit scheduling if not confirmed by then"
-}
-\`\`\`
-`;
-      
-      // Append the guidance before the end of the prompt
-      const lastInstructionPos = updatedPrompt.lastIndexOf("\n\n");
-      if (lastInstructionPos > 0) {
-        updatedPrompt = 
-          updatedPrompt.substring(0, lastInstructionPos) + 
-          "\n\n" + reminderGuidance + 
-          updatedPrompt.substring(lastInstructionPos);
-      } else {
-        updatedPrompt += "\n\n" + reminderGuidance;
-      }
-    }
+  // Check for any remaining unreplaced variables
+  const remainingVars = (finalPrompt.match(/\{\{([^}]+)\}\}/g) || [])
+    .map(v => v.slice(2, -2));
+  
+  if (remainingVars.length > 0) {
+    console.warn('Unreplaced variables in final prompt:', remainingVars);
   }
   
-  // Replace standard variables
-  for (const key in contextData) {
-    if (contextData.hasOwnProperty(key)) {
-      const value = contextData[key] !== null && contextData[key] !== undefined 
-        ? contextData[key] 
-        : "";
-      updatedPrompt = updatedPrompt.replace(new RegExp(`{{${key}}}`, 'g'), value);
-    }
-  }
-  
-  return updatedPrompt;
+  return finalPrompt;
 }
 
 /**

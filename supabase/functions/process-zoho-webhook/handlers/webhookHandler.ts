@@ -202,7 +202,8 @@ export async function handleZohoWebhook(req: Request) {
           current_date: new Date().toISOString().split('T')[0],
           next_step: projectData.nextStep || '',
           new_data: JSON.stringify(projectData),
-          is_reminder_check: false
+          is_reminder_check: false,
+          milestone_instructions: nextStepInstructions || ''  // Add milestone instructions to the context
         };
         
         console.log('Calling action detection workflow with context:', Object.keys(actionContext));
@@ -216,7 +217,7 @@ export async function handleZohoWebhook(req: Request) {
           actionContext.track_base_prompt,
           actionContext.current_date,
           actionContext.next_step,
-          nextStepInstructions || ''
+          actionContext.milestone_instructions  // Use the milestone instructions from the context
         );
         
         // Log the formatted action detection prompt
