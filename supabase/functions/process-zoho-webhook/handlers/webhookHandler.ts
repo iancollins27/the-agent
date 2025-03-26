@@ -121,11 +121,13 @@ export async function handleZohoWebhook(req: Request) {
       await updateProject(supabase, existingProject.id, projectUpdateData)
       projectId = existingProject.id;
     } else {
+      // When creating a new project, track creation time
       const { data: newProject, error } = await supabase
         .from('projects')
         .insert({
           ...projectUpdateData,
-          crm_id: projectData.crmId
+          crm_id: projectData.crmId,
+          created_at: new Date().toISOString() // Explicitly set created_at for new projects
         })
         .select('id')
         .single();

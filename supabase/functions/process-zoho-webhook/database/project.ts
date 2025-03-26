@@ -79,15 +79,20 @@ export async function createProject(
 ) {
   console.log('Creating new project with CRM ID:', data.crm_id);
   
-  const { error } = await supabase
+  const { data: newProject, error } = await supabase
     .from('projects')
-    .insert(data)
+    .insert({
+      ...data,
+      created_at: new Date().toISOString() // Explicitly set created_at to current timestamp
+    })
     .select()
 
   if (error) {
     console.error('Error creating project:', error)
     throw new Error('Failed to create project')
   }
+
+  return newProject;
 }
 
 /**

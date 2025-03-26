@@ -643,6 +643,7 @@ export type Database = {
         Row: {
           Address: string | null
           company_id: string | null
+          created_at: string
           crm_id: string | null
           id: string
           last_action_check: string | null
@@ -656,6 +657,7 @@ export type Database = {
         Insert: {
           Address?: string | null
           company_id?: string | null
+          created_at?: string
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
@@ -669,6 +671,7 @@ export type Database = {
         Update: {
           Address?: string | null
           company_id?: string | null
+          created_at?: string
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
@@ -905,6 +908,7 @@ export type Database = {
         Returns: {
           Address: string | null
           company_id: string | null
+          created_at: string
           crm_id: string | null
           id: string
           last_action_check: string | null
