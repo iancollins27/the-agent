@@ -139,12 +139,17 @@ export async function handleZohoWebhook(req: Request) {
       console.log(`Created new project with ID: ${projectId}`);
     }
 
-    // Log milestone updates for tracking purposes only
-    try {
-      await createMilestoneActionRecord(supabase, projectId, projectData.timeline)
-    } catch (error) {
-      console.error('Error creating milestone tracking records, but continuing:', error);
-      // We continue processing even if action records fail
+    // Log milestone updates for tracking purposes only if needed
+    // Only create milestone records for projects that have timeline data
+    if (projectData.timeline && Object.keys(projectData.timeline).length > 0) {
+      try {
+        await createMilestoneActionRecord(supabase, projectId, projectData.timeline)
+      } catch (error) {
+        console.error('Error creating milestone tracking records, but continuing:', error);
+        // We continue processing even if action records fail
+      }
+    } else {
+      console.log('No timeline data provided, skipping milestone tracking record creation');
     }
 
     // Run action detection and execution
