@@ -13,9 +13,9 @@ export async function getMilestoneInstructions(supabase: any, nextStep: string, 
 
   const { data: milestone, error } = await supabase
     .from('project_track_milestones')
-    .select('prompt_instructions')
-    .eq('track_id', projectTrackId)
-    .eq('step_title', nextStep)
+    .select('instructions')
+    .eq('project_track_id', projectTrackId)
+    .eq('name', nextStep)
     .single()
 
   if (error && error.status !== 404) {
@@ -23,7 +23,7 @@ export async function getMilestoneInstructions(supabase: any, nextStep: string, 
     return null
   }
 
-  return milestone ? milestone.prompt_instructions : null
+  return milestone ? milestone.instructions : null
 }
 
 /**

@@ -28,19 +28,12 @@ export async function createMilestoneActionRecord(supabase: any, projectId: stri
 
     console.log(`Creating ${filteredTimeline.length} milestone action records for project ${projectId}`)
     
-    const actions = filteredTimeline.map(([milestoneName, date]) => ({
+    const actions = filteredTimeline.map(([milestone, date]) => ({
       project_id: projectId,
-      action_type: 'data_update', // Changed from 'timeline_update' to 'data_update' which is likely an allowed value
-      action_payload: {
-        date: date,
-        milestone: milestoneName,
-        field: 'timeline',
-        value: `${milestoneName}: ${date}`
-      },
-      status: 'executed',
-      requires_approval: false,
-      executed_at: new Date().toISOString(),
-      message: `Timeline updated for ${milestoneName} on ${date}`
+      milestone: milestone,
+      action_date: date,
+      action_type: 'timeline_update',
+      description: `Timeline updated for ${milestone} on ${date}`
     }))
 
     const { data, error } = await supabase
@@ -77,12 +70,10 @@ export async function createReminderActionRecord(
 
   const action = {
     project_id: projectId,
-    action_type: 'reminder_creation', 
+    action_type: 'reminder_creation',
     action_payload: {
       date: reminderDate,
       reason: reason,
-      field: 'reminder',
-      value: reminderDate,
       description: `Reminder set for ${reminderDate}: ${reason}`
     },
     status: 'executed',
