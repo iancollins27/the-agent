@@ -26,31 +26,33 @@ export async function createMilestoneActionRecord(supabase: any, projectId: stri
       return
     }
 
-    console.log(`Creating ${filteredTimeline.length} milestone action records for project ${projectId}`)
+    console.log(`Creating ${filteredTimeline.length} milestone tracking records for project ${projectId}`)
     
-    const actions = filteredTimeline.map(([milestone, date]) => ({
+    // Note: These are just tracking records for milestones, not actual actions that require execution
+    const milestoneRecords = filteredTimeline.map(([milestone, date]) => ({
       project_id: projectId,
       action_type: 'data_update', // Use a valid action_type from the schema
       action_payload: {
         field: 'timeline',
         milestone: milestone,
         value: date,
-        date: date
+        date: date,
+        is_milestone_tracking: true // Flag to identify these are just milestone tracking records
       },
-      status: 'executed',
+      status: 'executed', // Already executed since these are just records of data updates
       requires_approval: false,
-      message: `Timeline updated for ${milestone} on ${date}`,
+      message: `Timeline milestone recorded: ${milestone} on ${date}`,
       executed_at: new Date().toISOString()
     }))
 
     const { data, error } = await supabase
       .from('action_records')
-      .insert(actions)
+      .insert(milestoneRecords)
 
     if (error) {
-      console.error('Error creating milestone action records:', error)
+      console.error('Error creating milestone tracking records:', error)
     } else {
-      console.log(`Successfully created ${actions.length} milestone action records`)
+      console.log(`Successfully created ${milestoneRecords.length} milestone tracking records`)
     }
   } catch (error) {
     console.error('Exception in createMilestoneActionRecord:', error)

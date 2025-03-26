@@ -125,12 +125,62 @@ export async function handleZohoWebhook(req: Request) {
       console.log(`Created new project with ID: ${projectId}`);
     }
 
-    // Log milestone updates using the new action_records table
+    // Log milestone updates for tracking purposes only
     try {
       await createMilestoneActionRecord(supabase, projectId, projectData.timeline)
     } catch (error) {
-      console.error('Error creating milestone action records, but continuing:', error);
+      console.error('Error creating milestone tracking records, but continuing:', error);
       // We continue processing even if action records fail
+    }
+
+    // Now run action detection and execution explicitly
+    console.log('Running action detection and execution prompt...');
+    try {
+      const actionPrompt = await getLatestActionPrompt(supabase);
+      
+      if (!actionPrompt || !actionPrompt.prompt_text) {
+        console.error('No action detection prompt found in the database');
+      } else {
+        // Format the context for the action prompt
+        const actionContext = {
+          summary: summary,
+          track_name: trackName || 'Default Track',
+          track_roles: trackRoles || '',
+          track_base_prompt: trackBasePrompt || '',
+          current_date: new Date().toISOString().split('T')[0],
+          next_step: projectData.nextStep || '',
+          new_data: JSON.stringify(projectData),
+          is_reminder_check: false
+        };
+        
+        console.log('Calling action detection workflow with context:', Object.keys(actionContext));
+        
+        // Call the action detection workflow
+        const { data: actionResult, error: actionError } = await supabase.functions.invoke(
+          'test-workflow-prompt',
+          {
+            body: {
+              promptType: 'action_detection_execution',
+              promptText: actionPrompt.prompt_text,
+              projectId: projectId,
+              contextData: actionContext,
+              aiProvider: aiProvider,
+              aiModel: aiModel,
+              workflowPromptId: actionPrompt.id,
+              initiatedBy: 'zoho-webhook'
+            }
+          }
+        );
+        
+        if (actionError) {
+          console.error('Error invoking action detection workflow:', actionError);
+        } else {
+          console.log('Action detection workflow completed successfully:', 
+            actionResult?.actionRecordId ? `Created action record: ${actionResult.actionRecordId}` : 'No action needed');
+        }
+      }
+    } catch (actionError) {
+      console.error('Error in action detection process:', actionError);
     }
 
     return new Response(
@@ -159,6 +209,28 @@ export async function handleZohoWebhook(req: Request) {
       }
     )
   }
+}
+
+/**
+ * Get the latest action detection workflow prompt
+ * @param supabase Supabase client
+ * @returns The latest action detection workflow prompt
+ */
+async function getLatestActionPrompt(supabase: any) {
+  const { data: prompt, error } = await supabase
+    .from('workflow_prompts')
+    .select('*')
+    .eq('type', 'action_detection_execution')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+    
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching action detection prompt:', error);
+    return null;
+  }
+  
+  return prompt;
 }
 
 /**
