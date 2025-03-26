@@ -6,11 +6,13 @@ import { normalizeRole } from './utils.ts';
 // Find or create project by CRM ID
 export async function getProjectByCrmId(supabase: SupabaseClient, crmId: string): Promise<{ id: string }> {
   console.log(`Looking for project with CRM ID: ${crmId}`);
+  console.log(`Type of CRM ID: ${typeof crmId}`);
+  console.log(`Raw CRM ID value: ${crmId}`);
   
   const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('id')
-    .eq('crm_id')
+    .eq('crm_id', crmId)
     .single();
 
   if (projectError) {

@@ -15,17 +15,26 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = initSupabaseClient();
 
+    // Log request method and URL for debugging
+    console.log(`Request method: ${req.method}, URL: ${req.url}`);
+    
     // Parse webhook payload
     const payload: WebhookPayload = await parseWebhookPayload(req);
     console.log('Parsed webhook payload:', payload);
     
     // Validate the payload
     if (!payload.contacts || !Array.isArray(payload.contacts) || !payload.Bid_ID) {
-      throw new Error('Invalid webhook payload: missing contacts array or Bid_ID');
+      const error = 'Invalid webhook payload: missing contacts array or Bid_ID';
+      console.error(error, payload);
+      throw new Error(error);
     }
 
+    // Ensure Bid_ID is treated as a string
+    const bidId = String(payload.Bid_ID);
+    console.log(`Using Bid_ID (as string): "${bidId}"`);
+
     // Get the project by CRM ID (Bid_ID)
-    const project = await getProjectByCrmId(supabase, payload.Bid_ID);
+    const project = await getProjectByCrmId(supabase, bidId);
 
     // Process each contact
     const results = await Promise.all(

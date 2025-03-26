@@ -8,7 +8,7 @@ export interface ContactPayload {
 
 export interface WebhookPayload {
   contacts: ContactPayload[];
-  Bid_ID: number;
+  Bid_ID: string;
 }
 
 export interface ContactProcessResult {
