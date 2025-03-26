@@ -14,6 +14,9 @@ import {
 import { generateSummary } from '../ai.ts'
 import { corsHeaders } from '../utils/cors.ts'
 import { getAIConfig } from './aiConfigHandler.ts'
+import { formatWorkflowPrompt } from '../utils/promptFormatters.ts'
+import { getTrackDetails } from '../services/trackService.ts'
+import { runActionDetection } from '../services/actionDetectionService.ts'
 
 /**
  * Main handler for processing the Zoho webhook
@@ -68,46 +71,6 @@ export async function handleZohoWebhook(req: Request) {
       projectData.nextStep,
       projectTrackId
     )
-    
-    // ENHANCED LOGGING: Log the retrieved milestone instructions status
-    if (nextStepInstructions) {
-      console.log('Retrieved milestone instructions successfully:', 
-        nextStepInstructions.substring(0, 50) + (nextStepInstructions.length > 50 ? '...' : ''));
-    } else {
-      console.warn('Failed to retrieve milestone instructions for next step:', projectData.nextStep);
-      
-      // ENHANCED LOGGING: Let's check if the milestone exists with exact step title match
-      try {
-        const { data: milestoneCheck, error } = await supabase
-          .from('project_track_milestones')
-          .select('id, step_title')
-          .eq('track_id', projectTrackId)
-          .order('step_order', { ascending: true });
-        
-        if (error) {
-          console.error('Error checking milestones:', error);
-        } else {
-          console.log('Available milestones for this track:', milestoneCheck.map(m => m.step_title));
-          
-          // Check for potential case sensitivity or whitespace issues
-          if (milestoneCheck.length > 0 && projectData.nextStep) {
-            const closeMatches = milestoneCheck.filter(m => 
-              m.step_title && 
-              (m.step_title.toLowerCase() === projectData.nextStep.toLowerCase() ||
-               m.step_title.toLowerCase().includes(projectData.nextStep.toLowerCase()) ||
-               projectData.nextStep.toLowerCase().includes(m.step_title.toLowerCase()))
-            );
-            
-            if (closeMatches.length > 0) {
-              console.warn('Possible close matches found:', closeMatches.map(m => m.step_title));
-              console.warn('Check for case sensitivity or whitespace issues');
-            }
-          }
-        }
-      } catch (checkError) {
-        console.error('Error during milestone existence check:', checkError);
-      }
-    }
 
     // Get track roles and base prompt if the project track exists
     const { trackRoles, trackBasePrompt, trackName } = await getTrackDetails(supabase, projectTrackId)
@@ -126,7 +89,6 @@ export async function handleZohoWebhook(req: Request) {
 
     // Get AI configuration
     const { aiProvider, aiModel, apiKey } = await getAIConfig(supabase)
-    
     console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`)
 
     // Generate summary using the configured AI provider
@@ -185,71 +147,20 @@ export async function handleZohoWebhook(req: Request) {
       // We continue processing even if action records fail
     }
 
-    // Now run action detection and execution explicitly
-    console.log('Running action detection and execution prompt...');
-    try {
-      const actionPrompt = await getLatestActionPrompt(supabase);
-      
-      if (!actionPrompt || !actionPrompt.prompt_text) {
-        console.error('No action detection prompt found in the database');
-      } else {
-        // Format the context for the action prompt
-        const actionContext = {
-          summary: summary,
-          track_name: trackName || 'Default Track',
-          track_roles: trackRoles || '',
-          track_base_prompt: trackBasePrompt || '',
-          current_date: new Date().toISOString().split('T')[0],
-          next_step: projectData.nextStep || '',
-          new_data: JSON.stringify(projectData),
-          is_reminder_check: false,
-          milestone_instructions: nextStepInstructions || ''  // Add milestone instructions to the context
-        };
-        
-        console.log('Calling action detection workflow with context:', Object.keys(actionContext));
-        
-        // Format the action detection prompt with variables
-        const formattedActionPrompt = replaceActionPromptVariables(
-          actionPrompt.prompt_text,
-          actionContext.summary,
-          actionContext.track_name,
-          actionContext.track_roles,
-          actionContext.track_base_prompt,
-          actionContext.current_date,
-          actionContext.next_step,
-          actionContext.milestone_instructions  // Use the milestone instructions from the context
-        );
-        
-        // Log the formatted action detection prompt
-        console.log('Final Action Detection Prompt:', formattedActionPrompt);
-        
-        // Call the action detection workflow
-        const { data: actionResult, error: actionError } = await supabase.functions.invoke(
-          'test-workflow-prompt',
-          {
-            body: {
-              promptType: 'action_detection_execution',
-              promptText: actionPrompt.prompt_text,
-              projectId: projectId,
-              contextData: actionContext,
-              aiProvider: aiProvider,
-              aiModel: aiModel,
-              workflowPromptId: actionPrompt.id,
-              initiatedBy: 'zoho-webhook'
-            }
-          }
-        );
-        
-        if (actionError) {
-          console.error('Error invoking action detection workflow:', actionError);
-        } else {
-          console.log('Action detection workflow completed successfully:', 
-            actionResult?.actionRecordId ? `Created action record: ${actionResult.actionRecordId}` : 'No action needed');
-        }
-      }
-    } catch (actionError) {
-      console.error('Error in action detection process:', actionError);
-    }
+    // Run action detection and execution
+    await runActionDetection(
+      supabase, 
+      projectId, 
+      summary, 
+      trackName, 
+      trackRoles, 
+      trackBasePrompt, 
+      projectData.nextStep,
+      projectData,
+      nextStepInstructions || '',
+      aiProvider,
+      aiModel
+    );
 
     return new Response(
       JSON.stringify({ 
@@ -277,115 +188,4 @@ export async function handleZohoWebhook(req: Request) {
       }
     )
   }
-}
-
-/**
- * Format action detection prompt with variables
- * Similar to formatWorkflowPrompt but for action detection
- */
-function replaceActionPromptVariables(
-  promptText: string,
-  summary: string,
-  trackName: string,
-  trackRoles: string,
-  trackBasePrompt: string,
-  currentDate: string,
-  nextStep: string,
-  milestoneInstructions: string
-) {
-  const finalPrompt = promptText
-    .replace('{{summary}}', summary)
-    .replace('{{track_name}}', trackName || '')
-    .replace('{{track_roles}}', trackRoles || '')
-    .replace('{{track_base_prompt}}', trackBasePrompt || '')
-    .replace('{{current_date}}', currentDate)
-    .replace('{{next_step}}', nextStep || '')
-    .replace('{{milestone_instructions}}', milestoneInstructions || '');
-
-  return finalPrompt;
-}
-
-/**
- * Get the latest action detection workflow prompt
- * @param supabase Supabase client
- * @returns The latest action detection workflow prompt
- */
-async function getLatestActionPrompt(supabase: any) {
-  const { data: prompt, error } = await supabase
-    .from('workflow_prompts')
-    .select('*')
-    .eq('type', 'action_detection_execution')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-    
-  if (error && error.code !== 'PGRST116') {
-    console.error('Error fetching action detection prompt:', error);
-    return null;
-  }
-  
-  return prompt;
-}
-
-/**
- * Get track details from the project track ID
- * @param supabase Supabase client
- * @param projectTrackId Project track ID
- * @returns Object containing track roles, base prompt, and name
- */
-async function getTrackDetails(supabase: any, projectTrackId: string | null) {
-  let trackRoles = '';
-  let trackBasePrompt = '';
-  let trackName = '';
-  
-  if (projectTrackId) {
-    const { data: trackData, error: trackError } = await supabase
-      .from('project_tracks')
-      .select('Roles, "track base prompt", name')
-      .eq('id', projectTrackId)
-      .single();
-      
-    if (!trackError && trackData) {
-      trackRoles = trackData.Roles || '';
-      trackBasePrompt = trackData['track base prompt'] || '';
-      trackName = trackData.name || '';
-    }
-  }
-  
-  return { trackRoles, trackBasePrompt, trackName };
-}
-
-/**
- * Format the workflow prompt with project data
- * @param promptTemplate Prompt template from the database
- * @param existingSummary Existing project summary if available
- * @param projectData Parsed project data
- * @param nextStepInstructions Instructions for the next milestone
- * @param trackRoles Track roles
- * @param trackBasePrompt Track base prompt
- * @param trackName Track name
- * @returns Formatted prompt
- */
-function formatWorkflowPrompt(
-  promptTemplate: string, 
-  existingSummary: string,
-  projectData: any,
-  nextStepInstructions: string,
-  trackRoles: string,
-  trackBasePrompt: string,
-  trackName: string
-) {
-  const finalPrompt = promptTemplate
-    .replace('{{summary}}', existingSummary)
-    .replace('{{new_data}}', JSON.stringify(projectData))
-    .replace('{{current_date}}', new Date().toISOString().split('T')[0])
-    .replace('{{next_step_instructions}}', nextStepInstructions)
-    .replace('{{track_roles}}', trackRoles || '')
-    .replace('{{track_base_prompt}}', trackBasePrompt || '')
-    .replace('{{track_name}}', trackName || '');
-
-  // ADDED: Log the final prompt string
-  console.log('Final Workflow Prompt for Summary Generation:', finalPrompt);
-
-  return finalPrompt;
 }
