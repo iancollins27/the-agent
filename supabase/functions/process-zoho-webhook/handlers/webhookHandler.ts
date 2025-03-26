@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { parseZohoData } from '../parser.ts'
 import { 
@@ -51,12 +50,14 @@ export async function handleZohoWebhook(req: Request) {
     console.log('Using project track ID:', projectTrackId)
 
     // Get milestone instructions if next step exists
+    console.log('Next step from projectData:', projectData.nextStep);
     const nextStepInstructions = await getMilestoneInstructions(
       supabase,
       projectData.nextStep,
       projectTrackId
     )
-    
+    console.log('Retrieved next step instructions:', nextStepInstructions);
+
     // Get track roles and base prompt if the project track exists
     const { trackRoles, trackBasePrompt, trackName } = await getTrackDetails(supabase, projectTrackId)
 
