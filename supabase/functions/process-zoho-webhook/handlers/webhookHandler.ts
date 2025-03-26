@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { parseZohoData } from '../parser.ts'
 import { 
@@ -44,19 +45,69 @@ export async function handleZohoWebhook(req: Request) {
     
     // Get existing project if any
     const existingProject = await getExistingProject(supabase, projectData.crmId)
-
+    
     // Determine which project track to use
     const projectTrackId = existingProject?.project_track || defaultTrackId || null
     console.log('Using project track ID:', projectTrackId)
 
     // Get milestone instructions if next step exists
     console.log('Next step from projectData:', projectData.nextStep);
+    
+    // ENHANCED LOGGING: Check if next step is valid for milestone lookup
+    if (!projectData.nextStep || projectData.nextStep.trim() === '') {
+      console.warn('Next step is empty or undefined, cannot retrieve milestone instructions');
+    }
+    
+    // ENHANCED LOGGING: Check if project track ID is valid for milestone lookup
+    if (!projectTrackId) {
+      console.warn('Project track ID is null, cannot retrieve milestone instructions');
+    }
+    
     const nextStepInstructions = await getMilestoneInstructions(
       supabase,
       projectData.nextStep,
       projectTrackId
     )
-    console.log('Retrieved next step instructions:', nextStepInstructions);
+    
+    // ENHANCED LOGGING: Log the retrieved milestone instructions status
+    if (nextStepInstructions) {
+      console.log('Retrieved milestone instructions successfully:', 
+        nextStepInstructions.substring(0, 50) + (nextStepInstructions.length > 50 ? '...' : ''));
+    } else {
+      console.warn('Failed to retrieve milestone instructions for next step:', projectData.nextStep);
+      
+      // ENHANCED LOGGING: Let's check if the milestone exists with exact step title match
+      try {
+        const { data: milestoneCheck, error } = await supabase
+          .from('project_track_milestones')
+          .select('id, step_title')
+          .eq('track_id', projectTrackId)
+          .order('step_order', { ascending: true });
+        
+        if (error) {
+          console.error('Error checking milestones:', error);
+        } else {
+          console.log('Available milestones for this track:', milestoneCheck.map(m => m.step_title));
+          
+          // Check for potential case sensitivity or whitespace issues
+          if (milestoneCheck.length > 0 && projectData.nextStep) {
+            const closeMatches = milestoneCheck.filter(m => 
+              m.step_title && 
+              (m.step_title.toLowerCase() === projectData.nextStep.toLowerCase() ||
+               m.step_title.toLowerCase().includes(projectData.nextStep.toLowerCase()) ||
+               projectData.nextStep.toLowerCase().includes(m.step_title.toLowerCase()))
+            );
+            
+            if (closeMatches.length > 0) {
+              console.warn('Possible close matches found:', closeMatches.map(m => m.step_title));
+              console.warn('Check for case sensitivity or whitespace issues');
+            }
+          }
+        }
+      } catch (checkError) {
+        console.error('Error during milestone existence check:', checkError);
+      }
+    }
 
     // Get track roles and base prompt if the project track exists
     const { trackRoles, trackBasePrompt, trackName } = await getTrackDetails(supabase, projectTrackId)
