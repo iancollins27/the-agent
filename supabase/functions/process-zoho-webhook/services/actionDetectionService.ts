@@ -35,33 +35,6 @@ export async function runActionDetection(
   try {
     console.log('Running action detection and execution prompt...');
     
-    // Get last action check time or use a default (24 hours ago)
-    const { data: projectInfo, error: projectError } = await supabase
-      .from('projects')
-      .select('last_action_check')
-      .eq('id', projectId)
-      .single();
-      
-    if (projectError) {
-      console.error('Error fetching project last_action_check:', projectError);
-    }
-    
-    const lastActionCheck = projectInfo?.last_action_check;
-    const currentTime = new Date().toISOString();
-    
-    // Skip action detection if it was checked recently (within last 30 minutes)
-    // unless this is explicitly coming from a webhook which should always run
-    if (lastActionCheck) {
-      const lastCheckTime = new Date(lastActionCheck).getTime();
-      const currentTimeMs = new Date().getTime();
-      const thirtyMinutesMs = 30 * 60 * 1000;
-      
-      if (currentTimeMs - lastCheckTime < thirtyMinutesMs) {
-        console.log(`Skipping action detection as it was checked recently (${new Date(lastActionCheck).toLocaleString()})`);
-        return { skipped: true, reason: 'Recently checked' };
-      }
-    }
-    
     const actionPrompt = await getLatestActionPrompt(supabase);
     
     if (!actionPrompt || !actionPrompt.prompt_text) {
@@ -79,7 +52,7 @@ export async function runActionDetection(
       next_step: nextStep || '',
       new_data: JSON.stringify(projectData),
       is_reminder_check: false,
-      milestone_instructions: milestoneInstructions || ''
+      milestone_instructions: milestoneInstructions || '' // Include milestone instructions
     };
     
     console.log('Calling action detection workflow with context:', Object.keys(actionContext));
@@ -104,16 +77,6 @@ export async function runActionDetection(
     if (actionError) {
       console.error('Error invoking action detection workflow:', actionError);
       return null;
-    }
-    
-    // Update the last_action_check timestamp
-    const { error: updateError } = await supabase
-      .from('projects')
-      .update({ last_action_check: currentTime })
-      .eq('id', projectId);
-      
-    if (updateError) {
-      console.error('Error updating last_action_check:', updateError);
     }
     
     console.log('Action detection workflow completed successfully:', 

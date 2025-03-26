@@ -48,12 +48,6 @@ async function handleActionNeeded(
   
   console.log("Action type detected:", actionType);
   
-  // Skip milestone_tracking actions if they're coming from the AI
-  if (actionType === "milestone_tracking") {
-    console.log("Skipping AI-generated milestone_tracking action as these should only be created by the system");
-    return null;
-  }
-  
   // Get the company ID from the project
   let companyId = null;
   try {
