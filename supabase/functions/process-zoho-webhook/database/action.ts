@@ -77,7 +77,7 @@ export async function createReminderActionRecord(
 
   const action = {
     project_id: projectId,
-    action_type: 'data_update', // Changed from 'reminder_creation' to 'data_update'
+    action_type: 'reminder_creation', 
     action_payload: {
       date: reminderDate,
       reason: reason,
