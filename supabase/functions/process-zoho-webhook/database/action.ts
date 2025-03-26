@@ -30,10 +30,17 @@ export async function createMilestoneActionRecord(supabase: any, projectId: stri
     
     const actions = filteredTimeline.map(([milestone, date]) => ({
       project_id: projectId,
-      milestone: milestone,
-      action_date: date,
-      action_type: 'timeline_update',
-      description: `Timeline updated for ${milestone} on ${date}`
+      action_type: 'data_update', // Use a valid action_type from the schema
+      action_payload: {
+        field: 'timeline',
+        milestone: milestone,
+        value: date,
+        date: date
+      },
+      status: 'executed',
+      requires_approval: false,
+      message: `Timeline updated for ${milestone} on ${date}`,
+      executed_at: new Date().toISOString()
     }))
 
     const { data, error } = await supabase
