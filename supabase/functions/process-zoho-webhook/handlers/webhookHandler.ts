@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { parseZohoData } from '../parser.ts'
 import { 
@@ -206,6 +207,21 @@ export async function handleZohoWebhook(req: Request) {
         
         console.log('Calling action detection workflow with context:', Object.keys(actionContext));
         
+        // Format the action detection prompt with variables
+        const formattedActionPrompt = replaceActionPromptVariables(
+          actionPrompt.prompt_text,
+          actionContext.summary,
+          actionContext.track_name,
+          actionContext.track_roles,
+          actionContext.track_base_prompt,
+          actionContext.current_date,
+          actionContext.next_step,
+          nextStepInstructions || ''
+        );
+        
+        // Log the formatted action detection prompt
+        console.log('Final Action Detection Prompt:', formattedActionPrompt);
+        
         // Call the action detection workflow
         const { data: actionResult, error: actionError } = await supabase.functions.invoke(
           'test-workflow-prompt',
@@ -260,6 +276,32 @@ export async function handleZohoWebhook(req: Request) {
       }
     )
   }
+}
+
+/**
+ * Format action detection prompt with variables
+ * Similar to formatWorkflowPrompt but for action detection
+ */
+function replaceActionPromptVariables(
+  promptText: string,
+  summary: string,
+  trackName: string,
+  trackRoles: string,
+  trackBasePrompt: string,
+  currentDate: string,
+  nextStep: string,
+  milestoneInstructions: string
+) {
+  const finalPrompt = promptText
+    .replace('{{summary}}', summary)
+    .replace('{{track_name}}', trackName || '')
+    .replace('{{track_roles}}', trackRoles || '')
+    .replace('{{track_base_prompt}}', trackBasePrompt || '')
+    .replace('{{current_date}}', currentDate)
+    .replace('{{next_step}}', nextStep || '')
+    .replace('{{milestone_instructions}}', milestoneInstructions || '');
+
+  return finalPrompt;
 }
 
 /**
