@@ -17,7 +17,5 @@ export {
 } from './database/milestone.ts';
 
 export { 
-  createMilestoneActionRecord,
-  createReminderActionRecord,
   setNextCheckDate,
 } from './database/action.ts';

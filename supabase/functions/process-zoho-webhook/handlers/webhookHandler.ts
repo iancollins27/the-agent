@@ -8,7 +8,6 @@ import {
   getWorkflowPrompt,
   updateProject,
   createProject,
-  createMilestoneActionRecord,
   findProfileByCrmId
 } from '../database.ts'
 import { generateSummary } from '../ai.ts'
@@ -137,14 +136,6 @@ export async function handleZohoWebhook(req: Request) {
       
       projectId = newProject.id;
       console.log(`Created new project with ID: ${projectId}`);
-    }
-
-    // Log milestone updates for tracking purposes only
-    try {
-      await createMilestoneActionRecord(supabase, projectId, projectData.timeline)
-    } catch (error) {
-      console.error('Error creating milestone tracking records, but continuing:', error);
-      // We continue processing even if action records fail
     }
 
     // Run action detection and execution
