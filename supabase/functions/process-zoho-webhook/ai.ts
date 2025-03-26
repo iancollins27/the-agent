@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 export async function generateSummary(prompt: string, apiKey: string, provider: string = 'openai', model: string = 'gpt-4o') {
@@ -28,15 +29,76 @@ export async function generateSummary(prompt: string, apiKey: string, provider: 
     }
     
     let response;
+    let retries = 0;
+    const maxRetries = 3;
+    let lastError;
     
-    if (provider === 'openai') {
-      response = await callOpenAI(prompt, apiKey, model);
-    } else if (provider === 'claude') {
-      response = await callClaude(prompt, apiKey, model);
-    } else if (provider === 'deepseek') {
-      response = await callDeepseek(prompt, apiKey, model);
-    } else {
-      throw new Error(`Unsupported AI provider: ${provider}`);
+    // Retry loop for resilience against transient API errors
+    while (retries < maxRetries) {
+      try {
+        if (provider === 'openai') {
+          console.log(`Attempt ${retries + 1} to call OpenAI API with model ${model}`);
+          response = await callOpenAI(prompt, apiKey, model);
+          break; // Success, exit the retry loop
+        } else if (provider === 'claude') {
+          response = await callClaude(prompt, apiKey, model);
+          break;
+        } else if (provider === 'deepseek') {
+          response = await callDeepseek(prompt, apiKey, model);
+          break;
+        } else {
+          throw new Error(`Unsupported AI provider: ${provider}`);
+        }
+      } catch (error) {
+        lastError = error;
+        console.error(`Attempt ${retries + 1} failed with error:`, error.message || error);
+        
+        // Check if this is a rate limit error or server error (which may benefit from a retry)
+        const shouldRetry = error.message?.includes('rate limit') || 
+                           error.message?.includes('server had an error') ||
+                           error.message?.includes('timeout') ||
+                           error.message?.includes('500') ||
+                           error.message?.includes('503');
+                           
+        if (!shouldRetry) {
+          console.log('Error does not appear to be retryable, breaking retry loop');
+          break;
+        }
+        
+        retries++;
+        if (retries < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s, etc.
+          const backoffTime = Math.pow(2, retries) * 1000;
+          console.log(`Retrying in ${backoffTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffTime));
+        }
+      }
+    }
+    
+    // If we've exhausted retries and still have an error, throw it
+    if (retries === maxRetries && lastError) {
+      throw lastError;
+    }
+    
+    // If we have a response, attempt a fallback provider if enabled
+    if (!response && provider === 'openai') {
+      console.log('OpenAI failed after retries, attempting to use Claude as fallback...');
+      try {
+        const claudeApiKey = Deno.env.get('CLAUDE_API_KEY');
+        if (claudeApiKey) {
+          response = await callClaude(prompt, claudeApiKey, 'claude-3-5-haiku-20241022');
+          console.log('Successfully used Claude as fallback');
+        } else {
+          console.log('No Claude API key configured for fallback');
+        }
+      } catch (fallbackError) {
+        console.error('Error using Claude as fallback:', fallbackError);
+        // Continue with the original error if fallback fails
+      }
+    }
+    
+    if (!response) {
+      throw new Error('Failed to generate response from any AI provider');
     }
     
     // Update the prompt run with the result
@@ -67,93 +129,164 @@ export async function generateSummary(prompt: string, apiKey: string, provider: 
         .eq('id', promptRunId);
     }
     
-    throw error;
+    // Generate a fallback simple summary if the AI service fails
+    try {
+      const fallbackSummary = `Unable to generate AI summary due to service error: ${error.message}. This is a basic fallback summary based on the raw data provided.`;
+      
+      if (promptRunId) {
+        await supabase
+          .from('prompt_runs')
+          .update({
+            prompt_output: fallbackSummary,
+            status: 'COMPLETED_FALLBACK',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', promptRunId);
+      }
+      
+      return fallbackSummary;
+    } catch (fallbackError) {
+      console.error('Error generating fallback summary:', fallbackError);
+      throw error; // Throw the original error
+    }
   }
 }
 
 async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-4o') {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1500
-    })
-  });
+  console.log(`Making OpenAI API request with model: ${model}`);
+  
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'OpenAI API error');
+    // Enhanced error handling with status code and response body
+    if (!response.ok) {
+      const errorBody = await response.text();
+      let errorMessage;
+      
+      try {
+        const errorJson = JSON.parse(errorBody);
+        errorMessage = errorJson.error?.message || `OpenAI API error: ${response.status}`;
+      } catch {
+        errorMessage = `OpenAI API error: ${response.status} - ${errorBody.substring(0, 200)}`;
+      }
+      
+      console.error(`OpenAI API error details: Status ${response.status}, Body:`, errorBody);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error(`Error in callOpenAI: ${error.message}`);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
 
 async function callClaude(prompt: string, apiKey: string, model: string = 'claude-3-5-haiku-20241022') {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      max_tokens: 1500
-    })
-  });
+  console.log(`Making Anthropic Claude API request with model: ${model}`);
+  
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 1500
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Claude API error');
+    if (!response.ok) {
+      const errorBody = await response.text();
+      let errorMessage;
+      
+      try {
+        const errorJson = JSON.parse(errorBody);
+        errorMessage = errorJson.error?.message || `Claude API error: ${response.status}`;
+      } catch {
+        errorMessage = `Claude API error: ${response.status} - ${errorBody.substring(0, 200)}`;
+      }
+      
+      console.error(`Claude API error details: Status ${response.status}, Body:`, errorBody);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  } catch (error) {
+    console.error(`Error in callClaude: ${error.message}`);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.content[0].text;
 }
 
 async function callDeepseek(prompt: string, apiKey: string, model: string = 'deepseek-chat') {
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1500
-    })
-  });
+  console.log(`Making DeepSeek API request with model: ${model}`);
+  
+  try {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1500
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'DeepSeek API error');
+    if (!response.ok) {
+      const errorBody = await response.text();
+      let errorMessage;
+      
+      try {
+        const errorJson = JSON.parse(errorBody);
+        errorMessage = errorJson.error?.message || `DeepSeek API error: ${response.status}`;
+      } catch {
+        errorMessage = `DeepSeek API error: ${response.status} - ${errorBody.substring(0, 200)}`;
+      }
+      
+      console.error(`DeepSeek API error details: Status ${response.status}, Body:`, errorBody);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error(`Error in callDeepseek: ${error.message}`);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
