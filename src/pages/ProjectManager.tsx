@@ -30,7 +30,7 @@ const ProjectManager: React.FC = () => {
   const [onlyShowMyProjects, setOnlyShowMyProjects] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { timeFilter, setTimeFilter, getTimeConstraint } = useTimeFilter();
+  const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -138,8 +138,10 @@ const ProjectManager: React.FC = () => {
 
       // Apply time filter if it's not set to "all"
       if (timeFilter !== TIME_FILTERS.ALL) {
-        const timeConstraint = getTimeConstraint();
-        query = query.gte('created_at', timeConstraint.toISOString());
+        const timeConstraint = getDateFilter();
+        if (timeConstraint) {
+          query = query.gte('created_at', timeConstraint);
+        }
       }
 
       const { data, error } = await query;
