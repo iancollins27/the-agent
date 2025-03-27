@@ -23,7 +23,7 @@ export async function logPromptRun(
       initiated_by: initiatedBy
     });
 
-    // Create base insert object without the initiatedBy field in case it doesn't exist
+    // Create base insert object
     const insertData: any = {
       project_id: projectId,
       workflow_prompt_id: workflowPromptId,
@@ -33,31 +33,9 @@ export async function logPromptRun(
       ai_model: aiModel,
     };
 
-    // Only add initiated_by if provided (this helps avoid DB errors if column doesn't exist)
+    // Add initiated_by if provided
     if (initiatedBy) {
-      // Check if initiatedBy column exists before adding it
-      try {
-        // Get column information from the table
-        const { data: columns, error: columnsError } = await supabase
-          .from('prompt_runs')
-          .select('*')
-          .limit(1);
-      
-        // If there's a test row and it has the initiated_by property, we can use it
-        if (!columnsError && columns && columns.length > 0) {
-          const testRow = columns[0];
-          const hasInitiatedBy = 'initiated_by' in testRow;
-          
-          if (hasInitiatedBy) {
-            insertData.initiated_by = initiatedBy;
-          } else {
-            console.log("'initiated_by' column doesn't exist in prompt_runs table, skipping this field");
-          }
-        }
-      } catch (columnCheckError) {
-        console.error("Error checking for initiated_by column:", columnCheckError);
-        // Continue without adding the field
-      }
+      insertData.initiated_by = initiatedBy;
     }
 
     // Insert the prompt run record

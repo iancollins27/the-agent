@@ -11,6 +11,8 @@ import PromptRunsTable from '../components/admin/PromptRunsTable';
 import PromptRunDetails from '../components/admin/PromptRunDetails';
 import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
+import { useTimeFilter } from "@/hooks/useTimeFilter";
+import TimeFilterSelect, { TIME_FILTERS } from "../components/admin/TimeFilterSelect";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -28,6 +30,7 @@ const ProjectManager: React.FC = () => {
   const [onlyShowMyProjects, setOnlyShowMyProjects] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { timeFilter, setTimeFilter, getTimeConstraint } = useTimeFilter();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -59,7 +62,7 @@ const ProjectManager: React.FC = () => {
     if (userProfile) {
       fetchPromptRuns();
     }
-  }, [statusFilter, userProfile, onlyShowMyProjects]);
+  }, [statusFilter, userProfile, onlyShowMyProjects, timeFilter]);
 
   const fetchPromptRuns = async () => {
     if (!user) {
@@ -82,6 +85,8 @@ const ProjectManager: React.FC = () => {
 
     setLoading(true);
     try {
+      console.log("Fetching prompt runs with company ID:", userProfile.profile_associated_company);
+      
       let projectQuery = supabase
         .from('projects')
         .select('id')
@@ -98,6 +103,8 @@ const ProjectManager: React.FC = () => {
         throw projectsError;
       }
 
+      console.log("Projects found:", projectsData?.length || 0);
+      
       if (!projectsData || projectsData.length === 0) {
         setPromptRuns([]);
         setLoading(false);
@@ -105,6 +112,7 @@ const ProjectManager: React.FC = () => {
       }
 
       const projectIds = projectsData.map(project => project.id);
+      console.log("Project IDs:", projectIds);
 
       let query = supabase
         .from('prompt_runs')
@@ -128,11 +136,19 @@ const ProjectManager: React.FC = () => {
         query = query.eq('status', statusFilter);
       }
 
+      // Apply time filter if it's not set to "all"
+      if (timeFilter !== TIME_FILTERS.ALL) {
+        const timeConstraint = getTimeConstraint();
+        query = query.gte('created_at', timeConstraint.toISOString());
+      }
+
       const { data, error } = await query;
 
       if (error) {
         throw error;
       }
+
+      console.log("Prompt runs found:", data?.length || 0);
 
       const formattedData = data.map(run => {
         const baseUrl = run.projects?.companies?.company_project_base_URL || null;
@@ -257,6 +273,32 @@ const ProjectManager: React.FC = () => {
     setDetailsOpen(true);
   };
 
+  const getEmptyStateMessage = () => {
+    if (!user) {
+      return "Please log in to view your project data";
+    }
+    
+    if (!userProfile?.profile_associated_company) {
+      return "Your user profile is not associated with a company. Contact your administrator.";
+    }
+    
+    if (onlyShowMyProjects) {
+      return "No prompt runs found for your projects. Try unchecking 'Only My Projects' filter.";
+    }
+    
+    if (statusFilter) {
+      return `No prompt runs found with the '${statusFilter}' status. Try selecting a different status.`;
+    }
+    
+    if (timeFilter !== TIME_FILTERS.ALL) {
+      return `No prompt runs found within the selected time range. Try selecting a different time range.`;
+    }
+    
+    return "No prompt runs found for your company's projects. This could be because:
+    1. No prompt runs have been created yet
+    2. You don't have access to the projects with prompt runs";
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <ProjectManagerNav />
@@ -264,7 +306,12 @@ const ProjectManager: React.FC = () => {
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Project Manager Dashboard</h2>
-          <div className="flex space-x-4">
+          <div className="flex space-x-2 items-center">
+            <TimeFilterSelect
+              value={timeFilter}
+              onChange={setTimeFilter}
+            />
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -308,10 +355,18 @@ const ProjectManager: React.FC = () => {
           <Card>
             <CardContent className="py-8">
               <p className="text-center text-muted-foreground">
-                {user ? 
-                  "No prompt runs found with the current filters" : 
-                  "Please log in to view your project data"}
+                {getEmptyStateMessage()}
               </p>
+              {userProfile && (
+                <div className="mt-4 text-center text-sm text-muted-foreground">
+                  <p>Debug info:</p>
+                  <p>User ID: {user?.id}</p>
+                  <p>Company ID: {userProfile?.profile_associated_company || 'None'}</p>
+                  <p>Status Filter: {statusFilter || 'None'}</p>
+                  <p>Only My Projects: {onlyShowMyProjects ? 'Yes' : 'No'}</p>
+                  <p>Time Filter: {timeFilter}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (
