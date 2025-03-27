@@ -9,7 +9,7 @@ export const TIME_FILTERS = {
   ALL: 'all'
 };
 
-export const useTimeFilter = (defaultFilter = TIME_FILTERS.LAST_HOUR) => {
+export const useTimeFilter = (defaultFilter = TIME_FILTERS.ALL) => {
   const [timeFilter, setTimeFilter] = useState(defaultFilter);
 
   const getDateFilter = () => {
