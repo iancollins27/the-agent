@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -8,8 +9,7 @@ import PromptRunsTable from '../components/admin/PromptRunsTable';
 import PromptRunDetails from '../components/admin/PromptRunDetails';
 import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
-import { useTimeFilter } from "@/hooks/useTimeFilter";
-import { TIME_FILTERS } from "../components/admin/TimeFilterSelect";
+import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import PromptRunFilters from '../components/admin/PromptRunFilters';
 import EmptyPromptRuns from '../components/admin/EmptyPromptRuns';
 import { usePromptRuns } from '@/hooks/usePromptRuns';
@@ -19,10 +19,11 @@ const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [onlyMyProjects, setOnlyMyProjects] = useState(false);  // Reverted to onlyMyProjects
+  const [onlyMyProjects, setOnlyMyProjects] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter();
+  // Explicitly set the default to ALL to ensure it's used
+  const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
 
   // Fetch user profile when component mounts
   useEffect(() => {
@@ -105,7 +106,7 @@ const ProjectManager: React.FC = () => {
             onTimeFilterChange={setTimeFilter}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
-            onlyShowMyProjects={onlyMyProjects}  // Kept onlyMyProjects here
+            onlyShowMyProjects={onlyMyProjects}
             onMyProjectsChange={setOnlyMyProjects}
             onRefresh={fetchPromptRuns}
           />
@@ -122,7 +123,7 @@ const ProjectManager: React.FC = () => {
               userId: user?.id,
               companyId: userProfile?.profile_associated_company,
               statusFilter,
-              onlyMyProjects,  // Changed back to onlyMyProjects
+              onlyMyProjects,
               timeFilter
             }}
           />

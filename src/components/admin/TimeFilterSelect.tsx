@@ -22,12 +22,16 @@ interface TimeFilterSelectProps {
 }
 
 const TimeFilterSelect: React.FC<TimeFilterSelectProps> = ({ value, onChange }) => {
+  // Ensure we have a valid default if value is undefined
+  const currentValue = value || TIME_FILTERS.ALL;
+  
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted-foreground">Show:</span>
       <Select 
-        value={value} 
+        value={currentValue} 
         onValueChange={onChange}
+        defaultValue={TIME_FILTERS.ALL}
       >
         <SelectTrigger className="w-[160px]">
           <SelectValue placeholder="Select time range" />
