@@ -123,7 +123,7 @@ const ProjectManager: React.FC = () => {
               userId: user?.id,
               companyId: userProfile?.profile_associated_company,
               statusFilter,
-              onlyMyProjects,
+              onlyShowMyProjects, // Corrected from onlyMyProjects
               timeFilter
             }}
           />
