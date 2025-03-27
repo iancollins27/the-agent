@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
-import { TIME_FILTERS } from "../components/admin/TimeFilterSelect";
+import { TIME_FILTERS } from "./useTimeFilter";
 import { usePromptFeedback } from './usePromptFeedback';
 import { 
   debugProjectData, 
@@ -19,6 +19,15 @@ interface UsePromptRunsProps {
   getDateFilter: () => string | null;
 }
 
+interface ProjectGroup {
+  projectName: string;
+  projectAddress: string;
+  projectId: string;
+  runs: PromptRun[];
+}
+
+export type GroupedPromptRuns = ProjectGroup[];
+
 export const usePromptRuns = ({
   userProfile,
   statusFilter,
@@ -27,15 +36,56 @@ export const usePromptRuns = ({
   getDateFilter
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
+  const [groupedPromptRuns, setGroupedPromptRuns] = useState<GroupedPromptRuns>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { handleRatingChange, handleFeedbackChange } = usePromptFeedback(setPromptRuns);
+
+  // Group prompt runs by project
+  useEffect(() => {
+    if (promptRuns.length > 0) {
+      const grouped = promptRuns.reduce((acc: GroupedPromptRuns, run) => {
+        // Skip runs without project_id
+        if (!run.project_id) return acc;
+        
+        // Find existing group or create new one
+        const existingGroupIndex = acc.findIndex(group => group.projectId === run.project_id);
+        
+        if (existingGroupIndex >= 0) {
+          // Add to existing group
+          acc[existingGroupIndex].runs.push(run);
+        } else {
+          // Create new group
+          acc.push({
+            projectId: run.project_id,
+            projectName: run.project_name || 'Unknown Project',
+            projectAddress: run.project_address || 'No Address',
+            runs: [run]
+          });
+        }
+        
+        return acc;
+      }, []);
+      
+      // Sort projects alphabetically by name
+      grouped.sort((a, b) => a.projectName.localeCompare(b.projectName));
+      
+      setGroupedPromptRuns(grouped);
+    } else {
+      setGroupedPromptRuns([]);
+    }
+  }, [promptRuns]);
 
   useEffect(() => {
     if (userProfile) {
       fetchPromptRuns();
     }
   }, [statusFilter, userProfile, onlyShowMyProjects, timeFilter]);
+
+  // Modified rating handler to update both flat and grouped runs
+  const handleGroupedRatingChange = (promptRunId: string, rating: number | null) => {
+    handleRatingChange(promptRunId, rating);
+  };
 
   const fetchPromptRuns = async () => {
     if (!userProfile?.profile_associated_company) {
@@ -96,8 +146,9 @@ export const usePromptRuns = ({
 
   return {
     promptRuns,
+    groupedPromptRuns,
     loading,
-    handleRatingChange,
+    handleRatingChange: handleGroupedRatingChange,
     handleFeedbackChange,
     fetchPromptRuns
   };

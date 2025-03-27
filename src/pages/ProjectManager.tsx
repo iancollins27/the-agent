@@ -1,11 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ProjectManagerNav from "../components/ProjectManagerNav";
 import PromptRunsTable from '../components/admin/PromptRunsTable';
+import GroupedPromptRunsTable from '../components/admin/GroupedPromptRunsTable';
 import PromptRunDetails from '../components/admin/PromptRunDetails';
 import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +22,7 @@ const ProjectManager: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [onlyMyProjects, setOnlyMyProjects] = useState(false);
+  const [groupByProject, setGroupByProject] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
   // Explicitly set the default to ALL to ensure it's used
@@ -53,6 +56,7 @@ const ProjectManager: React.FC = () => {
   // Use the custom hook to fetch prompt runs
   const { 
     promptRuns, 
+    groupedPromptRuns,
     loading, 
     handleRatingChange, 
     handleFeedbackChange, 
@@ -94,6 +98,10 @@ const ProjectManager: React.FC = () => {
     return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
 
+  const toggleGroupByProject = () => {
+    setGroupByProject(prev => !prev);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <ProjectManagerNav />
@@ -101,15 +109,24 @@ const ProjectManager: React.FC = () => {
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Project Manager Dashboard</h2>
-          <PromptRunFilters
-            timeFilter={timeFilter}
-            onTimeFilterChange={setTimeFilter}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            onlyShowMyProjects={onlyMyProjects}
-            onMyProjectsChange={setOnlyMyProjects}
-            onRefresh={fetchPromptRuns}
-          />
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              onClick={toggleGroupByProject}
+              className="text-xs"
+            >
+              {groupByProject ? "View Flat List" : "Group by Project"}
+            </Button>
+            <PromptRunFilters
+              timeFilter={timeFilter}
+              onTimeFilterChange={setTimeFilter}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              onlyShowMyProjects={onlyMyProjects}
+              onMyProjectsChange={setOnlyMyProjects}
+              onRefresh={fetchPromptRuns}
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -126,6 +143,12 @@ const ProjectManager: React.FC = () => {
               onlyMyProjects,
               timeFilter
             }}
+          />
+        ) : groupByProject ? (
+          <GroupedPromptRunsTable 
+            groupedPromptRuns={groupedPromptRuns} 
+            onRatingChange={handleRatingChange} 
+            onViewDetails={viewPromptRunDetails} 
           />
         ) : (
           <PromptRunsTable 
