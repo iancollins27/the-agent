@@ -8,7 +8,7 @@ interface EmptyPromptRunsProps {
     userId?: string | null;
     companyId?: string | null;
     statusFilter?: string | null;
-    onlyMyProjects?: boolean;
+    onlyMyProjects?: boolean;  // Changed back to onlyMyProjects
     timeFilter?: string;
   };
 }

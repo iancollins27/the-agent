@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -20,7 +19,7 @@ const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [onlyShowMyProjects, setOnlyShowMyProjects] = useState(false);
+  const [onlyMyProjects, setOnlyMyProjects] = useState(false);  // Reverted to onlyMyProjects
   const { toast } = useToast();
   const { user } = useAuth();
   const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter();
@@ -60,7 +59,7 @@ const ProjectManager: React.FC = () => {
   } = usePromptRuns({
     userProfile,
     statusFilter,
-    onlyShowMyProjects,
+    onlyShowMyProjects: onlyMyProjects,
     timeFilter,
     getDateFilter
   });
@@ -79,7 +78,7 @@ const ProjectManager: React.FC = () => {
       return "Your user profile is not associated with a company. Contact your administrator.";
     }
     
-    if (onlyShowMyProjects) {
+    if (onlyMyProjects) {
       return "No prompt runs found for your projects. Try unchecking 'Only My Projects' filter.";
     }
     
@@ -106,8 +105,8 @@ const ProjectManager: React.FC = () => {
             onTimeFilterChange={setTimeFilter}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
-            onlyShowMyProjects={onlyShowMyProjects}
-            onMyProjectsChange={setOnlyShowMyProjects}
+            onlyShowMyProjects={onlyMyProjects}  // Kept onlyMyProjects here
+            onMyProjectsChange={setOnlyMyProjects}
             onRefresh={fetchPromptRuns}
           />
         </div>
@@ -123,7 +122,7 @@ const ProjectManager: React.FC = () => {
               userId: user?.id,
               companyId: userProfile?.profile_associated_company,
               statusFilter,
-              onlyShowMyProjects, // Corrected from onlyMyProjects
+              onlyMyProjects,  // Changed back to onlyMyProjects
               timeFilter
             }}
           />
