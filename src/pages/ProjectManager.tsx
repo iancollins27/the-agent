@@ -87,11 +87,21 @@ const ProjectManager: React.FC = () => {
     try {
       console.log("Fetching prompt runs with company ID:", userProfile.profile_associated_company);
       
+      const { data: allProjects, error: allProjectsError } = await supabase
+        .from('projects')
+        .select('id, crm_id, Address')
+        .eq('company_id', userProfile.profile_associated_company);
+      
+      if (allProjectsError) {
+        console.error("Error fetching all projects:", allProjectsError);
+      } else {
+        console.log("All projects for company:", allProjects);
+      }
+      
       let projectQuery = supabase
         .from('projects')
         .select('id')
-        .eq('company_id', userProfile.profile_associated_company)
-        .neq('Project_status', 'Archived');
+        .eq('company_id', userProfile.profile_associated_company);
 
       if (onlyShowMyProjects) {
         projectQuery = projectQuery.eq('project_manager', userProfile.id);
@@ -113,6 +123,17 @@ const ProjectManager: React.FC = () => {
 
       const projectIds = projectsData.map(project => project.id);
       console.log("Project IDs:", projectIds);
+
+      const { data: allPromptRuns, error: allPromptRunsError } = await supabase
+        .from('prompt_runs')
+        .select('id, project_id, status, created_at')
+        .order('created_at', { ascending: false });
+      
+      if (allPromptRunsError) {
+        console.error("Error fetching all prompt runs:", allPromptRunsError);
+      } else {
+        console.log("All available prompt runs:", allPromptRuns);
+      }
 
       let query = supabase
         .from('prompt_runs')
@@ -136,7 +157,6 @@ const ProjectManager: React.FC = () => {
         query = query.eq('status', statusFilter);
       }
 
-      // Apply time filter if it's not set to "all"
       if (timeFilter !== TIME_FILTERS.ALL) {
         const timeConstraint = getDateFilter();
         if (timeConstraint) {
@@ -296,9 +316,7 @@ const ProjectManager: React.FC = () => {
       return `No prompt runs found within the selected time range. Try selecting a different time range.`;
     }
     
-    return `No prompt runs found for your company's projects. This could be because:
-1. No prompt runs have been created yet
-2. You don't have access to the projects with prompt runs`;
+    return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
 
   return (
