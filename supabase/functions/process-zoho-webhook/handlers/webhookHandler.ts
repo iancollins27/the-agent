@@ -29,28 +29,66 @@ export async function handleZohoWebhook(req: Request) {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Log the raw request body for debugging
-    const requestBody = await req.json()
-    console.log('Raw webhook payload:', requestBody)
+    // Log the request content type
+    console.log("Content-Type:", req.headers.get('content-type'));
+    
+    // Safely parse the request body
+    let requestBody;
+    try {
+      // Clone the request to avoid consuming it
+      const clonedReq = req.clone();
+      // Get raw text first
+      const rawText = await clonedReq.text();
+      console.log('Raw webhook payload text:', rawText);
+      
+      // Try to parse the text into JSON, with special handling for control characters
+      try {
+        // Replace any invalid control characters before parsing
+        const cleanText = rawText.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
+        requestBody = JSON.parse(cleanText);
+      } catch (jsonError) {
+        console.error('JSON parse error:', jsonError.message);
+        // If JSON parsing fails, check if it's form data
+        if (req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
+          const formData = new URLSearchParams(rawText);
+          // Convert form data to object
+          requestBody = Object.fromEntries(formData.entries());
+          console.log('Parsed form data payload:', requestBody);
+        } else {
+          throw jsonError;
+        }
+      }
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request format', details: parseError.message }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        }
+      );
+    }
+    
+    console.log('Parsed webhook payload:', requestBody);
     
     // Handle both cases where data might be nested or not
-    const rawData = requestBody.rawData || requestBody
-    const projectData = await parseZohoData(rawData)
-    console.log('Parsed project data:', projectData)
+    const rawData = requestBody.rawData || requestBody;
+    const projectData = await parseZohoData(rawData);
+    console.log('Parsed project data:', projectData);
 
     // Handle company creation/verification and get the Supabase UUID and default track
-    const companyInfo = await handleCompany(supabase, projectData, rawData)
-    const companyUuid = companyInfo.id
-    const defaultTrackId = companyInfo.defaultTrackId
+    const companyInfo = await handleCompany(supabase, projectData, rawData);
+    const companyUuid = companyInfo.id;
+    const defaultTrackId = companyInfo.defaultTrackId;
     
-    console.log('Using company UUID:', companyUuid, 'Default track ID:', defaultTrackId)
+    console.log('Using company UUID:', companyUuid, 'Default track ID:', defaultTrackId);
     
     // Get existing project if any
-    const existingProject = await getExistingProject(supabase, projectData.crmId)
+    const existingProject = await getExistingProject(supabase, projectData.crmId);
     
     // Determine which project track to use
-    const projectTrackId = existingProject?.project_track || defaultTrackId || null
-    console.log('Using project track ID:', projectTrackId)
+    const projectTrackId = existingProject?.project_track || defaultTrackId || null;
+    console.log('Using project track ID:', projectTrackId);
 
     // Get milestone instructions if next step exists
     console.log('Next step from projectData:', projectData.nextStep);
@@ -69,13 +107,13 @@ export async function handleZohoWebhook(req: Request) {
       supabase,
       projectData.nextStep,
       projectTrackId
-    )
+    );
 
     // Get track roles and base prompt if the project track exists
-    const { trackRoles, trackBasePrompt, trackName } = await getTrackDetails(supabase, projectTrackId)
+    const { trackRoles, trackBasePrompt, trackName } = await getTrackDetails(supabase, projectTrackId);
 
     // Get and format the workflow prompt
-    const promptTemplate = await getWorkflowPrompt(supabase, !!existingProject)
+    const promptTemplate = await getWorkflowPrompt(supabase, !!existingProject);
     const prompt = formatWorkflowPrompt(
       promptTemplate, 
       existingProject?.summary || '',
@@ -84,14 +122,14 @@ export async function handleZohoWebhook(req: Request) {
       trackRoles,
       trackBasePrompt,
       trackName
-    )
+    );
 
     // Get AI configuration
-    const { aiProvider, aiModel, apiKey } = await getAIConfig(supabase)
-    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`)
+    const { aiProvider, aiModel, apiKey } = await getAIConfig(supabase);
+    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
 
     // Generate summary using the configured AI provider
-    const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel)
+    const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
 
     // Find the project manager profile using the CRM ID
     let projectManagerId = null;
@@ -111,14 +149,14 @@ export async function handleZohoWebhook(req: Request) {
       project_track: projectTrackId,
       Address: projectData.propertyAddress,
       project_manager: projectManagerId
-    }
+    };
 
     console.log('Project update data:', projectUpdateData);
 
     // Update or create project
     let projectId;
     if (existingProject) {
-      await updateProject(supabase, existingProject.id, projectUpdateData)
+      await updateProject(supabase, existingProject.id, projectUpdateData);
       projectId = existingProject.id;
     } else {
       // When creating a new project, track creation time
@@ -170,15 +208,15 @@ export async function handleZohoWebhook(req: Request) {
         projectManagerId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500
       }
-    )
+    );
   }
 }
