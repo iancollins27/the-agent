@@ -294,9 +294,9 @@ const ProjectManager: React.FC = () => {
       return `No prompt runs found within the selected time range. Try selecting a different time range.`;
     }
     
-    return "No prompt runs found for your company's projects. This could be because:
-    1. No prompt runs have been created yet
-    2. You don't have access to the projects with prompt runs";
+    return `No prompt runs found for your company's projects. This could be because:
+1. No prompt runs have been created yet
+2. You don't have access to the projects with prompt runs`;
   };
 
   return (
