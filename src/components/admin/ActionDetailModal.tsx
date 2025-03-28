@@ -121,8 +121,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
     }
   };
 
-  const senderName = action.sender?.full_name || action.sender_name || null;
-  const recipientName = action.recipient?.full_name || action.recipient_name || null;
+  const senderName = action.sender?.full_name || action.sender_name || actionPayload.sender || null;
+  const recipientName = action.recipient?.full_name || action.recipient_name || actionPayload.recipient || null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

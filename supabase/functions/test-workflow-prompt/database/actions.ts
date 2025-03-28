@@ -76,6 +76,82 @@ async function handleActionNeeded(
 }
 
 /**
+ * Find a contact by name, role, or partial match
+ */
+async function findContactId(
+  supabase: SupabaseClient,
+  contactName: string,
+  projectId: string
+): Promise<string | null> {
+  if (!contactName || contactName.trim().length < 3) {
+    return null;
+  }
+
+  // Try to find the contact by exact name match first
+  try {
+    // Check project_contacts first to get contacts associated with this project
+    const { data: projectContacts, error: projectContactsError } = await supabase
+      .from('project_contacts')
+      .select('contact_id')
+      .eq('project_id', projectId);
+    
+    if (projectContactsError) {
+      console.error("Error fetching project contacts:", projectContactsError);
+    } else if (projectContacts && projectContacts.length > 0) {
+      // If we have project contacts, look for a match among them
+      const contactIds = projectContacts.map(pc => pc.contact_id);
+      
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id, full_name, role')
+        .in('id', contactIds);
+      
+      if (contactsError) {
+        console.error("Error fetching contacts by IDs:", contactsError);
+      } else if (contacts && contacts.length > 0) {
+        // Try exact match on full name
+        const exactMatch = contacts.find(c => 
+          c.full_name.toLowerCase() === contactName.toLowerCase());
+        
+        if (exactMatch) return exactMatch.id;
+        
+        // Try partial match on full name
+        const partialMatch = contacts.find(c => 
+          c.full_name.toLowerCase().includes(contactName.toLowerCase()) || 
+          contactName.toLowerCase().includes(c.full_name.toLowerCase()));
+        
+        if (partialMatch) return partialMatch.id;
+        
+        // Try matching by role
+        const roleMatch = contacts.find(c => 
+          c.role && c.role.toLowerCase() === contactName.toLowerCase());
+        
+        if (roleMatch) return roleMatch.id;
+      }
+    }
+    
+    // If no match found in project contacts, try all contacts as a fallback
+    const { data: allContacts, error: allContactsError } = await supabase
+      .from('contacts')
+      .select('id, full_name, role')
+      .ilike('full_name', `%${contactName}%`);
+    
+    if (allContactsError) {
+      console.error("Error searching all contacts:", allContactsError);
+    } else if (allContacts && allContacts.length > 0) {
+      console.log(`Found contact match for "${contactName}": ${allContacts[0].full_name}`);
+      return allContacts[0].id;
+    }
+    
+    console.log(`No contact found for name: "${contactName}"`);
+    return null;
+  } catch (error) {
+    console.error("Error finding contact:", error);
+    return null;
+  }
+}
+
+/**
  * Handle the message action type
  */
 async function handleMessageAction(
@@ -119,12 +195,33 @@ async function handleMessageAction(
     console.log("Final message content:", messageContent);
   }
   
-  // Extract recipient
+  // Extract recipient info
   const recipient = actionData.recipient || 
     (actionData.action_payload && actionData.action_payload.recipient) || 
     "Project team";
   
   console.log("Recipient:", recipient);
+  
+  // Extract sender info
+  const sender = actionData.sender || 
+    (actionData.action_payload && actionData.action_payload.sender) || 
+    "BidList Project Manager";
+    
+  console.log("Sender:", sender);
+  
+  // Find contact IDs for recipient and sender
+  let recipientId = null;
+  let senderId = null;
+  
+  try {
+    recipientId = await findContactId(supabase, recipient, projectId);
+    console.log(`Recipient ID resolution: ${recipient} -> ${recipientId || 'Not found'}`);
+    
+    senderId = await findContactId(supabase, sender, projectId);
+    console.log(`Sender ID resolution: ${sender} -> ${senderId || 'Not found'}`);
+  } catch (contactError) {
+    console.error("Error finding contacts:", contactError);
+  }
   
   // Extract or create description
   let description = null;
@@ -149,6 +246,7 @@ async function handleMessageAction(
   // Prepare the action payload
   const actionPayload = {
     recipient: recipient,
+    sender: sender,
     message_content: messageContent,
     description: description
   };
@@ -164,6 +262,8 @@ async function handleMessageAction(
         action_type: 'message',
         action_payload: actionPayload,
         message: messageContent,
+        recipient_id: recipientId,
+        sender_ID: senderId,
         requires_approval: true,
         status: 'pending'
       })
@@ -216,9 +316,33 @@ async function handleOtherActionTypes(
     actionPayload.recipient = actionData.recipient;
   }
   
+  if (actionData.sender && !actionPayload.sender) {
+    actionPayload.sender = actionData.sender;
+  }
+  
+  // Try to resolve recipient and sender IDs if applicable
+  let recipientId = null;
+  let senderId = null;
+  
+  try {
+    if (actionData.recipient) {
+      recipientId = await findContactId(supabase, actionData.recipient, projectId);
+      console.log(`Recipient ID resolution: ${actionData.recipient} -> ${recipientId || 'Not found'}`);
+    }
+    
+    if (actionData.sender) {
+      senderId = await findContactId(supabase, actionData.sender, projectId);
+      console.log(`Sender ID resolution: ${actionData.sender} -> ${senderId || 'Not found'}`);
+    }
+  } catch (contactError) {
+    console.error("Error finding contacts:", contactError);
+  }
+  
   console.log("Creating action record with payload:", {
     action_type: actionType,
     action_payload: actionPayload,
+    recipient_id: recipientId,
+    sender_ID: senderId
   });
   
   try {
@@ -229,6 +353,8 @@ async function handleOtherActionTypes(
         project_id: projectId,
         action_type: actionType,
         action_payload: actionPayload,
+        recipient_id: recipientId,
+        sender_ID: senderId,
         requires_approval: true,
         status: 'pending'
       })
