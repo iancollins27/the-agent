@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Check, X, Edit } from "lucide-react";
+import { Loader2, Check, X, Edit, MessageCircle, User } from "lucide-react";
 import { ActionRecord } from "@/components/Chat/types";
 import ActionTypeBadge from "./ActionTypeBadge";
 import { toast } from "sonner";
@@ -34,7 +34,11 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
     try {
       const { data, error } = await supabase
         .from('action_records')
-        .select('*')
+        .select(`
+          *,
+          recipient:contacts!recipient_id(id, full_name, phone_number, email),
+          sender:contacts!sender_ID(id, full_name, phone_number, email)
+        `)
         .eq('prompt_run_id', promptRunId)
         .order('created_at', { ascending: false });
 
@@ -108,6 +112,23 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
     fetchActions();
   };
 
+  const renderCommunicationParties = (action: ActionRecord) => {
+    // Only show for message type actions
+    if (action.action_type !== 'message') return null;
+    
+    const senderName = action.sender?.full_name || action.sender_name || "Unknown sender";
+    const recipientName = action.recipient?.full_name || action.recipient_name || "Unknown recipient";
+    
+    return (
+      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+        <User className="h-3 w-3" />
+        <span>From: <span className="font-medium">{senderName}</span></span>
+        <span className="mx-1">→</span>
+        <span>To: <span className="font-medium">{recipientName}</span></span>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-4">
@@ -140,24 +161,26 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
                   </span>
                 </div>
                 
-                {action.action_payload && (
-                  <div className="text-sm mt-1">
-                    {action.action_type === 'message' && (
-                      <div className="line-clamp-2">
-                        {(action.action_payload as any).message_content || 
-                         (action.action_payload as any).content || 
-                         action.message || 
-                         "No message content"}
-                      </div>
-                    )}
-                    {action.action_type === 'data_update' && (
-                      <div>
-                        Update <span className="font-medium">{(action.action_payload as any).field}</span> to{' '}
-                        <span className="font-medium">{(action.action_payload as any).value}</span>
-                      </div>
-                    )}
+                {action.action_type === 'message' && (
+                  <div className="flex items-start gap-1.5">
+                    <MessageCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-blue-500" />
+                    <div className="line-clamp-2 text-sm">
+                      {(action.action_payload as any).message_content || 
+                       (action.action_payload as any).content || 
+                       action.message || 
+                       "No message content"}
+                    </div>
                   </div>
                 )}
+                
+                {action.action_type === 'data_update' && (
+                  <div className="text-sm">
+                    Update <span className="font-medium">{(action.action_payload as any).field}</span> to{' '}
+                    <span className="font-medium">{(action.action_payload as any).value}</span>
+                  </div>
+                )}
+                
+                {renderCommunicationParties(action)}
                 
                 <div className="text-xs font-medium">
                   Status: <span className={

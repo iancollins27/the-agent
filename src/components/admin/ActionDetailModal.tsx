@@ -121,6 +121,9 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
     }
   };
 
+  const senderName = action.sender?.full_name || action.sender_name || null;
+  const recipientName = action.recipient?.full_name || action.recipient_name || null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -140,35 +143,35 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
           </div>
           
           {/* Sender and Recipient Information */}
-          <div className="space-y-3 pt-2">
-            {(action.sender_name || action.recipient_name) && (
+          {action.action_type === 'message' && (senderName || recipientName) && (
+            <div className="space-y-3 pt-2">
               <div className="grid grid-cols-2 gap-3">
-                {action.sender_name && (
+                {senderName && (
                   <div className="space-y-1">
                     <Label className="flex items-center gap-1">
                       <User className="h-3.5 w-3.5 text-muted-foreground" />
                       From
                     </Label>
                     <div className="text-sm bg-muted p-2 rounded-md">
-                      {action.sender_name}
+                      {senderName}
                     </div>
                   </div>
                 )}
                 
-                {action.recipient_name && (
+                {recipientName && (
                   <div className="space-y-1">
                     <Label className="flex items-center gap-1">
                       <User className="h-3.5 w-3.5 text-muted-foreground" />
                       To
                     </Label>
                     <div className="text-sm bg-muted p-2 rounded-md">
-                      {action.recipient_name}
+                      {recipientName}
                     </div>
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           
           {action.action_type === 'data_update' && (
             <div className="space-y-2">

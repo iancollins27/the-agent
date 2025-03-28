@@ -6,6 +6,14 @@ export type Message = {
   content: string;
 };
 
+export type ContactInfo = {
+  id: string;
+  full_name: string;
+  phone_number?: string;
+  email?: string;
+  role?: string;
+};
+
 export type ActionRecord = {
   id: string;
   action_type: string;
@@ -20,11 +28,11 @@ export type ActionRecord = {
   requires_approval?: boolean;
   message?: string | null;
   recipient_id?: string | null;
-  recipient?: { id: string, full_name: string } | null;
+  recipient?: ContactInfo | null;
   recipient_name?: string | null;
   project_name?: string | null;
-  project_address?: string | null; // Added this property
-  sender_ID?: string | null; // Note the capitalized ID to match the database column
-  sender?: { id: string, full_name: string } | null;
+  project_address?: string | null;
+  sender_ID?: string | null;
+  sender?: ContactInfo | null;
   sender_name?: string | null;
 };
