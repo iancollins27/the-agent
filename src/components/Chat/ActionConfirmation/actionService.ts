@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "../types";
 import { toast } from "sonner";
@@ -100,12 +101,11 @@ export async function sendCommunication(
       .from('contacts')
       .select('id, full_name, phone_number, email')
       .eq('id', senderId)
-      .single();
+      .maybeSingle();
       
     if (!senderError && senderData) {
       console.log('Found sender data:', senderData);
       senderInfo = {
-        senderId: senderData.id,
         sender: {
           id: senderData.id,
           name: senderData.full_name,
@@ -117,8 +117,11 @@ export async function sendCommunication(
       };
     } else {
       console.error('Error fetching sender data:', senderError);
+      console.log('Will attempt to send without sender information');
     }
   }
+  
+  console.log('Prepared sender info for request:', senderInfo);
   
   const { data, error } = await supabase.functions.invoke('send-communication', {
     body: {
