@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { callAIProvider } from "./ai-providers.ts";
@@ -51,131 +50,122 @@ serve(async (req) => {
         console.warn("Warning: projectId is missing, prompt run may not be logged correctly");
       }
       
-      const promptRunData = {
-        project_id: projectId || null,
-        workflow_prompt_id: workflowPromptId || null,
-        prompt_input: finalPrompt,
-        status: 'PENDING',
-        ai_provider: aiProvider,
-        ai_model: aiModel,
-        initiated_by: initiatedBy || null
-      };
+      promptRunId = await logPromptRun(
+        supabase, 
+        projectId, 
+        workflowPromptId, 
+        finalPrompt, 
+        aiProvider, 
+        aiModel
+      );
       
-      console.log("Creating prompt run with data:", promptRunData);
+      console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
+    } catch (promptRunError) {
+      console.error("Error creating prompt run:", promptRunError);
+    }
+    
+    let result: string;
+    let actionRecordId: string | null = null;
+    let reminderSet: boolean = false;
+    let nextCheckDateInfo = null;
+    
+    try {
+      result = await callAIProvider(aiProvider, aiModel, finalPrompt);
+      console.log("Raw AI response:", result);
       
-      try {
-        promptRunId = await logPromptRun(supabase, projectId, workflowPromptId, finalPrompt, aiProvider, aiModel, initiatedBy);
-        console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
-      } catch (promptRunError) {
-        console.error("Error creating prompt run:", promptRunError);
+      if (promptRunId) {
+        try {
+          await updatePromptRunWithResult(supabase, promptRunId, result);
+          console.log("Updated prompt run with result");
+        } catch (updateError) {
+          console.error("Error updating prompt run:", updateError);
+        }
+      } else {
+        console.warn("Could not update prompt run with result because promptRunId is null");
       }
       
-      let result: string;
-      let actionRecordId: string | null = null;
-      let reminderSet: boolean = false;
-      let nextCheckDateInfo = null;
-      
-      try {
-        result = await callAIProvider(aiProvider, aiModel, finalPrompt);
-        console.log("Raw AI response:", result);
-        
-        if (promptRunId) {
-          try {
-            await updatePromptRunWithResult(supabase, promptRunId, result);
-            console.log("Updated prompt run with result");
-          } catch (updateError) {
-            console.error("Error updating prompt run:", updateError);
-          }
-        } else {
-          console.warn("Could not update prompt run with result because promptRunId is null");
-        }
-        
-        if (promptType === "action_detection_execution" && projectId) {
-          try {
-            console.log("Checking for action data in result");
-            const actionData = extractJsonFromResponse(result);
-            console.log("Parsed action data:", actionData ? JSON.stringify(actionData, null, 2) : "No action data found");
-            
-            if (actionData) {
-              if (actionData.decision === "ACTION_NEEDED") {
-                try {
-                  actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
-                  console.log("Created action record:", actionRecordId || "Failed to create action record");
-                } catch (createActionError) {
-                  console.error("Error creating action record:", createActionError);
-                }
-              } else if (actionData.decision === "SET_FUTURE_REMINDER") {
-                const daysToAdd = actionData.days_until_check || 7;
-                const nextCheckDate = new Date();
-                nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
-                
-                try {
-                  nextCheckDateInfo = await setNextCheckDate(supabase, projectId, nextCheckDate.toISOString());
-                  reminderSet = true;
-                  console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
-                } catch (setDateError) {
-                  console.error("Error setting next check date:", setDateError);
-                }
-                
-                try {
-                  actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
-                    ...actionData,
-                    action_type: "set_future_reminder"
-                  });
-                  console.log("Created reminder action record:", actionRecordId || "Failed to create action record");
-                } catch (createActionError) {
-                  console.error("Error creating reminder action record:", createActionError);
-                }
-              } else {
-                console.log("No action needed based on decision:", actionData.decision);
+      if (promptType === "action_detection_execution" && projectId) {
+        try {
+          console.log("Checking for action data in result");
+          const actionData = extractJsonFromResponse(result);
+          console.log("Parsed action data:", actionData ? JSON.stringify(actionData, null, 2) : "No action data found");
+          
+          if (actionData) {
+            if (actionData.decision === "ACTION_NEEDED") {
+              try {
+                actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
+                console.log("Created action record:", actionRecordId || "Failed to create action record");
+              } catch (createActionError) {
+                console.error("Error creating action record:", createActionError);
+              }
+            } else if (actionData.decision === "SET_FUTURE_REMINDER") {
+              const daysToAdd = actionData.days_until_check || 7;
+              const nextCheckDate = new Date();
+              nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+              
+              try {
+                nextCheckDateInfo = await setNextCheckDate(supabase, projectId, nextCheckDate.toISOString());
+                reminderSet = true;
+                console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
+              } catch (setDateError) {
+                console.error("Error setting next check date:", setDateError);
+              }
+              
+              try {
+                actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
+                  ...actionData,
+                  action_type: "set_future_reminder"
+                });
+                console.log("Created reminder action record:", actionRecordId || "Failed to create action record");
+              } catch (createActionError) {
+                console.error("Error creating reminder action record:", createActionError);
               }
             } else {
-              console.log("No action data found or invalid format");
+              console.log("No action needed based on decision:", actionData.decision);
             }
-          } catch (parseError) {
-            console.error("Error parsing or processing action data:", parseError);
+          } else {
+            console.log("No action data found or invalid format");
           }
-        }
-      } catch (error) {
-        console.error(`Error calling AI provider (${aiProvider}):`, error);
-        result = generateMockResult(promptType, contextData);
-        result += `\n\nNote: There was an error using the ${aiProvider} API: ${error.message}`;
-        
-        if (promptRunId) {
-          try {
-            await updatePromptRunWithResult(supabase, promptRunId, error.message, true);
-          } catch (updateError) {
-            console.error("Error updating prompt run with error:", updateError);
-          }
+        } catch (parseError) {
+          console.error("Error parsing or processing action data:", parseError);
         }
       }
+    } catch (error) {
+      console.error(`Error calling AI provider (${aiProvider}):`, error);
+      result = generateMockResult(promptType, contextData);
+      result += `\n\nNote: There was an error using the ${aiProvider} API: ${error.message}`;
       
-      return new Response(
-        JSON.stringify({
-          output: result,
-          finalPrompt,
-          projectId,
-          promptType,
-          aiProvider,
-          aiModel,
-          promptRunId,
-          actionRecordId,
-          initiatedBy,
-          reminderSet,
-          nextCheckDateInfo
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-          status: 200,
+      if (promptRunId) {
+        try {
+          await updatePromptRunWithResult(supabase, promptRunId, error.message, true);
+        } catch (updateError) {
+          console.error("Error updating prompt run with error:", updateError);
         }
-      );
-    } catch (innerError) {
-      console.error("Error in prompt run operation:", innerError);
-      throw innerError;
+      }
     }
+    
+    return new Response(
+      JSON.stringify({
+        output: result,
+        finalPrompt,
+        projectId,
+        promptType,
+        aiProvider,
+        aiModel,
+        promptRunId,
+        actionRecordId,
+        initiatedBy,
+        reminderSet,
+        nextCheckDateInfo
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error("Error in test-workflow-prompt function:", error);
     
