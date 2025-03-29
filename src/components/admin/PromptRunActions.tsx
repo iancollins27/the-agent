@@ -64,14 +64,99 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
 
       if (error) throw error;
       
+      // Get the action details so we can execute it if needed
+      const { data: actionData, error: fetchError } = await supabase
+        .from('action_records')
+        .select('*')
+        .eq('id', actionId)
+        .single();
+        
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      // Execute message actions
+      if (actionData && actionData.action_type === 'message') {
+        try {
+          const actionPayload = actionData.action_payload || {};
+          
+          // Prepare recipient data
+          const recipient = {
+            id: actionData.recipient_id,
+            name: actionData.recipient_name || actionPayload.recipient,
+            phone: actionPayload.recipient_phone || actionPayload.phone,
+            email: actionPayload.recipient_email || actionPayload.email
+          };
+
+          // Determine communication channel
+          let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+          if (actionPayload.channel) {
+            channel = actionPayload.channel as 'sms' | 'email' | 'call';
+          } else if (recipient.email && !recipient.phone) {
+            channel = 'email';
+          }
+
+          // Get message content
+          const messageContent = actionData.message || 
+                                actionPayload.message_content || 
+                                actionPayload.content || 
+                                '';
+
+          const { data, error: sendError } = await supabase.functions.invoke('send-communication', {
+            body: {
+              actionId: actionId,
+              messageContent,
+              recipient,
+              channel,
+              projectId: actionData.project_id
+            }
+          });
+          
+          if (sendError) {
+            console.error('Error sending communication:', sendError);
+            toast.error("Action approved but communication failed to send");
+            
+            // Update action with failure information
+            await supabase
+              .from('action_records')
+              .update({
+                execution_result: {
+                  status: 'communication_failed',
+                  timestamp: new Date().toISOString(),
+                  error: sendError.message
+                }
+              })
+              .eq('id', actionId);
+          } else {
+            // Update action with success information
+            await supabase
+              .from('action_records')
+              .update({
+                execution_result: {
+                  status: 'message_sent',
+                  timestamp: new Date().toISOString(),
+                  channel: channel,
+                  details: data
+                }
+              })
+              .eq('id', actionId);
+            
+            toast.success("Action approved and message sent successfully");
+          }
+        } catch (execError) {
+          console.error('Error executing message action:', execError);
+          toast.error("Action approved but message execution failed");
+        }
+      } else {
+        toast.success("Action approved successfully");
+      }
+      
       // Update local state to reflect change
       setActions(prev => 
         prev.map(action => 
           action.id === actionId ? { ...action, status: 'approved', executed_at: new Date().toISOString() } : action
         )
       );
-      
-      toast.success("Action approved successfully");
     } catch (error) {
       console.error('Error approving action:', error);
       toast.error("Failed to approve action");

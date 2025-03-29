@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Dialog, 
@@ -171,6 +170,23 @@ const ActionConfirmDialog: React.FC<ActionConfirmDialogProps> = ({
             title: "Message Sent",
             description: `Communication successfully initiated`,
           });
+          
+          // Update action record with execution result
+          const { error: updateError } = await supabase
+            .from('action_records')
+            .update({
+              execution_result: {
+                status: 'message_sent',
+                timestamp: new Date().toISOString(),
+                channel: channel,
+                details: data
+              }
+            })
+            .eq('id', action.id);
+            
+          if (updateError) {
+            console.error('Error recording execution result:', updateError);
+          }
           
         } catch (commError: any) {
           console.error('Error sending communication:', commError);

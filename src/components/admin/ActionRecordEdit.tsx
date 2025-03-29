@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -22,7 +21,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
   const [message, setMessage] = React.useState(action.message || '');
   const [isSending, setIsSending] = React.useState(false);
 
-  // Safely convert actionPayload fields to strings for display purposes
   const getActionFieldString = (field: any): string => {
     if (field === null || field === undefined) {
       return '';
@@ -30,7 +28,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
     return String(field);
   };
 
-  // Parse action_payload for data_update actions
   const actionPayload = action.action_payload as Record<string, any>;
   const field = actionPayload?.field ? getActionFieldString(actionPayload.field) : '';
   const value = actionPayload?.value ? getActionFieldString(actionPayload.value) : '';
@@ -49,7 +46,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
       if (error) throw error;
 
-      // If approved and it's a data update, update the project data
       if (status === 'approved' && action.action_type === 'data_update' && action.project_id) {
         const updateData: Record<string, any> = {
           [field]: actionPayload.value
@@ -84,25 +80,22 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
     setIsSending(true);
     try {
-      // Prepare recipient data
       const recipient = {
         id: action.recipient_id,
         name: action.recipient_name,
-        // Extract phone and email from action payload if available
         phone: actionPayload.recipient_phone || actionPayload.phone,
         email: actionPayload.recipient_email || actionPayload.email
       };
 
-      // Determine communication channel based on available recipient data
-      let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+      let channel: 'sms' | 'email' | 'call' = 'sms';
       if (actionPayload.channel) {
         channel = actionPayload.channel as 'sms' | 'email' | 'call';
       } else if (recipient.email && !recipient.phone) {
         channel = 'email';
       }
 
-      // Get message content from appropriate field
-      const messageContent = action.message || 
+      const messageContent = message || 
+                            action.message ||
                             actionPayload.message_content || 
                             actionPayload.content || 
                             '';
@@ -123,12 +116,17 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         throw error;
       }
       
-      // Also update the action status to approved
       await supabase
         .from('action_records')
         .update({
           status: 'approved',
-          executed_at: new Date().toISOString()
+          executed_at: new Date().toISOString(),
+          execution_result: {
+            status: 'message_sent',
+            timestamp: new Date().toISOString(),
+            channel: channel,
+            details: data
+          }
         })
         .eq('id', action.id);
       
@@ -136,6 +134,22 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
       onActionUpdated();
     } catch (error) {
       console.error('Error sending communication:', error);
+      
+      try {
+        await supabase
+          .from('action_records')
+          .update({
+            execution_result: {
+              status: 'communication_failed',
+              timestamp: new Date().toISOString(),
+              error: error.message
+            }
+          })
+          .eq('id', action.id);
+      } catch (updateError) {
+        console.error('Error updating action with failure details:', updateError);
+      }
+      
       toast.error("Failed to send communication");
     } finally {
       setIsSending(false);
