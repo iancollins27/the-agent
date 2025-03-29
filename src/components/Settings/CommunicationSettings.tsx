@@ -164,7 +164,7 @@ const CommunicationSettings: React.FC = () => {
                 <SelectValue placeholder="Select an email provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {emailProviders.map((provider) => (
                   <SelectItem key={provider.id} value={provider.id}>
                     {provider.provider_name}
@@ -184,7 +184,7 @@ const CommunicationSettings: React.FC = () => {
                 <SelectValue placeholder="Select a phone/SMS provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {phoneProviders.map((provider) => (
                   <SelectItem key={provider.id} value={provider.id}>
                     {provider.provider_name}
