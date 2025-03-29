@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -120,20 +119,29 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
 
   const onSubmit = async (values: IntegrationFormValues) => {
     try {
+      console.log('Submitting form with values:', values);
+      console.log('Company ID:', company.id);
+      
+      // Ensure values are properly formatted for database
+      const formattedValues = {
+        company_id: company.id,
+        provider_type: values.provider_type,
+        provider_name: values.provider_name,
+        api_key: values.api_key,
+        api_secret: values.api_secret || null,
+        account_id: values.account_id || null,
+        is_active: values.is_active
+      };
+      
+      console.log('Formatted values:', formattedValues);
+      
       const { data, error } = await supabase
         .from('company_integrations')
-        .insert({
-          company_id: company.id,
-          provider_type: values.provider_type,
-          provider_name: values.provider_name,
-          api_key: values.api_key,
-          api_secret: values.api_secret || null,
-          account_id: values.account_id || null,
-          is_active: values.is_active
-        })
+        .insert(formattedValues)
         .select();
 
       if (error) {
+        console.error('Error details:', error);
         throw error;
       }
 
@@ -154,11 +162,20 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
 
       // Refresh providers list
       fetchProviders();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding integration:', error);
+      let errorMessage = "Failed to add integration";
+      
+      // Extract more detailed error message if available
+      if (error.message) {
+        errorMessage += `: ${error.message}`;
+      } else if (error.details) {
+        errorMessage += `: ${error.details}`;
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to add integration",
+        description: errorMessage,
         variant: "destructive",
       });
     }

@@ -11,6 +11,15 @@ export async function getProviderInfo(
 ): Promise<ProviderInfo> {
   let providerInfo: ProviderInfo | null = null;
   
+  // Log input parameters for debugging
+  console.log("getProviderInfo called with:", {
+    providerId,
+    companyId, 
+    channel,
+    actionId,
+    sourceIp
+  });
+  
   // If specific provider ID was provided, use that
   if (providerId) {
     providerInfo = await getProviderById(supabase, providerId, actionId, channel, sourceIp);
@@ -63,9 +72,16 @@ async function getProviderById(
   } 
   
   if (providerData && providerData.length > 0) {
+    console.log(`Provider found with ID: ${providerId}`, {
+      provider_name: providerData[0].provider_name || 'unnamed',
+      has_api_key: !!providerData[0].api_key,
+      has_api_secret: !!providerData[0].api_secret,
+      has_account_id: !!providerData[0].account_id
+    });
     return providerData[0];
   }
   
+  console.log(`No provider found with ID: ${providerId}`);
   return null;
 }
 
