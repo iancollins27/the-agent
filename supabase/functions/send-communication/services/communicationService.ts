@@ -25,7 +25,7 @@ export async function sendCommunication(
       return await sendViaTwilio(provider, channel, message, recipient);
     case 'sendgrid':
       return await sendViaSendGrid(provider, message, recipient);
-    default:
+    case 'mock':
       // For now, simulate success for testing
       console.log(`Using ${providerName} provider - mock implementation for testing`);
       return {
@@ -33,5 +33,10 @@ export async function sendCommunication(
         status: 'sent',
         provider_message_id: `mock-${Date.now()}`
       };
+    default:
+      console.log(`No matching provider found for ${providerName}. Attempting to use the first available provider.`);
+      // If no specific provider is matched, we could add logic to try a default provider
+      // For now, we'll throw an error
+      throw new Error(`Unsupported communication provider: ${providerName}`);
   }
 }
