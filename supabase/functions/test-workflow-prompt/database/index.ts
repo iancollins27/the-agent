@@ -1,17 +1,12 @@
 
-import { logPromptRun, updatePromptRunWithResult } from "./prompt-runs.ts";
-import { setProjectNextCheckDate, setNextCheckDate } from "./projects.ts";
+import { logPromptRun } from "./prompt-runs.ts";
+import { updatePromptRunWithResult } from "./prompt-runs.ts";
 import { createActionRecord } from "./actions.ts";
+import { setNextCheckDate } from "./projects.ts";
 
 export {
-  // Prompt runs related functions
   logPromptRun,
   updatePromptRunWithResult,
-  
-  // Project related functions
-  setProjectNextCheckDate,
-  setNextCheckDate,
-  
-  // Action related functions
-  createActionRecord
+  createActionRecord,
+  setNextCheckDate
 };

@@ -1,4 +1,5 @@
 
+
 export async function logPromptRun(
   supabase: SupabaseClient,
   projectId: string | null, 
@@ -16,7 +17,7 @@ export async function logPromptRun(
       ai_model: aiModel,
     });
 
-    // Create base insert object
+    // Create base insert object without the initiated_by field
     const insertData: any = {
       project_id: projectId,
       workflow_prompt_id: workflowPromptId,
