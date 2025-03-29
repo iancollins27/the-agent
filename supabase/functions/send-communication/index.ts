@@ -22,11 +22,20 @@ serve(async (req) => {
 
     // Parse request body
     const requestData: SendCommRequest = await req.json();
-    const { actionId, messageContent, recipient, channel, provider, projectId, companyId } = requestData;
+    const { 
+      actionId, 
+      messageContent, 
+      recipient, 
+      channel, 
+      providerId, 
+      projectId, 
+      companyId, 
+      isTest 
+    } = requestData;
 
-    console.log(`Processing communication request for action ID: ${actionId}`);
+    console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
-    console.log(`Channel: ${channel}, Requested provider ID: ${provider || 'not specified'}`);
+    console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
@@ -34,7 +43,7 @@ serve(async (req) => {
     // Determine provider info
     const providerInfo = await getProviderInfo(
       supabase, 
-      provider, 
+      providerId, 
       targetCompanyId, 
       channel, 
       actionId, 
@@ -71,6 +80,36 @@ serve(async (req) => {
     // Update action record with the communication ID
     if (actionId) {
       await updateActionRecord(supabase, actionId, commRecord.id, providerInfo.provider_name);
+    }
+
+    // If this is just a test, we can skip the actual sending
+    if (isTest) {
+      console.log('Test mode - skipping actual communication send');
+      
+      // Update communication status to TEST
+      await supabase
+        .from('communications')
+        .update({
+          status: 'TEST',
+          sent_at: new Date().toISOString(),
+          provider_response: { test: true }
+        })
+        .eq('id', commRecord.id);
+        
+      return new Response(
+        JSON.stringify({
+          success: true,
+          test: true,
+          communication_id: commRecord.id,
+          provider: providerInfo.provider_name,
+          channel: channel,
+          message: `Test communication recorded successfully`
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Send the actual communication

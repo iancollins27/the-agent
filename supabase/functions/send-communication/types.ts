@@ -2,7 +2,7 @@
 export type CommProvider = 'justcall' | 'twilio' | 'sendgrid' | 'none';
 
 export interface SendCommRequest {
-  actionId: string;
+  actionId?: string;
   messageContent: string;
   recipient: {
     id?: string;
@@ -11,9 +11,10 @@ export interface SendCommRequest {
     name?: string;
   };
   channel: 'sms' | 'email' | 'call';
-  provider?: string; // Provider ID from company_integrations table
+  providerId?: string; // Provider ID from company_integrations table
   projectId?: string;
   companyId?: string;
+  isTest?: boolean;
 }
 
 export interface ProviderInfo {

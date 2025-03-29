@@ -8,11 +8,28 @@ export async function createCommunicationRecord(
 ): Promise<{ id: string }> {
   const { projectId, channel, messageContent, recipient, providerInfo } = params;
 
+  // Determine the appropriate subtype based on the channel
+  let subtype = '';
+  switch (channel.toUpperCase()) {
+    case 'SMS':
+      subtype = 'SMS_MESSAGE';
+      break;
+    case 'EMAIL':
+      subtype = 'EMAIL_MESSAGE';
+      break;
+    case 'CALL':
+      subtype = 'CALL_INITIATED';
+      break;
+    default:
+      subtype = `${channel.toUpperCase()}_MESSAGE`;
+  }
+
   const { data: commRecord, error: commError } = await supabase
     .from('communications')
     .insert({
       project_id: projectId,
       type: channel.toUpperCase(),
+      subtype: subtype,
       direction: 'OUTBOUND',
       content: messageContent,
       timestamp: new Date().toISOString(),
