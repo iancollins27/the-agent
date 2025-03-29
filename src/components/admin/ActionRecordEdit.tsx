@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -88,6 +89,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
       
       console.log('Sender ID for communication:', senderId);
       
+      // Fetch recipient details
       const recipient = {
         id: action.recipient_id,
         name: action.recipient_name,
@@ -109,6 +111,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
       toast.info("Initiating communication...");
 
+      // Fetch sender contact details if we have a sender ID
       let senderInfo = {};
       if (senderId) {
         const { data: senderData, error: senderError } = await supabase
@@ -122,15 +125,13 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         } else if (senderData) {
           console.log('Using sender data:', senderData);
           senderInfo = {
-            sender_phone_number: senderData.phone_number,
+            sender_phone: senderData.phone_number,
             sender: {
               id: senderData.id,
               name: senderData.full_name,
-              phone: senderData.phone_number,
               phone_number: senderData.phone_number,
               email: senderData.email
-            },
-            sender_phone: senderData.phone_number
+            }
           };
         }
       }

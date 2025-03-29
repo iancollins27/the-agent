@@ -104,20 +104,16 @@ export async function sendCommunication(
       
     if (!senderError && senderData) {
       console.log('Found sender data:', senderData);
-      // Add sender information in multiple formats to ensure compatibility
+      // Add the sender's phone directly as sender_phone to use in JustCall
       senderInfo = {
-        // Add the phone number directly to the recipient object for JustCall
-        sender_phone_number: senderData.phone_number,
-        // Keep the legacy sender object for backward compatibility
+        sender_phone: senderData.phone_number,
+        // Also keep the full sender object for reference
         sender: {
           id: senderData.id,
           name: senderData.full_name,
-          phone: senderData.phone_number,
           phone_number: senderData.phone_number,
           email: senderData.email
-        },
-        // Also keep the legacy sender_phone field
-        sender_phone: senderData.phone_number
+        }
       };
     } else {
       console.error('Error fetching sender data:', senderError);

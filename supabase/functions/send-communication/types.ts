@@ -10,23 +10,21 @@ export interface SendCommRequest {
     phone?: string;
     email?: string;
     name?: string;
-    sender_phone_number?: string; // Direct phone number field for JustCall
+    sender_phone?: string; // Phone number for the sender (for JustCall)
     sender?: {
       id?: string;
       name?: string;
-      phone?: string;
-      phone_number?: string; // Add phone_number to sender type
+      phone_number?: string; // Primary phone number field
       email?: string;
     };
     sender_ID?: string; // Legacy field
-    sender_phone?: string;
   };
   channel: 'sms' | 'email' | 'call';
   providerId?: string; // Provider ID from company_integrations table
   projectId?: string;
   companyId?: string;
   isTest?: boolean;
-  senderId?: string; // New field for sender ID
+  senderId?: string; // ID for sender contact
 }
 
 export interface ProviderInfo {
@@ -46,10 +44,9 @@ export interface CommunicationRecordParams {
     phone?: string;
     email?: string;
     name?: string;
-    sender_phone_number?: string;
+    sender_phone?: string;
     sender?: any;
     sender_ID?: string;
-    sender_phone?: string;
   };
   providerInfo: ProviderInfo;
 }
