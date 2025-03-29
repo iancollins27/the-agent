@@ -36,6 +36,27 @@ export async function sendCommunication(
         status: 'sent',
         provider_message_id: `mock-${Date.now()}`
       };
+    case 'unnamed':
+      // Map unnamed providers based on their credentials
+      console.log(`Found provider with unnamed label, attempting to identify by credentials`);
+      
+      // Try to determine the actual provider type from the credentials structure
+      if (provider.account_id && provider.api_key && provider.api_secret) {
+        console.log(`Credentials structure suggests Twilio, using Twilio provider`);
+        return await sendViaTwilio(provider, channel, message, recipient);
+      } else if (provider.api_key && !provider.account_id) {
+        console.log(`Credentials structure suggests SendGrid, using SendGrid provider`);
+        return await sendViaSendGrid(provider, message, recipient);
+      }
+      
+      // Fall back to mock if we can't determine
+      console.log(`Unable to determine provider type from credentials, using mock implementation`);
+      return {
+        mock: true,
+        status: 'sent',
+        provider_message_id: `mock-unnamed-${Date.now()}`,
+        original_provider: 'unnamed'
+      };
     default:
       // If the provider name doesn't match any known providers
       // Log the issue and use mock provider as fallback for now
