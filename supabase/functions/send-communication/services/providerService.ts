@@ -40,11 +40,6 @@ export async function getProviderInfo(
     };
   }
   
-  // Ensure provider_name is always defined
-  if (!providerInfo.provider_name) {
-    providerInfo.provider_name = 'unknown';
-  }
-  
   return providerInfo;
 }
 
@@ -78,13 +73,27 @@ async function getProviderById(
   } 
   
   if (providerData && providerData.length > 0) {
+    // Query to get the provider_name, as it's not included in the secure RPC
+    const { data: integrationData, error: integrationError } = await supabase
+      .from('company_integrations')
+      .select('provider_name')
+      .eq('id', providerId)
+      .single();
+      
+    // Merge the provider_name from company_integrations with the secure credentials
+    const providerName = integrationError ? 'unnamed' : integrationData?.provider_name || 'unnamed';
+    
     console.log(`Provider found with ID: ${providerId}`, {
-      provider_name: providerData[0].provider_name || 'unnamed',
+      provider_name: providerName,
       has_api_key: !!providerData[0].api_key,
       has_api_secret: !!providerData[0].api_secret,
       has_account_id: !!providerData[0].account_id
     });
-    return providerData[0];
+    
+    return {
+      ...providerData[0],
+      provider_name: providerName
+    };
   }
   
   console.log(`No provider found with ID: ${providerId}`);

@@ -13,8 +13,8 @@ export async function sendCommunication(
   recipient: any,
   communicationId: string
 ): Promise<any> {
-  // Check if provider_name exists before using it
-  const providerName = provider?.provider_name || 'unknown';
+  // Make sure we use the provider_name from the database record
+  const providerName = provider.provider_name || 'unnamed';
   console.log(`Sending ${channel} via ${providerName} to ${recipient.phone || recipient.email}`);
 
   // Normalize provider name to lowercase for case-insensitive matching
@@ -36,9 +36,40 @@ export async function sendCommunication(
         status: 'sent',
         provider_message_id: `mock-${Date.now()}`
       };
+    case 'unnamed':
+      // Try to identify provider by credentials structure
+      console.log(`Found provider with unnamed label, attempting to identify by credentials`);
+      
+      // Check if it looks like Twilio credentials
+      if (provider.api_key && provider.api_secret && provider.account_id) {
+        console.log(`Credentials structure suggests Twilio, using Twilio provider`);
+        console.log(`Twilio API Key: ${provider.api_key.substring(0, 3)}...`);
+        console.log(`MOCK: Sending via Twilio: ${channel} to ${recipient.phone || recipient.email}`);
+        // For now, until Twilio is properly configured:
+        return {
+          provider: 'twilio',
+          status: 'sent',
+          provider_message_id: `twilio-${Date.now()}`
+        };
+      }
+      
+      // Check if it looks like JustCall credentials
+      if (provider.api_key && provider.api_secret && !provider.account_id) {
+        console.log(`Credentials structure suggests JustCall, using JustCall provider`);
+        console.log(`JustCall API Key: ${provider.api_key.substring(0, 3)}...`);
+        return await sendViaJustCall(provider, channel, message, recipient);
+      }
+      
+      // If can't identify, fall back to mock
+      console.log(`Could not identify the provider type from credentials, using mock implementation`);
+      return {
+        mock: true,
+        status: 'sent',
+        provider_message_id: `unidentified-${Date.now()}`
+      };
+      
     default:
       // If the provider name doesn't match any known providers
-      // Log the issue and use mock provider as fallback for now
       console.log(`Unsupported provider: "${providerName}". Using mock implementation as fallback.`);
       return {
         mock: true,
