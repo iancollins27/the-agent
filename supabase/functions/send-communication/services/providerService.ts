@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ProviderInfo } from "../types.ts";
 
@@ -39,12 +40,9 @@ export async function getProviderInfo(
     };
   }
   
-  // Ensure provider_name is always defined and log it
+  // Ensure provider_name is always defined
   if (!providerInfo.provider_name) {
-    console.log('Provider name was undefined, setting to "unnamed"');
-    providerInfo.provider_name = 'unnamed';
-  } else {
-    console.log(`Using provider with name: ${providerInfo.provider_name}`);
+    providerInfo.provider_name = 'unknown';
   }
   
   return providerInfo;
