@@ -30,7 +30,7 @@ export const debugProjectData = async (companyId: string) => {
     
     const { data: allProjects, error: allProjectsError } = await supabase
       .from('projects')
-      .select('id, crm_id, Address')
+      .select('id, crm_id, Address, project_manager')
       .eq('company_id', companyId);
     
     if (allProjectsError) {
@@ -55,14 +55,23 @@ export const debugProjectData = async (companyId: string) => {
 };
 
 // Fetch projects based on filters
-export const fetchProjects = async (companyId: string, userId: string | null, onlyMyProjects: boolean) => {
+export const fetchProjects = async (
+  companyId: string, 
+  userId: string | null, 
+  onlyMyProjects: boolean,
+  projectManagerFilter: string | null
+) => {
   let projectQuery = supabase
     .from('projects')
-    .select('id')
+    .select('id, crm_id, Address, project_manager')
     .eq('company_id', companyId);
 
   if (onlyMyProjects && userId) {
+    // This filter takes precedence over projectManagerFilter
     projectQuery = projectQuery.eq('project_manager', userId);
+  } else if (projectManagerFilter) {
+    // Only apply project manager filter if we're not filtering for current user's projects
+    projectQuery = projectQuery.eq('project_manager', projectManagerFilter);
   }
 
   const { data, error } = await projectQuery;
@@ -94,6 +103,7 @@ export const fetchFilteredPromptRuns = async (
         crm_id, 
         Address,
         company_id,
+        project_manager,
         companies:company_id (
           company_project_base_URL
         )

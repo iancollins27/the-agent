@@ -20,6 +20,7 @@ const ProjectManager: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [onlyMyProjects, setOnlyMyProjects] = useState(false);
+  const [projectManagerFilter, setProjectManagerFilter] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   // Explicitly set the default to ALL to ensure it's used
@@ -50,6 +51,20 @@ const ProjectManager: React.FC = () => {
     fetchUserProfile();
   }, [user]);
 
+  // Reset project manager filter when "only my projects" is checked
+  useEffect(() => {
+    if (onlyMyProjects) {
+      setProjectManagerFilter(null);
+    }
+  }, [onlyMyProjects]);
+
+  // Reset "only my projects" when project manager filter is set
+  useEffect(() => {
+    if (projectManagerFilter) {
+      setOnlyMyProjects(false);
+    }
+  }, [projectManagerFilter]);
+
   // Use the custom hook to fetch prompt runs
   const { 
     promptRuns, 
@@ -61,6 +76,7 @@ const ProjectManager: React.FC = () => {
     userProfile,
     statusFilter,
     onlyShowMyProjects: onlyMyProjects,
+    projectManagerFilter,
     timeFilter,
     getDateFilter
   });
@@ -83,6 +99,10 @@ const ProjectManager: React.FC = () => {
       return "No prompt runs found for your projects. Try unchecking 'Only My Projects' filter.";
     }
     
+    if (projectManagerFilter) {
+      return "No prompt runs found for the selected project manager's projects.";
+    }
+    
     if (statusFilter) {
       return `No prompt runs found with the '${statusFilter}' status. Try selecting a different status.`;
     }
@@ -99,7 +119,7 @@ const ProjectManager: React.FC = () => {
       <ProjectManagerNav />
       
       <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <h2 className="text-2xl font-bold">Project Manager Dashboard</h2>
           <PromptRunFilters
             timeFilter={timeFilter}
@@ -108,6 +128,8 @@ const ProjectManager: React.FC = () => {
             onStatusFilterChange={setStatusFilter}
             onlyShowMyProjects={onlyMyProjects}
             onMyProjectsChange={setOnlyMyProjects}
+            projectManagerFilter={projectManagerFilter}
+            onProjectManagerFilterChange={setProjectManagerFilter}
             onRefresh={fetchPromptRuns}
           />
         </div>
@@ -124,6 +146,7 @@ const ProjectManager: React.FC = () => {
               companyId: userProfile?.profile_associated_company,
               statusFilter,
               onlyMyProjects,
+              projectManagerFilter,
               timeFilter
             }}
           />

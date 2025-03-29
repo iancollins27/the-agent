@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Filter } from "lucide-react";
+import { Filter, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -10,6 +10,7 @@ import {
   DropdownMenuCheckboxItem
 } from "@/components/ui/dropdown-menu";
 import TimeFilterSelect from "./TimeFilterSelect";
+import ProjectManagerSelector from './ProjectManagerSelector';
 
 interface PromptRunFiltersProps {
   timeFilter: string;
@@ -18,6 +19,8 @@ interface PromptRunFiltersProps {
   onStatusFilterChange: (value: string | null) => void;
   onlyShowMyProjects: boolean;
   onMyProjectsChange: (value: boolean) => void;
+  projectManagerFilter: string | null;
+  onProjectManagerFilterChange: (value: string | null) => void;
   onRefresh: () => void;
 }
 
@@ -28,13 +31,20 @@ const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
   onStatusFilterChange,
   onlyShowMyProjects,
   onMyProjectsChange,
+  projectManagerFilter,
+  onProjectManagerFilterChange,
   onRefresh
 }) => {
   return (
-    <div className="flex space-x-2 items-center">
+    <div className="flex flex-wrap gap-2 items-center">
       <TimeFilterSelect
         value={timeFilter}
         onChange={onTimeFilterChange}
+      />
+      
+      <ProjectManagerSelector 
+        value={projectManagerFilter} 
+        onChange={onProjectManagerFilterChange} 
       />
       
       <DropdownMenu>
@@ -68,7 +78,10 @@ const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
           <SelectItem value="ERROR">Error</SelectItem>
         </SelectContent>
       </Select>
-      <Button onClick={onRefresh}>Refresh</Button>
+      
+      <Button onClick={onRefresh} variant="outline" size="icon">
+        <RefreshCw className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

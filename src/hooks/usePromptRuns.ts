@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
-import { TIME_FILTERS } from "../components/admin/TimeFilterSelect";
+import { TIME_FILTERS } from "./useTimeFilter";
 import { usePromptFeedback } from './usePromptFeedback';
 import { 
   debugProjectData, 
@@ -15,6 +15,7 @@ interface UsePromptRunsProps {
   userProfile: any;
   statusFilter: string | null;
   onlyShowMyProjects: boolean;
+  projectManagerFilter: string | null;
   timeFilter: string;
   getDateFilter: () => string | null;
 }
@@ -23,6 +24,7 @@ export const usePromptRuns = ({
   userProfile,
   statusFilter,
   onlyShowMyProjects,
+  projectManagerFilter,
   timeFilter,
   getDateFilter
 }: UsePromptRunsProps) => {
@@ -35,7 +37,7 @@ export const usePromptRuns = ({
     if (userProfile) {
       fetchPromptRuns();
     }
-  }, [statusFilter, userProfile, onlyShowMyProjects, timeFilter]);
+  }, [statusFilter, userProfile, onlyShowMyProjects, projectManagerFilter, timeFilter]);
 
   const fetchPromptRuns = async () => {
     if (!userProfile?.profile_associated_company) {
@@ -61,7 +63,8 @@ export const usePromptRuns = ({
       const projectsData = await fetchProjects(
         companyId, 
         userProfile.id, 
-        onlyShowMyProjects
+        onlyShowMyProjects,
+        projectManagerFilter
       );
       
       if (projectsData.length === 0) {
