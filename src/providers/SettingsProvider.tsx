@@ -17,6 +17,7 @@ interface CompanySettings {
   };
   default_email_provider?: string;
   default_phone_provider?: string;
+  communication_settings?: Json;
 }
 
 interface SettingsContextType {

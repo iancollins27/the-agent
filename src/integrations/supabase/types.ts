@@ -186,12 +186,17 @@ export type Database = {
           created_at: string
           direction: string
           duration: number | null
+          error_details: string | null
           id: string
           participants: Json
           processed_for_summary: boolean | null
           project_id: string | null
+          provider: string | null
+          provider_response: Json | null
           raw_webhook_id: string | null
           recording_url: string | null
+          sent_at: string | null
+          status: string | null
           subtype: string
           timestamp: string
           type: string
@@ -202,12 +207,17 @@ export type Database = {
           created_at?: string
           direction: string
           duration?: number | null
+          error_details?: string | null
           id?: string
           participants: Json
           processed_for_summary?: boolean | null
           project_id?: string | null
+          provider?: string | null
+          provider_response?: Json | null
           raw_webhook_id?: string | null
           recording_url?: string | null
+          sent_at?: string | null
+          status?: string | null
           subtype: string
           timestamp: string
           type: string
@@ -218,12 +228,17 @@ export type Database = {
           created_at?: string
           direction?: string
           duration?: number | null
+          error_details?: string | null
           id?: string
           participants?: Json
           processed_for_summary?: boolean | null
           project_id?: string | null
+          provider?: string | null
+          provider_response?: Json | null
           raw_webhook_id?: string | null
           recording_url?: string | null
+          sent_at?: string | null
+          status?: string | null
           subtype?: string
           timestamp?: string
           type?: string
