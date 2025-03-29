@@ -5,6 +5,7 @@ import ProjectManagerNav from "../components/ProjectManagerNav";
 import KnowledgeBaseSettings from "../components/Settings/KnowledgeBaseSettings";
 import CommunicationSettings from "../components/Settings/CommunicationSettings";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/components/admin/types";
 
 interface Company {
   id: string;
@@ -16,7 +17,7 @@ interface Company {
       page_id?: string;
       last_sync?: string;
     };
-  };
+  } | Json;
   default_email_provider?: string;
   default_phone_provider?: string;
 }
@@ -34,12 +35,17 @@ const CompanySettings: React.FC = () => {
           .from('companies')
           .select('*')
           .limit(1)
-          .single();
+          .maybeSingle();
           
         if (error) {
           console.error('Error fetching company:', error);
-        } else {
-          setCompany(data);
+        } else if (data) {
+          // Ensure knowledge_base_settings is properly typed
+          const formattedCompany: Company = {
+            ...data,
+            knowledge_base_settings: data.knowledge_base_settings || {}
+          };
+          setCompany(formattedCompany);
         }
       } catch (error) {
         console.error('Error fetching company data:', error);

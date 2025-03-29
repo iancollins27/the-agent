@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/components/admin/types";
 
 interface Company {
   id: string;
@@ -17,7 +19,7 @@ interface Company {
       page_id?: string;
       last_sync?: string;
     };
-  };
+  } | Json;
 }
 
 interface KnowledgeBaseSettingsProps {
@@ -28,18 +30,25 @@ interface KnowledgeBaseSettingsProps {
 const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, onUpdate }) => {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Safely extract Notion settings with type checking
+  const notionSettings = typeof company.knowledge_base_settings === 'object' && 
+                        company.knowledge_base_settings !== null && 
+                        'notion' in company.knowledge_base_settings ? 
+                        company.knowledge_base_settings.notion : undefined;
+
   const [notionToken, setNotionToken] = useState(
-    company.knowledge_base_settings?.notion?.token || ''
+    notionSettings?.token || ''
   );
   const [notionDatabaseId, setNotionDatabaseId] = useState(
-    company.knowledge_base_settings?.notion?.database_id || ''
+    notionSettings?.database_id || ''
   );
   const [notionPageId, setNotionPageId] = useState(
-    company.knowledge_base_settings?.notion?.page_id || ''
+    notionSettings?.page_id || ''
   );
 
-  const lastSyncDate = company.knowledge_base_settings?.notion?.last_sync 
-    ? new Date(company.knowledge_base_settings.notion.last_sync).toLocaleString()
+  const lastSyncDate = notionSettings?.last_sync 
+    ? new Date(notionSettings.last_sync).toLocaleString()
     : 'Never';
 
   const handleNotionConnect = async () => {
@@ -152,7 +161,7 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
               </p>
             </div>
 
-            {company.knowledge_base_settings?.notion?.last_sync && (
+            {notionSettings?.last_sync && (
               <div className="rounded-md bg-gray-50 dark:bg-gray-900 p-4">
                 <p className="text-sm font-medium">Last Synced: {lastSyncDate}</p>
               </div>
@@ -164,7 +173,7 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
       <CardFooter className="flex justify-end gap-2">
         <Button
           variant="outline"
-          disabled={isProcessing || !company.knowledge_base_settings?.notion?.last_sync}
+          disabled={isProcessing || !notionSettings?.last_sync}
           onClick={() => onUpdate({})}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
