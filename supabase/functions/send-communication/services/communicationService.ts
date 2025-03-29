@@ -13,10 +13,12 @@ export async function sendCommunication(
   recipient: any,
   communicationId: string
 ): Promise<any> {
-  console.log(`Sending ${channel} via ${provider.provider_name} to ${recipient.phone || recipient.email}`);
+  // Check if provider_name exists before using it
+  const providerName = provider?.provider_name || 'unknown';
+  console.log(`Sending ${channel} via ${providerName} to ${recipient.phone || recipient.email}`);
 
   // Route to the appropriate provider service
-  switch (provider.provider_name.toLowerCase()) {
+  switch (providerName.toLowerCase()) {
     case 'justcall':
       return await sendViaJustCall(provider, channel, message, recipient);
     case 'twilio':
@@ -25,7 +27,7 @@ export async function sendCommunication(
       return await sendViaSendGrid(provider, message, recipient);
     default:
       // For now, simulate success for testing
-      console.log(`Using ${provider.provider_name} provider - mock implementation for testing`);
+      console.log(`Using ${providerName} provider - mock implementation for testing`);
       return {
         mock: true,
         status: 'sent',
