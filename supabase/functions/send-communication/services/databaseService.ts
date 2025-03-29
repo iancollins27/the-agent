@@ -24,27 +24,27 @@ export async function createCommunicationRecord(
       subtype = `${channel.toUpperCase()}_MESSAGE`;
   }
 
-  // Use the CommDirection type explicitly and ensure it exactly matches the database constraint
+  // Use a string literal that exactly matches the database constraint
   // The database constraint requires 'INBOUND' or 'OUTBOUND' (uppercase)
-  const direction: CommDirection = 'OUTBOUND';
+  const direction = 'OUTBOUND';
   
   console.log(`Creating communication record with direction: ${direction}`);
   console.log(`Values being used - type: ${channel.toUpperCase()}, subtype: ${subtype}`);
 
   // First, check if we can query the communications table schema
   try {
-    const { data: tableInfo, error: tableError } = await supabase
+    const { error: tableError } = await supabase
       .from('communications')
       .select('direction')
       .limit(1);
       
     if (tableError) {
-      console.error(`Error querying communications table: ${tableError.message}`);
+      console.error(`Could not get table info: ${tableError.message}`);
     } else {
       console.log('Successfully queried communications table');
     }
   } catch (e) {
-    console.error(`Exception querying communications table: ${e.message}`);
+    console.error(`Exception checking table schema: ${e.message}`);
   }
 
   // Now attempt to insert the record
