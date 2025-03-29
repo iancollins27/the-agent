@@ -24,8 +24,9 @@ export async function createCommunicationRecord(
       subtype = `${channel.toUpperCase()}_MESSAGE`;
   }
 
-  // Define the direction explicitly as a valid CommDirection type
-  const direction: CommDirection = 'OUTBOUND';
+  // Define the direction as a literal string value that exactly matches the constraint
+  // Using the exact value 'OUTBOUND' that is allowed by the constraint
+  const direction = 'OUTBOUND';
   
   console.log(`Creating communication record with direction: ${direction}`);
   console.log(`Values being used - type: ${channel.toUpperCase()}, subtype: ${subtype}`);
