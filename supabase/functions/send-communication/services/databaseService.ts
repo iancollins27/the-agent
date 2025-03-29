@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { CommunicationRecordParams, CommDirection } from "../types.ts";
 
@@ -12,40 +11,23 @@ export async function createCommunicationRecord(
   let subtype = '';
   switch (channel.toUpperCase()) {
     case 'SMS':
-      subtype = 'SMS_MESSAGE';
+      subtype = 'sms_message';
       break;
     case 'EMAIL':
-      subtype = 'EMAIL_MESSAGE';
+      subtype = 'email_message';
       break;
     case 'CALL':
-      subtype = 'CALL_INITIATED';
+      subtype = 'call_initiated';
       break;
     default:
-      subtype = `${channel.toUpperCase()}_MESSAGE`;
+      subtype = `${channel.toLowerCase()}_message`;
   }
 
-  // Use a string literal that exactly matches the database constraint
-  // The database constraint requires 'INBOUND' or 'OUTBOUND' (uppercase)
-  const direction = 'OUTBOUND';
+  // Use lowercase 'outbound' to match database constraint
+  const direction = 'outbound';
   
   console.log(`Creating communication record with direction: ${direction}`);
   console.log(`Values being used - type: ${channel.toUpperCase()}, subtype: ${subtype}`);
-
-  // First, check if we can query the communications table schema
-  try {
-    const { error: tableError } = await supabase
-      .from('communications')
-      .select('direction')
-      .limit(1);
-      
-    if (tableError) {
-      console.error(`Could not get table info: ${tableError.message}`);
-    } else {
-      console.log('Successfully queried communications table');
-    }
-  } catch (e) {
-    console.error(`Exception checking table schema: ${e.message}`);
-  }
 
   // Now attempt to insert the record
   const { data: commRecord, error: commError } = await supabase
