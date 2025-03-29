@@ -7,16 +7,19 @@ import CommunicationSettings from "../components/Settings/CommunicationSettings"
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/components/admin/types";
 
+// Define a more specific type for the Notion settings
+interface NotionSettings {
+  token?: string;
+  database_id?: string;
+  page_id?: string;
+  last_sync?: string;
+}
+
 interface Company {
   id: string;
   name: string;
   knowledge_base_settings?: {
-    notion?: {
-      token?: string;
-      database_id?: string;
-      page_id?: string;
-      last_sync?: string;
-    };
+    notion?: NotionSettings;
   } | Json;
   default_email_provider?: string;
   default_phone_provider?: string;

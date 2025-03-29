@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,18 @@ import { Loader2, Save, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/components/admin/types";
 
+// Define a more specific type for the Notion settings
+interface NotionSettings {
+  token?: string;
+  database_id?: string;
+  page_id?: string;
+  last_sync?: string;
+}
+
 interface Company {
   id: string;
   knowledge_base_settings?: {
-    notion?: {
-      token?: string;
-      database_id?: string;
-      page_id?: string;
-      last_sync?: string;
-    };
+    notion?: NotionSettings;
   } | Json;
 }
 
@@ -31,11 +34,19 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Safely extract Notion settings with type checking
-  const notionSettings = typeof company.knowledge_base_settings === 'object' && 
-                        company.knowledge_base_settings !== null && 
-                        'notion' in company.knowledge_base_settings ? 
-                        company.knowledge_base_settings.notion : undefined;
+  // Safely extract Notion settings with better type checking
+  const notionSettings: NotionSettings | undefined = (() => {
+    if (typeof company.knowledge_base_settings === 'object' && 
+        company.knowledge_base_settings !== null) {
+      // Check if it has a notion property that's an object
+      if ('notion' in company.knowledge_base_settings && 
+          typeof company.knowledge_base_settings.notion === 'object' &&
+          company.knowledge_base_settings.notion !== null) {
+        return company.knowledge_base_settings.notion;
+      }
+    }
+    return undefined;
+  })();
 
   const [notionToken, setNotionToken] = useState(
     notionSettings?.token || ''
