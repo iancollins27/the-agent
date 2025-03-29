@@ -1,6 +1,6 @@
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { CommunicationRecordParams } from "../types.ts";
+import { CommunicationRecordParams, CommDirection } from "../types.ts";
 
 export async function createCommunicationRecord(
   supabase: SupabaseClient,
@@ -24,15 +24,36 @@ export async function createCommunicationRecord(
       subtype = `${channel.toUpperCase()}_MESSAGE`;
   }
 
-  // Check if the communications table has a check constraint on the direction column
-  // and ensure we're using one of the allowed values (e.g., 'OUTBOUND', 'INBOUND')
+  // Define the direction explicitly as a valid CommDirection type
+  const direction: CommDirection = 'OUTBOUND';
+  
+  console.log(`Creating communication record with direction: ${direction}`);
+  console.log(`Values being used - type: ${channel.toUpperCase()}, subtype: ${subtype}`);
+
+  // First, check if we can query the communications table schema
+  try {
+    const { data: tableInfo, error: tableError } = await supabase
+      .from('communications')
+      .select('direction')
+      .limit(1);
+      
+    if (tableError) {
+      console.error(`Error querying communications table: ${tableError.message}`);
+    } else {
+      console.log('Successfully queried communications table');
+    }
+  } catch (e) {
+    console.error(`Exception querying communications table: ${e.message}`);
+  }
+
+  // Now attempt to insert the record
   const { data: commRecord, error: commError } = await supabase
     .from('communications')
     .insert({
       project_id: projectId,
       type: channel.toUpperCase(),
       subtype: subtype,
-      direction: 'OUTBOUND', // Make sure this matches one of the allowed values in the check constraint
+      direction: direction,
       content: messageContent,
       timestamp: new Date().toISOString(),
       participants: [
@@ -52,9 +73,11 @@ export async function createCommunicationRecord(
 
   if (commError) {
     console.error(`Error creating communication record: ${commError.message}`);
+    console.error(`Error details: ${JSON.stringify(commError)}`);
     throw new Error(`Failed to create communication record: ${commError.message}`);
   }
   
+  console.log(`Successfully created communication record with ID: ${commRecord.id}`);
   return commRecord;
 }
 

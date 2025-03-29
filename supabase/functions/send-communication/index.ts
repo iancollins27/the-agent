@@ -15,10 +15,27 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting send-communication function execution");
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Get more information about the communications table structure
+    try {
+      console.log("Checking communications table schema...");
+      // Try to describe the communications table to see if it has the expected constraints
+      const { error: descError } = await supabase.rpc('get_table_info', { 
+        table_name: 'communications' 
+      });
+      
+      if (descError) {
+        console.log(`Could not get table info: ${descError.message}`);
+      }
+    } catch (e) {
+      console.log(`Exception checking table schema: ${e.message}`);
+    }
 
     // Parse request body
     const requestData: SendCommRequest = await req.json();
@@ -66,16 +83,39 @@ serve(async (req) => {
     console.log(`Using communication provider: ${providerInfo.provider_name}`);
 
     // Record in communications table
-    const commRecord = await createCommunicationRecord(
-      supabase,
-      {
-        projectId,
-        channel,
-        messageContent,
-        recipient,
-        providerInfo
+    let commRecord;
+    try {
+      commRecord = await createCommunicationRecord(
+        supabase,
+        {
+          projectId,
+          channel,
+          messageContent,
+          recipient,
+          providerInfo
+        }
+      );
+    } catch (commError) {
+      console.error(`Communication record creation failed: ${commError.message}`);
+      
+      // Try to get more details about the error by querying the communications table schema
+      try {
+        const { data: columnInfo, error: columnError } = await supabase.rpc('get_column_info', {
+          table_name: 'communications',
+          column_name: 'direction'
+        });
+        
+        if (columnError) {
+          console.error(`Error getting column info: ${columnError.message}`);
+        } else {
+          console.log(`Column info for 'direction': ${JSON.stringify(columnInfo)}`);
+        }
+      } catch (e) {
+        console.error(`Exception getting column info: ${e.message}`);
       }
-    );
+      
+      throw commError;
+    }
 
     // Update action record with the communication ID
     if (actionId) {
@@ -163,6 +203,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error(`Error in send-communication function: ${error.message}`);
+    console.error(`Error stack: ${error.stack || 'No stack trace available'}`);
     
     return new Response(
       JSON.stringify({
