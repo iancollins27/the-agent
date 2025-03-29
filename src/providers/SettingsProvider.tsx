@@ -57,6 +57,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             variant: "destructive",
           });
         } else if (data) {
+          console.log('Fetched company settings:', data);
           setCompanySettings(data);
         }
       } catch (error) {
@@ -80,6 +81,16 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     
     try {
+      // For notion_settings, merge with existing settings
+      if (updates.notion_settings && companySettings.notion_settings) {
+        updates.notion_settings = {
+          ...companySettings.notion_settings,
+          ...updates.notion_settings
+        };
+      }
+      
+      console.log('Updating company settings:', updates);
+      
       const { error } = await supabase
         .from('companies')
         .update(updates)
