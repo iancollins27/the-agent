@@ -1,0 +1,289 @@
+
+import { supabase } from "@/integrations/supabase/client";
+import { ActionRecord } from "../types";
+import { toast } from "sonner";
+
+export async function updateActionStatus(
+  actionId: string, 
+  approve: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from('action_records')
+    .update({
+      status: approve ? 'approved' : 'rejected',
+      executed_at: approve ? new Date().toISOString() : null
+    })
+    .eq('id', actionId);
+    
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updateProjectData(
+  projectId: string,
+  field: string,
+  value: any
+): Promise<void> {
+  const { error } = await supabase
+    .from('projects')
+    .update({
+      [field]: value
+    })
+    .eq('id', projectId);
+    
+  if (error) {
+    throw error;
+  }
+}
+
+export async function setProjectReminder(
+  projectId: string,
+  daysToAdd: number,
+  checkReason: string,
+  actionId: string
+): Promise<void> {
+  // Calculate the next check date based on days_until_check
+  const nextCheckDate = new Date();
+  nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+  
+  // Update the project with the next check date
+  const { error } = await supabase
+    .from('projects')
+    .update({
+      next_check_date: nextCheckDate.toISOString()
+    })
+    .eq('id', projectId);
+    
+  if (error) {
+    throw error;
+  }
+  
+  // Record the execution result
+  await supabase
+    .from('action_records')
+    .update({
+      execution_result: {
+        status: 'reminder_set',
+        timestamp: new Date().toISOString(),
+        next_check_date: nextCheckDate.toISOString(),
+        details: `Reminder set to check in ${daysToAdd} days: ${checkReason || 'No reason provided'}`
+      }
+    })
+    .eq('id', actionId);
+}
+
+export async function sendCommunication(
+  actionId: string,
+  messageContent: string,
+  recipient: {
+    id?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+  },
+  channel: 'sms' | 'email' | 'call',
+  projectId?: string,
+  companyId?: string
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('send-communication', {
+    body: {
+      actionId,
+      messageContent,
+      recipient,
+      channel,
+      projectId,
+      companyId
+    }
+  });
+  
+  if (error) {
+    throw new Error(`Communication error: ${error.message}`);
+  }
+  
+  // Record the execution success if needed
+  return data;
+}
+
+export async function recordCommunicationFailure(
+  actionId: string, 
+  errorMessage: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('action_records')
+    .update({
+      execution_result: {
+        status: 'communication_failed',
+        timestamp: new Date().toISOString(),
+        error: errorMessage
+      }
+    })
+    .eq('id', actionId);
+    
+  if (error) {
+    console.error('Error recording execution result:', error);
+  }
+}
+
+export async function processNotionIntegration(
+  actionId: string,
+  companyId: string | null,
+  notionToken: string,
+  notionDatabaseId?: string,
+  notionPageId?: string
+): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('process-notion-integration', {
+    body: { 
+      companyId,
+      notionToken,
+      notionDatabaseId,
+      notionPageId
+    }
+  });
+  
+  if (error) {
+    throw error;
+  }
+  
+  // Record the execution result
+  await supabase
+    .from('action_records')
+    .update({
+      execution_result: {
+        status: 'notion_integration_started',
+        timestamp: new Date().toISOString(),
+        details: data
+      }
+    })
+    .eq('id', actionId);
+    
+  return data;
+}
+
+export async function getCompanyIdFromProject(projectId: string): Promise<string | null> {
+  if (!projectId) return null;
+  
+  const { data, error } = await supabase
+    .from('projects')
+    .select('company_id')
+    .eq('id', projectId)
+    .maybeSingle();
+  
+  if (error || !data) {
+    console.error('Error getting company ID:', error);
+    return null;
+  }
+  
+  return data.company_id;
+}
+
+// Function to execute the appropriate action based on action type
+export async function executeAction(action: ActionRecord): Promise<void> {
+  if (!action) return;
+  
+  try {
+    const actionPayload = action.action_payload as Record<string, any>;
+    
+    // First update the action status
+    await updateActionStatus(action.id, true);
+    
+    // Then execute the specific action based on type
+    switch (action.action_type) {
+      case 'data_update':
+        if (action.project_id) {
+          await updateProjectData(
+            action.project_id, 
+            actionPayload.field, 
+            actionPayload.value
+          );
+          toast.success(actionPayload.description || "Project updated successfully");
+        }
+        break;
+        
+      case 'set_future_reminder':
+        if (action.project_id) {
+          const daysToAdd = actionPayload.days_until_check || 7;
+          await setProjectReminder(
+            action.project_id, 
+            daysToAdd, 
+            actionPayload.check_reason || '', 
+            action.id
+          );
+          toast.success(`Reminder set to check this project again in ${daysToAdd} days`);
+        }
+        break;
+        
+      case 'message':
+        // Prepare recipient data
+        const recipient = {
+          id: action.recipient_id,
+          name: action.recipient_name,
+          phone: actionPayload.recipient_phone || actionPayload.phone,
+          email: actionPayload.recipient_email || actionPayload.email
+        };
+
+        // Determine communication channel
+        let channel: 'sms' | 'email' | 'call' = 'sms';
+        if (actionPayload.channel) {
+          channel = actionPayload.channel as 'sms' | 'email' | 'call';
+        } else if (recipient.email && !recipient.phone) {
+          channel = 'email';
+        }
+
+        // Get message content
+        const messageContent = action.message || 
+                              actionPayload.message_content || 
+                              actionPayload.content || 
+                              '';
+
+        toast.info("Sending communication...");
+        
+        try {
+          await sendCommunication(
+            action.id,
+            messageContent,
+            recipient,
+            channel,
+            action.project_id,
+            actionPayload.company_id
+          );
+          toast.success("Message sent successfully");
+        } catch (commError: any) {
+          console.error('Error sending communication:', commError);
+          toast.error(commError.message || "Failed to send the message");
+          await recordCommunicationFailure(action.id, commError.message || "Unknown error");
+        }
+        break;
+        
+      case 'notion_integration':
+        const companyId = await getCompanyIdFromProject(action.project_id || '');
+        await processNotionIntegration(
+          action.id,
+          companyId,
+          actionPayload.notion_token,
+          actionPayload.notion_database_id,
+          actionPayload.notion_page_id
+        );
+        toast.success("Notion integration started. Content will be processed in the background.");
+        break;
+        
+      default:
+        toast.success("Action approved successfully");
+    }
+  } catch (error: any) {
+    console.error('Error executing action:', error);
+    toast.error(error.message || "Failed to execute action");
+    throw error;
+  }
+}
+
+export async function rejectAction(actionId: string): Promise<void> {
+  try {
+    await updateActionStatus(actionId, false);
+    toast.success("Action rejected successfully");
+  } catch (error: any) {
+    console.error('Error rejecting action:', error);
+    toast.error(error.message || "Failed to reject action");
+    throw error;
+  }
+}
