@@ -8,8 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertCircle, Check, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 type ProviderType = 'email' | 'phone';
 
@@ -29,6 +33,18 @@ type CompanySettings = {
   default_phone_provider?: string | null;
 };
 
+// Define form validation schema
+const integrationFormSchema = z.object({
+  provider_type: z.enum(['email', 'phone']),
+  provider_name: z.string().min(1, "Provider name is required"),
+  api_key: z.string().min(1, "API key is required"),
+  api_secret: z.string().optional(),
+  account_id: z.string().optional(),
+  is_active: z.boolean().default(true),
+});
+
+type IntegrationFormValues = z.infer<typeof integrationFormSchema>;
+
 const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) => Promise<void> }> = ({ 
   company,
   onUpdate
@@ -43,14 +59,17 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
   });
   const { toast } = useToast();
 
-  // New provider form state
-  const [newProvider, setNewProvider] = useState<Partial<Provider>>({
-    provider_type: 'phone',
-    provider_name: '',
-    api_key: '',
-    api_secret: '',
-    account_id: '',
-    is_active: true
+  // Initialize react-hook-form
+  const form = useForm<IntegrationFormValues>({
+    resolver: zodResolver(integrationFormSchema),
+    defaultValues: {
+      provider_type: 'phone',
+      provider_name: '',
+      api_key: '',
+      api_secret: '',
+      account_id: '',
+      is_active: true
+    },
   });
 
   useEffect(() => {
@@ -99,34 +118,18 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
     return 'phone';
   };
 
-  const handleNewProviderChange = (field: string, value: string | boolean) => {
-    setNewProvider(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const saveNewProvider = async () => {
-    if (!newProvider.provider_name || !newProvider.api_key) {
-      toast({
-        title: "Validation Error",
-        description: "Provider name and API key are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const onSubmit = async (values: IntegrationFormValues) => {
     try {
       const { data, error } = await supabase
         .from('company_integrations')
         .insert({
           company_id: company.id,
-          provider_type: newProvider.provider_type,
-          provider_name: newProvider.provider_name,
-          api_key: newProvider.api_key,
-          api_secret: newProvider.api_secret,
-          account_id: newProvider.account_id,
-          is_active: newProvider.is_active
+          provider_type: values.provider_type,
+          provider_name: values.provider_name,
+          api_key: values.api_key,
+          api_secret: values.api_secret || null,
+          account_id: values.account_id || null,
+          is_active: values.is_active
         })
         .select();
 
@@ -134,8 +137,13 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
         throw error;
       }
 
+      toast({
+        title: "Success",
+        description: "Integration added successfully",
+      });
+
       // Reset the form
-      setNewProvider({
+      form.reset({
         provider_type: 'phone',
         provider_name: '',
         api_key: '',
@@ -144,18 +152,13 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
         is_active: true
       });
 
-      toast({
-        title: "Success",
-        description: "Provider added successfully",
-      });
-
       // Refresh providers list
       fetchProviders();
     } catch (error) {
-      console.error('Error adding provider:', error);
+      console.error('Error adding integration:', error);
       toast({
         title: "Error",
-        description: "Failed to add provider",
+        description: "Failed to add integration",
         variant: "destructive",
       });
     }
@@ -280,90 +283,11 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="providers">Providers</TabsTrigger>
+              <TabsTrigger value="add-integration">Add Integration</TabsTrigger>
               <TabsTrigger value="defaults">Default Settings</TabsTrigger>
             </TabsList>
             
             <TabsContent value="providers" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add New Provider</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="provider_type">Provider Type</Label>
-                      <Select 
-                        value={newProvider.provider_type} 
-                        onValueChange={(value) => handleNewProviderChange('provider_type', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="phone">Phone/SMS</SelectItem>
-                          <SelectItem value="email">Email</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="provider_name">Provider Name</Label>
-                      <Input 
-                        id="provider_name" 
-                        placeholder="e.g., Twilio, SendGrid" 
-                        value={newProvider.provider_name}
-                        onChange={(e) => handleNewProviderChange('provider_name', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="api_key">API Key</Label>
-                      <Input 
-                        id="api_key" 
-                        type="password" 
-                        placeholder="API Key" 
-                        value={newProvider.api_key}
-                        onChange={(e) => handleNewProviderChange('api_key', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="api_secret">API Secret (Optional)</Label>
-                      <Input 
-                        id="api_secret" 
-                        type="password" 
-                        placeholder="API Secret" 
-                        value={newProvider.api_secret}
-                        onChange={(e) => handleNewProviderChange('api_secret', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="account_id">Account ID (Optional)</Label>
-                      <Input 
-                        id="account_id" 
-                        placeholder="Account ID" 
-                        value={newProvider.account_id}
-                        onChange={(e) => handleNewProviderChange('account_id', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2 pt-8">
-                      <Switch 
-                        id="is_active" 
-                        checked={newProvider.is_active}
-                        onCheckedChange={(checked) => handleNewProviderChange('is_active', checked)}
-                      />
-                      <Label htmlFor="is_active">Active</Label>
-                    </div>
-                  </div>
-
-                  <Button onClick={saveNewProvider} className="mt-4">
-                    <Plus className="mr-2 h-4 w-4" /> Add Provider
-                  </Button>
-                </CardContent>
-              </Card>
-
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-medium mb-4">Phone/SMS Providers</h3>
@@ -453,7 +377,7 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
                                 </Button>
                                 <Button 
                                   variant="outline" 
-                                  size="sm" 
+                                  size="sm"
                                   onClick={() => handleUpdateDefaultProvider('email', provider.id)}
                                   disabled={companySettings.default_email_provider === provider.id}
                                 >
@@ -475,6 +399,134 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
                   )}
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="add-integration">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Add New Integration</CardTitle>
+                  <CardDescription>
+                    Configure a new communication provider
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <FormField
+                          control={form.control}
+                          name="provider_type"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Provider Type</FormLabel>
+                              <Select 
+                                onValueChange={field.onChange} 
+                                defaultValue={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="phone">Phone/SMS</SelectItem>
+                                  <SelectItem value="email">Email</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="provider_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Provider Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Twilio, SendGrid" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="api_key"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>API Key</FormLabel>
+                              <FormControl>
+                                <Input type="password" placeholder="API Key" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="api_secret"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>API Secret (Optional)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="password" 
+                                  placeholder="API Secret" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="account_id"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account ID (Optional)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Account ID" 
+                                  {...field} 
+                                  value={field.value || ''}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="is_active"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0 pt-8">
+                              <FormControl>
+                                <Switch 
+                                  checked={field.value} 
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <FormLabel>Active</FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <Button type="submit" className="mt-4">
+                        <Plus className="mr-2 h-4 w-4" /> Add Integration
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
             </TabsContent>
             
             <TabsContent value="defaults" className="space-y-6">
