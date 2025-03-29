@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,7 +6,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Message, ActionRecord } from "./types";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
-import ActionConfirmDialog from "./ActionConfirmation";
+import ActionConfirmDialog from "./ActionConfirmation/ActionConfirmDialog";
 
 type ChatInterfaceProps = {
   projectId?: string;
@@ -141,6 +142,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         />
       </CardFooter>
 
+      {/* Updated to match the expected props */}
       <ActionConfirmDialog
         action={pendingAction}
         isOpen={actionDialogOpen}

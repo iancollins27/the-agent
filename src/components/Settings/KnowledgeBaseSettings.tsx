@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ const KnowledgeBaseSettings: React.FC = () => {
 
   useEffect(() => {
     if (companySettings?.notion_settings) {
-      const settings = companySettings.notion_settings as any;
+      const settings = companySettings.notion_settings;
       setNotionToken(settings.token || '');
       setNotionDatabaseId(settings.database_id || '');
       setNotionPageId(settings.page_id || '');
@@ -86,7 +87,7 @@ const KnowledgeBaseSettings: React.FC = () => {
           <Input
             id="notion_token"
             type="password"
-            value={notionConfig.token}
+            value={notionToken}
             onChange={(e) => setNotionToken(e.target.value)}
             placeholder="Enter your Notion integration token"
           />
@@ -96,7 +97,7 @@ const KnowledgeBaseSettings: React.FC = () => {
           <Label htmlFor="notion_database_id">Notion Database ID</Label>
           <Input
             id="notion_database_id"
-            value={notionConfig.database_id}
+            value={notionDatabaseId}
             onChange={(e) => setNotionDatabaseId(e.target.value)}
             placeholder="Enter Notion database ID to sync"
           />
@@ -106,7 +107,7 @@ const KnowledgeBaseSettings: React.FC = () => {
           <Label htmlFor="notion_page_id">Notion Page ID (Optional)</Label>
           <Input
             id="notion_page_id"
-            value={notionConfig.page_id}
+            value={notionPageId}
             onChange={(e) => setNotionPageId(e.target.value)}
             placeholder="Enter specific Notion page ID (optional)"
           />
