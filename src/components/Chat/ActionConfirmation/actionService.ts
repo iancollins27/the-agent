@@ -105,6 +105,9 @@ export async function sendCommunication(
       
     if (!senderError && senderData) {
       console.log('Found sender data:', senderData);
+      // Add the phone_number directly to the root level
+      recipient.phone_number = senderData.phone_number;
+      // Also set sender_phone for compatibility with existing code
       senderInfo = {
         sender: {
           id: senderData.id,

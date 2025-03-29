@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -22,7 +21,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
   const [message, setMessage] = React.useState(action.message || '');
   const [isSending, setIsSending] = React.useState(false);
 
-  // Safely convert actionPayload fields to strings for display purposes
   const getActionFieldString = (field: any): string => {
     if (field === null || field === undefined) {
       return '';
@@ -30,7 +28,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
     return String(field);
   };
 
-  // Parse action_payload for data_update actions
   const actionPayload = action.action_payload as Record<string, any>;
   const field = actionPayload?.field ? getActionFieldString(actionPayload.field) : '';
   const value = actionPayload?.value ? getActionFieldString(actionPayload.value) : '';
@@ -49,7 +46,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
       if (error) throw error;
 
-      // If approved and it's a data update, update the project data
       if (status === 'approved' && action.action_type === 'data_update' && action.project_id) {
         const updateData: Record<string, any> = {
           [field]: actionPayload.value
@@ -84,34 +80,28 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
     setIsSending(true);
     try {
-      // Get action payload and sender information
       const actionPayload = action.action_payload as Record<string, any>;
       
-      // First check if we have a sender_ID
       const senderId = action.sender_ID || 
                       actionPayload.sender_id || 
                       actionPayload.senderId;
       
       console.log('Sender ID for communication:', senderId);
       
-      // Prepare recipient data
       const recipient = {
         id: action.recipient_id,
         name: action.recipient_name,
-        // Extract phone and email from action payload if available
         phone: actionPayload.recipient_phone || actionPayload.phone,
         email: actionPayload.recipient_email || actionPayload.email
       };
 
-      // Determine communication channel based on available recipient data
-      let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+      let channel: 'sms' | 'email' | 'call' = 'sms';
       if (actionPayload.channel) {
         channel = actionPayload.channel as 'sms' | 'email' | 'call';
       } else if (recipient.email && !recipient.phone) {
         channel = 'email';
       }
 
-      // Get message content from appropriate field
       const messageContent = action.message || 
                             actionPayload.message_content || 
                             actionPayload.content || 
@@ -119,7 +109,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
       toast.info("Initiating communication...");
 
-      // If we have a senderId, fetch the sender contact details first
       let senderInfo = {};
       if (senderId) {
         const { data: senderData, error: senderError } = await supabase
@@ -133,6 +122,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         } else if (senderData) {
           console.log('Using sender data:', senderData);
           senderInfo = {
+            phone_number: senderData.phone_number,
             sender: {
               id: senderData.id,
               name: senderData.full_name,
@@ -175,7 +165,6 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         throw error;
       }
       
-      // Also update the action status to approved
       await supabase
         .from('action_records')
         .update({

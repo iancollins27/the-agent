@@ -27,22 +27,31 @@ export async function sendViaJustCall(
   // Get the sender's phone number to use as JustCall number
   let justcallNumber = null;
   
+  // Log entire recipient object for debugging
   console.log('Debug - Full recipient object:', JSON.stringify(recipient, null, 2));
   
-  // First check if sender exists and has a phone_number field (most common case)
-  if (recipient.sender && recipient.sender.phone_number) {
-    justcallNumber = recipient.sender.phone_number;
-    console.log(`Using sender's phone_number from sender object: ${justcallNumber}`);
-  } 
-  // Then check if sender exists and has a phone field (alternate field name)
-  else if (recipient.sender && recipient.sender.phone) {
-    justcallNumber = recipient.sender.phone;
-    console.log(`Using sender's phone from sender object: ${justcallNumber}`);
+  // Check all possible places where the sender phone might be
+  // 1. Check if there's a standalone phone_number field in the recipient
+  if (recipient.phone_number) {
+    justcallNumber = recipient.phone_number;
+    console.log(`Found phone_number at root level: ${justcallNumber}`);
   }
-  // Then check for sender_phone (legacy field)
+  // 2. Check if recipient has a direct sender_phone field
   else if (recipient.sender_phone) {
     justcallNumber = recipient.sender_phone;
-    console.log(`Using sender_phone: ${justcallNumber}`);
+    console.log(`Using sender_phone field: ${justcallNumber}`);
+  }
+  // 3. Check if the sender object exists and has phone fields
+  else if (recipient.sender) {
+    console.log('Sender object found, checking for phone number');
+    if (recipient.sender.phone_number) {
+      justcallNumber = recipient.sender.phone_number;
+      console.log(`Using sender.phone_number: ${justcallNumber}`);
+    } 
+    else if (recipient.sender.phone) {
+      justcallNumber = recipient.sender.phone;
+      console.log(`Using sender.phone: ${justcallNumber}`);
+    }
   }
   
   // If sender phone is not available, check if provider has justcall_number configured
@@ -54,9 +63,13 @@ export async function sendViaJustCall(
   // Final check if JustCall number is available
   if (!justcallNumber) {
     console.log('No JustCall number found in any of these locations:');
-    console.log('- recipient.sender.phone_number: ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
-    console.log('- recipient.sender.phone: ', recipient.sender ? recipient.sender.phone : 'sender not defined');
+    console.log('- recipient.phone_number: ', recipient.phone_number);
     console.log('- recipient.sender_phone: ', recipient.sender_phone);
+    console.log('- recipient.sender: ', recipient.sender ? 'exists' : 'not defined');
+    if (recipient.sender) {
+      console.log('  - recipient.sender.phone_number: ', recipient.sender.phone_number);
+      console.log('  - recipient.sender.phone: ', recipient.sender.phone);
+    }
     console.log('- providerInfo.justcall_number: ', providerInfo.justcall_number);
     
     throw new Error('JustCall number is required either in provider configuration or as sender phone number');
