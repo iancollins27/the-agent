@@ -96,25 +96,14 @@ export async function sendCommunication(
   // If we have a senderId, fetch the sender contact details to include in the request
   let senderInfo = {};
   if (senderId) {
-    console.log(`Attempting to fetch sender contact with ID: ${senderId}`);
-    
     const { data: senderData, error: senderError } = await supabase
       .from('contacts')
       .select('id, full_name, phone_number, email')
       .eq('id', senderId)
       .maybeSingle();
       
-    if (senderError) {
-      console.error('Error fetching sender contact:', senderError);
-      console.log(`Failed to retrieve sender contact for ID: ${senderId}`);
-    } else if (senderData) {
-      console.log('Sender contact found:', {
-        id: senderData.id,
-        full_name: senderData.full_name,
-        phone_number: senderData.phone_number ? 'PHONE NUMBER PRESENT' : 'NO PHONE NUMBER',
-        email: senderData.email
-      });
-
+    if (!senderError && senderData) {
+      console.log('Found sender data:', senderData);
       // Add the sender's phone directly as sender_phone to use in JustCall
       senderInfo = {
         sender_phone: senderData.phone_number,
@@ -127,10 +116,9 @@ export async function sendCommunication(
         }
       };
     } else {
-      console.log(`No sender contact found for ID: ${senderId}`);
+      console.error('Error fetching sender data:', senderError);
+      console.log('Will attempt to send without sender information');
     }
-  } else {
-    console.log('No sender ID provided');
   }
   
   console.log('Prepared sender info for request:', senderInfo);
