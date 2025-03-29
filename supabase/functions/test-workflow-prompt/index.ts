@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { callAIProvider } from "./ai-providers.ts";
@@ -16,9 +15,8 @@ export const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests properly
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders, status: 200 });
+    return new Response("ok", { headers: corsHeaders });
   }
   
   try {
@@ -52,7 +50,6 @@ serve(async (req) => {
         console.warn("Warning: projectId is missing, prompt run may not be logged correctly");
       }
       
-      // Remove the initiated_by field since it doesn't exist in the database schema
       promptRunId = await logPromptRun(
         supabase, 
         projectId, 
