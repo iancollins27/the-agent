@@ -25,6 +25,7 @@ const ActionConfirmDialog: React.FC<ActionConfirmationProps> = ({
   onActionResolved 
 }) => {
   const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   if (!action) return null;
 
@@ -33,9 +34,13 @@ const ActionConfirmDialog: React.FC<ActionConfirmationProps> = ({
 
   const handleActionResponse = async (approve: boolean) => {
     try {
+      setIsProcessing(true);
+      
       if (approve) {
+        console.log('Approving action:', action);
         await executeAction(action);
       } else {
+        console.log('Rejecting action:', action.id);
         await rejectAction(action.id);
       }
       
@@ -49,6 +54,8 @@ const ActionConfirmDialog: React.FC<ActionConfirmationProps> = ({
         description: "Failed to process your response",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -123,11 +130,19 @@ const ActionConfirmDialog: React.FC<ActionConfirmationProps> = ({
         </div>
         
         <DialogFooter className="sm:justify-between">
-          <Button variant="outline" onClick={() => handleActionResponse(false)}>
+          <Button 
+            variant="outline" 
+            onClick={() => handleActionResponse(false)}
+            disabled={isProcessing}
+          >
             Reject
           </Button>
-          <Button onClick={() => handleActionResponse(true)}>
-            <Check className="h-4 w-4 mr-2" /> Approve
+          <Button 
+            onClick={() => handleActionResponse(true)}
+            disabled={isProcessing}
+          >
+            <Check className="h-4 w-4 mr-2" /> 
+            {isProcessing ? "Processing..." : "Approve"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -85,7 +85,16 @@ export async function sendCommunication(
   channel: 'sms' | 'email' | 'call',
   projectId?: string,
   companyId?: string
-): Promise<void> {
+): Promise<any> {
+  console.log('Sending communication with data:', {
+    actionId,
+    messageContent,
+    recipient,
+    channel,
+    projectId,
+    companyId
+  });
+  
   const { data, error } = await supabase.functions.invoke('send-communication', {
     body: {
       actionId,
@@ -98,8 +107,11 @@ export async function sendCommunication(
   });
   
   if (error) {
+    console.error('Communication error:', error);
     throw new Error(`Communication error: ${error.message}`);
   }
+  
+  console.log('Communication sent successfully:', data);
   
   // Record the execution success if needed
   return data;
@@ -182,6 +194,7 @@ export async function executeAction(action: ActionRecord): Promise<void> {
   if (!action) return;
   
   try {
+    console.log('Executing action:', action);
     const actionPayload = action.action_payload as Record<string, any>;
     
     // First update the action status
@@ -236,6 +249,14 @@ export async function executeAction(action: ActionRecord): Promise<void> {
                               actionPayload.content || 
                               '';
 
+        console.log('Preparing to send communication:', {
+          actionId: action.id,
+          messageContent,
+          recipient,
+          channel,
+          projectId: action.project_id
+        });
+                              
         toast.info("Sending communication...");
         
         try {
@@ -252,6 +273,7 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           console.error('Error sending communication:', commError);
           toast.error(commError.message || "Failed to send the message");
           await recordCommunicationFailure(action.id, commError.message || "Unknown error");
+          throw commError; // Re-throw so the caller knows there was an error
         }
         break;
         
