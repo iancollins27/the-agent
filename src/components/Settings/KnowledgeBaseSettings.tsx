@@ -35,30 +35,38 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Safely extract Notion settings with better type checking
-  const notionSettings: NotionSettings | undefined = (() => {
+  const notionSettings: NotionSettings = (() => {
     if (typeof company.knowledge_base_settings === 'object' && 
         company.knowledge_base_settings !== null) {
       // Check if it has a notion property that's an object
       if ('notion' in company.knowledge_base_settings && 
           typeof company.knowledge_base_settings.notion === 'object' &&
           company.knowledge_base_settings.notion !== null) {
-        return company.knowledge_base_settings.notion;
+        // Now we ensure we only extract the fields we want
+        const notion = company.knowledge_base_settings.notion;
+        return {
+          token: typeof notion.token === 'string' ? notion.token : undefined,
+          database_id: typeof notion.database_id === 'string' ? notion.database_id : undefined,
+          page_id: typeof notion.page_id === 'string' ? notion.page_id : undefined,
+          last_sync: typeof notion.last_sync === 'string' ? notion.last_sync : undefined
+        };
       }
     }
-    return undefined;
+    // Return empty object matching NotionSettings shape
+    return {};
   })();
 
   const [notionToken, setNotionToken] = useState(
-    notionSettings?.token || ''
+    notionSettings.token || ''
   );
   const [notionDatabaseId, setNotionDatabaseId] = useState(
-    notionSettings?.database_id || ''
+    notionSettings.database_id || ''
   );
   const [notionPageId, setNotionPageId] = useState(
-    notionSettings?.page_id || ''
+    notionSettings.page_id || ''
   );
 
-  const lastSyncDate = notionSettings?.last_sync 
+  const lastSyncDate = notionSettings.last_sync 
     ? new Date(notionSettings.last_sync).toLocaleString()
     : 'Never';
 
@@ -172,7 +180,7 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
               </p>
             </div>
 
-            {notionSettings?.last_sync && (
+            {notionSettings.last_sync && (
               <div className="rounded-md bg-gray-50 dark:bg-gray-900 p-4">
                 <p className="text-sm font-medium">Last Synced: {lastSyncDate}</p>
               </div>
@@ -184,7 +192,7 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
       <CardFooter className="flex justify-end gap-2">
         <Button
           variant="outline"
-          disabled={isProcessing || !notionSettings?.last_sync}
+          disabled={isProcessing || !notionSettings.last_sync}
           onClick={() => onUpdate({})}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
