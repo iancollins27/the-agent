@@ -106,19 +106,6 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
             description: `Communication successfully initiated`,
           });
           
-          // Update action record with execution results
-          await supabase
-            .from('action_records')
-            .update({
-              execution_result: {
-                status: 'message_sent',
-                timestamp: new Date().toISOString(),
-                channel: channel,
-                details: data
-              }
-            })
-            .eq('id', action.id);
-          
         } catch (commError: any) {
           console.error('Error sending communication:', commError);
           toast({
@@ -126,18 +113,6 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
             description: commError.message || "Failed to send the message",
             variant: "destructive",
           });
-          
-          // Update action record with failure
-          await supabase
-            .from('action_records')
-            .update({
-              execution_result: {
-                status: 'communication_failed',
-                timestamp: new Date().toISOString(),
-                error: commError.message
-              }
-            })
-            .eq('id', action.id);
         }
       } else if (!approve) {
         toast({

@@ -4,4 +4,3 @@
  */
 export { updateProjectWithAI } from "./singleProjectUpdater.ts";
 export { updateProjectWithSpecificInfo } from "./multiProjectUpdater.ts";
-export { executeSpecificAction } from "./actionExecutor.ts";
