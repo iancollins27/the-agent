@@ -27,15 +27,20 @@ export async function sendViaJustCall(
   // Get the sender's phone number to use as JustCall number
   let justcallNumber = null;
   
-  // First check if sender exists and has a phone_number field
+  // First check if sender exists and has a phone_number field (most common case)
   if (recipient.sender && recipient.sender.phone) {
     justcallNumber = recipient.sender.phone;
-    console.log(`Using sender's phone number as JustCall number: ${justcallNumber}`);
+    console.log(`Using sender's phone from sender object: ${justcallNumber}`);
   } 
+  // Then check if sender exists and has a phone field (alternate field name)
+  else if (recipient.sender && recipient.sender.phone_number) {
+    justcallNumber = recipient.sender.phone_number;
+    console.log(`Using sender's phone_number: ${justcallNumber}`);
+  }
   // Then check for sender_phone (legacy field)
   else if (recipient.sender_phone) {
     justcallNumber = recipient.sender_phone;
-    console.log(`Using sender_phone as JustCall number: ${justcallNumber}`);
+    console.log(`Using sender_phone: ${justcallNumber}`);
   }
   
   // If sender phone is not available, check if provider has justcall_number configured
@@ -46,8 +51,13 @@ export async function sendViaJustCall(
   
   // Final check if JustCall number is available
   if (!justcallNumber) {
-    console.log('No sender phone number found');
-    throw new Error('Sender phone number is required for JustCall SMS');
+    console.log('No JustCall number found in any of these locations:');
+    console.log('- recipient.sender.phone: ', recipient.sender ? recipient.sender.phone : 'sender not defined');
+    console.log('- recipient.sender.phone_number: ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
+    console.log('- recipient.sender_phone: ', recipient.sender_phone);
+    console.log('- providerInfo.justcall_number: ', providerInfo.justcall_number);
+    
+    throw new Error('JustCall number is required either in provider configuration or as sender phone number');
   }
 
   // Create authorization header using API key and secret

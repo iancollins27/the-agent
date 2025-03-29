@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -72,9 +71,11 @@ serve(async (req) => {
         recipient.sender = {
           id: senderData.id,
           name: senderData.full_name,
-          phone: senderData.phone_number,
+          phone: senderData.phone_number, // Make sure phone field is set from phone_number
+          phone_number: senderData.phone_number, // Keep the original field name too
           email: senderData.email
         };
+        // Backward compatibility
         recipient.sender_phone = senderData.phone_number;
       }
     } else if (recipient.sender_ID) {
@@ -93,12 +94,20 @@ serve(async (req) => {
         recipient.sender = {
           id: senderData.id,
           name: senderData.full_name,
-          phone: senderData.phone_number,
+          phone: senderData.phone_number, // Make sure phone field is set 
+          phone_number: senderData.phone_number, // Keep the original field name too
           email: senderData.email
         };
         recipient.sender_phone = senderData.phone_number;
       }
     }
+
+    // Log the final recipient object to verify sender info is correctly attached
+    console.log('Final recipient object with sender information:', {
+      ...recipient,
+      // Truncate message content if present to keep logs clean
+      message: recipient.message ? `${recipient.message.substring(0, 20)}...` : undefined
+    });
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);

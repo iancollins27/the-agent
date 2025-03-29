@@ -103,15 +103,20 @@ export async function sendCommunication(
       .single();
       
     if (!senderError && senderData) {
+      console.log('Found sender data:', senderData);
       senderInfo = {
         senderId: senderData.id,
         sender: {
           id: senderData.id,
           name: senderData.full_name,
           phone: senderData.phone_number,
+          phone_number: senderData.phone_number,
           email: senderData.email
-        }
+        },
+        sender_phone: senderData.phone_number
       };
+    } else {
+      console.error('Error fetching sender data:', senderError);
     }
   }
   
