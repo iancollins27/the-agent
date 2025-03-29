@@ -71,6 +71,9 @@ export async function sendCommunication(
     default:
       // If the provider name doesn't match any known providers
       console.log(`Unsupported provider: "${providerName}". Using mock implementation as fallback.`);
+      // Add additional debugging to help identify case sensitivity issues
+      console.log(`Normalized provider name was "${normalizedProviderName}" (original: "${providerName}")`);
+      console.log(`Available provider options: justcall, twilio, sendgrid, mock, unnamed`);
       return {
         mock: true,
         status: 'sent',
