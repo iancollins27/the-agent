@@ -908,6 +908,17 @@ export type Database = {
             }
             Returns: unknown
           }
+      get_column_info: {
+        Args: {
+          table_name: string
+          column_name: string
+        }
+        Returns: {
+          data_type: string
+          is_nullable: boolean
+          column_default: string
+        }[]
+      }
       get_company_integration_keys: {
         Args: {
           integration_id: string
@@ -933,6 +944,16 @@ export type Database = {
           Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
           summary: string | null
+        }[]
+      }
+      get_table_info: {
+        Args: {
+          table_name: string
+        }
+        Returns: {
+          constraint_name: string
+          constraint_type: string
+          definition: string
         }[]
       }
       halfvec_avg: {
