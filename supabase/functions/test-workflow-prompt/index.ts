@@ -31,11 +31,15 @@ serve(async (req) => {
       throw new Error("Invalid JSON in request body");
     }
     
-    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId, initiatedBy } = requestBody;
+    const { promptType, promptText, projectId, contextData, aiProvider, aiModel, workflowPromptId } = requestBody;
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
     console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
-    console.log(`Initiated by: ${initiatedBy || 'System'}`);
+    
+    if (requestBody.initiatedBy) {
+      console.log(`Initiated by: ${requestBody.initiatedBy}`);
+    }
+    
     console.log("Context data provided:", contextData);
     
     if (!promptText) {
@@ -156,7 +160,6 @@ serve(async (req) => {
         aiModel,
         promptRunId,
         actionRecordId,
-        initiatedBy,
         reminderSet,
         nextCheckDateInfo
       }),

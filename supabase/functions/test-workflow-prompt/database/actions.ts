@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { setProjectNextCheckDate } from "./projects.ts";
 
@@ -393,29 +392,34 @@ async function handleFutureReminder(
   }
   
   // Create an action record to document the reminder setting
-  const { data, error } = await supabase
-    .from('action_records')
-    .insert({
-      prompt_run_id: promptRunId,
-      project_id: projectId,
-      action_type: 'set_future_reminder',
-      action_payload: {
-        days_until_check: daysToAdd,
-        check_reason: actionData.check_reason || 'Follow-up check',
-        description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`
-      },
-      requires_approval: false,
-      status: 'executed',
-      executed_at: new Date().toISOString()
-    })
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('action_records')
+      .insert({
+        prompt_run_id: promptRunId,
+        project_id: projectId,
+        action_type: 'set_future_reminder',
+        action_payload: {
+          days_until_check: daysToAdd,
+          check_reason: actionData.check_reason || 'Follow-up check',
+          description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`
+        },
+        requires_approval: false,
+        status: 'executed',
+        executed_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error("Error creating reminder action record:", error);
+      throw new Error(`Failed to create reminder action record: ${error.message}`);
+    }
     
-  if (error) {
+    console.log("Reminder action record created successfully:", data);
+    return data.id;
+  } catch (error) {
     console.error("Error creating reminder action record:", error);
-    throw new Error(`Failed to create reminder action record: ${error.message}`);
+    return null;
   }
-  
-  console.log("Reminder action record created successfully:", data);
-  return data.id;
 }
