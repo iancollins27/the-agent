@@ -54,6 +54,12 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
 
   const handleApproveAction = async (actionId: string) => {
     try {
+      const action = actions.find(a => a.id === actionId);
+      if (!action) {
+        throw new Error("Action not found");
+      }
+
+      // First update the action status
       const { error } = await supabase
         .from('action_records')
         .update({
@@ -63,6 +69,57 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
         .eq('id', actionId);
 
       if (error) throw error;
+      
+      // If it's a message action, also send the communication
+      if (action.action_type === 'message') {
+        const actionPayload = action.action_payload as Record<string, any>;
+        
+        // Prepare recipient data
+        const recipient = {
+          id: action.recipient_id,
+          name: action.recipient_name || (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient : null),
+          phone: action.recipient?.phone_number || 
+                (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_phone || actionPayload.phone : null),
+          email: action.recipient?.email || 
+                (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_email || actionPayload.email : null)
+        };
+
+        // Determine communication channel based on available recipient data
+        let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
+        if (actionPayload && typeof actionPayload === 'object' && actionPayload.channel) {
+          channel = actionPayload.channel as 'sms' | 'email' | 'call';
+        } else if (recipient.email && !recipient.phone) {
+          channel = 'email';
+        }
+
+        // Get message content from appropriate field
+        const messageContent = action.message || 
+                              (actionPayload && typeof actionPayload === 'object' ? actionPayload.message_content || actionPayload.content : '') ||
+                              '';
+
+        toast.info("Sending communication...");
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('send-communication', {
+            body: {
+              actionId: action.id,
+              messageContent,
+              recipient,
+              channel,
+              projectId: action.project_id
+            }
+          });
+          
+          if (error) {
+            throw error;
+          }
+          
+          toast.success("Communication sent successfully");
+        } catch (commError) {
+          console.error('Error sending communication:', commError);
+          toast.error("Failed to send communication");
+        }
+      }
       
       // Update local state to reflect change
       setActions(prev => 
@@ -165,18 +222,26 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
                   <div className="flex items-start gap-1.5">
                     <MessageCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-blue-500" />
                     <div className="line-clamp-2 text-sm">
-                      {(action.action_payload as any).message_content || 
-                       (action.action_payload as any).content || 
-                       action.message || 
-                       "No message content"}
+                      {action.message || 
+                      (typeof action.action_payload === 'object' && action.action_payload !== null ? 
+                        (action.action_payload as any).message_content || 
+                        (action.action_payload as any).content || 
+                        "No message content" 
+                      : "No message content")}
                     </div>
                   </div>
                 )}
                 
                 {action.action_type === 'data_update' && (
                   <div className="text-sm">
-                    Update <span className="font-medium">{(action.action_payload as any).field}</span> to{' '}
-                    <span className="font-medium">{(action.action_payload as any).value}</span>
+                    Update <span className="font-medium">
+                      {typeof action.action_payload === 'object' && action.action_payload !== null ? 
+                        (action.action_payload as any).field : 'unknown field'}
+                    </span> to{' '}
+                    <span className="font-medium">
+                      {typeof action.action_payload === 'object' && action.action_payload !== null ? 
+                        (action.action_payload as any).value : 'unknown value'}
+                    </span>
                   </div>
                 )}
                 
