@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -54,13 +55,16 @@ serve(async (req) => {
     console.log(`Recipient details:`, recipient);
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
 
-    // Prepare an object to hold sender information
+    // Create separate objects for sender and recipient information
     let senderInfo = {};
-    let effectiveSenderId = senderId || recipient.sender_ID;
+    
+    // Try to get the sender information using the explicit senderId or from recipient.sender_ID (legacy)
+    const effectiveSenderId = senderId || (recipient.sender_ID ? recipient.sender_ID : null);
+    
+    console.log(`Effective sender ID determined: ${effectiveSenderId || 'None provided'}`);
 
-    // Handle sender info if available
     if (effectiveSenderId) {
-      console.log(`Looking up sender with ID: ${effectiveSenderId}`);
+      console.log(`Looking up sender contact with ID: ${effectiveSenderId}`);
       
       const { data: senderData, error: senderError } = await supabase
         .from('contacts')
@@ -69,7 +73,7 @@ serve(async (req) => {
         .single();
         
       if (senderError) {
-        console.log(`Error fetching sender: ${senderError.message}`);
+        console.log(`Error fetching sender contact: ${senderError.message}`);
       } else if (senderData) {
         console.log(`Sender contact found:`, senderData);
         console.log(`Sender phone number from contact: ${senderData.phone_number}`);
@@ -86,10 +90,10 @@ serve(async (req) => {
           sender_phone: senderData.phone_number
         };
       } else {
-        console.log(`No sender data found for ID: ${effectiveSenderId}`);
+        console.log(`No sender contact data found for ID: ${effectiveSenderId}`);
       }
     } else {
-      console.log("No sender ID provided in request payload");
+      console.log("No sender ID provided in request or recipient object");
     }
 
     // Now check if we received a recipient ID, and if so, fetch those details
@@ -121,7 +125,7 @@ serve(async (req) => {
     };
 
     // Log the final recipient and sender objects to verify all info is correctly attached
-    console.log('Final recipient object with sender information:', {
+    console.log('Final enriched recipient object with sender information:', {
       ...enrichedRecipient,
       // Truncate message content if present to keep logs clean
       message: enrichedRecipient.message ? `${enrichedRecipient.message.substring(0, 20)}...` : undefined

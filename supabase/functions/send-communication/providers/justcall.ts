@@ -29,20 +29,25 @@ export async function sendViaJustCall(
   
   console.log('Looking for JustCall number in the following places:');
   
-  // Check if provider has justcall_number configured first (highest priority)
+  // First priority: Check if provider has justcall_number configured
   if (providerInfo.justcall_number) {
     justcallNumber = providerInfo.justcall_number;
     console.log(`Using provider configured JustCall number: ${justcallNumber}`);
   }
-  // Next use sender_phone if it exists directly at the top level
+  // Second priority: Check if sender_phone exists at the top level
   else if (recipient.sender_phone) {
     justcallNumber = recipient.sender_phone;
     console.log(`Using sender_phone from top level: ${justcallNumber}`);
   }
-  // If not, try to check whether we got a sender object with phone_number
-  else if (recipient.sender && recipient.sender.phone_number) {
-    justcallNumber = recipient.sender.phone_number;
-    console.log(`Using sender.phone_number: ${justcallNumber}`);
+  // Third priority: Check sender object properties
+  else if (recipient.sender) {
+    if (recipient.sender.phone_number) {
+      justcallNumber = recipient.sender.phone_number;
+      console.log(`Using sender.phone_number: ${justcallNumber}`);
+    } else if (recipient.sender.phone) {
+      justcallNumber = recipient.sender.phone;
+      console.log(`Using sender.phone: ${justcallNumber}`);
+    }
   }
   
   // Final check if JustCall number is available
@@ -51,6 +56,7 @@ export async function sendViaJustCall(
     console.log('- provider justcall_number: ', providerInfo.justcall_number);
     console.log('- recipient.sender_phone: ', recipient.sender_phone);
     console.log('- recipient.sender?.phone_number: ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
+    console.log('- recipient.sender?.phone: ', recipient.sender ? recipient.sender.phone : 'sender not defined');
     
     throw new Error('JustCall number is required either in provider configuration or as sender phone number');
   }
