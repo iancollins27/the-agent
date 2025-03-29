@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,19 +8,21 @@ import { useToast } from "@/components/ui/use-toast";
 import { Loader2, Save, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface KnowledgeBaseSettingsProps {
-  company: {
-    id: string;
-    knowledge_base_settings?: {
-      notion?: {
-        token?: string;
-        database_id?: string;
-        page_id?: string;
-        last_sync?: string;
-      };
+interface Company {
+  id: string;
+  knowledge_base_settings?: {
+    notion?: {
+      token?: string;
+      database_id?: string;
+      page_id?: string;
+      last_sync?: string;
     };
   };
-  onUpdate: (updates?: any) => void | Promise<void>;
+}
+
+interface KnowledgeBaseSettingsProps {
+  company: Company;
+  onUpdate: (updates: any) => void | Promise<void>;
 }
 
 const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, onUpdate }) => {
@@ -81,7 +82,7 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
       });
       
       // Refresh company data to get updated settings
-      onUpdate();
+      onUpdate({});
     } catch (error) {
       console.error('Error connecting to Notion:', error);
       toast({
@@ -164,7 +165,7 @@ const KnowledgeBaseSettings: React.FC<KnowledgeBaseSettingsProps> = ({ company, 
         <Button
           variant="outline"
           disabled={isProcessing || !company.knowledge_base_settings?.notion?.last_sync}
-          onClick={onUpdate}
+          onClick={() => onUpdate({})}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
           Refresh

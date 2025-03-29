@@ -25,16 +25,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const body = await req.json();
     const url = new URL(req.url);
-    const path = url.pathname.split('/').pop();
-
-    if (req.method === 'POST' && path === 'add') {
-      // Add new integration
-      const requestData = await req.json();
-
+    
+    // Add new integration
+    if (req.method === 'POST' && url.pathname.endsWith('manage-integrations') && body.company_id) {
       // Validate required fields
-      if (!requestData.company_id || !requestData.provider_type || 
-          !requestData.provider_name || !requestData.api_key) {
+      if (!body.company_id || !body.provider_type || 
+          !body.provider_name || !body.api_key) {
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -50,7 +48,7 @@ serve(async (req) => {
       // Insert the integration with service role (bypassing RLS)
       const { data, error } = await supabase
         .from('company_integrations')
-        .insert(requestData)
+        .insert(body)
         .select();
 
       if (error) {
@@ -65,11 +63,10 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
-    } else if (req.method === 'POST' && path === 'delete') {
-      // Delete integration
-      const { integrationId } = await req.json();
-      
-      if (!integrationId) {
+    } 
+    // Delete integration
+    else if (req.method === 'POST' && body.integrationId) {      
+      if (!body.integrationId) {
         return new Response(
           JSON.stringify({ success: false, error: 'Integration ID is required' }),
           { 
@@ -82,7 +79,7 @@ serve(async (req) => {
       const { error } = await supabase
         .from('company_integrations')
         .delete()
-        .eq('id', integrationId);
+        .eq('id', body.integrationId);
         
       if (error) {
         console.error('Error deleting integration:', error);
@@ -96,11 +93,10 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
-    } else if (req.method === 'POST' && path === 'toggle-status') {
-      // Toggle integration status
-      const { integrationId, isActive } = await req.json();
-      
-      if (integrationId === undefined || isActive === undefined) {
+    } 
+    // Toggle integration status
+    else if (req.method === 'POST' && body.integrationId !== undefined && body.isActive !== undefined) {      
+      if (body.integrationId === undefined || body.isActive === undefined) {
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -115,8 +111,8 @@ serve(async (req) => {
       
       const { error } = await supabase
         .from('company_integrations')
-        .update({ is_active: !isActive })
-        .eq('id', integrationId);
+        .update({ is_active: !body.isActive })
+        .eq('id', body.integrationId);
         
       if (error) {
         console.error('Error updating integration status:', error);
@@ -130,11 +126,10 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
-    } else if (req.method === 'POST' && path === 'update-default') {
-      // Update default provider
-      const { companyId, type, providerId } = await req.json();
-      
-      if (!companyId || !type) {
+    } 
+    // Update default provider
+    else if (req.method === 'POST' && body.companyId && body.type) {      
+      if (!body.companyId || !body.type) {
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -147,14 +142,14 @@ serve(async (req) => {
         );
       }
       
-      const updates = type === 'email' 
-        ? { default_email_provider: providerId } 
-        : { default_phone_provider: providerId };
+      const updates = body.type === 'email' 
+        ? { default_email_provider: body.providerId } 
+        : { default_phone_provider: body.providerId };
         
       const { error } = await supabase
         .from('companies')
         .update(updates)
-        .eq('id', companyId);
+        .eq('id', body.companyId);
         
       if (error) {
         console.error('Error updating default provider:', error);

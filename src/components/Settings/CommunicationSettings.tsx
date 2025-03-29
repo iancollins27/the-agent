@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DotsHorizontalIcon, PlusIcon, Trash2 } from 'lucide-react';
+import { MoreHorizontal, PlusIcon, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -237,9 +237,7 @@ const CommunicationSettings = () => {
       const { data, error } = await supabase.functions.invoke('manage-integrations', {
         body: {
           integrationId
-        },
-        method: 'POST',
-        path: 'delete'
+        }
       });
       
       if (error) {
@@ -289,9 +287,7 @@ const CommunicationSettings = () => {
         body: {
           integrationId,
           isActive
-        },
-        method: 'POST',
-        path: 'toggle-status'
+        }
       });
       
       if (error) {
@@ -340,9 +336,7 @@ const CommunicationSettings = () => {
           companyId: selectedCompany || defaultCompanyId,
           type,
           providerId: providerId === 'none' ? null : providerId
-        },
-        method: 'POST',
-        path: 'update-default'
+        }
       });
       
       if (error) {
@@ -575,7 +569,7 @@ const CommunicationSettings = () => {
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0">
                         <span className="sr-only">Open menu</span>
-                        <DotsHorizontalIcon className="h-4 w-4" />
+                        <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

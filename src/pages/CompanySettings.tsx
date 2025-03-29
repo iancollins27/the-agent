@@ -6,9 +6,24 @@ import KnowledgeBaseSettings from "../components/Settings/KnowledgeBaseSettings"
 import CommunicationSettings from "../components/Settings/CommunicationSettings";
 import { supabase } from "@/integrations/supabase/client";
 
+interface Company {
+  id: string;
+  name: string;
+  knowledge_base_settings?: {
+    notion?: {
+      token?: string;
+      database_id?: string;
+      page_id?: string;
+      last_sync?: string;
+    };
+  };
+  default_email_provider?: string;
+  default_phone_provider?: string;
+}
+
 const CompanySettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState("knowledge-base");
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -93,12 +108,7 @@ const CompanySettings: React.FC = () => {
           </TabsContent>
           
           <TabsContent value="communications">
-            {company && (
-              <CommunicationSettings
-                company={company}
-                onUpdate={handleCompanyUpdate}
-              />
-            )}
+            <CommunicationSettings />
           </TabsContent>
         </Tabs>
       </div>
