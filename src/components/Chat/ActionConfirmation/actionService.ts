@@ -93,15 +93,39 @@ export async function sendCommunication(
     senderId
   });
   
+  // If we have a senderId, fetch the sender contact details to include in the request
+  let senderInfo = {};
+  if (senderId) {
+    const { data: senderData, error: senderError } = await supabase
+      .from('contacts')
+      .select('id, full_name, phone_number, email')
+      .eq('id', senderId)
+      .single();
+      
+    if (!senderError && senderData) {
+      senderInfo = {
+        senderId: senderData.id,
+        sender: {
+          id: senderData.id,
+          name: senderData.full_name,
+          phone: senderData.phone_number,
+          email: senderData.email
+        }
+      };
+    }
+  }
+  
   const { data, error } = await supabase.functions.invoke('send-communication', {
     body: {
       actionId,
       messageContent,
-      recipient,
+      recipient: {
+        ...recipient,
+        ...senderInfo
+      },
       channel,
       projectId,
-      companyId,
-      senderId
+      companyId
     }
   });
   

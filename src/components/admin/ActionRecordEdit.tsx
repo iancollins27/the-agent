@@ -84,6 +84,14 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
     setIsSending(true);
     try {
+      // Get action payload and sender information
+      const actionPayload = action.action_payload as Record<string, any>;
+      
+      // First check if we have a sender_ID
+      const senderId = action.sender_ID || 
+                      actionPayload.sender_id || 
+                      actionPayload.senderId;
+      
       // Prepare recipient data
       const recipient = {
         id: action.recipient_id,
@@ -109,13 +117,29 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
 
       toast.info("Initiating communication...");
 
+      // If we have a senderId, fetch the sender contact details first
+      if (senderId) {
+        const { data: senderData, error: senderError } = await supabase
+          .from('contacts')
+          .select('id, full_name, phone_number, email')
+          .eq('id', senderId)
+          .single();
+          
+        if (senderError) {
+          console.error('Error fetching sender:', senderError);
+        } else if (senderData) {
+          console.log('Using sender data:', senderData);
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('send-communication', {
         body: {
           actionId: action.id,
           messageContent,
           recipient,
           channel,
-          projectId: action.project_id
+          projectId: action.project_id,
+          senderId
         }
       });
       
