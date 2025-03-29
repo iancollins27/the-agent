@@ -30,7 +30,7 @@ export async function createCommunicationRecord(
       project_id: projectId,
       type: channel.toUpperCase(),
       subtype: subtype,
-      direction: 'OUTBOUND',
+      direction: 'OUTBOUND', // Explicitly set direction to OUTBOUND for all sent communications
       content: messageContent,
       timestamp: new Date().toISOString(),
       participants: [
