@@ -2,12 +2,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
 
 // Types for our settings context
 interface CompanySettings {
   id?: string;
   name?: string;
-  knowledge_base_settings?: Record<string, any>;
+  knowledge_base_settings?: Json;
   notion_settings?: {
     token: string;
     database_id: string;

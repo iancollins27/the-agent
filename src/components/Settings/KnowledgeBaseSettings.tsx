@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/providers/SettingsProvider";
 
 const KnowledgeBaseSettings: React.FC = () => {
@@ -51,16 +51,15 @@ const KnowledgeBaseSettings: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const updatedSettings = {
-        ...companySettings,
+      await updateCompanySettings({
         notion_settings: {
           token: notionToken,
           database_id: notionDatabaseId,
-          page_id: notionPageId
+          page_id: notionPageId,
+          last_sync: notionConfig.last_sync
         }
-      };
+      });
       
-      await updateCompanySettings(updatedSettings);
       toast({
         title: "Success",
         description: "Notion settings updated successfully.",
