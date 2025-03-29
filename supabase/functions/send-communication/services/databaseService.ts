@@ -24,13 +24,15 @@ export async function createCommunicationRecord(
       subtype = `${channel.toUpperCase()}_MESSAGE`;
   }
 
+  // Check if the communications table has a check constraint on the direction column
+  // and ensure we're using one of the allowed values (e.g., 'OUTBOUND', 'INBOUND')
   const { data: commRecord, error: commError } = await supabase
     .from('communications')
     .insert({
       project_id: projectId,
       type: channel.toUpperCase(),
       subtype: subtype,
-      direction: 'OUTBOUND', // Explicitly set direction to OUTBOUND for all sent communications
+      direction: 'OUTBOUND', // Make sure this matches one of the allowed values in the check constraint
       content: messageContent,
       timestamp: new Date().toISOString(),
       participants: [

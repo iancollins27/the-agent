@@ -1,5 +1,6 @@
 
 export type CommProvider = 'justcall' | 'twilio' | 'sendgrid' | 'none';
+export type CommDirection = 'INBOUND' | 'OUTBOUND';
 
 export interface SendCommRequest {
   actionId?: string;
