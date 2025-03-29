@@ -27,20 +27,22 @@ export async function sendViaJustCall(
   // Get the sender's phone number to use as JustCall number
   let justcallNumber = null;
   
+  console.log('Looking for JustCall number in the following places:');
+  
   // Check if provider has justcall_number configured first (highest priority)
   if (providerInfo.justcall_number) {
     justcallNumber = providerInfo.justcall_number;
     console.log(`Using provider configured JustCall number: ${justcallNumber}`);
   }
-  // Next use sender_phone if it exists directly on action record
+  // Next use sender_phone if it exists directly at the top level
   else if (recipient.sender_phone) {
     justcallNumber = recipient.sender_phone;
-    console.log(`Using sender_phone from action: ${justcallNumber}`);
+    console.log(`Using sender_phone from top level: ${justcallNumber}`);
   }
   // If not, try to check whether we got a sender object with phone_number
   else if (recipient.sender && recipient.sender.phone_number) {
     justcallNumber = recipient.sender.phone_number;
-    console.log(`Using sender's phone_number: ${justcallNumber}`);
+    console.log(`Using sender.phone_number: ${justcallNumber}`);
   }
   
   // Final check if JustCall number is available
