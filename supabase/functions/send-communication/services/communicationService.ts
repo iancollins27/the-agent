@@ -20,6 +20,9 @@ export async function sendCommunication(
   // Normalize provider name to lowercase for case-insensitive matching
   const normalizedProviderName = providerName.toLowerCase();
   
+  // For debugging purposes, log the normalized provider name
+  console.log(`Using normalized provider name: "${normalizedProviderName}" (original: "${providerName}")`);
+  
   // Route to the appropriate provider service
   switch (normalizedProviderName) {
     case 'justcall':
