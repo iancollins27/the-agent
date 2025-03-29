@@ -33,9 +33,7 @@ const ProjectManagerSelector: React.FC<ProjectManagerSelectorProps> = ({ value, 
         const { data: projectManagerIds, error: idsError } = await supabase
           .from('projects')
           .select('project_manager')
-          .not('project_manager', 'is', null)
-          .eq('project_manager', 'is not', null)
-          .distinctOn('project_manager');
+          .not('project_manager', 'is', null);
 
         if (idsError) {
           console.error('Error fetching project managers:', idsError);
