@@ -29,8 +29,13 @@ export async function sendViaJustCall(
   
   console.log('Debug - Full recipient object:', JSON.stringify(recipient, null, 2));
   
+  // Check directly on recipient for sender_phone_number (new field we're adding)
+  if (recipient.sender_phone_number) {
+    justcallNumber = recipient.sender_phone_number;
+    console.log(`Using sender_phone_number directly from recipient: ${justcallNumber}`);
+  }
   // First check if sender exists and has a phone_number field (most common case)
-  if (recipient.sender && recipient.sender.phone_number) {
+  else if (recipient.sender && recipient.sender.phone_number) {
     justcallNumber = recipient.sender.phone_number;
     console.log(`Using sender's phone_number from sender object: ${justcallNumber}`);
   } 
@@ -54,6 +59,7 @@ export async function sendViaJustCall(
   // Final check if JustCall number is available
   if (!justcallNumber) {
     console.log('No JustCall number found in any of these locations:');
+    console.log('- recipient.sender_phone_number: ', recipient.sender_phone_number);
     console.log('- recipient.sender.phone_number: ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
     console.log('- recipient.sender.phone: ', recipient.sender ? recipient.sender.phone : 'sender not defined');
     console.log('- recipient.sender_phone: ', recipient.sender_phone);

@@ -10,10 +10,12 @@ export interface SendCommRequest {
     phone?: string;
     email?: string;
     name?: string;
+    sender_phone_number?: string; // Direct phone number field for JustCall
     sender?: {
       id?: string;
       name?: string;
       phone?: string;
+      phone_number?: string; // Add phone_number to sender type
       email?: string;
     };
     sender_ID?: string; // Legacy field
@@ -44,6 +46,7 @@ export interface CommunicationRecordParams {
     phone?: string;
     email?: string;
     name?: string;
+    sender_phone_number?: string;
     sender?: any;
     sender_ID?: string;
     sender_phone?: string;

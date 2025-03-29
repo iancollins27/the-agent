@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "../types";
 import { toast } from "sonner";
@@ -105,7 +104,11 @@ export async function sendCommunication(
       
     if (!senderError && senderData) {
       console.log('Found sender data:', senderData);
+      // Add sender information in multiple formats to ensure compatibility
       senderInfo = {
+        // Add the phone number directly to the recipient object for JustCall
+        sender_phone_number: senderData.phone_number,
+        // Keep the legacy sender object for backward compatibility
         sender: {
           id: senderData.id,
           name: senderData.full_name,
@@ -113,6 +116,7 @@ export async function sendCommunication(
           phone_number: senderData.phone_number,
           email: senderData.email
         },
+        // Also keep the legacy sender_phone field
         sender_phone: senderData.phone_number
       };
     } else {
