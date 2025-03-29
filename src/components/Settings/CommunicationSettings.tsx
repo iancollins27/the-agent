@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -120,7 +121,6 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
   const onSubmit = async (values: IntegrationFormValues) => {
     try {
       console.log('Submitting form with values:', values);
-      console.log('Company ID:', company.id);
       
       // Ensure values are properly formatted for database
       const formattedValues = {
@@ -135,14 +135,23 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
       
       console.log('Formatted values:', formattedValues);
       
-      const { data, error } = await supabase
-        .from('company_integrations')
-        .insert(formattedValues)
-        .select();
-
-      if (error) {
-        console.error('Error details:', error);
-        throw error;
+      // Use the edge function to add the integration
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/manage-integrations/add`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabase.supabaseKey}`
+          },
+          body: JSON.stringify(formattedValues)
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to add integration');
       }
 
       toast({
@@ -183,11 +192,28 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
 
   const handleUpdateDefaultProvider = async (type: 'email' | 'phone', providerId: string | null) => {
     try {
-      const updates = type === 'email' 
-        ? { default_email_provider: providerId } 
-        : { default_phone_provider: providerId };
-        
-      await onUpdate(updates);
+      // Use the edge function to update the default provider
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/manage-integrations/update-default`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabase.supabaseKey}`
+          },
+          body: JSON.stringify({
+            companyId: company.id,
+            type,
+            providerId
+          })
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `Failed to update default ${type} provider`);
+      }
       
       setCompanySettings(prev => ({
         ...prev,
@@ -212,13 +238,26 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
 
   const toggleProviderStatus = async (providerId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('company_integrations')
-        .update({ is_active: !currentStatus })
-        .eq('id', providerId);
-
-      if (error) {
-        throw error;
+      // Use the edge function to toggle provider status
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/manage-integrations/toggle-status`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabase.supabaseKey}`
+          },
+          body: JSON.stringify({
+            integrationId: providerId,
+            isActive: currentStatus
+          })
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to update provider status');
       }
 
       // Update local state
@@ -257,13 +296,25 @@ const CommunicationSettings: React.FC<{ company: any; onUpdate: (updates: any) =
     }
 
     try {
-      const { error } = await supabase
-        .from('company_integrations')
-        .delete()
-        .eq('id', providerId);
-
-      if (error) {
-        throw error;
+      // Use the edge function to delete the provider
+      const response = await fetch(
+        `${supabase.supabaseUrl}/functions/v1/manage-integrations/delete`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabase.supabaseKey}`
+          },
+          body: JSON.stringify({
+            integrationId: providerId
+          })
+        }
+      );
+      
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to delete provider');
       }
 
       // Update local state
