@@ -25,6 +25,9 @@ export async function sendViaJustCall(
   // Check sender object for phone
   console.log("- sender.phone: ", sender?.phone);
 
+  // Check action record for sender_phone
+  console.log("- action record sender_phone: ", providerInfo.action_sender_phone);
+
   // Check legacy paths (compatibility)
   console.log("- recipient.sender_phone (legacy): ", recipient['sender_phone']);
   console.log("- recipient.sender?.phone_number (legacy): ", recipient['sender'] ? recipient['sender'].phone_number : "sender not defined");
@@ -34,6 +37,7 @@ export async function sendViaJustCall(
   // Try to get the JustCall number from any available source
   const justCallNumber = providerInfo.justcall_number || 
                        sender?.phone || 
+                       providerInfo.action_sender_phone ||
                        recipient['sender_phone'] || 
                        (recipient['sender'] && recipient['sender'].phone_number) ||
                        (recipient['sender'] && recipient['sender'].phone) ||
