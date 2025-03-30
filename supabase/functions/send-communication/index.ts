@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -36,6 +37,12 @@ serve(async (req) => {
 
     // Parse request body
     const requestData: SendCommRequest = await req.json();
+    
+    // Log the full request payload
+    console.log("==== FULL REQUEST PAYLOAD ====");
+    console.log(JSON.stringify(requestData, null, 2));
+    console.log("=============================");
+    
     const { 
       actionId,
       messageContent,
