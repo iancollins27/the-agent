@@ -30,6 +30,7 @@ export interface ProviderInfo {
   api_secret?: string;
   account_id?: string;
   justcall_number?: string;
+  default_phone?: string;
 }
 
 export interface CommunicationRecordParams {

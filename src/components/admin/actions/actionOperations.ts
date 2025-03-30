@@ -12,6 +12,8 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
       throw new Error("Action not found");
     }
 
+    console.log("Approving action:", action.id, "with sender_ID:", action.sender_ID);
+
     // First update the action status
     const { error } = await supabase
       .from('action_records')
@@ -45,13 +47,43 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
                             actionPayload.content || 
                             '';
       
-      // Sender information
-      const sender = {
-        id: action.sender_ID,
-        name: action.sender_name,
-        phone: actionPayload.sender_phone,
-        email: actionPayload.sender_email
-      };
+      // We need to make sure we have sender information
+      let sender = undefined;
+      
+      // If we have sender_ID, fetch the sender details
+      if (action.sender_ID) {
+        console.log("Fetching sender details for ID:", action.sender_ID);
+        
+        const { data: senderData, error: senderError } = await supabase
+          .from('contacts')
+          .select('id, full_name, phone_number, email')
+          .eq('id', action.sender_ID)
+          .single();
+          
+        if (senderError) {
+          console.error('Error fetching sender data:', senderError);
+        } else if (senderData) {
+          console.log("Found sender data:", senderData);
+          sender = {
+            id: senderData.id,
+            name: senderData.full_name,
+            phone: senderData.phone_number,
+            email: senderData.email
+          };
+        }
+      } else {
+        console.log("No sender_ID found in action record");
+      }
+
+      // Log the final request payload for debugging
+      console.log("Sending communication with payload:", {
+        actionId: action.id,
+        messageContent,
+        recipient,
+        sender,
+        channel,
+        projectId: action.project_id
+      });
 
       toast.info("Sending communication...");
       
@@ -61,7 +93,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
             actionId: action.id,
             messageContent,
             recipient,
-            sender,
+            sender, // This will be undefined if we couldn't find sender data
             channel,
             projectId: action.project_id
           }
