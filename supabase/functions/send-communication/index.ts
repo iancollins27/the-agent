@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -22,19 +21,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check communications table structure for debugging purposes (optional check)
-    try {
-      console.log("Checking communications table schema...");
-      const { error: descError } = await supabase.rpc('get_table_info', { 
-        table_name: 'communications' 
-      });
-      if (descError) {
-        console.log(`Could not get table info: ${descError.message}`);
-      }
-    } catch (e) {
-      console.log(`Exception checking table schema: ${e.message}`);
-    }
-
     // Parse request body
     const requestData: SendCommRequest = await req.json();
     
@@ -47,7 +33,7 @@ serve(async (req) => {
       actionId,
       messageContent,
       recipient,
-      sender,      // Simplify by just calling it "sender"
+      sender,      // This should now be properly included in the request
       channel,
       providerId,
       projectId,
@@ -64,13 +50,13 @@ serve(async (req) => {
     // ----- HANDLE SENDER INFORMATION -----
     // If the incoming request has a sender object, start with that.
     // If only a senderId is passed, fall back to that.
-    let senderInfo = { ...sender };
+    let senderInfo = { ...sender } || {};
     if (!senderInfo.id && senderId) {
       senderInfo.id = senderId;
     }
 
     // If we have a sender.id but are missing phone/email/name, fetch from 'contacts'
-    if (senderInfo.id && (!senderInfo.phone || !senderInfo.email || !senderInfo.name)) {
+    if (senderInfo && senderInfo.id && (!senderInfo.phone || !senderInfo.email || !senderInfo.name)) {
       console.log(`Looking up sender with ID: ${senderInfo.id}`);
       const { data: senderData, error: senderError } = await supabase
         .from('contacts')

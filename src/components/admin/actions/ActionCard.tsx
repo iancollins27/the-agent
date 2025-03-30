@@ -23,6 +23,9 @@ const ActionCard: React.FC<ActionCardProps> = ({
   
   const handleApprove = async () => {
     try {
+      // Log the full action object before approving
+      console.log("Approving action with data:", JSON.stringify(action, null, 2));
+      
       await handleApproveAction(action);
       updateActionStatus(action.id, 'approved', new Date().toISOString());
       onActionUpdate();

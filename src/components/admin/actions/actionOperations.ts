@@ -27,6 +27,8 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
     if (action.action_type === 'message') {
       const actionPayload = action.action_payload as Record<string, any>;
       
+      console.log("Original action data:", JSON.stringify(action, null, 2));
+      
       // Prepare recipient data - consistent approach
       const recipient = {
         id: action.recipient_id,
@@ -39,7 +41,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
               (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_email || actionPayload.email : null)
       };
 
-      // Prepare sender data - using same approach as recipient for consistency
+      // Prepare sender data - using the same approach as recipient for consistency
       const sender = {
         id: action.sender_ID,
         name: action.sender_name ||
