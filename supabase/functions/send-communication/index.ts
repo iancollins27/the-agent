@@ -21,13 +21,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check communications table structure for debugging purposes
+    // Check communications table structure for debugging purposes (optional check)
     try {
       console.log("Checking communications table schema...");
       const { error: descError } = await supabase.rpc('get_table_info', { 
         table_name: 'communications' 
       });
-      
       if (descError) {
         console.log(`Could not get table info: ${descError.message}`);
       }
@@ -38,78 +37,67 @@ serve(async (req) => {
     // Parse request body
     const requestData: SendCommRequest = await req.json();
     const { 
-      actionId, 
-      messageContent, 
-      recipient, 
-      sender: explicitSender, // New explicit sender field
-      channel, 
-      providerId, 
-      projectId, 
-      companyId, 
+      actionId,
+      messageContent,
+      recipient,
+      sender,      // Simplify by just calling it "sender"
+      channel,
+      providerId,
+      projectId,
+      companyId,
       isTest,
-      senderId 
+      senderId     // For backward-compat or fallback
     } = requestData;
 
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
+    console.log(`Sender details:`, sender);
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
     
     // ----- HANDLE SENDER INFORMATION -----
-    // Determine the sender information from available sources 
-    let senderInfo = explicitSender ? { ...explicitSender } : {};
-    
-    // Try to get the sender information using the explicit senderId or from legacy fields
-    const effectiveSenderId = senderId ;
-    
-    console.log(`Effective sender ID determined: ${effectiveSenderId || 'None provided'}`);
+    // If the incoming request has a sender object, start with that.
+    // If only a senderId is passed, fall back to that.
+    let senderInfo = { ...sender };
+    if (!senderInfo.id && senderId) {
+      senderInfo.id = senderId;
+    }
 
-    if (effectiveSenderId && !explicitSender) {
-      console.log(`Looking up sender contact with ID: ${effectiveSenderId}`);
-      
+    // If we have a sender.id but are missing phone/email/name, fetch from 'contacts'
+    if (senderInfo.id && (!senderInfo.phone || !senderInfo.email || !senderInfo.name)) {
+      console.log(`Looking up sender with ID: ${senderInfo.id}`);
       const { data: senderData, error: senderError } = await supabase
         .from('contacts')
         .select('id, full_name, phone_number, email')
-        .eq('id', effectiveSenderId)
+        .eq('id', senderInfo.id)
         .single();
-        
+
       if (senderError) {
         console.log(`Error fetching sender contact: ${senderError.message}`);
       } else if (senderData) {
         console.log(`Sender contact found:`, senderData);
-        console.log(`Sender phone number from contact: ${senderData.phone_number}`);
-        
-        // Set the sender information
-        senderInfo = {
-          id: senderData.id,
-          name: senderData.full_name,
-          phone: senderData.phone_number,
-          email: senderData.email
-        };
-      } else {
-        console.log(`No sender contact data found for ID: ${effectiveSenderId}`);
+        senderInfo.name = senderInfo.name || senderData.full_name;
+        senderInfo.phone = senderInfo.phone || senderData.phone_number;
+        senderInfo.email = senderInfo.email || senderData.email;
       }
-    } else if (!effectiveSenderId) {
-      console.log("No sender ID provided in request or recipient object");
     }
 
     // ----- HANDLE RECIPIENT INFORMATION -----
+    // This logic matches what you already have, just left intact
     let recipientInfo = { ...recipient };
-    
+
     // If recipient has an ID but missing other details, fetch them
-    if (recipient.id && (!recipient.phone || !recipient.email || !recipient.name)) {
-      console.log(`Looking up recipient with ID: ${recipient.id}`);
-      
+    if (recipientInfo.id && (!recipientInfo.phone || !recipientInfo.email || !recipientInfo.name)) {
+      console.log(`Looking up recipient with ID: ${recipientInfo.id}`);
       const { data: recipientData, error: recipientError } = await supabase
         .from('contacts')
         .select('id, full_name, phone_number, email')
-        .eq('id', recipient.id)
+        .eq('id', recipientInfo.id)
         .single();
-        
+
       if (recipientError) {
         console.log(`Error fetching recipient: ${recipientError.message}`);
       } else if (recipientData) {
         console.log(`Recipient contact found:`, recipientData);
-        
         // Update recipient info with data from contacts table
         recipientInfo.name = recipientInfo.name || recipientData.full_name;
         recipientInfo.phone = recipientInfo.phone || recipientData.phone_number;
@@ -117,35 +105,13 @@ serve(async (req) => {
       }
     }
 
-    // ----- BACKWARD COMPATIBILITY SUPPORT -----
-    // For backward compatibility, extract sender info from legacy location in recipient object
-    if (!senderInfo.phone && recipient.sender_phone) {
-      console.log(`Using legacy sender_phone from recipient object: ${recipient.sender_phone}`);
-      senderInfo.phone = recipient.sender_phone;
-    }
-    
-    if (!senderInfo.phone && recipient.sender?.phone_number) {
-      console.log(`Using legacy sender.phone_number from recipient object: ${recipient.sender.phone_number}`);
-      senderInfo.phone = recipient.sender.phone_number;
-    }
-    
-    if (!senderInfo.phone && recipient.sender?.phone) {
-      console.log(`Using legacy sender.phone from recipient object: ${recipient.sender.phone}`);
-      senderInfo.phone = recipient.sender.phone;
-    }
-
     // Log the final recipient and sender objects
-    console.log('Final recipient information:', {
-      ...recipientInfo,
-      // Truncate message content if present to keep logs clean
-      message: recipientInfo.message ? `${recipientInfo.message.substring(0, 20)}...` : undefined
-    });
-    
+    console.log('Final recipient information:', recipientInfo);
     console.log('Final sender information:', senderInfo);
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
-    
+
     // Determine provider info
     const providerInfo = await getProviderInfo(
       supabase, 
@@ -187,23 +153,6 @@ serve(async (req) => {
       );
     } catch (commError) {
       console.error(`Communication record creation failed: ${commError.message}`);
-      
-      // Try to get more details about the error by querying the communications table schema
-      try {
-        const { data: columnInfo, error: columnError } = await supabase.rpc('get_column_info', {
-          table_name: 'communications',
-          column_name: 'direction'
-        });
-        
-        if (columnError) {
-          console.error(`Error getting column info: ${columnError.message}`);
-        } else {
-          console.log(`Column info for 'direction': ${JSON.stringify(columnInfo)}`);
-        }
-      } catch (e) {
-        console.error(`Exception getting column info: ${e.message}`);
-      }
-      
       throw commError;
     }
 
@@ -212,11 +161,9 @@ serve(async (req) => {
       await updateActionRecord(supabase, actionId, commRecord.id, providerInfo.provider_name);
     }
 
-    // If this is just a test, we can skip the actual sending
+    // If this is just a test, we skip sending
     if (isTest) {
       console.log('Test mode - skipping actual communication send');
-      
-      // Update communication status to TEST
       await supabase
         .from('communications')
         .update({
@@ -245,7 +192,6 @@ serve(async (req) => {
     // Send the actual communication
     let sendResult;
     try {
-      // Pass both recipient and sender info separately to the communication service
       sendResult = await sendCommunication(
         supabase, 
         providerInfo, 
@@ -257,8 +203,6 @@ serve(async (req) => {
       );
     } catch (sendError) {
       console.error(`Error sending communication: ${sendError.message}`);
-      
-      // Update communication status to FAILED
       await supabase
         .from('communications')
         .update({
@@ -266,7 +210,6 @@ serve(async (req) => {
           error_details: sendError.message
         })
         .eq('id', commRecord.id);
-
       throw sendError;
     }
 
