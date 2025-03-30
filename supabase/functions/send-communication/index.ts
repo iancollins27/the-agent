@@ -59,7 +59,7 @@ serve(async (req) => {
     let senderInfo = explicitSender ? { ...explicitSender } : {};
     
     // Try to get the sender information using the explicit senderId or from legacy fields
-    const effectiveSenderId = senderId || (recipient.sender_ID ? recipient.sender_ID : null);
+    const effectiveSenderId = senderId ;
     
     console.log(`Effective sender ID determined: ${effectiveSenderId || 'None provided'}`);
 
