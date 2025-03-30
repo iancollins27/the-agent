@@ -84,6 +84,16 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
                 (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_email || actionPayload.email : null)
         };
 
+        // Prepare sender data - THIS IS THE NEW CODE
+        const sender = action.sender ? {
+          id: action.sender.id,
+          name: action.sender.full_name,
+          phone: action.sender.phone_number,
+          email: action.sender.email
+        } : action.sender_ID ? {
+          id: action.sender_ID
+        } : undefined;
+
         // Determine communication channel based on available recipient data
         let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
         if (actionPayload && typeof actionPayload === 'object' && actionPayload.channel) {
@@ -100,11 +110,13 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
         toast.info("Sending communication...");
         
         try {
+          // Updated to include sender in the payload
           const { data, error } = await supabase.functions.invoke('send-communication', {
             body: {
               actionId: action.id,
               messageContent,
               recipient,
+              sender, // Include sender information in the request
               channel,
               projectId: action.project_id
             }
