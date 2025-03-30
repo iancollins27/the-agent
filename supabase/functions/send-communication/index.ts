@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -22,10 +21,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get more information about the communications table structure
+    // Check communications table structure for debugging purposes
     try {
       console.log("Checking communications table schema...");
-      // Try to describe the communications table to see if it has the expected constraints
       const { error: descError } = await supabase.rpc('get_table_info', { 
         table_name: 'communications' 
       });
@@ -43,6 +41,7 @@ serve(async (req) => {
       actionId, 
       messageContent, 
       recipient, 
+      sender: explicitSender, // New explicit sender field
       channel, 
       providerId, 
       projectId, 
@@ -54,16 +53,17 @@ serve(async (req) => {
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
-
-    // Create separate objects for sender and recipient information
-    let senderInfo = {};
     
-    // Try to get the sender information using the explicit senderId or from recipient.sender_ID (legacy)
+    // ----- HANDLE SENDER INFORMATION -----
+    // Determine the sender information from available sources 
+    let senderInfo = explicitSender ? { ...explicitSender } : {};
+    
+    // Try to get the sender information using the explicit senderId or from legacy fields
     const effectiveSenderId = senderId || (recipient.sender_ID ? recipient.sender_ID : null);
     
     console.log(`Effective sender ID determined: ${effectiveSenderId || 'None provided'}`);
 
-    if (effectiveSenderId) {
+    if (effectiveSenderId && !explicitSender) {
       console.log(`Looking up sender contact with ID: ${effectiveSenderId}`);
       
       const { data: senderData, error: senderError } = await supabase
@@ -78,26 +78,25 @@ serve(async (req) => {
         console.log(`Sender contact found:`, senderData);
         console.log(`Sender phone number from contact: ${senderData.phone_number}`);
         
-        // Add sender info to a separate object
+        // Set the sender information
         senderInfo = {
-          sender: {
-            id: senderData.id,
-            name: senderData.full_name,
-            phone_number: senderData.phone_number,
-            email: senderData.email
-          },
-          // Important: Set the sender_phone at the top level for JustCall
-          sender_phone: senderData.phone_number
+          id: senderData.id,
+          name: senderData.full_name,
+          phone: senderData.phone_number,
+          email: senderData.email
         };
       } else {
         console.log(`No sender contact data found for ID: ${effectiveSenderId}`);
       }
-    } else {
+    } else if (!effectiveSenderId) {
       console.log("No sender ID provided in request or recipient object");
     }
 
-    // Now check if we received a recipient ID, and if so, fetch those details
-    if (recipient.id) {
+    // ----- HANDLE RECIPIENT INFORMATION -----
+    let recipientInfo = { ...recipient };
+    
+    // If recipient has an ID but missing other details, fetch them
+    if (recipient.id && (!recipient.phone || !recipient.email || !recipient.name)) {
       console.log(`Looking up recipient with ID: ${recipient.id}`);
       
       const { data: recipientData, error: recipientError } = await supabase
@@ -112,24 +111,37 @@ serve(async (req) => {
         console.log(`Recipient contact found:`, recipientData);
         
         // Update recipient info with data from contacts table
-        recipient.name = recipientData.full_name;
-        recipient.phone = recipient.phone || recipientData.phone_number;
-        recipient.email = recipient.email || recipientData.email;
+        recipientInfo.name = recipientInfo.name || recipientData.full_name;
+        recipientInfo.phone = recipientInfo.phone || recipientData.phone_number;
+        recipientInfo.email = recipientInfo.email || recipientData.email;
       }
     }
 
-    // Merge the sender info into the recipient object for backward compatibility
-    const enrichedRecipient = {
-      ...recipient,
-      ...senderInfo
-    };
+    // ----- BACKWARD COMPATIBILITY SUPPORT -----
+    // For backward compatibility, extract sender info from legacy location in recipient object
+    if (!senderInfo.phone && recipient.sender_phone) {
+      console.log(`Using legacy sender_phone from recipient object: ${recipient.sender_phone}`);
+      senderInfo.phone = recipient.sender_phone;
+    }
+    
+    if (!senderInfo.phone && recipient.sender?.phone_number) {
+      console.log(`Using legacy sender.phone_number from recipient object: ${recipient.sender.phone_number}`);
+      senderInfo.phone = recipient.sender.phone_number;
+    }
+    
+    if (!senderInfo.phone && recipient.sender?.phone) {
+      console.log(`Using legacy sender.phone from recipient object: ${recipient.sender.phone}`);
+      senderInfo.phone = recipient.sender.phone;
+    }
 
-    // Log the final recipient and sender objects to verify all info is correctly attached
-    console.log('Final enriched recipient object with sender information:', {
-      ...enrichedRecipient,
+    // Log the final recipient and sender objects
+    console.log('Final recipient information:', {
+      ...recipientInfo,
       // Truncate message content if present to keep logs clean
-      message: enrichedRecipient.message ? `${enrichedRecipient.message.substring(0, 20)}...` : undefined
+      message: recipientInfo.message ? `${recipientInfo.message.substring(0, 20)}...` : undefined
     });
+    
+    console.log('Final sender information:', senderInfo);
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
@@ -149,11 +161,11 @@ serve(async (req) => {
       throw new Error('Message content is required');
     }
 
-    if (channel === 'sms' && !enrichedRecipient.phone) {
+    if (channel === 'sms' && !recipientInfo.phone) {
       throw new Error('Phone number is required for SMS communications');
     }
 
-    if (channel === 'email' && !enrichedRecipient.email) {
+    if (channel === 'email' && !recipientInfo.email) {
       throw new Error('Email address is required for email communications');
     }
 
@@ -168,7 +180,8 @@ serve(async (req) => {
           projectId,
           channel,
           messageContent,
-          recipient: enrichedRecipient,
+          recipient: recipientInfo,
+          sender: senderInfo,
           providerInfo
         }
       );
@@ -232,12 +245,14 @@ serve(async (req) => {
     // Send the actual communication
     let sendResult;
     try {
+      // Pass both recipient and sender info separately to the communication service
       sendResult = await sendCommunication(
         supabase, 
         providerInfo, 
         channel, 
         messageContent, 
-        enrichedRecipient, 
+        recipientInfo,
+        senderInfo, 
         commRecord.id
       );
     } catch (sendError) {

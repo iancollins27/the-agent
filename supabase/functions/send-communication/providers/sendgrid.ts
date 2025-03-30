@@ -4,11 +4,16 @@ import { ProviderInfo } from "../types.ts";
 export async function sendViaSendGrid(
   providerInfo: ProviderInfo, 
   message: string, 
-  recipient: any
+  recipient: any,
+  sender: any
 ): Promise<any> {
   // Mock implementation - would be replaced with actual API call
   console.log(`MOCK: Sending email via SendGrid to ${recipient.email}`);
   console.log(`SendGrid API Key: ${providerInfo.api_key.substring(0, 3)}...`);
+  
+  if (sender && sender.email) {
+    console.log(`From email address: ${sender.email}`);
+  }
   
   return {
     provider: 'sendgrid',

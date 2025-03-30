@@ -5,7 +5,8 @@ export async function sendViaTwilio(
   providerInfo: ProviderInfo, 
   channel: string, 
   message: string, 
-  recipient: any
+  recipient: any,
+  sender: any
 ): Promise<any> {
   // Mock implementation - would be replaced with actual API call
   console.log(`MOCK: Sending via Twilio: ${channel} to ${recipient.phone}`);
@@ -13,6 +14,11 @@ export async function sendViaTwilio(
   
   // Add more debugging to help diagnose any issues
   console.log(`Recipient details:`, JSON.stringify(recipient, null, 2));
+  
+  if (sender && sender.phone) {
+    console.log(`Sender phone: ${sender.phone}`);
+  }
+  
   console.log(`Message:`, message.substring(0, 50) + (message.length > 50 ? '...' : ''));
   console.log(`Provider Info:`, {
     name: providerInfo.provider_name,

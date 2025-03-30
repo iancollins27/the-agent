@@ -5,7 +5,8 @@ export async function sendViaJustCall(
   providerInfo: ProviderInfo, 
   channel: string, 
   message: string, 
-  recipient: any
+  recipient: any,
+  sender: any
 ): Promise<any> {
   console.log(`Sending via JustCall: ${channel} to ${recipient.phone}`);
   
@@ -34,19 +35,23 @@ export async function sendViaJustCall(
     justcallNumber = providerInfo.justcall_number;
     console.log(`Using provider configured JustCall number: ${justcallNumber}`);
   }
-  // Second priority: Check if sender_phone exists at the top level
+  // Second priority: Check if sender has a phone number
+  else if (sender && sender.phone) {
+    justcallNumber = sender.phone;
+    console.log(`Using sender.phone: ${justcallNumber}`);
+  }
+  // Backward compatibility checks
   else if (recipient.sender_phone) {
     justcallNumber = recipient.sender_phone;
-    console.log(`Using sender_phone from top level: ${justcallNumber}`);
+    console.log(`Using legacy recipient.sender_phone: ${justcallNumber}`);
   }
-  // Third priority: Check sender object properties
   else if (recipient.sender) {
     if (recipient.sender.phone_number) {
       justcallNumber = recipient.sender.phone_number;
-      console.log(`Using sender.phone_number: ${justcallNumber}`);
+      console.log(`Using legacy recipient.sender.phone_number: ${justcallNumber}`);
     } else if (recipient.sender.phone) {
       justcallNumber = recipient.sender.phone;
-      console.log(`Using sender.phone: ${justcallNumber}`);
+      console.log(`Using legacy recipient.sender.phone: ${justcallNumber}`);
     }
   }
   
@@ -54,9 +59,10 @@ export async function sendViaJustCall(
   if (!justcallNumber) {
     console.log('No JustCall number found in any of these locations:');
     console.log('- provider justcall_number: ', providerInfo.justcall_number);
-    console.log('- recipient.sender_phone: ', recipient.sender_phone);
-    console.log('- recipient.sender?.phone_number: ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
-    console.log('- recipient.sender?.phone: ', recipient.sender ? recipient.sender.phone : 'sender not defined');
+    console.log('- sender.phone: ', sender ? sender.phone : 'sender not defined');
+    console.log('- recipient.sender_phone (legacy): ', recipient.sender_phone);
+    console.log('- recipient.sender?.phone_number (legacy): ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
+    console.log('- recipient.sender?.phone (legacy): ', recipient.sender ? recipient.sender.phone : 'sender not defined');
     
     throw new Error('JustCall number is required either in provider configuration or as sender phone number');
   }

@@ -11,11 +11,16 @@ export async function sendCommunication(
   channel: string,
   message: string,
   recipient: any,
+  sender: any,
   communicationId: string
 ): Promise<any> {
   // Make sure we use the provider_name from the database record
   const providerName = provider.provider_name || 'unnamed';
   console.log(`Sending ${channel} via ${providerName} to ${recipient.phone || recipient.email}`);
+  
+  if (sender && sender.phone) {
+    console.log(`Using sender phone: ${sender.phone}`);
+  }
 
   // Normalize provider name to lowercase for case-insensitive matching
   const normalizedProviderName = providerName.toLowerCase();
@@ -26,11 +31,11 @@ export async function sendCommunication(
   // Route to the appropriate provider service
   switch (normalizedProviderName) {
     case 'justcall':
-      return await sendViaJustCall(provider, channel, message, recipient);
+      return await sendViaJustCall(provider, channel, message, recipient, sender);
     case 'twilio':
-      return await sendViaTwilio(provider, channel, message, recipient);
+      return await sendViaTwilio(provider, channel, message, recipient, sender);
     case 'sendgrid':
-      return await sendViaSendGrid(provider, message, recipient);
+      return await sendViaSendGrid(provider, message, recipient, sender);
     case 'mock':
       // For testing purposes only
       console.log(`Using mock provider - simulating successful message delivery`);
@@ -60,7 +65,7 @@ export async function sendCommunication(
       if (provider.api_key && provider.api_secret && !provider.account_id) {
         console.log(`Credentials structure suggests JustCall, using JustCall provider`);
         console.log(`JustCall API Key: ${provider.api_key.substring(0, 3)}...`);
-        return await sendViaJustCall(provider, channel, message, recipient);
+        return await sendViaJustCall(provider, channel, message, recipient, sender);
       }
       
       // If can't identify, fall back to mock

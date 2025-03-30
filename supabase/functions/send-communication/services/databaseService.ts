@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { CommunicationRecordParams, CommDirection } from "../types.ts";
 
@@ -5,7 +6,7 @@ export async function createCommunicationRecord(
   supabase: SupabaseClient,
   params: CommunicationRecordParams
 ): Promise<{ id: string }> {
-  const { projectId, channel, messageContent, recipient, providerInfo } = params;
+  const { projectId, channel, messageContent, recipient, sender, providerInfo } = params;
 
   // Determine the appropriate subtype based on the channel
   let subtype = '';
@@ -29,6 +30,28 @@ export async function createCommunicationRecord(
   console.log(`Creating communication record with direction: ${direction}`);
   console.log(`Values being used - type: ${channel.toUpperCase()}, subtype: ${subtype}`);
 
+  // Prepare participants array with recipient info
+  const participants = [
+    {
+      type: 'recipient',
+      contact_id: recipient.id,
+      name: recipient.name,
+      phone: recipient.phone,
+      email: recipient.email
+    }
+  ];
+
+  // Add sender to participants if available
+  if (sender && (sender.id || sender.name || sender.phone || sender.email)) {
+    participants.push({
+      type: 'sender',
+      contact_id: sender.id,
+      name: sender.name,
+      phone: sender.phone,
+      email: sender.email
+    });
+  }
+
   // Now attempt to insert the record
   const { data: commRecord, error: commError } = await supabase
     .from('communications')
@@ -39,15 +62,7 @@ export async function createCommunicationRecord(
       direction: direction,
       content: messageContent,
       timestamp: new Date().toISOString(),
-      participants: [
-        {
-          type: 'recipient',
-          contact_id: recipient.id,
-          name: recipient.name,
-          phone: recipient.phone,
-          email: recipient.email
-        }
-      ],
+      participants: participants,
       provider: providerInfo.provider_name,
       status: 'PENDING'
     })
