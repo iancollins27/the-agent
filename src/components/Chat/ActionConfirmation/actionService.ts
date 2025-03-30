@@ -93,8 +93,8 @@ export async function sendCommunication(
     senderId
   });
   
-  // If we have a senderId, fetch the sender contact details to include in the request
-  let senderInfo = {};
+  // If we have a senderId, fetch the sender contact details
+  let sender = undefined;
   if (senderId) {
     const { data: senderData, error: senderError } = await supabase
       .from('contacts')
@@ -104,16 +104,12 @@ export async function sendCommunication(
       
     if (!senderError && senderData) {
       console.log('Found sender data:', senderData);
-      // Add the sender's phone directly as sender_phone to use in JustCall
-      senderInfo = {
-        sender_phone: senderData.phone_number,
-        // Also keep the full sender object for reference
-        sender: {
-          id: senderData.id,
-          name: senderData.full_name,
-          phone_number: senderData.phone_number,
-          email: senderData.email
-        }
+      // Create a properly structured sender object
+      sender = {
+        id: senderData.id,
+        name: senderData.full_name,
+        phone: senderData.phone_number,
+        email: senderData.email
       };
     } else {
       console.error('Error fetching sender data:', senderError);
@@ -121,16 +117,15 @@ export async function sendCommunication(
     }
   }
   
-  console.log('Prepared sender info for request:', senderInfo);
+  console.log('Prepared sender info for request:', sender);
   
+  // Send the communication with properly separated sender and recipient
   const { data, error } = await supabase.functions.invoke('send-communication', {
     body: {
       actionId,
       messageContent,
-      recipient: {
-        ...recipient,
-        ...senderInfo
-      },
+      recipient,
+      sender,
       channel,
       projectId,
       companyId
@@ -253,6 +248,7 @@ export async function executeAction(action: ActionRecord): Promise<void> {
         break;
         
       case 'message':
+        // Extract recipient info
         const recipient = {
           id: action.recipient_id,
           name: action.recipient_name,

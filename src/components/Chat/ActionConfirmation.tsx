@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Check, X, AlertCircle, MapPin } from "lucide-react";
@@ -62,7 +61,6 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
         const recipient = {
           id: action.recipient_id,
           name: action.recipient_name || actionPayload.recipient,
-          // Extract phone and email from action payload if available
           phone: actionPayload.recipient_phone || actionPayload.phone,
           email: actionPayload.recipient_email || actionPayload.email
         };
@@ -80,6 +78,38 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
                               actionPayload.message_content || 
                               actionPayload.content || 
                               '';
+                              
+        // Extract sender information
+        const senderId = action.sender_ID || 
+                        actionPayload.sender_id || 
+                        actionPayload.senderId;
+                        
+        // Prepare sender data if available
+        let sender = undefined;
+        if (action.sender) {
+          sender = {
+            id: action.sender.id,
+            name: action.sender.full_name,
+            phone: action.sender.phone_number,
+            email: action.sender.email
+          };
+        } else if (senderId) {
+          // Fetch sender data if ID is available
+          const { data: senderData, error: senderError } = await supabase
+            .from('contacts')
+            .select('id, full_name, phone_number, email')
+            .eq('id', senderId)
+            .maybeSingle();
+            
+          if (!senderError && senderData) {
+            sender = {
+              id: senderData.id,
+              name: senderData.full_name,
+              phone: senderData.phone_number,
+              email: senderData.email
+            };
+          }
+        }
 
         toast({
           title: "Sending Message",
@@ -92,6 +122,7 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
               actionId: action.id,
               messageContent,
               recipient,
+              sender,
               channel,
               projectId: action.project_id
             }

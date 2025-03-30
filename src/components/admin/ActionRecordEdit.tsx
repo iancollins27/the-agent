@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -89,7 +88,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
       
       console.log('Sender ID for communication:', senderId);
       
-      // Fetch recipient details
+      // Prepare recipient details
       const recipient = {
         id: action.recipient_id,
         name: action.recipient_name,
@@ -112,7 +111,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
       toast.info("Initiating communication...");
 
       // Fetch sender contact details if we have a sender ID
-      let senderInfo = {};
+      let sender = undefined;
       if (senderId) {
         const { data: senderData, error: senderError } = await supabase
           .from('contacts')
@@ -124,14 +123,11 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
           console.error('Error fetching sender:', senderError);
         } else if (senderData) {
           console.log('Using sender data:', senderData);
-          senderInfo = {
-            sender_phone: senderData.phone_number,
-            sender: {
-              id: senderData.id,
-              name: senderData.full_name,
-              phone_number: senderData.phone_number,
-              email: senderData.email
-            }
+          sender = {
+            id: senderData.id,
+            name: senderData.full_name,
+            phone: senderData.phone_number,
+            email: senderData.email
           };
         }
       }
@@ -139,10 +135,8 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
       console.log('Sending communication with payload:', {
         actionId: action.id,
         messageContent,
-        recipient: {
-          ...recipient,
-          ...senderInfo
-        },
+        recipient,
+        sender,
         channel,
         projectId: action.project_id,
         senderId
@@ -152,10 +146,8 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         body: {
           actionId: action.id,
           messageContent,
-          recipient: {
-            ...recipient,
-            ...senderInfo
-          },
+          recipient,
+          sender,
           channel,
           projectId: action.project_id,
           senderId
