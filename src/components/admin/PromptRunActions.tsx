@@ -74,25 +74,32 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
       if (action.action_type === 'message') {
         const actionPayload = action.action_payload as Record<string, any>;
         
-        // Prepare recipient data
+        // Prepare recipient data - consistent approach
         const recipient = {
           id: action.recipient_id,
-          name: action.recipient_name || (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient : null),
-          phone: action.recipient?.phone_number || 
+          name: action.recipient_name || 
+               (action.recipient ? action.recipient.full_name : null) ||
+               (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient : null),
+          phone: (action.recipient ? action.recipient.phone_number : null) || 
                 (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_phone || actionPayload.phone : null),
-          email: action.recipient?.email || 
+          email: (action.recipient ? action.recipient.email : null) || 
                 (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_email || actionPayload.email : null)
         };
 
-        // Prepare sender data - THIS IS THE NEW CODE
-        const sender = action.sender ? {
-          id: action.sender.id,
-          name: action.sender.full_name,
-          phone: action.sender.phone_number,
-          email: action.sender.email
-        } : action.sender_ID ? {
-          id: action.sender_ID
-        } : undefined;
+        // Prepare sender data - using same approach as recipient for consistency
+        const sender = {
+          id: action.sender_ID,
+          name: action.sender_name ||
+               (action.sender ? action.sender.full_name : null) ||
+               (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender : null),
+          phone: (action.sender ? action.sender.phone_number : null) ||
+                (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_phone : null),
+          email: (action.sender ? action.sender.email : null) ||
+                (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_email : null)
+        };
+
+        // Log the sender data for debugging
+        console.log("Prepared sender data:", sender);
 
         // Determine communication channel based on available recipient data
         let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
@@ -109,17 +116,20 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
 
         toast.info("Sending communication...");
         
+        // Log the full payload for debugging
+        const payload = {
+          actionId: action.id,
+          messageContent,
+          recipient,
+          sender,
+          channel,
+          projectId: action.project_id
+        };
+        console.log("Sending payload to send-communication:", payload);
+        
         try {
-          // Updated to include sender in the payload
           const { data, error } = await supabase.functions.invoke('send-communication', {
-            body: {
-              actionId: action.id,
-              messageContent,
-              recipient,
-              sender, // Include sender information in the request
-              channel,
-              projectId: action.project_id
-            }
+            body: payload
           });
           
           if (error) {
