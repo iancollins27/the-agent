@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -82,11 +83,16 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
     try {
       const actionPayload = action.action_payload as Record<string, any>;
       
+      // Log sender_ID to debug
+      console.log('DEBUG: action.sender_ID =', action.sender_ID);
+      console.log('DEBUG: actionPayload.sender_id =', actionPayload.sender_id);
+      console.log('DEBUG: actionPayload.senderId =', actionPayload.senderId);
+      
       const senderId = action.sender_ID || 
                       actionPayload.sender_id || 
                       actionPayload.senderId;
       
-      console.log('Sender ID for communication:', senderId);
+      console.log('DEBUG: Final sender ID for communication:', senderId);
       
       // Prepare recipient details
       const recipient = {
@@ -95,6 +101,8 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         phone: actionPayload.recipient_phone || actionPayload.phone,
         email: actionPayload.recipient_email || actionPayload.email
       };
+
+      console.log('DEBUG: Recipient info:', recipient);
 
       let channel: 'sms' | 'email' | 'call' = 'sms';
       if (actionPayload.channel) {
@@ -113,6 +121,8 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
       // Fetch sender contact details if we have a sender ID
       let sender = undefined;
       if (senderId) {
+        console.log('DEBUG: Fetching contact details for sender ID:', senderId);
+        
         const { data: senderData, error: senderError } = await supabase
           .from('contacts')
           .select('id, full_name, phone_number, email')
@@ -122,24 +132,33 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         if (senderError) {
           console.error('Error fetching sender:', senderError);
         } else if (senderData) {
-          console.log('Using sender data:', senderData);
+          console.log('DEBUG: Sender data retrieved successfully:', senderData);
+          console.log('DEBUG: Sender phone_number:', senderData.phone_number);
+          console.log('DEBUG: Sender email:', senderData.email);
+          console.log('DEBUG: Sender full_name:', senderData.full_name);
+          
           sender = {
             id: senderData.id,
             name: senderData.full_name,
             phone: senderData.phone_number,
             email: senderData.email
           };
+          
+          console.log('DEBUG: Constructed sender object:', sender);
+        } else {
+          console.log('DEBUG: No sender data found for ID:', senderId);
         }
+      } else {
+        console.log('DEBUG: No sender ID provided, communication will be sent without sender info');
       }
 
-      console.log('Sending communication with payload:', {
+      console.log('DEBUG: Final payload for send-communication:', {
         actionId: action.id,
         messageContent,
         recipient,
         sender,
         channel,
-        projectId: action.project_id,
-        senderId
+        projectId: action.project_id
       });
 
       const { data, error } = await supabase.functions.invoke('send-communication', {
@@ -149,14 +168,16 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
           recipient,
           sender,
           channel,
-          projectId: action.project_id,
-          senderId
+          projectId: action.project_id
         }
       });
       
       if (error) {
+        console.error('DEBUG: Error from send-communication function:', error);
         throw error;
       }
+      
+      console.log('DEBUG: Communication sent successfully, response:', data);
       
       await supabase
         .from('action_records')

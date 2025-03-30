@@ -12,7 +12,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
       throw new Error("Action not found");
     }
 
-    console.log("Approving action:", action.id, "with sender_ID:", action.sender_ID);
+    console.log("DEBUG: Approving action:", action.id, "with sender_ID:", action.sender_ID);
 
     // First update the action status
     const { error } = await supabase
@@ -47,6 +47,9 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
                             actionPayload.content || 
                             '';
       
+      // Log Sender ID
+      console.log("DEBUG: Working with sender_ID in action record:", action.sender_ID);
+      
       // We need to make sure we have sender information
       let sender = undefined;
       
@@ -62,6 +65,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
           
         if (senderError) {
           console.error('Error fetching sender data:', senderError);
+          console.log("DEBUG: Error details:", senderError.message, senderError.details, senderError.hint);
         } else if (senderData) {
           console.log("DEBUG: Successfully fetched sender data:", senderData);
           console.log("DEBUG: Sender phone_number:", senderData.phone_number);
@@ -108,6 +112,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
         });
         
         if (error) {
+          console.error("DEBUG: Error from send-communication function:", error);
           throw error;
         }
         

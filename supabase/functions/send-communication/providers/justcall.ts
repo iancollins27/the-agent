@@ -27,8 +27,9 @@ export async function sendViaJustCall(
 
   // Check legacy paths (compatibility)
   console.log("- recipient.sender_phone (legacy): ", recipient['sender_phone']);
-  console.log("- recipient.sender?.phone_number (legacy): ", recipient['sender'] ? `sender not defined` : "sender.phone_number");
-  console.log("- recipient.sender?.phone (legacy): ", recipient['sender'] ? `sender not defined` : "sender.phone");
+  console.log("- recipient.sender?.phone_number (legacy): ", recipient['sender'] ? recipient['sender'].phone_number : "sender not defined");
+  console.log("- recipient.sender?.phone (legacy): ", recipient['sender'] ? recipient['sender'].phone : "sender not defined");
+  console.log("- provider default_phone: ", providerInfo.default_phone);
 
   // Try to get the JustCall number from any available source
   const justCallNumber = providerInfo.justcall_number || 
@@ -39,8 +40,10 @@ export async function sendViaJustCall(
                        providerInfo.default_phone;
 
   if (!justCallNumber) {
-    console.log("No JustCall number found in any of these locations:");
-    throw new Error("JustCall number is required either in provider configuration or as sender phone number");
+    console.log("No JustCall number found in any of these locations. This is required for sending.");
+    
+    // Detailed error message to help with debugging
+    throw new Error("JustCall number is required either in provider configuration or as sender phone number. Please configure this in the provider settings.");
   }
 
   console.log(`Using JustCall number: ${justCallNumber} for outbound communication`);
