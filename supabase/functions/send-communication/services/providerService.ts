@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ProviderInfo } from "../types.ts";
 
@@ -107,6 +108,15 @@ async function getProviderById(supabase: SupabaseClient, providerId: string, sou
   if (!settingsError && additionalSettings) {
     defaultPhone = additionalSettings.default_phone;
     justcallNumber = additionalSettings.justcall_number;
+    
+    console.log(`Found provider settings:`, {
+      default_phone: defaultPhone,
+      justcall_number: justcallNumber
+    });
+  } else if (settingsError) {
+    console.error('Error fetching provider settings:', settingsError);
+  } else {
+    console.log('No additional provider settings found');
   }
 
   // Log that we found the provider, but don't log the actual keys

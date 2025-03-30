@@ -52,7 +52,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
       
       // If we have sender_ID, fetch the sender details
       if (action.sender_ID) {
-        console.log("Fetching sender details for ID:", action.sender_ID);
+        console.log("DEBUG: Found sender_ID in action record:", action.sender_ID);
         
         const { data: senderData, error: senderError } = await supabase
           .from('contacts')
@@ -63,20 +63,28 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
         if (senderError) {
           console.error('Error fetching sender data:', senderError);
         } else if (senderData) {
-          console.log("Found sender data:", senderData);
+          console.log("DEBUG: Successfully fetched sender data:", senderData);
+          console.log("DEBUG: Sender phone_number:", senderData.phone_number);
+          console.log("DEBUG: Sender email:", senderData.email);
+          console.log("DEBUG: Sender full_name:", senderData.full_name);
+          
           sender = {
             id: senderData.id,
             name: senderData.full_name,
             phone: senderData.phone_number,
             email: senderData.email
           };
+          
+          console.log("DEBUG: Constructed sender object:", sender);
+        } else {
+          console.log("DEBUG: Sender data not found for ID:", action.sender_ID);
         }
       } else {
-        console.log("No sender_ID found in action record");
+        console.log("DEBUG: No sender_ID found in action record");
       }
 
       // Log the final request payload for debugging
-      console.log("Sending communication with payload:", {
+      console.log("DEBUG: Sending communication with payload:", {
         actionId: action.id,
         messageContent,
         recipient,
@@ -103,6 +111,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
           throw error;
         }
         
+        console.log("DEBUG: Communication sent successfully, response:", data);
         toast.success("Communication sent successfully");
       } catch (commError) {
         console.error('Error sending communication:', commError);
