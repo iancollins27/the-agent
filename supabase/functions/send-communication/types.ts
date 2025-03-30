@@ -10,16 +10,6 @@ export interface SendCommRequest {
     phone?: string;
     email?: string;
     name?: string;
-    // Legacy fields - kept for backward compatibility
-    sender_phone?: string;
-    sender?: {
-      id?: string;
-      name?: string;
-      phone_number?: string;
-      phone?: string;
-      email?: string;
-    };
-    sender_ID?: string;
   };
   sender?: {
     id?: string;
@@ -32,7 +22,6 @@ export interface SendCommRequest {
   projectId?: string;
   companyId?: string;
   isTest?: boolean;
-  senderId?: string;
 }
 
 export interface ProviderInfo {

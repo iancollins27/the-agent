@@ -40,29 +40,12 @@ export async function sendViaJustCall(
     justcallNumber = sender.phone;
     console.log(`Using sender.phone: ${justcallNumber}`);
   }
-  // Backward compatibility checks
-  else if (recipient.sender_phone) {
-    justcallNumber = recipient.sender_phone;
-    console.log(`Using legacy recipient.sender_phone: ${justcallNumber}`);
-  }
-  else if (recipient.sender) {
-    if (recipient.sender.phone_number) {
-      justcallNumber = recipient.sender.phone_number;
-      console.log(`Using legacy recipient.sender.phone_number: ${justcallNumber}`);
-    } else if (recipient.sender.phone) {
-      justcallNumber = recipient.sender.phone;
-      console.log(`Using legacy recipient.sender.phone: ${justcallNumber}`);
-    }
-  }
   
   // Final check if JustCall number is available
   if (!justcallNumber) {
     console.log('No JustCall number found in any of these locations:');
     console.log('- provider justcall_number: ', providerInfo.justcall_number);
     console.log('- sender.phone: ', sender ? sender.phone : 'sender not defined');
-    console.log('- recipient.sender_phone (legacy): ', recipient.sender_phone);
-    console.log('- recipient.sender?.phone_number (legacy): ', recipient.sender ? recipient.sender.phone_number : 'sender not defined');
-    console.log('- recipient.sender?.phone (legacy): ', recipient.sender ? recipient.sender.phone : 'sender not defined');
     
     throw new Error('JustCall number is required either in provider configuration or as sender phone number');
   }

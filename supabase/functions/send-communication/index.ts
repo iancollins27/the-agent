@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -33,13 +34,12 @@ serve(async (req) => {
       actionId,
       messageContent,
       recipient,
-      sender,      // This should now be properly included in the request
+      sender,
       channel,
       providerId,
       projectId,
       companyId,
-      isTest,
-      senderId     // For backward-compat or fallback
+      isTest
     } = requestData;
 
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
@@ -47,60 +47,18 @@ serve(async (req) => {
     console.log(`Sender details:`, sender);
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
     
-    // ----- HANDLE SENDER INFORMATION -----
-    // If the incoming request has a sender object, start with that.
-    // If only a senderId is passed, fall back to that.
-    let senderInfo = { ...sender } || {};
-    if (!senderInfo.id && senderId) {
-      senderInfo.id = senderId;
+    // Validate required fields
+    if (!messageContent) {
+      throw new Error('Message content is required');
     }
 
-    // If we have a sender.id but are missing phone/email/name, fetch from 'contacts'
-    if (senderInfo && senderInfo.id && (!senderInfo.phone || !senderInfo.email || !senderInfo.name)) {
-      console.log(`Looking up sender with ID: ${senderInfo.id}`);
-      const { data: senderData, error: senderError } = await supabase
-        .from('contacts')
-        .select('id, full_name, phone_number, email')
-        .eq('id', senderInfo.id)
-        .single();
-
-      if (senderError) {
-        console.log(`Error fetching sender contact: ${senderError.message}`);
-      } else if (senderData) {
-        console.log(`Sender contact found:`, senderData);
-        senderInfo.name = senderInfo.name || senderData.full_name;
-        senderInfo.phone = senderInfo.phone || senderData.phone_number;
-        senderInfo.email = senderInfo.email || senderData.email;
-      }
+    if (channel === 'sms' && !recipient.phone) {
+      throw new Error('Phone number is required for SMS communications');
     }
 
-    // ----- HANDLE RECIPIENT INFORMATION -----
-    // This logic matches what you already have, just left intact
-    let recipientInfo = { ...recipient };
-
-    // If recipient has an ID but missing other details, fetch them
-    if (recipientInfo.id && (!recipientInfo.phone || !recipientInfo.email || !recipientInfo.name)) {
-      console.log(`Looking up recipient with ID: ${recipientInfo.id}`);
-      const { data: recipientData, error: recipientError } = await supabase
-        .from('contacts')
-        .select('id, full_name, phone_number, email')
-        .eq('id', recipientInfo.id)
-        .single();
-
-      if (recipientError) {
-        console.log(`Error fetching recipient: ${recipientError.message}`);
-      } else if (recipientData) {
-        console.log(`Recipient contact found:`, recipientData);
-        // Update recipient info with data from contacts table
-        recipientInfo.name = recipientInfo.name || recipientData.full_name;
-        recipientInfo.phone = recipientInfo.phone || recipientData.phone_number;
-        recipientInfo.email = recipientInfo.email || recipientData.email;
-      }
+    if (channel === 'email' && !recipient.email) {
+      throw new Error('Email address is required for email communications');
     }
-
-    // Log the final recipient and sender objects
-    console.log('Final recipient information:', recipientInfo);
-    console.log('Final sender information:', senderInfo);
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
@@ -115,19 +73,6 @@ serve(async (req) => {
       req.headers.get('x-real-ip') || 'unknown'
     );
 
-    // Validate required fields
-    if (!messageContent) {
-      throw new Error('Message content is required');
-    }
-
-    if (channel === 'sms' && !recipientInfo.phone) {
-      throw new Error('Phone number is required for SMS communications');
-    }
-
-    if (channel === 'email' && !recipientInfo.email) {
-      throw new Error('Email address is required for email communications');
-    }
-
     console.log(`Using communication provider: ${providerInfo.provider_name}`);
 
     // Record in communications table
@@ -139,8 +84,8 @@ serve(async (req) => {
           projectId,
           channel,
           messageContent,
-          recipient: recipientInfo,
-          sender: senderInfo,
+          recipient,
+          sender,
           providerInfo
         }
       );
@@ -190,8 +135,8 @@ serve(async (req) => {
         providerInfo, 
         channel, 
         messageContent, 
-        recipientInfo,
-        senderInfo, 
+        recipient,
+        sender, 
         commRecord.id
       );
     } catch (sendError) {

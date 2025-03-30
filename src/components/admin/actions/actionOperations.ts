@@ -25,65 +25,46 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
     
     // If it's a message action, also send the communication
     if (action.action_type === 'message') {
+      // Extract data from action
       const actionPayload = action.action_payload as Record<string, any>;
       
-      console.log("Original action data:", JSON.stringify(action, null, 2));
-      
-      // Prepare recipient data - consistent approach
+      // Recipient information
       const recipient = {
         id: action.recipient_id,
-        name: action.recipient_name || 
-             (action.recipient ? action.recipient.full_name : null) ||
-             (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient : null),
-        phone: (action.recipient ? action.recipient.phone_number : null) || 
-              (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_phone || actionPayload.phone : null),
-        email: (action.recipient ? action.recipient.email : null) || 
-              (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_email || actionPayload.email : null)
+        name: action.recipient_name,
+        phone: actionPayload.recipient_phone || actionPayload.phone,
+        email: actionPayload.recipient_email || actionPayload.email
       };
 
-      // Prepare sender data - using the same approach as recipient for consistency
+      // Communication channel
+      const channel = actionPayload.channel || 'sms';
+      
+      // Message content
+      const messageContent = action.message || 
+                            actionPayload.message_content || 
+                            actionPayload.content || 
+                            '';
+      
+      // Sender information
       const sender = {
         id: action.sender_ID,
-        name: action.sender_name ||
-             (action.sender ? action.sender.full_name : null) ||
-             (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender : null),
-        phone: (action.sender ? action.sender.phone_number : null) ||
-              (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_phone : null),
-        email: (action.sender ? action.sender.email : null) ||
-              (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_email : null)
+        name: action.sender_name,
+        phone: actionPayload.sender_phone,
+        email: actionPayload.sender_email
       };
-
-      console.log("Prepared sender data:", sender);
-
-      // Determine communication channel based on available recipient data
-      let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
-      if (actionPayload && typeof actionPayload === 'object' && actionPayload.channel) {
-        channel = actionPayload.channel as 'sms' | 'email' | 'call';
-      } else if (recipient.email && !recipient.phone) {
-        channel = 'email';
-      }
-
-      // Get message content from appropriate field
-      const messageContent = action.message || 
-                            (actionPayload && typeof actionPayload === 'object' ? actionPayload.message_content || actionPayload.content : '') ||
-                            '';
 
       toast.info("Sending communication...");
       
-      // Log the full payload for debugging
-      const payload = {
-        actionId: action.id,
-        messageContent,
-        recipient,
-        sender,
-        channel,
-        projectId: action.project_id
-      };
-      console.log("Sending payload to send-communication:", payload);
-      
       try {
         const { data, error } = await supabase.functions.invoke('send-communication', {
-          body: payload
+          body: {
+            actionId: action.id,
+            messageContent,
+            recipient,
+            sender,
+            channel,
+            projectId: action.project_id
+          }
         });
         
         if (error) {
