@@ -11,12 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, MessageSquare, Database, Calendar, MapPin, User, Phone } from "lucide-react";
+import { Loader2, MessageSquare, Database, Calendar, MapPin, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "@/components/Chat/types";
 import ActionTypeBadge from "./ActionTypeBadge";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 interface ActionDetailModalProps {
   action: ActionRecord | null;
@@ -34,9 +33,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [editedMessage, setEditedMessage] = useState<string>("");
-  const [senderDetails, setSenderDetails] = useState<{ name?: string, phone?: string, email?: string } | null>(null);
 
-  // Initialize form values and fetch sender details when action changes
+  // Initialize form values when action changes
   React.useEffect(() => {
     if (action) {
       const actionPayload = action.action_payload as Record<string, any>;
@@ -47,13 +45,6 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
           actionPayload.message_text || 
           ""
         );
-        
-        // Fetch sender details if sender_ID is available
-        if (action.sender_ID) {
-          fetchSenderDetails(action.sender_ID);
-        } else {
-          setSenderDetails(null);
-        }
       } else if (actionPayload.description) {
         setEditedMessage(actionPayload.description);
       } else {
@@ -61,31 +52,6 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
       }
     }
   }, [action]);
-
-  // Fetch sender details from contacts table
-  const fetchSenderDetails = async (senderId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('full_name, phone_number, email')
-        .eq('id', senderId)
-        .single();
-        
-      if (error) {
-        console.error('Error fetching sender details:', error);
-        setSenderDetails(null);
-      } else if (data) {
-        setSenderDetails({
-          name: data.full_name,
-          phone: data.phone_number,
-          email: data.email
-        });
-      }
-    } catch (error) {
-      console.error('Error in fetchSenderDetails:', error);
-      setSenderDetails(null);
-    }
-  };
 
   if (!action) return null;
 
@@ -155,20 +121,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
     }
   };
 
-  const senderName = senderDetails?.name || action.sender?.full_name || action.sender_name || actionPayload.sender || null;
-  const senderPhone = senderDetails?.phone || action.sender?.phone_number || actionPayload.sender_phone || null;
+  const senderName = action.sender?.full_name || action.sender_name || actionPayload.sender || null;
   const recipientName = action.recipient?.full_name || action.recipient_name || actionPayload.recipient || null;
-
-  // Format phone number for display if it exists
-  const formatPhoneNumber = (phone: string | null) => {
-    if (!phone) return null;
-    
-    // Basic formatting for US numbers, can be expanded for international
-    if (phone.length === 10) {
-      return `(${phone.substring(0, 3)}) ${phone.substring(3, 6)}-${phone.substring(6)}`;
-    }
-    return phone;
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -198,20 +152,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                       <User className="h-3.5 w-3.5 text-muted-foreground" />
                       From
                     </Label>
-                    <div className="text-sm bg-muted p-2 rounded-md flex items-center justify-between">
-                      <span>{senderName}</span>
-                      {senderPhone && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
-                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-2">
-                            <p className="text-sm">{formatPhoneNumber(senderPhone)}</p>
-                          </PopoverContent>
-                        </Popover>
-                      )}
+                    <div className="text-sm bg-muted p-2 rounded-md">
+                      {senderName}
                     </div>
                   </div>
                 )}
