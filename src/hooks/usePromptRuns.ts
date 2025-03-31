@@ -99,6 +99,7 @@ export const usePromptRuns = ({
 
   return {
     promptRuns,
+    setPromptRuns,
     loading,
     handleRatingChange,
     handleFeedbackChange,

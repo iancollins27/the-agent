@@ -13,6 +13,8 @@ import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import PromptRunFilters from '../components/admin/PromptRunFilters';
 import EmptyPromptRuns from '../components/admin/EmptyPromptRuns';
 import { usePromptRuns } from '@/hooks/usePromptRuns';
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const ProjectManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -21,6 +23,7 @@ const ProjectManager: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [onlyMyProjects, setOnlyMyProjects] = useState(false);
   const [projectManagerFilter, setProjectManagerFilter] = useState<string | null>(null);
+  const [hideReviewed, setHideReviewed] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
   // Explicitly set the default to ALL to ensure it's used
@@ -71,7 +74,8 @@ const ProjectManager: React.FC = () => {
     loading, 
     handleRatingChange, 
     handleFeedbackChange, 
-    fetchPromptRuns 
+    fetchPromptRuns,
+    setPromptRuns
   } = usePromptRuns({
     userProfile,
     statusFilter,
@@ -84,6 +88,15 @@ const ProjectManager: React.FC = () => {
   const viewPromptRunDetails = (run: PromptRun) => {
     setSelectedRun(run);
     setDetailsOpen(true);
+  };
+
+  const handleRunReviewed = (promptRunId: string) => {
+    // Update the local state to mark the run as reviewed
+    setPromptRuns(prev => 
+      prev.map(run => 
+        run.id === promptRunId ? { ...run, reviewed: true } : run
+      )
+    );
   };
 
   const getEmptyStateMessage = () => {
@@ -121,17 +134,27 @@ const ProjectManager: React.FC = () => {
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <h2 className="text-2xl font-bold">Project Manager Dashboard</h2>
-          <PromptRunFilters
-            timeFilter={timeFilter}
-            onTimeFilterChange={setTimeFilter}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            onlyShowMyProjects={onlyMyProjects}
-            onMyProjectsChange={setOnlyMyProjects}
-            projectManagerFilter={projectManagerFilter}
-            onProjectManagerFilterChange={setProjectManagerFilter}
-            onRefresh={fetchPromptRuns}
-          />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="hide-reviewed"
+                checked={hideReviewed}
+                onCheckedChange={setHideReviewed}
+              />
+              <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
+            </div>
+            <PromptRunFilters
+              timeFilter={timeFilter}
+              onTimeFilterChange={setTimeFilter}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              onlyShowMyProjects={onlyMyProjects}
+              onMyProjectsChange={setOnlyMyProjects}
+              projectManagerFilter={projectManagerFilter}
+              onProjectManagerFilterChange={setProjectManagerFilter}
+              onRefresh={fetchPromptRuns}
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -154,7 +177,9 @@ const ProjectManager: React.FC = () => {
           <PromptRunsTable 
             promptRuns={promptRuns} 
             onRatingChange={handleRatingChange} 
-            onViewDetails={viewPromptRunDetails} 
+            onViewDetails={viewPromptRunDetails}
+            onRunReviewed={handleRunReviewed}
+            hideReviewed={hideReviewed}
           />
         )}
 
