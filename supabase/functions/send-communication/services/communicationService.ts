@@ -3,7 +3,7 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ProviderInfo } from "../types.ts";
 import { sendViaJustCall } from "../providers/justcall.ts";
 import { sendViaTwilio } from "../providers/twilio.ts";
-import { sendViaSendgrid } from "../providers/sendgrid.ts";
+import { sendViaSendGrid } from "../providers/sendgrid.ts";
 
 export async function sendCommunication(
   supabase: SupabaseClient,
@@ -50,14 +50,14 @@ export async function sendCommunication(
     
     // Extract relevant email information from recipient and sender
     const recipientEmail = recipient.email;
-    const recipientName = recipient.name;
+    const recipientName = recipient.name || '';
     const senderEmail = sender?.email;
     const senderName = sender?.name;
     
     console.log(`Email details - To: ${recipientName} <${recipientEmail}>, From: ${senderName || 'No name'} <${senderEmail || 'No email'}>`);
     
     if (normalizedProviderName === 'sendgrid') {
-      return await sendViaSendgrid(
+      return await sendViaSendGrid(
         providerInfo,
         recipientEmail,
         recipientName,
