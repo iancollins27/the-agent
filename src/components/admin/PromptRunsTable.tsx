@@ -52,6 +52,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
 
   const handleMarkAsReviewed = async (promptRun: PromptRun) => {
     try {
+      // Update the database to mark the prompt run as reviewed
       const { error } = await supabase
         .from('prompt_runs')
         .update({ reviewed: true })

@@ -1,3 +1,4 @@
+
 import { Database } from "@/integrations/supabase/types";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -51,5 +52,5 @@ export interface PromptRun {
   workflow_type?: string;
   prompt_text?: string;
   result?: string;
-  reviewed?: boolean;
+  reviewed?: boolean; // Added this field to match the new database column
 }
