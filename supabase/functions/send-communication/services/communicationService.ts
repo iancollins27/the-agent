@@ -3,7 +3,6 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ProviderInfo } from "../types.ts";
 import { sendViaJustCall } from "../providers/justcall.ts";
 import { sendViaTwilio } from "../providers/twilio.ts";
-import { sendViaSendGrid } from "../providers/sendgrid.ts";
 
 export async function sendCommunication(
   supabase: SupabaseClient,
@@ -46,29 +45,8 @@ export async function sendCommunication(
   }
   
   else if (channel === 'email') {
-    console.log(`Sending email via ${providerInfo.provider_name} to ${recipient.email}`);
-    
-    // Extract relevant email information from recipient and sender
-    const recipientEmail = recipient.email;
-    const recipientName = recipient.name || '';
-    const senderEmail = sender?.email;
-    const senderName = sender?.name;
-    
-    console.log(`Email details - To: ${recipientName} <${recipientEmail}>, From: ${senderName || 'No name'} <${senderEmail || 'No email'}>`);
-    
-    if (normalizedProviderName === 'sendgrid') {
-      return await sendViaSendGrid(
-        providerInfo,
-        recipientEmail,
-        recipientName,
-        messageContent,
-        senderEmail,
-        senderName,
-        communicationId
-      );
-    } else {
-      throw new Error(`Unsupported provider for email: ${providerInfo.provider_name}`);
-    }
+    // For now, we're removing the SendGrid integration
+    throw new Error("Email communications are temporarily unavailable");
   }
   
   else if (channel === 'call') {
