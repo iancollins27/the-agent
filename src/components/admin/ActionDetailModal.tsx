@@ -11,17 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, MessageSquare, Database, Calendar, MapPin, User, Phone } from "lucide-react";
+import { Loader2, MessageSquare, Database, Calendar, MapPin, User } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "@/components/Chat/types";
 import ActionTypeBadge from "./ActionTypeBadge";
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface ActionDetailModalProps {
   action: ActionRecord | null;
@@ -39,25 +33,6 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [editedMessage, setEditedMessage] = useState<string>("");
-  const [senderDetails, setSenderDetails] = useState<{
-    full_name?: string;
-    phone_number?: string;
-  } | null>(null);
-
-  // Function to format phone number for display
-  const formatPhoneNumber = (phoneNumber?: string) => {
-    if (!phoneNumber) return "";
-    
-    // Basic formatting for US numbers, adjust as needed
-    if (phoneNumber.length === 10) {
-      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6)}`;
-    } else if (phoneNumber.startsWith("+1") && phoneNumber.length === 12) {
-      const digits = phoneNumber.slice(2);
-      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    }
-    
-    return phoneNumber; // Return as is if not in expected format
-  };
 
   // Initialize form values when action changes
   React.useEffect(() => {
@@ -74,31 +49,6 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
         setEditedMessage(actionPayload.description);
       } else {
         setEditedMessage(action.message || "");
-      }
-
-      // Fetch sender details if sender_ID is available
-      if (action.sender_ID) {
-        const fetchSenderDetails = async () => {
-          try {
-            const { data, error } = await supabase
-              .from('contacts')
-              .select('full_name, phone_number')
-              .eq('id', action.sender_ID)
-              .single();
-            
-            if (error) {
-              console.error('Error fetching sender details:', error);
-            } else if (data) {
-              setSenderDetails(data);
-            }
-          } catch (err) {
-            console.error('Exception fetching sender details:', err);
-          }
-        };
-        
-        fetchSenderDetails();
-      } else {
-        setSenderDetails(null);
       }
     }
   }, [action]);
@@ -171,9 +121,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
     }
   };
 
-  const senderName = action.sender?.full_name || action.sender_name || actionPayload.sender || senderDetails?.full_name || null;
+  const senderName = action.sender?.full_name || action.sender_name || actionPayload.sender || null;
   const recipientName = action.recipient?.full_name || action.recipient_name || actionPayload.recipient || null;
-  const senderPhone = action.sender_phone || senderDetails?.phone_number || null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -203,22 +152,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                       <User className="h-3.5 w-3.5 text-muted-foreground" />
                       From
                     </Label>
-                    <div className="text-sm bg-muted p-2 rounded-md flex items-center justify-between">
-                      <span>{senderName}</span>
-                      {senderPhone && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6">
-                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{formatPhoneNumber(senderPhone)}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
+                    <div className="text-sm bg-muted p-2 rounded-md">
+                      {senderName}
                     </div>
                   </div>
                 )}

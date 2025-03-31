@@ -12,7 +12,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
       throw new Error("Action not found");
     }
 
-    console.log("DEBUG: Approving action:", action.id, "with sender_ID:", action.sender_ID, "and sender_phone:", action.sender_phone);
+    console.log("DEBUG: Approving action:", action.id, "with sender_ID:", action.sender_ID);
 
     // First update the action status
     const { error } = await supabase
@@ -47,9 +47,8 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
                             actionPayload.content || 
                             '';
       
-      // Log Sender ID and phone
+      // Log Sender ID
       console.log("DEBUG: Working with sender_ID in action record:", action.sender_ID);
-      console.log("DEBUG: Working with sender_phone in action record:", action.sender_phone);
       
       // We need to make sure we have sender information
       let sender = undefined;
@@ -76,31 +75,16 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
           sender = {
             id: senderData.id,
             name: senderData.full_name,
-            phone: senderData.phone_number || action.sender_phone, // Use sender_phone as fallback
+            phone: senderData.phone_number,
             email: senderData.email
           };
           
           console.log("DEBUG: Constructed sender object:", sender);
         } else {
           console.log("DEBUG: Sender data not found for ID:", action.sender_ID);
-          
-          // If we can't find sender data but have sender_phone, create minimal sender object
-          if (action.sender_phone) {
-            sender = {
-              phone: action.sender_phone
-            };
-            console.log("DEBUG: Created minimal sender with phone:", sender);
-          }
         }
-      } else if (action.sender_phone) {
-        // If we only have sender_phone but no sender_ID
-        console.log("DEBUG: No sender_ID found but have sender_phone:", action.sender_phone);
-        sender = {
-          phone: action.sender_phone
-        };
-        console.log("DEBUG: Created minimal sender with phone:", sender);
       } else {
-        console.log("DEBUG: No sender_ID or sender_phone found in action record");
+        console.log("DEBUG: No sender_ID found in action record");
       }
 
       // Log the final request payload for debugging
@@ -121,7 +105,7 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
             actionId: action.id,
             messageContent,
             recipient,
-            sender, // This will include the phone if available
+            sender, // This will be undefined if we couldn't find sender data
             channel,
             projectId: action.project_id
           }

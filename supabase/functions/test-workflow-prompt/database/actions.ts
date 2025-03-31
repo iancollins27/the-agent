@@ -204,42 +204,6 @@ async function findContactId(
 }
 
 /**
- * Get contact phone number by contact ID
- */
-async function getContactPhoneNumber(
-  supabase: SupabaseClient,
-  contactId: string | null
-): Promise<string | null> {
-  if (!contactId) {
-    return null;
-  }
-  
-  try {
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('phone_number')
-      .eq('id', contactId)
-      .single();
-    
-    if (error) {
-      console.error("Error fetching contact phone number:", error);
-      return null;
-    }
-    
-    if (data && data.phone_number) {
-      console.log(`Found phone number ${data.phone_number} for contact ID ${contactId}`);
-      return data.phone_number;
-    }
-    
-    console.log(`No phone number found for contact ID ${contactId}`);
-    return null;
-  } catch (error) {
-    console.error("Error getting contact phone number:", error);
-    return null;
-  }
-}
-
-/**
  * Handle the message action type
  */
 async function handleMessageAction(
@@ -311,13 +275,6 @@ async function handleMessageAction(
     console.error("Error finding contacts:", contactError);
   }
   
-  // Get the sender's phone number
-  let senderPhone = null;
-  if (senderId) {
-    senderPhone = await getContactPhoneNumber(supabase, senderId);
-    console.log(`Sender phone number: ${senderPhone || 'Not found'}`);
-  }
-  
   // Extract or create description
   let description = null;
   if (actionData.description) {
@@ -359,7 +316,6 @@ async function handleMessageAction(
         message: messageContent,
         recipient_id: recipientId,
         sender_ID: senderId,
-        sender_phone: senderPhone,
         requires_approval: true,
         status: 'pending'
       })
@@ -419,7 +375,6 @@ async function handleOtherActionTypes(
   // Try to resolve recipient and sender IDs if applicable
   let recipientId = null;
   let senderId = null;
-  let senderPhone = null;
   
   try {
     if (actionData.recipient) {
@@ -430,12 +385,6 @@ async function handleOtherActionTypes(
     if (actionData.sender) {
       senderId = await findContactId(supabase, actionData.sender, projectId);
       console.log(`Sender ID resolution: ${actionData.sender} -> ${senderId || 'Not found'}`);
-      
-      // Get the sender's phone number
-      if (senderId) {
-        senderPhone = await getContactPhoneNumber(supabase, senderId);
-        console.log(`Sender phone number: ${senderPhone || 'Not found'}`);
-      }
     }
   } catch (contactError) {
     console.error("Error finding contacts:", contactError);
@@ -445,8 +394,7 @@ async function handleOtherActionTypes(
     action_type: actionType,
     action_payload: actionPayload,
     recipient_id: recipientId,
-    sender_ID: senderId,
-    sender_phone: senderPhone
+    sender_ID: senderId
   });
   
   try {
@@ -459,7 +407,6 @@ async function handleOtherActionTypes(
         action_payload: actionPayload,
         recipient_id: recipientId,
         sender_ID: senderId,
-        sender_phone: senderPhone,
         requires_approval: true,
         status: 'pending'
       })

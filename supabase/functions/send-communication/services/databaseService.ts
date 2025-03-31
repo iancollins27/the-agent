@@ -102,23 +102,3 @@ export async function updateActionRecord(
     console.error(`Error updating action record: ${actionUpdateError.message}`);
   }
 }
-
-export async function log_integration_key_access(
-  supabase: SupabaseClient,
-  integrationId: string,
-  accessReason: string,
-  sourceIp: string
-): Promise<void> {
-  try {
-    await supabase.rpc('log_integration_key_access', {
-      p_integration_id: integrationId,
-      p_accessed_by: 'send-communication-function',
-      p_access_reason: accessReason,
-      p_source_ip: sourceIp
-    });
-    console.log(`Logged access to integration keys for ${integrationId}`);
-  } catch (error) {
-    console.error(`Failed to log integration key access: ${error}`);
-    // We don't throw this error as it's not critical to the main flow
-  }
-}

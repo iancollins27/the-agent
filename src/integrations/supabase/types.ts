@@ -24,7 +24,6 @@ export type Database = {
           recipient_id: string | null
           requires_approval: boolean
           sender_ID: string | null
-          sender_phone: string | null
           status: string
         }
         Insert: {
@@ -41,7 +40,6 @@ export type Database = {
           recipient_id?: string | null
           requires_approval?: boolean
           sender_ID?: string | null
-          sender_phone?: string | null
           status?: string
         }
         Update: {
@@ -58,7 +56,6 @@ export type Database = {
           recipient_id?: string | null
           requires_approval?: boolean
           sender_ID?: string | null
-          sender_phone?: string | null
           status?: string
         }
         Relationships: [
