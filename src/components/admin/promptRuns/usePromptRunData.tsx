@@ -41,7 +41,8 @@ export const usePromptRunData = (statusFilter: string | null) => {
           // Make sure it matches our PromptRun type
           workflow_type: run.workflow_prompts?.type,
           prompt_text: run.prompt_input,
-          result: run.prompt_output
+          result: run.prompt_output,
+          reviewed: run.reviewed || false
         } as unknown as PromptRun;
       });
 

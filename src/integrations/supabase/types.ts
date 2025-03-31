@@ -738,6 +738,7 @@ export type Database = {
           project_id: string | null
           prompt_input: string
           prompt_output: string | null
+          reviewed: boolean | null
           status: string
           workflow_prompt_id: string | null
         }
@@ -754,6 +755,7 @@ export type Database = {
           project_id?: string | null
           prompt_input: string
           prompt_output?: string | null
+          reviewed?: boolean | null
           status?: string
           workflow_prompt_id?: string | null
         }
@@ -770,6 +772,7 @@ export type Database = {
           project_id?: string | null
           prompt_input?: string
           prompt_output?: string | null
+          reviewed?: boolean | null
           status?: string
           workflow_prompt_id?: string | null
         }

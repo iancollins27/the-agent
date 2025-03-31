@@ -52,5 +52,5 @@ export interface PromptRun {
   workflow_type?: string;
   prompt_text?: string;
   result?: string;
-  reviewed?: boolean; // Added this field to match the new database column
+  reviewed?: boolean; // Added this field to match the database column
 }
