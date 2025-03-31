@@ -84,12 +84,19 @@ export async function sendCommunication(
   },
   channel: 'sms' | 'email' | 'call',
   projectId?: string,
-  companyId?: string
+  companyId?: string,
+  sender?: {
+    id?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+  }
 ): Promise<any> {
   console.log('Sending communication with data:', {
     actionId,
     messageContent,
     recipient,
+    sender,
     channel,
     projectId,
     companyId
@@ -100,6 +107,7 @@ export async function sendCommunication(
       actionId,
       messageContent,
       recipient,
+      sender,
       channel,
       projectId,
       companyId
@@ -235,6 +243,14 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           email: actionPayload.recipient_email || actionPayload.email
         };
 
+        // Prepare sender data
+        const sender = {
+          id: action.sender_ID,
+          name: action.sender_name,
+          phone: action.sender?.phone_number || actionPayload.sender_phone || actionPayload.from,
+          email: action.sender?.email || actionPayload.sender_email
+        };
+
         // Determine communication channel
         let channel: 'sms' | 'email' | 'call' = 'sms';
         if (actionPayload.channel) {
@@ -253,6 +269,7 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           actionId: action.id,
           messageContent,
           recipient,
+          sender,
           channel,
           projectId: action.project_id
         });
@@ -266,7 +283,8 @@ export async function executeAction(action: ActionRecord): Promise<void> {
             recipient,
             channel,
             action.project_id,
-            actionPayload.company_id
+            actionPayload.company_id,
+            sender
           );
           toast.success("Message sent successfully");
         } catch (commError: any) {

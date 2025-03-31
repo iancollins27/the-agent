@@ -47,11 +47,13 @@ serve(async (req) => {
       providerId, 
       projectId, 
       companyId, 
-      isTest 
+      isTest,
+      sender
     } = requestData;
 
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
+    console.log(`Sender details:`, sender || 'Not provided');
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
 
     // Determine company ID
@@ -161,7 +163,8 @@ serve(async (req) => {
         channel, 
         messageContent, 
         recipient, 
-        commRecord.id
+        commRecord.id,
+        sender
       );
     } catch (sendError) {
       console.error(`Error sending communication: ${sendError.message}`);

@@ -5,7 +5,8 @@ export async function sendViaJustCall(
   providerInfo: ProviderInfo, 
   channel: string, 
   message: string, 
-  recipient: any
+  recipient: any,
+  sender?: any
 ): Promise<any> {
   console.log(`Sending via JustCall: ${channel} to ${recipient.phone}`);
   
@@ -24,11 +25,15 @@ export async function sendViaJustCall(
     throw new Error('Recipient phone number is required for JustCall SMS');
   }
 
-  // Check if we have the JustCall number from which to send
-  if (!providerInfo.justcall_number) {
-    console.log('No JustCall number provided in provider config');
-    throw new Error('JustCall number is required in provider configuration');
+  // Determine which phone number to send from
+  const senderPhone = sender?.phone || providerInfo.justcall_number;
+  
+  if (!senderPhone) {
+    console.log('No sender phone number provided and no default JustCall number configured');
+    throw new Error('Sender phone number is required for JustCall SMS');
   }
+
+  console.log(`Using sender phone number: ${senderPhone}`);
 
   // Create authorization header using API key and secret
   const authHeader = `${providerInfo.api_key}:${providerInfo.api_secret}`;
@@ -36,7 +41,7 @@ export async function sendViaJustCall(
   try {
     // Prepare request payload
     const payload = {
-      justcall_number: providerInfo.justcall_number, // The JustCall number to send from
+      justcall_number: senderPhone, // The JustCall number to send from
       body: message, // The SMS message content
       contact_number: recipient.phone, // The recipient's phone number
       restrict_once: "Yes" // Prevent duplicate messages

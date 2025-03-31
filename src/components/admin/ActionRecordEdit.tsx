@@ -93,6 +93,14 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
         email: actionPayload.recipient_email || actionPayload.email
       };
 
+      // Prepare sender data
+      const sender = {
+        id: action.sender_ID,
+        name: action.sender_name || actionPayload.sender_name,
+        phone: action.sender?.phone_number || actionPayload.sender_phone || actionPayload.from,
+        email: action.sender?.email || actionPayload.sender_email
+      };
+
       // Determine communication channel based on available recipient data
       let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
       if (actionPayload.channel) {
@@ -114,6 +122,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
           actionId: action.id,
           messageContent,
           recipient,
+          sender,
           channel,
           projectId: action.project_id
         }

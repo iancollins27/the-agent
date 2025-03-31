@@ -11,6 +11,12 @@ export interface SendCommRequest {
     email?: string;
     name?: string;
   };
+  sender?: {
+    id?: string;
+    phone?: string;
+    email?: string;
+    name?: string;
+  };
   channel: 'sms' | 'email' | 'call';
   providerId?: string; // Provider ID from company_integrations table
   projectId?: string;
@@ -23,6 +29,7 @@ export interface ProviderInfo {
   api_key: string;
   api_secret?: string;
   account_id?: string;
+  justcall_number?: string;
 }
 
 export interface CommunicationRecordParams {

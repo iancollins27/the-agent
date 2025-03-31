@@ -84,6 +84,16 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
                 (actionPayload && typeof actionPayload === 'object' ? actionPayload.recipient_email || actionPayload.email : null)
         };
 
+        // Prepare sender data
+        const sender = {
+          id: action.sender_ID,
+          name: action.sender_name || (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_name : null),
+          phone: action.sender?.phone_number || 
+                (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_phone || actionPayload.from : null),
+          email: action.sender?.email || 
+                (actionPayload && typeof actionPayload === 'object' ? actionPayload.sender_email : null)
+        };
+
         // Determine communication channel based on available recipient data
         let channel: 'sms' | 'email' | 'call' = 'sms'; // Default to SMS
         if (actionPayload && typeof actionPayload === 'object' && actionPayload.channel) {
@@ -105,6 +115,7 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
               actionId: action.id,
               messageContent,
               recipient,
+              sender,
               channel,
               projectId: action.project_id
             }
