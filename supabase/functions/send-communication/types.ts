@@ -10,21 +10,12 @@ export interface SendCommRequest {
     phone?: string;
     email?: string;
     name?: string;
-    sender?: {
-      id?: string;
-      name?: string;
-      phone?: string;
-      email?: string;
-    };
-    sender_ID?: string; // Legacy field
-    sender_phone?: string;
   };
   channel: 'sms' | 'email' | 'call';
   providerId?: string; // Provider ID from company_integrations table
   projectId?: string;
   companyId?: string;
   isTest?: boolean;
-  senderId?: string; // New field for sender ID
 }
 
 export interface ProviderInfo {
@@ -32,7 +23,6 @@ export interface ProviderInfo {
   api_key: string;
   api_secret?: string;
   account_id?: string;
-  justcall_number?: string;
 }
 
 export interface CommunicationRecordParams {
@@ -44,9 +34,6 @@ export interface CommunicationRecordParams {
     phone?: string;
     email?: string;
     name?: string;
-    sender?: any;
-    sender_ID?: string;
-    sender_phone?: string;
   };
   providerInfo: ProviderInfo;
 }

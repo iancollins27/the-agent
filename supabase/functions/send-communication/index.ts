@@ -47,58 +47,12 @@ serve(async (req) => {
       providerId, 
       projectId, 
       companyId, 
-      isTest,
-      senderId 
+      isTest 
     } = requestData;
 
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
-
-    // Handle sender info if available
-    if (senderId) {
-      console.log(`Sender ID provided: ${senderId}, fetching sender details`);
-      const { data: senderData, error: senderError } = await supabase
-        .from('contacts')
-        .select('id, full_name, phone_number, email')
-        .eq('id', senderId)
-        .single();
-        
-      if (senderError) {
-        console.log(`Error fetching sender: ${senderError.message}`);
-      } else if (senderData) {
-        console.log(`Sender details fetched:`, senderData);
-        // Attach sender info to recipient object so it's available to provider implementations
-        recipient.sender = {
-          id: senderData.id,
-          name: senderData.full_name,
-          phone: senderData.phone_number,
-          email: senderData.email
-        };
-        recipient.sender_phone = senderData.phone_number;
-      }
-    } else if (recipient.sender_ID) {
-      // Handle legacy field name if present
-      console.log(`Legacy sender_ID provided: ${recipient.sender_ID}, fetching sender details`);
-      const { data: senderData, error: senderError } = await supabase
-        .from('contacts')
-        .select('id, full_name, phone_number, email')
-        .eq('id', recipient.sender_ID)
-        .single();
-        
-      if (senderError) {
-        console.log(`Error fetching sender: ${senderError.message}`);
-      } else if (senderData) {
-        console.log(`Sender details fetched:`, senderData);
-        recipient.sender = {
-          id: senderData.id,
-          name: senderData.full_name,
-          phone: senderData.phone_number,
-          email: senderData.email
-        };
-        recipient.sender_phone = senderData.phone_number;
-      }
-    }
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
