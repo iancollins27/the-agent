@@ -12,8 +12,6 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
       throw new Error("Action not found");
     }
 
-    console.log("DEBUG: Approving action:", action.id, "with sender_ID:", action.sender_ID);
-
     // First update the action status
     const { error } = await supabase
       .from('action_records')
@@ -25,103 +23,21 @@ export const handleApproveAction = async (action: ActionRecord): Promise<void> =
 
     if (error) throw error;
     
-    // If it's a message action, also send the communication
+    // If it's a message action, mark it as approved but don't send anything
     if (action.action_type === 'message') {
-      // Extract data from action
-      const actionPayload = action.action_payload as Record<string, any>;
+      toast.info("Communications functionality has been disabled.");
       
-      // Recipient information
-      const recipient = {
-        id: action.recipient_id,
-        name: action.recipient_name,
-        phone: actionPayload.recipient_phone || actionPayload.phone,
-        email: actionPayload.recipient_email || actionPayload.email
-      };
-
-      // Communication channel
-      const channel = actionPayload.channel || 'sms';
-      
-      // Message content
-      const messageContent = action.message || 
-                            actionPayload.message_content || 
-                            actionPayload.content || 
-                            '';
-      
-      // Log Sender ID
-      console.log("DEBUG: Working with sender_ID in action record:", action.sender_ID);
-      
-      // We need to make sure we have sender information
-      let sender = undefined;
-      
-      // If we have sender_ID, fetch the sender details
-      if (action.sender_ID) {
-        console.log("DEBUG: Found sender_ID in action record:", action.sender_ID);
-        
-        const { data: senderData, error: senderError } = await supabase
-          .from('contacts')
-          .select('id, full_name, phone_number, email')
-          .eq('id', action.sender_ID)
-          .single();
-          
-        if (senderError) {
-          console.error('Error fetching sender data:', senderError);
-          console.log("DEBUG: Error details:", senderError.message, senderError.details, senderError.hint);
-        } else if (senderData) {
-          console.log("DEBUG: Successfully fetched sender data:", senderData);
-          console.log("DEBUG: Sender phone_number:", senderData.phone_number);
-          console.log("DEBUG: Sender email:", senderData.email);
-          console.log("DEBUG: Sender full_name:", senderData.full_name);
-          
-          sender = {
-            id: senderData.id,
-            name: senderData.full_name,
-            phone: senderData.phone_number,
-            email: senderData.email
-          };
-          
-          console.log("DEBUG: Constructed sender object:", sender);
-        } else {
-          console.log("DEBUG: Sender data not found for ID:", action.sender_ID);
-        }
-      } else {
-        console.log("DEBUG: No sender_ID found in action record");
-      }
-
-      // Log the final request payload for debugging
-      console.log("DEBUG: Sending communication with payload:", {
-        actionId: action.id,
-        messageContent,
-        recipient,
-        sender,
-        channel,
-        projectId: action.project_id
-      });
-
-      toast.info("Sending communication...");
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('send-communication', {
-          body: {
-            actionId: action.id,
-            messageContent,
-            recipient,
-            sender, // This will be undefined if we couldn't find sender data
-            channel,
-            projectId: action.project_id
+      // Record that we didn't actually send the communication
+      await supabase
+        .from('action_records')
+        .update({
+          execution_result: {
+            status: 'disabled',
+            timestamp: new Date().toISOString(),
+            details: 'Outbound communications functionality has been disabled'
           }
-        });
-        
-        if (error) {
-          console.error("DEBUG: Error from send-communication function:", error);
-          throw error;
-        }
-        
-        console.log("DEBUG: Communication sent successfully, response:", data);
-        toast.success("Communication sent successfully");
-      } catch (commError) {
-        console.error('Error sending communication:', commError);
-        toast.error("Failed to send communication");
-      }
+        })
+        .eq('id', action.id);
     }
     
     toast.success("Action approved successfully");

@@ -2,6 +2,8 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BellOff } from "lucide-react";
 
 export const CommunicationLog = () => {
   const communications = [
@@ -32,35 +34,45 @@ export const CommunicationLog = () => {
   ];
 
   return (
-    <ScrollArea className="h-[250px]">
-      <div className="space-y-4">
-        {communications.map((comm) => (
-          <div
-            key={comm.id}
-            className={`flex items-start gap-3 p-3 rounded-lg border ${
-              comm.type === "inbound" ? "bg-blue-50" : "bg-green-50"
-            }`}
-          >
-            <div className="mt-1">
-              {comm.type === "inbound" ? (
-                <ArrowDownLeft className="w-4 h-4 text-blue-600" />
-              ) : (
-                <ArrowUpRight className="w-4 h-4 text-green-600" />
-              )}
-            </div>
-            
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="text-xs">
-                  {comm.type === "inbound" ? "From" : "To"}: {comm.type === "inbound" ? comm.sender : comm.recipient}
-                </Badge>
-                <span className="text-xs text-muted-foreground">{comm.timestamp}</span>
+    <div className="space-y-4">
+      <Alert className="bg-amber-50 border-amber-200">
+        <BellOff className="h-4 w-4 text-amber-600" />
+        <AlertTitle>Outbound Communications Disabled</AlertTitle>
+        <AlertDescription>
+          The outbound communications functionality has been disabled. You can view past communications but cannot send new ones.
+        </AlertDescription>
+      </Alert>
+      
+      <ScrollArea className="h-[250px]">
+        <div className="space-y-4">
+          {communications.map((comm) => (
+            <div
+              key={comm.id}
+              className={`flex items-start gap-3 p-3 rounded-lg border ${
+                comm.type === "inbound" ? "bg-blue-50" : "bg-green-50"
+              }`}
+            >
+              <div className="mt-1">
+                {comm.type === "inbound" ? (
+                  <ArrowDownLeft className="w-4 h-4 text-blue-600" />
+                ) : (
+                  <ArrowUpRight className="w-4 h-4 text-green-600" />
+                )}
               </div>
-              <p className="text-sm">{comm.message}</p>
+              
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-xs">
+                    {comm.type === "inbound" ? "From" : "To"}: {comm.type === "inbound" ? comm.sender : comm.recipient}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{comm.timestamp}</span>
+                </div>
+                <p className="text-sm">{comm.message}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 };

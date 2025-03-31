@@ -1,12 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
-import { SendCommRequest, ProviderInfo } from "./types.ts";
-import { determineCompanyId } from "./services/companyService.ts";
-import { getProviderInfo } from "./services/providerService.ts";
-import { createCommunicationRecord, updateActionRecord } from "./services/databaseService.ts";
-import { sendCommunication } from "./services/communicationService.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -15,168 +9,18 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Starting send-communication function execution");
-    
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Parse request body
-    const requestData: SendCommRequest = await req.json();
-    
-    // Log the full request payload
-    console.log("==== FULL REQUEST PAYLOAD ====");
-    console.log(JSON.stringify(requestData, null, 2));
-    console.log("=============================");
-    
-    const { 
-      actionId,
-      messageContent,
-      recipient,
-      sender,
-      channel,
-      providerId,
-      projectId,
-      companyId,
-      isTest
-    } = requestData;
-
-    console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
-    console.log(`Recipient details:`, recipient);
-    console.log(`Sender details:`, sender);
-    console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
-    
-    // Validate required fields
-    if (!messageContent) {
-      throw new Error('Message content is required');
-    }
-
-    if (channel === 'sms' && !recipient.phone) {
-      throw new Error('Phone number is required for SMS communications');
-    }
-
-    if (channel === 'email' && !recipient.email) {
-      throw new Error('Email address is required for email communications');
-    }
-
-    // Determine company ID
-    const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
-
-    // Determine provider info
-    const providerInfo = await getProviderInfo(
-      supabase, 
-      providerId, 
-      targetCompanyId, 
-      channel, 
-      actionId, 
-      req.headers.get('x-real-ip') || 'unknown'
-    );
-
-    console.log(`Using communication provider: ${providerInfo.provider_name}`);
-
-    // Record in communications table
-    let commRecord;
-    try {
-      commRecord = await createCommunicationRecord(
-        supabase,
-        {
-          projectId,
-          channel,
-          messageContent,
-          recipient,
-          sender,
-          providerInfo
-        }
-      );
-    } catch (commError) {
-      console.error(`Communication record creation failed: ${commError.message}`);
-      throw commError;
-    }
-
-    // Update action record with the communication ID
-    if (actionId) {
-      await updateActionRecord(supabase, actionId, commRecord.id, providerInfo.provider_name);
-    }
-
-    // If this is just a test, we skip sending
-    if (isTest) {
-      console.log('Test mode - skipping actual communication send');
-      await supabase
-        .from('communications')
-        .update({
-          status: 'TEST',
-          sent_at: new Date().toISOString(),
-          provider_response: { test: true }
-        })
-        .eq('id', commRecord.id);
-        
-      return new Response(
-        JSON.stringify({
-          success: true,
-          test: true,
-          communication_id: commRecord.id,
-          provider: providerInfo.provider_name,
-          channel: channel,
-          message: `Test communication recorded successfully`
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Send the actual communication
-    let sendResult;
-    try {
-      sendResult = await sendCommunication(
-        supabase, 
-        providerInfo, 
-        channel, 
-        messageContent, 
-        recipient,
-        sender, 
-        commRecord.id
-      );
-    } catch (sendError) {
-      console.error(`Error sending communication: ${sendError.message}`);
-      await supabase
-        .from('communications')
-        .update({
-          status: 'FAILED',
-          error_details: sendError.message
-        })
-        .eq('id', commRecord.id);
-      throw sendError;
-    }
-
-    // Update communication status to SENT
-    await supabase
-      .from('communications')
-      .update({
-        status: 'SENT',
-        sent_at: new Date().toISOString(),
-        provider_response: sendResult
-      })
-      .eq('id', commRecord.id);
-
     return new Response(
       JSON.stringify({
-        success: true,
-        communication_id: commRecord.id,
-        provider: providerInfo.provider_name,
-        channel: channel,
-        message: `Communication successfully sent via ${providerInfo.provider_name}`
+        success: false,
+        error: "Outbound communications functionality has been disabled"
       }),
       {
-        status: 200,
+        status: 501, // Not Implemented
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   } catch (error) {
     console.error(`Error in send-communication function: ${error.message}`);
-    console.error(`Error stack: ${error.stack || 'No stack trace available'}`);
     
     return new Response(
       JSON.stringify({

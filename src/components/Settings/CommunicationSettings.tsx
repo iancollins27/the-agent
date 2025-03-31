@@ -23,7 +23,6 @@ const CommunicationSettings: React.FC = () => {
   const [selectedPhoneProvider, setSelectedPhoneProvider] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -89,55 +88,12 @@ const CommunicationSettings: React.FC = () => {
     }
   };
 
-  const handleTestCommunication = async () => {
-    if (!companySettings?.id) {
-      toast({
-        title: "Error",
-        description: "No company selected",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsTesting(true);
-    try {
-      console.log('Testing communication with provider:', selectedPhoneProvider);
-      
-      const { data, error } = await supabase.functions.invoke('send-communication', {
-        body: {
-          messageContent: "This is a test message from the settings page",
-          recipient: {
-            name: "Test User",
-            phone: "1234567890" // Use a valid test number in production
-          },
-          channel: "sms",
-          providerId: selectedPhoneProvider,
-          companyId: companySettings.id,
-          isTest: true
-        }
-      });
-      
-      if (error) {
-        console.error('Error invoking send-communication function:', error);
-        throw new Error(error.message);
-      }
-      
-      console.log('Communication test response:', data);
-      
-      toast({
-        title: "Test Successful",
-        description: "Communication test was successful. Check the logs for details.",
-      });
-    } catch (error: any) {
-      console.error('Error testing communication:', error);
-      toast({
-        title: "Test Failed",
-        description: error.message || "Communication test failed",
-        variant: "destructive",
-      });
-    } finally {
-      setIsTesting(false);
-    }
+  const handleTestCommunication = () => {
+    toast({
+      title: "Functionality Disabled",
+      description: "Outbound communications functionality has been disabled",
+      variant: "destructive",
+    });
   };
 
   if (settingsLoading || isLoading) {
@@ -205,11 +161,11 @@ const CommunicationSettings: React.FC = () => {
             
             <Button 
               onClick={handleTestCommunication} 
-              disabled={isTesting || (!selectedPhoneProvider && !selectedEmailProvider)}
               variant="outline"
-              className="mt-4"
+              className="mt-4 line-through"
+              title="Outbound communications functionality has been disabled"
             >
-              {isTesting ? "Testing..." : "Test Communication"}
+              Test Communication (Disabled)
             </Button>
           </div>
         </CardContent>

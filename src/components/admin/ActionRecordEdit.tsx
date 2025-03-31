@@ -73,128 +73,26 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
     }
   };
 
-  const handleSendCommunication = async () => {
-    if (action.action_type !== 'message') {
-      toast.error("Only message actions can be sent as communications");
-      return;
-    }
-
-    setIsSending(true);
-    try {
-      const actionPayload = action.action_payload as Record<string, any>;
-      
-      // Log sender_ID to debug
-      console.log('DEBUG: action.sender_ID =', action.sender_ID);
-      console.log('DEBUG: actionPayload.sender_id =', actionPayload.sender_id);
-      console.log('DEBUG: actionPayload.senderId =', actionPayload.senderId);
-      
-      const senderId = action.sender_ID || 
-                      actionPayload.sender_id || 
-                      actionPayload.senderId;
-      
-      console.log('DEBUG: Final sender ID for communication:', senderId);
-      
-      // Prepare recipient details
-      const recipient = {
-        id: action.recipient_id,
-        name: action.recipient_name,
-        phone: actionPayload.recipient_phone || actionPayload.phone,
-        email: actionPayload.recipient_email || actionPayload.email
-      };
-
-      console.log('DEBUG: Recipient info:', recipient);
-
-      let channel: 'sms' | 'email' | 'call' = 'sms';
-      if (actionPayload.channel) {
-        channel = actionPayload.channel as 'sms' | 'email' | 'call';
-      } else if (recipient.email && !recipient.phone) {
-        channel = 'email';
-      }
-
-      const messageContent = action.message || 
-                            actionPayload.message_content || 
-                            actionPayload.content || 
-                            '';
-
-      toast.info("Initiating communication...");
-
-      // Fetch sender contact details if we have a sender ID
-      let sender = undefined;
-      if (senderId) {
-        console.log('DEBUG: Fetching contact details for sender ID:', senderId);
-        
-        const { data: senderData, error: senderError } = await supabase
-          .from('contacts')
-          .select('id, full_name, phone_number, email')
-          .eq('id', senderId)
-          .maybeSingle();
-          
-        if (senderError) {
-          console.error('Error fetching sender:', senderError);
-        } else if (senderData) {
-          console.log('DEBUG: Sender data retrieved successfully:', senderData);
-          console.log('DEBUG: Sender phone_number:', senderData.phone_number);
-          console.log('DEBUG: Sender email:', senderData.email);
-          console.log('DEBUG: Sender full_name:', senderData.full_name);
-          
-          sender = {
-            id: senderData.id,
-            name: senderData.full_name,
-            phone: senderData.phone_number,
-            email: senderData.email
-          };
-          
-          console.log('DEBUG: Constructed sender object:', sender);
-        } else {
-          console.log('DEBUG: No sender data found for ID:', senderId);
+  const handleSendCommunication = () => {
+    toast.info("Outbound communications functionality has been disabled");
+    
+    // Record that we didn't actually send the communication
+    supabase
+      .from('action_records')
+      .update({
+        execution_result: {
+          status: 'disabled',
+          timestamp: new Date().toISOString(),
+          details: 'Outbound communications functionality has been disabled'
         }
-      } else {
-        console.log('DEBUG: No sender ID provided, communication will be sent without sender info');
-      }
-
-      console.log('DEBUG: Final payload for send-communication:', {
-        actionId: action.id,
-        messageContent,
-        recipient,
-        sender,
-        channel,
-        projectId: action.project_id
+      })
+      .eq('id', action.id)
+      .then(() => {
+        onActionUpdated();
+      })
+      .catch(error => {
+        console.error('Error updating action record:', error);
       });
-
-      const { data, error } = await supabase.functions.invoke('send-communication', {
-        body: {
-          actionId: action.id,
-          messageContent,
-          recipient,
-          sender,
-          channel,
-          projectId: action.project_id
-        }
-      });
-      
-      if (error) {
-        console.error('DEBUG: Error from send-communication function:', error);
-        throw error;
-      }
-      
-      console.log('DEBUG: Communication sent successfully, response:', data);
-      
-      await supabase
-        .from('action_records')
-        .update({
-          status: 'approved',
-          executed_at: new Date().toISOString()
-        })
-        .eq('id', action.id);
-      
-      toast.success("Communication sent successfully");
-      onActionUpdated();
-    } catch (error) {
-      console.error('Error sending communication:', error);
-      toast.error("Failed to send communication");
-    } finally {
-      setIsSending(false);
-    }
   };
 
   return (
@@ -283,7 +181,7 @@ const ActionRecordEdit: React.FC<ActionRecordEditProps> = ({ action, onActionUpd
                 disabled={isSending}
               >
                 <SendHorizonal className="h-4 w-4 mr-2" />
-                {isSending ? "Sending..." : "Send Communication"}
+                <span className="line-through">Send Communication</span> (Disabled)
               </Button>
             )}
             <Button onClick={handleSave} className="flex-1">

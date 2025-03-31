@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "../types";
 import { toast } from "sonner";
@@ -69,77 +70,9 @@ export async function setProjectReminder(
     .eq('id', actionId);
 }
 
-export async function sendCommunication(
-  actionId: string,
-  messageContent: string,
-  recipient: {
-    id?: string;
-    name?: string;
-    phone?: string;
-    email?: string;
-  },
-  channel: 'sms' | 'email' | 'call',
-  projectId?: string,
-  companyId?: string,
-  senderId?: string
-): Promise<any> {
-  console.log('Sending communication with data:', {
-    actionId,
-    messageContent,
-    recipient,
-    channel,
-    projectId,
-    companyId,
-    senderId
-  });
-  
-  // If we have a senderId, fetch the sender contact details
-  let sender = undefined;
-  if (senderId) {
-    const { data: senderData, error: senderError } = await supabase
-      .from('contacts')
-      .select('id, full_name, phone_number, email')
-      .eq('id', senderId)
-      .maybeSingle();
-      
-    if (!senderError && senderData) {
-      console.log('Found sender data:', senderData);
-      // Create a properly structured sender object
-      sender = {
-        id: senderData.id,
-        name: senderData.full_name,
-        phone: senderData.phone_number,
-        email: senderData.email
-      };
-    } else {
-      console.error('Error fetching sender data:', senderError);
-      console.log('Will attempt to send without sender information');
-    }
-  }
-  
-  console.log('Prepared sender info for request:', sender);
-  
-  // Send the communication with properly separated sender and recipient
-  const { data, error } = await supabase.functions.invoke('send-communication', {
-    body: {
-      actionId,
-      messageContent,
-      recipient,
-      sender,
-      channel,
-      projectId,
-      companyId
-    }
-  });
-  
-  if (error) {
-    console.error('Communication error:', error);
-    throw new Error(`Communication error: ${error.message}`);
-  }
-  
-  console.log('Communication sent successfully:', data);
-  
-  return data;
+export async function sendCommunication(): Promise<any> {
+  toast.info("Outbound communications functionality has been disabled");
+  return Promise.resolve({ disabled: true });
 }
 
 export async function recordCommunicationFailure(
@@ -169,31 +102,20 @@ export async function processNotionIntegration(
   notionDatabaseId?: string,
   notionPageId?: string
 ): Promise<any> {
-  const { data, error } = await supabase.functions.invoke('process-notion-integration', {
-    body: { 
-      companyId,
-      notionToken,
-      notionDatabaseId,
-      notionPageId
-    }
-  });
-  
-  if (error) {
-    throw error;
-  }
+  toast.info("Notion integration functionality has been disabled");
   
   await supabase
     .from('action_records')
     .update({
       execution_result: {
-        status: 'notion_integration_started',
+        status: 'notion_integration_disabled',
         timestamp: new Date().toISOString(),
-        details: data
+        details: 'Notion integration functionality has been disabled'
       }
     })
     .eq('id', actionId);
     
-  return data;
+  return { disabled: true };
 }
 
 export async function getCompanyIdFromProject(projectId: string): Promise<string | null> {
@@ -248,70 +170,34 @@ export async function executeAction(action: ActionRecord): Promise<void> {
         break;
         
       case 'message':
-        // Extract recipient info
-        const recipient = {
-          id: action.recipient_id,
-          name: action.recipient_name,
-          phone: actionPayload.recipient_phone || actionPayload.phone,
-          email: actionPayload.recipient_email || actionPayload.email
-        };
-
-        let channel: 'sms' | 'email' | 'call' = 'sms';
-        if (actionPayload.channel) {
-          channel = actionPayload.channel as 'sms' | 'email' | 'call';
-        } else if (recipient.email && !recipient.phone) {
-          channel = 'email';
-        }
-
-        const messageContent = action.message || 
-                              actionPayload.message_content || 
-                              actionPayload.content || 
-                              '';
-
-        const senderId = action.sender_ID || 
-                        actionPayload.sender_id || 
-                        actionPayload.senderId;
-
-        console.log('Preparing to send communication:', {
-          actionId: action.id,
-          messageContent,
-          recipient,
-          channel,
-          projectId: action.project_id,
-          senderId
-        });
-                              
-        toast.info("Sending communication...");
+        // Instead of sending a communication, just record that it was disabled
+        toast.info("Outbound communications functionality has been disabled");
         
-        try {
-          await sendCommunication(
-            action.id,
-            messageContent,
-            recipient,
-            channel,
-            action.project_id,
-            actionPayload.company_id,
-            senderId
-          );
-          toast.success("Message sent successfully");
-        } catch (commError: any) {
-          console.error('Error sending communication:', commError);
-          toast.error(commError.message || "Failed to send the message");
-          await recordCommunicationFailure(action.id, commError.message || "Unknown error");
-          throw commError;
-        }
+        await supabase
+          .from('action_records')
+          .update({
+            execution_result: {
+              status: 'communication_disabled',
+              timestamp: new Date().toISOString(),
+              details: 'Outbound communications functionality has been disabled'
+            }
+          })
+          .eq('id', action.id);
         break;
         
       case 'notion_integration':
-        const companyId = await getCompanyIdFromProject(action.project_id || '');
-        await processNotionIntegration(
-          action.id,
-          companyId,
-          actionPayload.notion_token,
-          actionPayload.notion_database_id,
-          actionPayload.notion_page_id
-        );
-        toast.success("Notion integration started. Content will be processed in the background.");
+        toast.info("Notion integration functionality has been disabled");
+        
+        await supabase
+          .from('action_records')
+          .update({
+            execution_result: {
+              status: 'notion_integration_disabled',
+              timestamp: new Date().toISOString(),
+              details: 'Notion integration functionality has been disabled'
+            }
+          })
+          .eq('id', action.id);
         break;
         
       default:
