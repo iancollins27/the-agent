@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -18,6 +17,7 @@ interface UsePromptRunsProps {
   projectManagerFilter: string | null;
   timeFilter: string;
   getDateFilter: () => string | null;
+  onlyShowLatestRuns?: boolean;
 }
 
 export const usePromptRuns = ({
@@ -26,7 +26,8 @@ export const usePromptRuns = ({
   onlyShowMyProjects,
   projectManagerFilter,
   timeFilter,
-  getDateFilter
+  getDateFilter,
+  onlyShowLatestRuns = false
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,7 @@ export const usePromptRuns = ({
     if (userProfile) {
       fetchPromptRuns();
     }
-  }, [statusFilter, userProfile, onlyShowMyProjects, projectManagerFilter, timeFilter]);
+  }, [statusFilter, userProfile, onlyShowMyProjects, projectManagerFilter, timeFilter, onlyShowLatestRuns]);
 
   const fetchPromptRuns = async () => {
     if (!userProfile?.profile_associated_company) {
@@ -82,7 +83,33 @@ export const usePromptRuns = ({
       const data = await fetchFilteredPromptRuns(projectIds, statusFilter, timeConstraint);
       
       // Format the data for display
-      const formattedData = formatPromptRunData(data);
+      let formattedData = formatPromptRunData(data);
+
+      // If onlyShowLatestRuns is true, filter to keep only the latest run for each project
+      if (onlyShowLatestRuns && formattedData.length > 0) {
+        // Create a map to store the latest prompt run for each project
+        const latestRunsByProject = new Map<string, PromptRun>();
+        
+        // Iterate through all prompt runs to find the latest for each project
+        formattedData.forEach(run => {
+          if (!run.project_id) return; // Skip runs without a project ID
+          
+          const existingRun = latestRunsByProject.get(run.project_id);
+          
+          // If we don't have a run for this project yet, or if this run is more recent than what we have
+          if (!existingRun || new Date(run.created_at) > new Date(existingRun.created_at)) {
+            latestRunsByProject.set(run.project_id, run);
+          }
+        });
+        
+        // Convert the map values back to an array
+        formattedData = Array.from(latestRunsByProject.values());
+        
+        // Sort by created_at in descending order (most recent first)
+        formattedData.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      }
 
       setPromptRuns(formattedData);
     } catch (error) {

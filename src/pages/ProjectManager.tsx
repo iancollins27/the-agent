@@ -68,7 +68,7 @@ const ProjectManager: React.FC = () => {
     }
   }, [projectManagerFilter]);
 
-  // Use the custom hook to fetch prompt runs
+  // Use the custom hook to fetch prompt runs, only showing the latest run for each project
   const { 
     promptRuns, 
     loading, 
@@ -82,7 +82,8 @@ const ProjectManager: React.FC = () => {
     onlyShowMyProjects: onlyMyProjects,
     projectManagerFilter,
     timeFilter,
-    getDateFilter
+    getDateFilter,
+    onlyShowLatestRuns: true // Only show the latest run for each project
   });
 
   const viewPromptRunDetails = (run: PromptRun) => {
