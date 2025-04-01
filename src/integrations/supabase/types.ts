@@ -665,6 +665,7 @@ export type Database = {
           crm_id: string | null
           id: string
           last_action_check: string | null
+          latest_prompt_run_ID: string | null
           next_check_date: string | null
           next_step: string | null
           project_manager: string | null
@@ -679,6 +680,7 @@ export type Database = {
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
+          latest_prompt_run_ID?: string | null
           next_check_date?: string | null
           next_step?: string | null
           project_manager?: string | null
@@ -693,6 +695,7 @@ export type Database = {
           crm_id?: string | null
           id?: string
           last_action_check?: string | null
+          latest_prompt_run_ID?: string | null
           next_check_date?: string | null
           next_step?: string | null
           project_manager?: string | null
@@ -706,6 +709,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_latest_prompt_run_ID_fkey"
+            columns: ["latest_prompt_run_ID"]
+            isOneToOne: false
+            referencedRelation: "prompt_runs"
             referencedColumns: ["id"]
           },
           {
@@ -944,6 +954,7 @@ export type Database = {
           crm_id: string | null
           id: string
           last_action_check: string | null
+          latest_prompt_run_ID: string | null
           next_check_date: string | null
           next_step: string | null
           project_manager: string | null

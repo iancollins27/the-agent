@@ -66,6 +66,24 @@ serve(async (req) => {
       );
       
       console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
+      
+      // Update the latest_prompt_run_ID field on the project if this is an action detection prompt
+      if (promptType === "action_detection_execution" && projectId && promptRunId) {
+        try {
+          const { error: updateError } = await supabase
+            .from('projects')
+            .update({ latest_prompt_run_ID: promptRunId })
+            .eq('id', projectId);
+            
+          if (updateError) {
+            console.error("Error updating project with latest_prompt_run_ID:", updateError);
+          } else {
+            console.log(`Successfully updated project ${projectId} with latest_prompt_run_ID: ${promptRunId}`);
+          }
+        } catch (updateProjectError) {
+          console.error("Exception updating project latest_prompt_run_ID:", updateProjectError);
+        }
+      }
     } catch (promptRunError) {
       console.error("Error creating prompt run:", promptRunError);
     }
