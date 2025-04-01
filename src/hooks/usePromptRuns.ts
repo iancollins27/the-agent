@@ -85,14 +85,22 @@ export const usePromptRuns = ({
       // Format the data for display
       let formattedData = formatPromptRunData(data);
 
+      console.log(`Total prompt runs before filtering: ${formattedData.length}`);
+      console.log(`onlyShowLatestRuns is set to: ${onlyShowLatestRuns}`);
+
       // If onlyShowLatestRuns is true, filter to keep only the latest run for each project
       if (onlyShowLatestRuns && formattedData.length > 0) {
+        console.log("Filtering to show only latest runs per project");
+        
         // Create a map to store the latest prompt run for each project
         const latestRunsByProject = new Map<string, PromptRun>();
         
         // Iterate through all prompt runs to find the latest for each project
         formattedData.forEach(run => {
-          if (!run.project_id) return; // Skip runs without a project ID
+          if (!run.project_id) {
+            console.log(`Skipping run ${run.id} with no project_id`);
+            return; // Skip runs without a project ID
+          }
           
           const existingRun = latestRunsByProject.get(run.project_id);
           
@@ -109,6 +117,8 @@ export const usePromptRuns = ({
         formattedData.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
+        
+        console.log(`Total prompt runs after filtering for latest only: ${formattedData.length}`);
       }
 
       setPromptRuns(formattedData);

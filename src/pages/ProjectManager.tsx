@@ -44,6 +44,7 @@ const ProjectManager: React.FC = () => {
         if (error) {
           console.error('Error fetching user profile:', error);
         } else {
+          console.log('User profile loaded:', data);
           setUserProfile(data);
         }
       } catch (error) {
@@ -85,6 +86,8 @@ const ProjectManager: React.FC = () => {
     getDateFilter,
     onlyShowLatestRuns: true // Only show the latest run for each project
   });
+
+  console.log(`ProjectManager component: Retrieved ${promptRuns.length} prompt runs`);
 
   const viewPromptRunDetails = (run: PromptRun) => {
     setSelectedRun(run);
