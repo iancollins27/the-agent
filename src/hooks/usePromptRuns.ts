@@ -89,7 +89,7 @@ export const usePromptRuns = ({
       console.log(`onlyShowLatestRuns is set to: ${onlyShowLatestRuns}`);
 
       // If onlyShowLatestRuns is true, filter to keep only the latest run for each project
-      if (onlyShowLatestRuns && formattedData.length > 0) {
+      if (onlyShowLatestRuns === true && formattedData.length > 0) {
         console.log("Filtering to show only latest runs per project");
         
         // Create a map to store the latest prompt run for each project
@@ -119,6 +119,8 @@ export const usePromptRuns = ({
         );
         
         console.log(`Total prompt runs after filtering for latest only: ${formattedData.length}`);
+      } else {
+        console.log(`Skipping latest runs filter, showing all ${formattedData.length} runs`);
       }
 
       setPromptRuns(formattedData);

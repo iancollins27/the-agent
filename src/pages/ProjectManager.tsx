@@ -84,10 +84,11 @@ const ProjectManager: React.FC = () => {
     projectManagerFilter,
     timeFilter,
     getDateFilter,
-    onlyShowLatestRuns: true // Only show the latest run for each project
+    onlyShowLatestRuns: true // Explicitly set to true to ensure the latest runs filter is applied
   });
 
   console.log(`ProjectManager component: Retrieved ${promptRuns.length} prompt runs`);
+  console.log(`Using latest runs filter: true`);
 
   const viewPromptRunDetails = (run: PromptRun) => {
     setSelectedRun(run);
@@ -130,6 +131,14 @@ const ProjectManager: React.FC = () => {
     
     return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
+
+  // Force a refresh on component mount to ensure latest data
+  useEffect(() => {
+    if (userProfile) {
+      console.log("Forcing a data refresh on component mount");
+      fetchPromptRuns();
+    }
+  }, [userProfile]);
 
   return (
     <div className="min-h-screen bg-slate-50">
