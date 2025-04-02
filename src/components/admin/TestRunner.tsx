@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
 
 type TestRunnerProps = {
   selectedPromptIds: string[];
@@ -12,8 +13,14 @@ type TestRunnerProps = {
   isMultiProjectTest?: boolean;
 };
 
-const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete, isMultiProjectTest = false }: TestRunnerProps) => {
+const TestRunner = ({ 
+  selectedPromptIds, 
+  selectedProjectIds, 
+  onTestComplete, 
+  isMultiProjectTest = false 
+}: TestRunnerProps) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [useMCP, setUseMCP] = useState<boolean>(false);
   const { toast } = useToast();
   
   const runTest = async () => {
@@ -116,7 +123,8 @@ const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete, isM
               aiModel: aiModel,
               workflowPromptId: promptData.id,
               initiatedBy: userEmail,
-              isMultiProjectTest: isMultiProjectTest // Pass the flag to the edge function
+              isMultiProjectTest: isMultiProjectTest,
+              useMCP: useMCP // Use Model Context Protocol if enabled
             }
           });
           
@@ -129,7 +137,10 @@ const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete, isM
             promptRunId: data.promptRunId,
             actionRecordId: data.actionRecordId,
             reminderSet: data.reminderSet || false,
-            nextCheckDateInfo: data.nextCheckDateInfo
+            nextCheckDateInfo: data.nextCheckDateInfo,
+            usedMCP: data.usedMCP,
+            humanReviewRequestId: data.humanReviewRequestId,
+            knowledgeResultsCount: data.knowledgeResults
           });
         }
         
@@ -153,18 +164,37 @@ const TestRunner = ({ selectedPromptIds, selectedProjectIds, onTestComplete, isM
   };
 
   return (
-    <div className="flex justify-end">
-      <Button 
-        onClick={runTest} 
-        disabled={isLoading || selectedPromptIds.length === 0 || selectedProjectIds.length === 0}
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Testing...
-          </>
-        ) : isMultiProjectTest ? "Run Multi-Project Test" : "Run Test"}
-      </Button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Switch 
+            id="mcp-toggle" 
+            checked={useMCP} 
+            onCheckedChange={setUseMCP} 
+          />
+          <label htmlFor="mcp-toggle" className="text-sm font-medium">
+            Use Model Context Protocol (MCP)
+          </label>
+        </div>
+        <Button 
+          onClick={runTest} 
+          disabled={isLoading || selectedPromptIds.length === 0 || selectedProjectIds.length === 0}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Testing...
+            </>
+          ) : isMultiProjectTest ? "Run Multi-Project Test" : "Run Test"}
+        </Button>
+      </div>
+      {useMCP && (
+        <div className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
+          <span className="font-medium">Model Context Protocol (MCP) enabled</span>: This uses a more structured approach 
+          for AI interactions with tool-calling capabilities for knowledge base integration and human-in-the-loop workflows.
+          Currently works with OpenAI and Claude providers only.
+        </div>
+      )}
     </div>
   );
 };
