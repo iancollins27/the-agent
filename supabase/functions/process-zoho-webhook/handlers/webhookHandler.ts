@@ -1,21 +1,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { parseZohoData } from '../parser.ts'
-import { 
-  handleCompany, 
-  getExistingProject, 
-  getMilestoneInstructions,
-  getWorkflowPrompt,
-  updateProject,
-  createProject,
-  findProfileByCrmId
-} from '../database.ts'
-import { generateSummary } from '../ai.ts'
 import { corsHeaders } from '../utils/cors.ts'
-import { getAIConfig } from './aiConfigHandler.ts'
-import { formatWorkflowPrompt } from '../utils/promptFormatters.ts'
-import { getTrackDetails } from '../services/trackService.ts'
-import { runActionDetection } from '../services/actionDetectionService.ts'
+import { processWebhookRequest, createErrorResponse, createSuccessResponse } from '../services/webhookIntake.ts'
+import { normalizeWebhookData } from '../services/normalizer.ts'
+import { processWebhookBusinessLogic } from '../services/businessLogic.ts'
+import { generateWorkflowPrompt, runWorkflowPrompt } from '../services/workflowPrompt.ts'
+import { detectAndProcessActions } from '../services/actionDetection.ts'
 
 /**
  * Main handler for processing the Zoho webhook
@@ -24,199 +14,100 @@ import { runActionDetection } from '../services/actionDetectionService.ts'
  */
 export async function handleZohoWebhook(req: Request) {
   try {
+    // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Log the request content type
-    console.log("Content-Type:", req.headers.get('content-type'));
-    
-    // Safely parse the request body
-    let requestBody;
+    // Step 1: Process the webhook request
+    let webhookData;
     try {
-      // Clone the request to avoid consuming it
-      const clonedReq = req.clone();
-      // Get raw text first
-      const rawText = await clonedReq.text();
-      console.log('Raw webhook payload text:', rawText);
-      
-      // Try to parse the text into JSON, with special handling for control characters
-      try {
-        // Replace any invalid control characters before parsing
-        const cleanText = rawText.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
-        requestBody = JSON.parse(cleanText);
-      } catch (jsonError) {
-        console.error('JSON parse error:', jsonError.message);
-        // If JSON parsing fails, check if it's form data
-        if (req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
-          const formData = new URLSearchParams(rawText);
-          // Convert form data to object
-          requestBody = Object.fromEntries(formData.entries());
-          console.log('Parsed form data payload:', requestBody);
-        } else {
-          throw jsonError;
-        }
-      }
-    } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid request format', details: parseError.message }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
+      webhookData = await processWebhookRequest(req);
+    } catch (error) {
+      console.error('Error processing webhook request:', error);
+      return createErrorResponse(error.message, 400);
+    }
+
+    // Step 2: Normalize the webhook data
+    let normalizedData, projectData;
+    try {
+      const result = await normalizeWebhookData(webhookData.source, webhookData.payload);
+      normalizedData = result.standardizedData;
+      projectData = result.projectData;
+    } catch (error) {
+      console.error('Error normalizing webhook data:', error);
+      return createErrorResponse(`Failed to normalize data: ${error.message}`, 422);
+    }
+
+    // Step 3: Process business logic
+    let businessLogicResult;
+    try {
+      businessLogicResult = await processWebhookBusinessLogic(supabase, projectData, normalizedData);
+    } catch (error) {
+      console.error('Error processing business logic:', error);
+      return createErrorResponse(`Business logic error: ${error.message}`, 500);
+    }
+
+    // Step 4: Generate a workflow prompt
+    let workflowResult;
+    try {
+      // Generate the workflow prompt
+      const promptResult = await generateWorkflowPrompt(
+        supabase,
+        businessLogicResult.projectId,
+        projectData,
+        businessLogicResult
       );
-    }
-    
-    console.log('Parsed webhook payload:', requestBody);
-    
-    // Handle both cases where data might be nested or not
-    const rawData = requestBody.rawData || requestBody;
-    const projectData = await parseZohoData(rawData);
-    console.log('Parsed project data:', projectData);
-
-    // Handle company creation/verification and get the Supabase UUID and default track
-    const companyInfo = await handleCompany(supabase, projectData, rawData);
-    const companyUuid = companyInfo.id;
-    const defaultTrackId = companyInfo.defaultTrackId;
-    
-    console.log('Using company UUID:', companyUuid, 'Default track ID:', defaultTrackId);
-    
-    // Get existing project if any
-    const existingProject = await getExistingProject(supabase, projectData.crmId);
-    
-    // Determine which project track to use
-    const projectTrackId = existingProject?.project_track || defaultTrackId || null;
-    console.log('Using project track ID:', projectTrackId);
-
-    // Get milestone instructions if next step exists
-    console.log('Next step from projectData:', projectData.nextStep);
-    
-    // ENHANCED LOGGING: Check if next step is valid for milestone lookup
-    if (!projectData.nextStep || projectData.nextStep.trim() === '') {
-      console.warn('Next step is empty or undefined, cannot retrieve milestone instructions');
-    }
-    
-    // ENHANCED LOGGING: Check if project track ID is valid for milestone lookup
-    if (!projectTrackId) {
-      console.warn('Project track ID is null, cannot retrieve milestone instructions');
-    }
-    
-    const nextStepInstructions = await getMilestoneInstructions(
-      supabase,
-      projectData.nextStep,
-      projectTrackId
-    );
-
-    // Get track roles and base prompt if the project track exists
-    const { trackRoles, trackBasePrompt, trackName } = await getTrackDetails(supabase, projectTrackId);
-
-    // Get and format the workflow prompt
-    const promptTemplate = await getWorkflowPrompt(supabase, !!existingProject);
-    const prompt = formatWorkflowPrompt(
-      promptTemplate, 
-      existingProject?.summary || '',
-      projectData,
-      nextStepInstructions || '',
-      trackRoles,
-      trackBasePrompt,
-      trackName
-    );
-
-    // Get AI configuration
-    const { aiProvider, aiModel, apiKey } = await getAIConfig(supabase);
-    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
-
-    // Generate summary using the configured AI provider
-    const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
-
-    // Find the project manager profile using the CRM ID
-    let projectManagerId = null;
-    if (projectData.projectManagerId) {
-      projectManagerId = await findProfileByCrmId(supabase, projectData.projectManagerId);
-      console.log('Project manager profile ID:', projectManagerId);
-    }
-
-    // Prepare project data using the company UUID from Supabase
-    console.log('Address being saved to project:', projectData.propertyAddress);
-    
-    const projectUpdateData = {
-      summary,
-      next_step: projectData.nextStep,
-      last_action_check: new Date().toISOString(),
-      company_id: companyUuid,
-      project_track: projectTrackId,
-      Address: projectData.propertyAddress,
-      project_manager: projectManagerId
-    };
-
-    console.log('Project update data:', projectUpdateData);
-
-    // Update or create project
-    let projectId;
-    if (existingProject) {
-      await updateProject(supabase, existingProject.id, projectUpdateData);
-      projectId = existingProject.id;
-    } else {
-      // When creating a new project, track creation time
-      const { data: newProject, error } = await supabase
-        .from('projects')
-        .insert({
-          ...projectUpdateData,
-          crm_id: projectData.crmId,
-          created_at: new Date().toISOString() // Explicitly set created_at for new projects
-        })
-        .select('id')
-        .single();
-        
-      if (error) {
-        throw new Error(`Failed to create project: ${error.message}`);
-      }
       
-      projectId = newProject.id;
-      console.log(`Created new project with ID: ${projectId}`);
+      // Run the workflow prompt through the AI
+      workflowResult = await runWorkflowPrompt(
+        supabase,
+        businessLogicResult.projectId,
+        promptResult.summary || '',
+        businessLogicResult.aiProvider || 'openai',
+        businessLogicResult.aiModel || 'gpt-4o'
+      );
+      
+      // Update the summary in our business logic result
+      businessLogicResult.summary = workflowResult.summary;
+    } catch (error) {
+      console.error('Error generating workflow prompt:', error);
+      return createErrorResponse(`Workflow prompt error: ${error.message}`, 500);
     }
 
-    // Run action detection and execution
-    await runActionDetection(
-      supabase, 
-      projectId, 
-      summary, 
-      trackName, 
-      trackRoles, 
-      trackBasePrompt, 
-      projectData.nextStep,
-      projectData,
-      nextStepInstructions || '',
-      aiProvider,
-      aiModel
-    );
+    // Step 5: Run action detection and execution
+    let actionResult = {};
+    try {
+      actionResult = await detectAndProcessActions(
+        supabase,
+        businessLogicResult.projectId,
+        workflowResult.summary,
+        businessLogicResult,
+        projectData
+      );
+    } catch (error) {
+      console.error('Error detecting actions:', error);
+      // We don't want to fail the webhook if action detection fails
+      // Just log the error and continue
+    }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        summary, 
-        isNewProject: !existingProject,
-        parsedData: projectData,
-        nextStepInstructions,
-        companyUuid,
-        projectTrackId,
-        aiProvider,
-        aiModel,
-        projectId,
-        projectManagerId
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // Return success response with all the data
+    return createSuccessResponse({ 
+      success: true, 
+      summary: workflowResult.summary, 
+      isNewProject: businessLogicResult.isNewProject,
+      parsedData: projectData,
+      nextStepInstructions: businessLogicResult.nextStepInstructions,
+      companyUuid: businessLogicResult.companyUuid,
+      projectTrackId: businessLogicResult.projectTrackId,
+      aiProvider: businessLogicResult.aiProvider,
+      aiModel: businessLogicResult.aiModel,
+      projectId: businessLogicResult.projectId,
+      actionResult
+    });
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    );
+    console.error('Unhandled error:', error);
+    return createErrorResponse(error.message, 500);
   }
 }
