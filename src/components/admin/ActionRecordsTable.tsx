@@ -3,26 +3,21 @@ import React from 'react';
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import {
-  flexRender,
+  useReactTable,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  useReactTable,
-  ColumnDef,
 } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Edit, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { ActionRecord } from "@/components/admin/types";
-import ActionTypeBadge from './ActionTypeBadge';
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import ActionRecordRow from './tables/ActionRecordRow';
+import ActionRecordsPagination from './tables/ActionRecordsPagination';
+import { getActionTableColumns } from './tables/ActionTableColumns';
 
 interface ActionRecordsTableProps {
   data: ActionRecord[];
@@ -77,138 +72,7 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
     }
   };
 
-  const columns: ColumnDef<ActionRecord>[] = [
-    {
-      id: "select",
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: "action_type",
-      header: "Type",
-      cell: ({ row }) => <ActionTypeBadge type={row.getValue("action_type")} />,
-    },
-    {
-      accessorKey: "created_at",
-      header: "Date",
-      cell: ({ row }) => {
-        const date = new Date(row.getValue("created_at") as string);
-        return <span>{date.toLocaleString()}</span>;
-      },
-    },
-    {
-      accessorKey: "description",
-      header: "Description",
-      cell: ({ row }) => {
-        const record = row.original;
-        const actionPayload = record.action_payload as Record<string, any>;
-        const description = actionPayload?.description || record.message || '';
-        
-        return (
-          <div className="line-clamp-2 max-w-[300px]">
-            {description}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "project_name",
-      header: "Project",
-      cell: ({ row }) => {
-        const projectName = row.original.project_name;
-        const projectAddress = row.original.project_address;
-        
-        return (
-          <div>
-            <div className="font-medium">{projectName || 'N/A'}</div>
-            {projectAddress && <div className="text-xs text-muted-foreground">{projectAddress}</div>}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => getStatusBadge(row.getValue("status") as string),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const action = row.original;
-        
-        return (
-          <div className="flex items-center gap-2 justify-end">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewDetails(action);
-              }}
-            >
-              <Edit className="h-4 w-4 text-muted-foreground" />
-              <span className="sr-only">Edit</span>
-            </Button>
-            
-            {action.status === 'pending' && (
-              <>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleApproveClick(action);
-                  }}
-                  disabled={isApproving[action.id]}
-                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                >
-                  {isApproving[action.id] ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">Approve</span>
-                </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRejectClick(action);
-                  }}
-                  disabled={isRejecting[action.id]}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  {isRejecting[action.id] ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <XCircle className="h-4 w-4" />
-                  )}
-                  <span className="sr-only">Reject</span>
-                </Button>
-              </>
-            )}
-          </div>
-        );
-      },
-    },
-  ];
+  const columns = getActionTableColumns(getStatusBadge);
 
   const table = useReactTable({
     data,
@@ -234,10 +98,8 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
                   <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
+                      : header.column.columnDef.header
+                    }
                   </TableHead>
                 ))}
               </TableRow>
@@ -246,18 +108,15 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
+                <ActionRecordRow
                   key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="cursor-pointer hover:bg-muted/40"
-                  onClick={() => onViewDetails(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                  row={row}
+                  onViewDetails={onViewDetails}
+                  onApprove={handleApproveClick}
+                  onReject={handleRejectClick}
+                  isApproving={isApproving}
+                  isRejecting={isRejecting}
+                />
               ))
             ) : (
               <TableRow>
@@ -270,24 +129,7 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
         </Table>
       </div>
       
-      <div className="flex items-center justify-end space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
-      </div>
+      <ActionRecordsPagination table={table} />
     </div>
   );
 };
