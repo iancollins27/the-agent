@@ -1,20 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ProjectManagerNav from "../components/ProjectManagerNav";
-import PromptRunsTable from '../components/admin/PromptRunsTable';
 import PromptRunDetails from '../components/admin/PromptRunDetails';
 import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
-import PromptRunFilters from '../components/admin/PromptRunFilters';
-import EmptyPromptRuns from '../components/admin/EmptyPromptRuns';
 import { usePromptRuns } from '@/hooks/usePromptRuns';
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+
+// Import new components
+import ProjectManagerHeader from '../components/project-manager/ProjectManagerHeader';
+import ProjectManagerFilters from '../components/project-manager/ProjectManagerFilters';
+import ProjectManagerContent from '../components/project-manager/ProjectManagerContent';
 
 const ProjectManager: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -146,55 +145,39 @@ const ProjectManager: React.FC = () => {
       
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-4">
-          <h2 className="text-2xl font-bold">Project Manager Dashboard</h2>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="hide-reviewed"
-                checked={hideReviewed}
-                onCheckedChange={setHideReviewed}
-              />
-              <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
-            </div>
-            <PromptRunFilters
-              timeFilter={timeFilter}
-              onTimeFilterChange={setTimeFilter}
-              statusFilter={statusFilter}
-              onStatusFilterChange={setStatusFilter}
-              onlyShowMyProjects={onlyMyProjects}
-              onMyProjectsChange={setOnlyMyProjects}
-              projectManagerFilter={projectManagerFilter}
-              onProjectManagerFilterChange={setProjectManagerFilter}
-              onRefresh={fetchPromptRuns}
-            />
-          </div>
+          <ProjectManagerHeader title="Project Manager Dashboard" />
+          <ProjectManagerFilters 
+            hideReviewed={hideReviewed}
+            setHideReviewed={setHideReviewed}
+            timeFilter={timeFilter}
+            setTimeFilter={setTimeFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            onlyMyProjects={onlyMyProjects}
+            setOnlyMyProjects={setOnlyMyProjects}
+            projectManagerFilter={projectManagerFilter}
+            setProjectManagerFilter={setProjectManagerFilter}
+            onRefresh={fetchPromptRuns}
+          />
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : promptRuns.length === 0 ? (
-          <EmptyPromptRuns
-            message={getEmptyStateMessage()}
-            debugInfo={{
-              userId: user?.id,
-              companyId: userProfile?.profile_associated_company,
-              statusFilter,
-              onlyMyProjects,
-              projectManagerFilter,
-              timeFilter
-            }}
-          />
-        ) : (
-          <PromptRunsTable 
-            promptRuns={promptRuns} 
-            onRatingChange={handleRatingChange} 
-            onViewDetails={viewPromptRunDetails}
-            onRunReviewed={handleRunReviewed}
-            hideReviewed={hideReviewed}
-          />
-        )}
+        <ProjectManagerContent 
+          loading={loading}
+          promptRuns={promptRuns}
+          hideReviewed={hideReviewed}
+          getEmptyStateMessage={getEmptyStateMessage}
+          debugInfo={{
+            userId: user?.id,
+            companyId: userProfile?.profile_associated_company,
+            statusFilter,
+            onlyMyProjects,
+            projectManagerFilter,
+            timeFilter
+          }}
+          onViewDetails={viewPromptRunDetails}
+          onRatingChange={handleRatingChange}
+          onRunReviewed={handleRunReviewed}
+        />
 
         <PromptRunDetails 
           promptRun={selectedRun} 
