@@ -13,6 +13,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
+  flexRender,
 } from "@tanstack/react-table";
 import { ActionRecord } from "@/components/admin/types";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +100,7 @@ const ActionRecordsTable: React.FC<ActionRecordsTableProps> = ({
                   <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
-                      : header.column.columnDef.header
+                      : flexRender(header.column.columnDef.header, header.getContext())
                     }
                   </TableHead>
                 ))}
