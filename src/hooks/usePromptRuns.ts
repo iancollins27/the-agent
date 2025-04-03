@@ -1,8 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
 import { TIME_FILTERS } from "./useTimeFilter";
 import { usePromptFeedback } from './usePromptFeedback';
+import { supabase } from "@/integrations/supabase/client";
 import { 
   debugProjectData, 
   fetchProjects, 

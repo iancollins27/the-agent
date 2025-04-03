@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Star, ExternalLink, Eye, CheckSquare } from "lucide-react";
 import { PromptRun } from './types';
-import PromptRunStatusBadge from './PromptRunStatusBadge';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,10 +89,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableCaption>List of recent prompt runs from your projects</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead>Project</TableHead>
           <TableHead>Address</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Status</TableHead>
           <TableHead>Time</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -102,7 +98,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableBody>
         {filteredPromptRuns.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-6">
+            <TableCell colSpan={4} className="text-center py-6">
               {hideReviewed 
                 ? "All prompt runs have been reviewed. Great job!" 
                 : "No prompt runs found matching your criteria."}
@@ -111,12 +107,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
         ) : (
           filteredPromptRuns.map((run) => (
             <TableRow key={run.id}>
-              <TableCell>{run.project_name || 'Unknown'}</TableCell>
               <TableCell>{run.project_address || 'N/A'}</TableCell>
-              <TableCell>{run.workflow_prompt_type || 'Unknown'}</TableCell>
-              <TableCell>
-                <PromptRunStatusBadge status={run.status} />
-              </TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
               <TableCell>{renderStars(run)}</TableCell>
               <TableCell className="text-right space-x-2">
