@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -20,6 +19,7 @@ interface UsePromptRunsProps {
   timeFilter: string;
   getDateFilter: () => string | null;
   onlyShowLatestRuns?: boolean;
+  excludeReminderActions?: boolean;
 }
 
 export const usePromptRuns = ({
@@ -29,7 +29,8 @@ export const usePromptRuns = ({
   projectManagerFilter,
   timeFilter,
   getDateFilter,
-  onlyShowLatestRuns = false
+  onlyShowLatestRuns = false,
+  excludeReminderActions = false
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,15 @@ export const usePromptRuns = ({
     if (userProfile) {
       fetchPromptRuns();
     }
-  }, [statusFilter, userProfile, onlyShowMyProjects, projectManagerFilter, timeFilter, onlyShowLatestRuns]);
+  }, [
+    statusFilter, 
+    userProfile, 
+    onlyShowMyProjects, 
+    projectManagerFilter, 
+    timeFilter, 
+    onlyShowLatestRuns,
+    excludeReminderActions
+  ]);
 
   const fetchPromptRuns = async () => {
     if (!userProfile?.profile_associated_company) {
@@ -59,10 +68,8 @@ export const usePromptRuns = ({
     try {
       const companyId = userProfile.profile_associated_company;
       
-      // Debug logging to help troubleshoot data issues
       await debugProjectData(companyId);
       
-      // Fetch projects based on filters
       const projectsData = await fetchProjects(
         companyId, 
         userProfile.id, 
@@ -78,44 +85,35 @@ export const usePromptRuns = ({
 
       const projectIds = projectsData.map(project => project.id);
       
-      // Get time constraint from filter
       const timeConstraint = timeFilter !== TIME_FILTERS.ALL ? getDateFilter() : null;
       
-      // Fetch prompt runs with filters
       const data = await fetchFilteredPromptRuns(projectIds, statusFilter, timeConstraint);
       
-      // Format the data for display
       let formattedData = formatPromptRunData(data);
 
       console.log(`Total prompt runs before filtering: ${formattedData.length}`);
       console.log(`onlyShowLatestRuns is set to: ${onlyShowLatestRuns}`);
 
-      // If onlyShowLatestRuns is true, filter to keep only the latest run for each project
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
         console.log("Filtering to show only latest runs per project");
         
-        // Create a map to store the latest prompt run for each project
         const latestRunsByProject = new Map<string, PromptRun>();
         
-        // Iterate through all prompt runs to find the latest for each project
         formattedData.forEach(run => {
           if (!run.project_id) {
             console.log(`Skipping run ${run.id} with no project_id`);
-            return; // Skip runs without a project ID
+            return;
           }
           
           const existingRun = latestRunsByProject.get(run.project_id);
           
-          // If we don't have a run for this project yet, or if this run is more recent than what we have
           if (!existingRun || new Date(run.created_at) > new Date(existingRun.created_at)) {
             latestRunsByProject.set(run.project_id, run);
           }
         });
         
-        // Convert the map values back to an array
         formattedData = Array.from(latestRunsByProject.values());
         
-        // Sort by created_at in descending order (most recent first)
         formattedData.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -123,6 +121,34 @@ export const usePromptRuns = ({
         console.log(`Total prompt runs after filtering for latest only: ${formattedData.length}`);
       } else {
         console.log(`Skipping latest runs filter, showing all ${formattedData.length} runs`);
+      }
+
+      if (excludeReminderActions && formattedData.length > 0) {
+        const promptRunIds = formattedData.map(run => run.id);
+        
+        const { data: actionData, error: actionError } = await supabase
+          .from('action_records')
+          .select('prompt_run_id, action_type')
+          .in('prompt_run_id', promptRunIds);
+
+        if (actionError) {
+          console.error('Error fetching action records:', actionError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to filter out reminder actions",
+          });
+        } else {
+          const reminderActionRunIds = new Set(
+            actionData
+              .filter(action => action.action_type === 'set_future_reminder')
+              .map(action => action.prompt_run_id)
+          );
+
+          formattedData = formattedData.filter(
+            run => !reminderActionRunIds.has(run.id)
+          );
+        }
       }
 
       setPromptRuns(formattedData);

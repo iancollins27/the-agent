@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -23,6 +22,7 @@ const ProjectManager: React.FC = () => {
   const [onlyMyProjects, setOnlyMyProjects] = useState(false);
   const [projectManagerFilter, setProjectManagerFilter] = useState<string | null>(null);
   const [hideReviewed, setHideReviewed] = useState(true);
+  const [excludeReminderActions, setExcludeReminderActions] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   // Explicitly set the default to ALL to ensure it's used
@@ -83,7 +83,8 @@ const ProjectManager: React.FC = () => {
     projectManagerFilter,
     timeFilter,
     getDateFilter,
-    onlyShowLatestRuns: true // Explicitly set to true to ensure the latest runs filter is applied
+    onlyShowLatestRuns: true,
+    excludeReminderActions
   });
 
   console.log(`ProjectManager component: Retrieved ${promptRuns.length} prompt runs`);
@@ -149,6 +150,8 @@ const ProjectManager: React.FC = () => {
           <ProjectManagerFilters 
             hideReviewed={hideReviewed}
             setHideReviewed={setHideReviewed}
+            excludeReminderActions={excludeReminderActions}
+            setExcludeReminderActions={setExcludeReminderActions}
             timeFilter={timeFilter}
             setTimeFilter={setTimeFilter}
             statusFilter={statusFilter}
