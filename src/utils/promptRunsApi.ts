@@ -15,6 +15,7 @@ export const formatPromptRunData = (data: any[]): PromptRun[] => {
       project_name: run.projects?.crm_id || 'Unknown Project',
       project_address: run.projects?.Address || null,
       project_crm_url: crmUrl,
+      project_next_step: run.projects?.next_step || null, // Including the next_step field
       workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
       workflow_type: run.workflow_prompts?.type,
       prompt_text: run.prompt_input,
@@ -63,7 +64,7 @@ export const fetchProjects = async (
 ) => {
   let projectQuery = supabase
     .from('projects')
-    .select('id, crm_id, Address, project_manager')
+    .select('id, crm_id, Address, project_manager, next_step') // Added next_step to the selection
     .eq('company_id', companyId);
 
   if (onlyMyProjects && userId) {
@@ -104,6 +105,7 @@ export const fetchFilteredPromptRuns = async (
         Address,
         company_id,
         project_manager,
+        next_step,
         companies:company_id (
           company_project_base_URL
         )
