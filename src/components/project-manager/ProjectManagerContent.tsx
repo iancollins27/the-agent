@@ -41,6 +41,15 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
 
+  // Calculate the displayed projects count (after filtering for hideReviewed)
+  const displayedRuns = hideReviewed 
+    ? promptRuns.filter(run => !run.reviewed)
+    : promptRuns;
+  
+  // Get unique project IDs to show actual project count
+  const uniqueProjectIds = new Set(displayedRuns.map(run => run.project_id).filter(Boolean));
+  const projectCount = uniqueProjectIds.size;
+
   if (promptRuns.length === 0) {
     return (
       <EmptyPromptRuns
@@ -51,13 +60,21 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   }
 
   return (
-    <PromptRunsTable 
-      promptRuns={promptRuns} 
-      onRatingChange={onRatingChange} 
-      onViewDetails={onViewDetails}
-      onRunReviewed={onRunReviewed}
-      hideReviewed={hideReviewed}
-    />
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-muted-foreground">
+          Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({displayedRuns.length} {displayedRuns.length === 1 ? 'prompt run' : 'prompt runs'})
+        </p>
+      </div>
+      
+      <PromptRunsTable 
+        promptRuns={promptRuns} 
+        onRatingChange={onRatingChange} 
+        onViewDetails={onViewDetails}
+        onRunReviewed={onRunReviewed}
+        hideReviewed={hideReviewed}
+      />
+    </div>
   );
 };
 
