@@ -15,8 +15,7 @@ export const formatPromptRunData = (data: any[]): PromptRun[] => {
       project_name: run.projects?.crm_id || 'Unknown Project',
       project_address: run.projects?.Address || null,
       project_crm_url: crmUrl,
-      project_next_step: run.projects?.next_step || null,
-      project_roofer_contact: run.projects?.roofer_contact || null, // Added this property
+      project_next_step: run.projects?.next_step || null, // Including the next_step field
       workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
       workflow_type: run.workflow_prompts?.type,
       prompt_text: run.prompt_input,
@@ -32,7 +31,7 @@ export const debugProjectData = async (companyId: string) => {
     
     const { data: allProjects, error: allProjectsError } = await supabase
       .from('projects')
-      .select('id, crm_id, Address, project_manager, roofer_contact') // Added roofer_contact
+      .select('id, crm_id, Address, project_manager')
       .eq('company_id', companyId);
     
     if (allProjectsError) {
@@ -65,7 +64,7 @@ export const fetchProjects = async (
 ) => {
   let projectQuery = supabase
     .from('projects')
-    .select('id, crm_id, Address, project_manager, next_step, roofer_contact') // Added roofer_contact
+    .select('id, crm_id, Address, project_manager, next_step') // Added next_step to the selection
     .eq('company_id', companyId);
 
   if (onlyMyProjects && userId) {
@@ -107,7 +106,6 @@ export const fetchFilteredPromptRuns = async (
         company_id,
         project_manager,
         next_step,
-        roofer_contact,
         companies:company_id (
           company_project_base_URL
         )
