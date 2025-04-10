@@ -1,95 +1,38 @@
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React from 'react';
+import AdminPage from './pages/AdminPage';
+import ChatPage from './pages/ChatPage';
+import ProjectPage from './pages/ProjectPage';
+import CompanyPage from './pages/CompanyPage';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import PublicPage from './pages/PublicPage';
+import PricingPage from './pages/PricingPage';
+import AccountPage from './pages/AccountPage';
+import SubscriptionPage from './pages/SubscriptionPage';
+import NotFoundPage from './pages/NotFoundPage';
+import WebhookTestPage from './pages/WebhookTestPage';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import AdminConsole from "./pages/AdminConsole";
-import AgentChat from "./pages/AgentChat";
-import ChatbotConfig from "./pages/ChatbotConfig";
-import CompanySettings from "./pages/CompanySettings";
-import MermaidDiagrams from "./pages/MermaidDiagrams";
-import ProjectManager from "./pages/ProjectManager";
-
-const queryClient = new QueryClient();
-
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+function App() {
+  return (
+    <Router>
       <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <AdminConsole />
-            </ProtectedRoute>
-          }
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute>
-              <AdminConsole />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/chat" 
-          element={
-            <ProtectedRoute>
-              <AgentChat />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/chatbot-config" 
-          element={
-            <ProtectedRoute>
-              <ChatbotConfig />
-            </ProtectedRoute>
-          } 
-        />
-        <Route path="/company-settings" element={<CompanySettings />} />
-        <Route
-          path="/system-diagrams"
-          element={
-            <ProtectedRoute>
-              <MermaidDiagrams />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project-manager"
-          element={
-            <ProtectedRoute>
-              <ProjectManager />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/public" element={<PublicPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+        <Route path="/" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/project/:id" element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
+        <Route path="/company/:id" element={<ProtectedRoute><CompanyPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+        <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+        <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
+        <Route path="/webhook-test" element={<React.lazy(() => import('./pages/WebhookTestPage'))} />
       </Routes>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </Router>
+  );
+}
 
 export default App;
