@@ -1,7 +1,7 @@
 
 import { Routes, Route } from 'react-router-dom';
 import React from 'react';
-import { AuthProvider } from '@/integrations/supabase/UserProvider';
+import { UserProvider } from '@/integrations/supabase/UserProvider';
 import NotFound from './pages/NotFound';
 import WebhookTestPage from './pages/WebhookTestPage';
 import AgentChat from './pages/AgentChat';
@@ -15,7 +15,7 @@ const LazyWebhookTestPage = React.lazy(() => import('./pages/WebhookTestPage'));
 
 function App() {
   return (
-    <AuthProvider>
+    <UserProvider>
       <Routes>
         <Route path="/login" element={<Auth />} />
         <Route path="/admin" element={<AdminConsole />} />
@@ -30,7 +30,7 @@ function App() {
         } />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </AuthProvider>
+    </UserProvider>
   );
 }
 
