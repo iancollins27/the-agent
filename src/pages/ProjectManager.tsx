@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -23,6 +24,8 @@ const ProjectManager: React.FC = () => {
   const [projectManagerFilter, setProjectManagerFilter] = useState<string | null>(null);
   const [hideReviewed, setHideReviewed] = useState(true);
   const [excludeReminderActions, setExcludeReminderActions] = useState(false);
+  const [groupByRoofer, setGroupByRoofer] = useState(false);
+  const [sortRooferAlphabetically, setSortRooferAlphabetically] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
   // Explicitly set the default to ALL to ensure it's used
@@ -132,6 +135,21 @@ const ProjectManager: React.FC = () => {
     return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
 
+  // Group and sort prompt runs if needed
+  const processedPromptRuns = React.useMemo(() => {
+    let runs = [...promptRuns];
+
+    if (sortRooferAlphabetically) {
+      runs.sort((a, b) => {
+        const rooferA = a.project_roofer_contact || 'zzz'; // Put empty values at the end
+        const rooferB = b.project_roofer_contact || 'zzz';
+        return rooferA.localeCompare(rooferB);
+      });
+    }
+    
+    return runs;
+  }, [promptRuns, sortRooferAlphabetically]);
+
   // Force a refresh on component mount to ensure latest data
   useEffect(() => {
     if (userProfile) {
@@ -160,15 +178,20 @@ const ProjectManager: React.FC = () => {
             setOnlyMyProjects={setOnlyMyProjects}
             projectManagerFilter={projectManagerFilter}
             setProjectManagerFilter={setProjectManagerFilter}
+            groupByRoofer={groupByRoofer}
+            setGroupByRoofer={setGroupByRoofer}
+            sortRooferAlphabetically={sortRooferAlphabetically}
+            setSortRooferAlphabetically={setSortRooferAlphabetically}
             onRefresh={fetchPromptRuns}
           />
         </div>
 
         <ProjectManagerContent 
           loading={loading}
-          promptRuns={promptRuns}
+          promptRuns={processedPromptRuns}
           hideReviewed={hideReviewed}
           getEmptyStateMessage={getEmptyStateMessage}
+          groupByRoofer={groupByRoofer}
           debugInfo={{
             userId: user?.id,
             companyId: userProfile?.profile_associated_company,
