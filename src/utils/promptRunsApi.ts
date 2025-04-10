@@ -15,7 +15,8 @@ export const formatPromptRunData = (data: any[]): PromptRun[] => {
       project_name: run.projects?.crm_id || 'Unknown Project',
       project_address: run.projects?.Address || null,
       project_crm_url: crmUrl,
-      project_next_step: run.projects?.next_step || null, // Including the next_step field
+      project_next_step: run.projects?.next_step || null,
+      project_roofer_contact: run.roofer_contact || null, // Including the roofer contact
       workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
       workflow_type: run.workflow_prompts?.type,
       prompt_text: run.prompt_input,
@@ -130,5 +131,44 @@ export const fetchFilteredPromptRuns = async (
   }
 
   console.log("Prompt runs found:", data?.length || 0);
+  
+  // Fetch roofer contact information for each project
+  if (data && data.length > 0) {
+    const projectIds = data.map(run => run.project_id).filter(Boolean);
+    const uniqueProjectIds = [...new Set(projectIds)];
+    
+    if (uniqueProjectIds.length > 0) {
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('project_contacts')
+        .select(`
+          project_id,
+          contacts:contact_id (
+            id, full_name, role
+          )
+        `)
+        .in('project_id', uniqueProjectIds);
+      
+      if (!contactsError && contactsData) {
+        // Create a map of project_id to roofer contact name
+        const rooferContactMap = new Map();
+        
+        contactsData.forEach(item => {
+          if (item.contacts && item.contacts.role === 'roofer') {
+            rooferContactMap.set(item.project_id, item.contacts.full_name);
+          }
+        });
+        
+        // Add roofer contact to each prompt run
+        data.forEach(run => {
+          if (run.project_id && rooferContactMap.has(run.project_id)) {
+            run.roofer_contact = rooferContactMap.get(run.project_id);
+          }
+        });
+      } else {
+        console.error("Error fetching roofer contacts:", contactsError);
+      }
+    }
+  }
+  
   return data;
 };
