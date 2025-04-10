@@ -1,7 +1,8 @@
-
 const openaiApiKey = Deno.env.get("OPENAI_API_KEY") || "";
 const claudeApiKey = Deno.env.get("CLAUDE_API_KEY") || "";
 const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "";
+
+import { MCPContext, formatForOpenAI, formatForClaude, extractToolCallsFromOpenAI, extractToolCallsFromClaude } from "./mcp.ts";
 
 /**
  * Calls the appropriate AI provider based on the specified provider and model
@@ -28,6 +29,32 @@ export async function callAIProvider(aiProvider: string, aiModel: string, prompt
       }
     default:
       throw new Error(`Unknown AI provider: ${aiProvider}`);
+  }
+}
+
+/**
+ * Calls the appropriate AI provider with MCP formatting
+ */
+export async function callAIProviderWithMCP(
+  aiProvider: string, 
+  aiModel: string, 
+  mcpContext: MCPContext
+): Promise<any> {
+  switch (aiProvider) {
+    case "openai":
+      if (openaiApiKey) {
+        return await callOpenAIWithMCP(mcpContext, aiModel);
+      } else {
+        throw new Error("OpenAI API key not configured");
+      }
+    case "claude":
+      if (claudeApiKey) {
+        return await callClaudeWithMCP(mcpContext, aiModel);
+      } else {
+        throw new Error("Claude API key not configured");
+      }
+    default:
+      throw new Error(`MCP not supported for provider: ${aiProvider}`);
   }
 }
 
@@ -68,6 +95,34 @@ async function callOpenAI(prompt: string, model: string = "gpt-4o-mini") {
 }
 
 /**
+ * Calls the OpenAI API with MCP formatting
+ */
+async function callOpenAIWithMCP(mcpContext: MCPContext, model: string = "gpt-4o") {
+  const requestBody = formatForOpenAI(mcpContext);
+  
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openaiApiKey}`,
+    },
+    body: JSON.stringify({
+      ...requestBody,
+      temperature: 0.2,
+      max_tokens: 1500,
+    }),
+  });
+  
+  const data = await response.json();
+  if (data.error) {
+    console.error("OpenAI API error:", data.error);
+    throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+  }
+  
+  return data;
+}
+
+/**
  * Calls the Claude API with the given prompt and model
  */
 async function callClaude(prompt: string, model: string = "claude-3-5-haiku-20241022") {
@@ -101,6 +156,35 @@ async function callClaude(prompt: string, model: string = "claude-3-5-haiku-2024
   }
   
   return data.content?.[0]?.text || "Error: No response from Claude";
+}
+
+/**
+ * Calls the Claude API with MCP formatting
+ */
+async function callClaudeWithMCP(mcpContext: MCPContext, model: string = "claude-3-5-haiku-20241022") {
+  const requestBody = formatForClaude(mcpContext);
+  
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": claudeApiKey,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      ...requestBody,
+      max_tokens: 1500,
+      temperature: 0.2,
+    }),
+  });
+  
+  const data = await response.json();
+  if (data.error) {
+    console.error("Claude API error:", data.error);
+    throw new Error(`Claude API error: ${data.error.message || data.error}`);
+  }
+  
+  return data;
 }
 
 /**

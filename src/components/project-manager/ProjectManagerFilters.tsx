@@ -7,6 +7,8 @@ import PromptRunFilters from '../admin/PromptRunFilters';
 interface ProjectManagerFiltersProps {
   hideReviewed: boolean;
   setHideReviewed: (value: boolean) => void;
+  excludeReminderActions: boolean;
+  setExcludeReminderActions: (value: boolean) => void;
   timeFilter: string;
   setTimeFilter: (value: string) => void;
   statusFilter: string | null;
@@ -21,6 +23,8 @@ interface ProjectManagerFiltersProps {
 const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   hideReviewed,
   setHideReviewed,
+  excludeReminderActions,
+  setExcludeReminderActions,
   timeFilter,
   setTimeFilter,
   statusFilter,
@@ -40,6 +44,15 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           onCheckedChange={setHideReviewed}
         />
         <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="exclude-reminder-actions"
+          checked={excludeReminderActions}
+          onCheckedChange={setExcludeReminderActions}
+        />
+        <Label htmlFor="exclude-reminder-actions">Exclude Reminder Actions</Label>
       </div>
       
       <PromptRunFilters

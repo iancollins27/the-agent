@@ -46,11 +46,12 @@ export interface PromptRun {
   project_name?: string;
   project_address?: string;
   project_crm_url?: string;
+  project_next_step?: string; // Added this property for the next step
   workflow_prompt_type?: string;
   ai_provider?: string;
   ai_model?: string;
   workflow_type?: string;
   prompt_text?: string;
   result?: string;
-  reviewed: boolean; // Changed from optional to required to match how we're using it
+  reviewed: boolean;
 }
