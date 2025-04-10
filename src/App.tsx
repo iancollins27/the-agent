@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+import { Routes, Route } from 'react-router-dom';
 import React from 'react';
 import AdminPage from './pages/AdminPage';
 import ChatPage from './pages/ChatPage';
@@ -16,22 +17,20 @@ import WebhookTestPage from './pages/WebhookTestPage';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/public" element={<PublicPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-        <Route path="/" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-        <Route path="/project/:id" element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
-        <Route path="/company/:id" element={<ProtectedRoute><CompanyPage /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-        <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-        <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
-        <Route path="/webhook-test" element={<React.lazy(() => import('./pages/WebhookTestPage'))} />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/public" element={<PublicPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="*" element={<NotFoundPage />} />
+      <Route path="/" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+      <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+      <Route path="/project/:id" element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
+      <Route path="/company/:id" element={<ProtectedRoute><CompanyPage /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
+      <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+      <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
+      <Route path="/webhook-test" element={<React.lazy(() => import('./pages/WebhookTestPage'))} />
+    </Routes>
   );
 }
 
