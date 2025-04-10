@@ -1,42 +1,36 @@
 
 import { Routes, Route } from 'react-router-dom';
 import React from 'react';
-import AdminPage from './pages/AdminPage';
-import ChatPage from './pages/ChatPage';
-import ProjectPage from './pages/ProjectPage';
-import CompanyPage from './pages/CompanyPage';
-import { AuthProvider } from './contexts/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
-import PublicPage from './pages/PublicPage';
-import PricingPage from './pages/PricingPage';
-import AccountPage from './pages/AccountPage';
-import SubscriptionPage from './pages/SubscriptionPage';
-import NotFoundPage from './pages/NotFoundPage';
+import { AuthProvider } from '@/integrations/supabase/UserProvider';
+import NotFound from './pages/NotFound';
 import WebhookTestPage from './pages/WebhookTestPage';
+import AgentChat from './pages/AgentChat';
+import AdminConsole from './pages/AdminConsole';
+import ProjectManager from './pages/ProjectManager';
+import CompanySettings from './pages/CompanySettings';
+import MermaidDiagrams from './pages/MermaidDiagrams';
+import Auth from './pages/Auth';
 
 const LazyWebhookTestPage = React.lazy(() => import('./pages/WebhookTestPage'));
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/public" element={<PublicPage />} />
-      <Route path="/pricing" element={<PricingPage />} />
-      <Route path="*" element={<NotFoundPage />} />
-      <Route path="/" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-      <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-      <Route path="/project/:id" element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
-      <Route path="/company/:id" element={<ProtectedRoute><CompanyPage /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
-      <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-      <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
-      <Route path="/webhook-test" element={
-        <React.Suspense fallback={<div>Loading...</div>}>
-          <LazyWebhookTestPage />
-        </React.Suspense>
-      } />
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Auth />} />
+        <Route path="/admin" element={<AdminConsole />} />
+        <Route path="/chat" element={<AgentChat />} />
+        <Route path="/" element={<ProjectManager />} />
+        <Route path="/company/settings" element={<CompanySettings />} />
+        <Route path="/diagrams" element={<MermaidDiagrams />} />
+        <Route path="/webhook-test" element={
+          <React.Suspense fallback={<div>Loading...</div>}>
+            <LazyWebhookTestPage />
+          </React.Suspense>
+        } />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AuthProvider>
   );
 }
 
