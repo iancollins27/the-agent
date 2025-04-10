@@ -91,6 +91,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
         <TableRow>
           <TableHead>Address</TableHead>
           <TableHead>Next Step</TableHead>
+          <TableHead>Roofer Contact</TableHead>
           <TableHead>Time</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -99,7 +100,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableBody>
         {filteredPromptRuns.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center py-6">
+            <TableCell colSpan={6} className="text-center py-6">
               {hideReviewed 
                 ? "All prompt runs have been reviewed. Great job!" 
                 : "No prompt runs found matching your criteria."}
@@ -110,6 +111,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
             <TableRow key={run.id}>
               <TableCell>{run.project_address || 'N/A'}</TableCell>
               <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
+              <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
               <TableCell>{renderStars(run)}</TableCell>
               <TableCell className="text-right space-x-2">
