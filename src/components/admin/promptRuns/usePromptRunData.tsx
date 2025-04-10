@@ -52,7 +52,7 @@ export const usePromptRunData = (statusFilter: string | null) => {
           
           if (!contactsError && contactsData) {
             contactsData.forEach(item => {
-              if (item.contacts && item.contacts.role === 'roofer') {
+              if (item.contacts && item.contacts.role === 'Roofer') {
                 rooferContactMap.set(item.project_id, item.contacts.full_name);
               }
             });

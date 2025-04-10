@@ -153,7 +153,7 @@ export const fetchFilteredPromptRuns = async (
         const rooferContactMap = new Map();
         
         contactsData.forEach(item => {
-          if (item.contacts && item.contacts.role === 'roofer') {
+          if (item.contacts && item.contacts.role === 'Roofer') {
             rooferContactMap.set(item.project_id, item.contacts.full_name);
           }
         });
@@ -161,6 +161,7 @@ export const fetchFilteredPromptRuns = async (
         // Add roofer contact to each prompt run
         data.forEach(run => {
           if (run.project_id && rooferContactMap.has(run.project_id)) {
+            // Add the property to each run object
             run.roofer_contact = rooferContactMap.get(run.project_id);
           }
         });
