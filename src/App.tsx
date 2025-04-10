@@ -15,6 +15,8 @@ import SubscriptionPage from './pages/SubscriptionPage';
 import NotFoundPage from './pages/NotFoundPage';
 import WebhookTestPage from './pages/WebhookTestPage';
 
+const LazyWebhookTestPage = React.lazy(() => import('./pages/WebhookTestPage'));
+
 function App() {
   return (
     <Routes>
@@ -29,7 +31,11 @@ function App() {
       <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
       <Route path="/subscription" element={<ProtectedRoute><SubscriptionPage /></ProtectedRoute>} />
-      <Route path="/webhook-test" element={<React.lazy(() => import('./pages/WebhookTestPage'))} />
+      <Route path="/webhook-test" element={
+        <React.Suspense fallback={<div>Loading...</div>}>
+          <LazyWebhookTestPage />
+        </React.Suspense>
+      } />
     </Routes>
   );
 }
