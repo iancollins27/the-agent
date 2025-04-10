@@ -58,13 +58,14 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
       <PromptRunFilters
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
+        statusFilter={null} // Remove status filter
+        onStatusFilterChange={() => {}} // No-op function
         onlyShowMyProjects={onlyMyProjects}
         onMyProjectsChange={setOnlyMyProjects}
         projectManagerFilter={projectManagerFilter}
         onProjectManagerFilterChange={setProjectManagerFilter}
         onRefresh={onRefresh}
+        hideStatusFilter={true} // Add a prop to hide status filter in child component
       />
     </div>
   );
