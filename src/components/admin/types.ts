@@ -47,7 +47,6 @@ export interface PromptRun {
   project_address?: string;
   project_crm_url?: string;
   project_next_step?: string; // Added this property for the next step
-  project_roofer_contact?: string | null; // Added property for roofer contact name
   workflow_prompt_type?: string;
   ai_provider?: string;
   ai_model?: string;
