@@ -1,37 +1,95 @@
 
-import { Routes, Route } from 'react-router-dom';
-import React from 'react';
-import { UserProvider } from '@/integrations/supabase/UserProvider';
-import NotFound from './pages/NotFound';
-import WebhookTestPage from './pages/WebhookTestPage';
-import AgentChat from './pages/AgentChat';
-import AdminConsole from './pages/AdminConsole';
-import ProjectManager from './pages/ProjectManager';
-import CompanySettings from './pages/CompanySettings';
-import MermaidDiagrams from './pages/MermaidDiagrams';
-import Auth from './pages/Auth';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import Auth from "./pages/Auth";
+import NotFound from "./pages/NotFound";
+import AdminConsole from "./pages/AdminConsole";
+import AgentChat from "./pages/AgentChat";
+import ChatbotConfig from "./pages/ChatbotConfig";
+import CompanySettings from "./pages/CompanySettings";
+import MermaidDiagrams from "./pages/MermaidDiagrams";
+import ProjectManager from "./pages/ProjectManager";
 
-const LazyWebhookTestPage = React.lazy(() => import('./pages/WebhookTestPage'));
+const queryClient = new QueryClient();
 
-function App() {
-  return (
-    <UserProvider>
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
       <Routes>
-        <Route path="/login" element={<Auth />} />
-        <Route path="/admin" element={<AdminConsole />} />
-        <Route path="/chat" element={<AgentChat />} />
-        <Route path="/" element={<ProjectManager />} />
-        <Route path="/company/settings" element={<CompanySettings />} />
-        <Route path="/diagrams" element={<MermaidDiagrams />} />
-        <Route path="/webhook-test" element={
-          <React.Suspense fallback={<div>Loading...</div>}>
-            <LazyWebhookTestPage />
-          </React.Suspense>
-        } />
+        <Route path="/auth" element={<Auth />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AdminConsole />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute>
+              <AdminConsole />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/chat" 
+          element={
+            <ProtectedRoute>
+              <AgentChat />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/chatbot-config" 
+          element={
+            <ProtectedRoute>
+              <ChatbotConfig />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="/company-settings" element={<CompanySettings />} />
+        <Route
+          path="/system-diagrams"
+          element={
+            <ProtectedRoute>
+              <MermaidDiagrams />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project-manager"
+          element={
+            <ProtectedRoute>
+              <ProjectManager />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </UserProvider>
-  );
-}
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;

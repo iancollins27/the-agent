@@ -17,12 +17,6 @@ export async function normalizeWebhookData(source: string, rawPayload: any): Pro
 }> {
   console.log(`Normalizing ${source} webhook data`);
   
-  // Check if payload is empty
-  if (!rawPayload || (typeof rawPayload === 'object' && Object.keys(rawPayload).length === 0)) {
-    console.warn('Empty webhook payload received. Using fallback data.');
-    return createFallbackData(source);
-  }
-  
   switch (source.toLowerCase()) {
     case 'zoho':
       return normalizeZohoData(rawPayload);
@@ -34,46 +28,6 @@ export async function normalizeWebhookData(source: string, rawPayload: any): Pro
     default:
       throw new Error(`Unsupported webhook source: ${source}`);
   }
-}
-
-/**
- * Create fallback data when payload is empty
- */
-function createFallbackData(source: string): {
-  projectData: ParsedProjectData;
-  standardizedData: StandardizedWebhookData;
-} {
-  const fallbackId = `fallback-${Date.now()}`;
-  
-  const projectData: ParsedProjectData = {
-    crmId: fallbackId,
-    zohoCompanyId: '',
-    lastMilestone: '',
-    nextStep: 'Webhook payload was empty - manual verification needed',
-    propertyAddress: 'Unknown Address',
-    notes: 'This record was created from an empty webhook payload',
-    timeline: {
-      contractSigned: '',
-      siteVisitScheduled: '',
-      workOrderConfirmed: '',
-      roofInstallApproved: '',
-      roofInstallScheduled: '',
-      installDateConfirmedByRoofer: '',
-      roofInstallComplete: '',
-      roofInstallFinalized: ''
-    }
-  };
-  
-  const standardizedData: StandardizedWebhookData = {
-    crmId: fallbackId,
-    companyId: '',
-    eventType: 'project_updated',
-    rawPayload: {}
-  };
-  
-  console.log('Created fallback data due to empty payload');
-  
-  return { projectData, standardizedData };
 }
 
 /**
