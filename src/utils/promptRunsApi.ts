@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { PromptRun } from '@/components/admin/types';
 import { toast } from "@/components/ui/use-toast";
@@ -86,6 +85,11 @@ export const fetchProjects = async (
   return data || [];
 };
 
+// Define a type for our database result with the additional roofer_contact property
+interface PromptRunWithRoofer extends Record<string, any> {
+  roofer_contact?: string | null;
+}
+
 // Fetch prompt runs with filters
 export const fetchFilteredPromptRuns = async (
   projectIds: string[],
@@ -132,9 +136,12 @@ export const fetchFilteredPromptRuns = async (
 
   console.log("Prompt runs found:", data?.length || 0);
   
+  // Create an array of our extended type
+  const promptRunsWithRoofer: PromptRunWithRoofer[] = data || [];
+  
   // Fetch roofer contact information for each project
-  if (data && data.length > 0) {
-    const projectIds = data.map(run => run.project_id).filter(Boolean);
+  if (promptRunsWithRoofer.length > 0) {
+    const projectIds = promptRunsWithRoofer.map(run => run.project_id).filter(Boolean);
     const uniqueProjectIds = [...new Set(projectIds)];
     
     if (uniqueProjectIds.length > 0) {
@@ -159,7 +166,7 @@ export const fetchFilteredPromptRuns = async (
         });
         
         // Add roofer contact to each prompt run
-        data.forEach(run => {
+        promptRunsWithRoofer.forEach(run => {
           if (run.project_id && rooferContactMap.has(run.project_id)) {
             // Add the property to each run object
             run.roofer_contact = rooferContactMap.get(run.project_id);
@@ -171,5 +178,5 @@ export const fetchFilteredPromptRuns = async (
     }
   }
   
-  return data;
+  return promptRunsWithRoofer;
 };

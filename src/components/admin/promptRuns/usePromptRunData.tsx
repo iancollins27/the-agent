@@ -4,6 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../types';
 
+// Define a type that includes the roofer_contact property
+interface PromptRunDbResult extends Record<string, any> {
+  roofer_contact?: string | null;
+}
+
 export const usePromptRunData = (statusFilter: string | null) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,8 +66,11 @@ export const usePromptRunData = (statusFilter: string | null) => {
           }
         }
         
+        // Cast data to our extended type
+        const dataWithRoofer = data as PromptRunDbResult[];
+        
         // Format data to include project, workflow information and properly cast to PromptRun type
-        const formattedData = data.map(run => {
+        const formattedData = dataWithRoofer.map(run => {
           const projectId = run.project_id;
           const rooferContact = projectId ? rooferContactMap.get(projectId) : null;
           
