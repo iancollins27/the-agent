@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMe
 import { Button } from "@/components/ui/button";
 import { Filter, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ProjectManagerSelector from "@/components/admin/ProjectManagerSelector";
 
 interface ProjectManagerFiltersProps {
   hideReviewed: boolean;
@@ -86,18 +87,10 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
       </Select>
       
       {/* Project Manager filter */}
-      <Select 
-        value={projectManagerFilter || "all"} 
-        onValueChange={(value) => setProjectManagerFilter(value === "all" ? null : value)}
-      >
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="All Managers" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Managers</SelectItem>
-          {/* ProjectManagerSelector options would be here */}
-        </SelectContent>
-      </Select>
+      <ProjectManagerSelector 
+        value={projectManagerFilter} 
+        onChange={setProjectManagerFilter}
+      />
       
       {/* Combined filter dropdown */}
       <DropdownMenu>
