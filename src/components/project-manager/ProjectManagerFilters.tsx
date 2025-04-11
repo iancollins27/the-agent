@@ -63,7 +63,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           checked={excludeReminderActions}
           onCheckedChange={setExcludeReminderActions}
         />
-        <Label htmlFor="exclude-reminder-actions">Exclude Reminder Actions</Label>
+        <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
       </div>
       
       {/* Custom filter dropdown for roofer grouping and sorting */}
@@ -106,14 +106,14 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
       <PromptRunFilters
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
-        statusFilter={null} // Remove status filter
-        onStatusFilterChange={() => {}} // No-op function
+        statusFilter={null}
+        onStatusFilterChange={() => {}}
         onlyShowMyProjects={onlyMyProjects}
         onMyProjectsChange={setOnlyMyProjects}
         projectManagerFilter={projectManagerFilter}
         onProjectManagerFilterChange={setProjectManagerFilter}
         onRefresh={onRefresh}
-        hideStatusFilter={true} // Add a prop to hide status filter in child component
+        hideStatusFilter={true}
       />
     </div>
   );
