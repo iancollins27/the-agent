@@ -127,10 +127,9 @@ export const usePromptRuns = ({
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
-        // Get all action records for these prompt runs
         const { data: actionData, error: actionError } = await supabase
           .from('action_records')
-          .select('prompt_run_id, action_type, action_payload')
+          .select('prompt_run_id, action_type')
           .in('prompt_run_id', promptRunIds);
 
         if (actionError) {
@@ -141,60 +140,21 @@ export const usePromptRuns = ({
             description: "Failed to filter out reminder actions",
           });
         } else {
-          console.log('Action records fetched:', actionData.length);
-          
-          // Debug log - check what action types we have
-          const actionTypes = new Set(actionData.map(action => action.action_type));
-          console.log('Action types found:', Array.from(actionTypes));
-          
-          // Create a map to track which prompt runs should be excluded
-          const excludedPromptRunIds = new Set();
-          
-          // Identify prompt runs with reminder actions or NO_ACTION
-          actionData.forEach(action => {
-            // Debug individual action records to see what's happening
-            console.log(`Action record for run ${action.prompt_run_id}: type=${action.action_type}`);
-            
-            // Check action_type directly
-            if (
-              action.action_type === 'set_future_reminder' || 
-              action.action_type === 'NO_ACTION'
-            ) {
-              excludedPromptRunIds.add(action.prompt_run_id);
-            }
-            
-            // Also check inside action_payload for any no action indicators
-            if (action.action_payload) {
-              const payload = action.action_payload;
-              if (
-                (typeof payload === 'object' && 
-                 payload !== null && 
-                 'action_type' in payload && 
-                 (payload.action_type === 'NO_ACTION'))
-              ) {
-                console.log(`Found NO_ACTION in payload for run ${action.prompt_run_id}`);
-                excludedPromptRunIds.add(action.prompt_run_id);
-              }
-            }
-          });
-          
-          console.log(`Number of prompt runs to exclude: ${excludedPromptRunIds.size}`);
-          
-          // Also identify prompt runs with no action records (no actions needed)
-          const runsWithActions = new Set(actionData.map(action => action.prompt_run_id));
-          
-          // Get runs without any actions
-          const runsWithoutActions = promptRunIds.filter(id => !runsWithActions.has(id));
-          console.log(`Runs without any action records: ${runsWithoutActions.length}`);
-          
-          // Add runs without any actions to excluded set
-          runsWithoutActions.forEach(id => excludedPromptRunIds.add(id));
+          // Filter out both reminder actions and NO_ACTION type
+          const filteredActionRunIds = new Set(
+            actionData
+              .filter(action => 
+                action.action_type === 'set_future_reminder' || 
+                action.action_type === 'NO_ACTION'
+              )
+              .map(action => action.prompt_run_id)
+          );
 
-          // Filter out excluded runs
-          const originalCount = formattedData.length;
-          formattedData = formattedData.filter(run => !excludedPromptRunIds.has(run.id));
+          formattedData = formattedData.filter(
+            run => !filteredActionRunIds.has(run.id)
+          );
           
-          console.log(`Filtered runs: ${originalCount} → ${formattedData.length} (${excludedPromptRunIds.size} excluded)`);
+          console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
         }
       }
 
