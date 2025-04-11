@@ -87,14 +87,14 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
       
       {/* Project Manager filter */}
       <Select 
-        value={projectManagerFilter || ""} 
-        onValueChange={(value) => setProjectManagerFilter(value || null)}
+        value={projectManagerFilter || "all"} 
+        onValueChange={(value) => setProjectManagerFilter(value === "all" ? null : value)}
       >
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="All Managers" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">All Managers</SelectItem>
+          <SelectItem value="all">All Managers</SelectItem>
           {/* ProjectManagerSelector options would be here */}
         </SelectContent>
       </Select>
