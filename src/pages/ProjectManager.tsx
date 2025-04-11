@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -10,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
 
-// Import new components
+// Import components
 import ProjectManagerHeader from '../components/project-manager/ProjectManagerHeader';
 import ProjectManagerFilters from '../components/project-manager/ProjectManagerFilters';
 import ProjectManagerContent from '../components/project-manager/ProjectManagerContent';
@@ -28,10 +27,8 @@ const ProjectManager: React.FC = () => {
   const [sortRooferAlphabetically, setSortRooferAlphabetically] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
-  // Explicitly set the default to ALL to ensure it's used
   const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
 
-  // Fetch user profile when component mounts
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
@@ -57,21 +54,18 @@ const ProjectManager: React.FC = () => {
     fetchUserProfile();
   }, [user]);
 
-  // Reset project manager filter when "only my projects" is checked
   useEffect(() => {
     if (onlyMyProjects) {
       setProjectManagerFilter(null);
     }
   }, [onlyMyProjects]);
 
-  // Reset "only my projects" when project manager filter is set
   useEffect(() => {
     if (projectManagerFilter) {
       setOnlyMyProjects(false);
     }
   }, [projectManagerFilter]);
 
-  // Use the custom hook to fetch prompt runs, only showing the latest run for each project
   const { 
     promptRuns, 
     loading, 
@@ -99,7 +93,6 @@ const ProjectManager: React.FC = () => {
   };
 
   const handleRunReviewed = (promptRunId: string) => {
-    // Update the local state to mark the run as reviewed
     setPromptRuns(prev => 
       prev.map(run => 
         run.id === promptRunId ? { ...run, reviewed: true } : run
@@ -135,7 +128,6 @@ const ProjectManager: React.FC = () => {
     return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
 
-  // Group and sort prompt runs if needed
   const processedPromptRuns = React.useMemo(() => {
     let runs = [...promptRuns];
 
@@ -150,7 +142,6 @@ const ProjectManager: React.FC = () => {
     return runs;
   }, [promptRuns, sortRooferAlphabetically]);
 
-  // Force a refresh on component mount to ensure latest data
   useEffect(() => {
     if (userProfile) {
       console.log("Forcing a data refresh on component mount");

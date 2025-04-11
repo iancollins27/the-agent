@@ -2,10 +2,10 @@
 import React from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Filter } from "lucide-react";
-import PromptRunFilters from '../admin/PromptRunFilters';
+import { Filter, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ProjectManagerFiltersProps {
   hideReviewed: boolean;
@@ -65,8 +65,41 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         />
         <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
       </div>
+
+      {/* Show text for time filter */}
+      <span className="text-sm text-muted-foreground">Show:</span>
       
-      {/* Custom filter dropdown for roofer grouping and sorting */}
+      {/* Time filter select */}
+      <Select 
+        value={timeFilter} 
+        onValueChange={setTimeFilter}
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder="Select time range" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="last_hour">Last Hour</SelectItem>
+          <SelectItem value="last_24_hours">Last 24 Hours</SelectItem>
+          <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+          <SelectItem value="all">All Time</SelectItem>
+        </SelectContent>
+      </Select>
+      
+      {/* Project Manager filter */}
+      <Select 
+        value={projectManagerFilter || ""} 
+        onValueChange={(value) => setProjectManagerFilter(value || null)}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="All Managers" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="">All Managers</SelectItem>
+          {/* ProjectManagerSelector options would be here */}
+        </SelectContent>
+      </Select>
+      
+      {/* Combined filter dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="flex items-center gap-2">
@@ -103,18 +136,10 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
       
-      <PromptRunFilters
-        timeFilter={timeFilter}
-        onTimeFilterChange={setTimeFilter}
-        statusFilter={null}
-        onStatusFilterChange={() => {}}
-        onlyShowMyProjects={onlyMyProjects}
-        onMyProjectsChange={setOnlyMyProjects}
-        projectManagerFilter={projectManagerFilter}
-        onProjectManagerFilterChange={setProjectManagerFilter}
-        onRefresh={onRefresh}
-        hideStatusFilter={true}
-      />
+      {/* Refresh button */}
+      <Button onClick={onRefresh} variant="outline" size="icon">
+        <RefreshCw className="h-4 w-4" />
+      </Button>
     </div>
   );
 };
