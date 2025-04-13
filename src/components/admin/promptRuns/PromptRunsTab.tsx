@@ -8,14 +8,14 @@ import PromptRunLoader from './PromptRunLoader';
 import EmptyPromptRunsState from './EmptyPromptRunsState';
 import { usePromptRunData } from './usePromptRunData';
 import { usePromptRunActions } from './usePromptRunActions';
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const PromptRunsTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [hideReviewed, setHideReviewed] = useState(true);
+  const [reviewFilter, setReviewFilter] = useState("not-reviewed");
   
   // Custom hooks for data fetching and actions
   const { promptRuns, setPromptRuns, loading, fetchPromptRuns } = usePromptRunData(statusFilter);
@@ -43,13 +43,26 @@ const PromptRunsTab: React.FC = () => {
           setStatusFilter={setStatusFilter}
           fetchPromptRuns={fetchPromptRuns}
         />
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="hide-reviewed-admin"
-            checked={hideReviewed}
-            onCheckedChange={setHideReviewed}
-          />
-          <Label htmlFor="hide-reviewed-admin">Hide Reviewed</Label>
+        <div className="flex items-center space-x-4">
+          <Label>Show:</Label>
+          <RadioGroup 
+            value={reviewFilter} 
+            onValueChange={setReviewFilter}
+            className="flex space-x-4"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="all" id="show-all" />
+              <Label htmlFor="show-all">All</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="reviewed" id="show-reviewed" />
+              <Label htmlFor="show-reviewed">Reviewed</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="not-reviewed" id="show-not-reviewed" />
+              <Label htmlFor="show-not-reviewed">Not Reviewed</Label>
+            </div>
+          </RadioGroup>
         </div>
       </div>
 
@@ -63,7 +76,7 @@ const PromptRunsTab: React.FC = () => {
           onRatingChange={handleRatingChange} 
           onViewDetails={viewPromptRunDetails} 
           onRunReviewed={handleRunReviewed}
-          hideReviewed={hideReviewed}
+          reviewFilter={reviewFilter}
         />
       )}
 
