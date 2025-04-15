@@ -56,7 +56,14 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error invoking function:', error);
+        throw error;
+      }
+      
+      if (!data) {
+        throw new Error('No response data received');
+      }
       
       if (data.error) {
         throw new Error(data.error);
@@ -124,7 +131,7 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
   return (
     <div className="flex space-x-2">
       {error && (
-        <p className="text-xs text-red-500">Error: {error}</p>
+        <p className="text-xs text-red-500">{error}</p>
       )}
       
       {!hasGenerated ? (

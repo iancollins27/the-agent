@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -194,30 +195,3 @@ serve(async (req) => {
     );
   }
 });
-
-// Helper function to create a Supabase client
-function createClient(supabaseUrl: string, supabaseKey: string) {
-  return {
-    from: (table: string) => ({
-      select: (columns: string) => ({
-        in: (column: string, values: any[]) => ({
-          eq: (column: string, value: any) => ({
-            order: (column: string, { ascending }: { ascending: boolean }) => new Promise((resolve) => {
-              // Mock implementation for type checking - this will be replaced by actual Supabase client
-              resolve({ data: [], error: null });
-            })
-          }),
-          order: (column: string, { ascending }: { ascending: boolean }) => new Promise((resolve) => {
-            // Mock implementation for type checking - this will be replaced by actual Supabase client
-            resolve({ data: [], error: null });
-          }),
-          limit: (limit: number) => ({
-            single: () => new Promise((resolve) => {
-              resolve({ data: null, error: null });
-            })
-          })
-        })
-      })
-    })
-  };
-}
