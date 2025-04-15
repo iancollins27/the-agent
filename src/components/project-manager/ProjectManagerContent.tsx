@@ -5,6 +5,7 @@ import { PromptRun } from '../admin/types';
 import EmptyPromptRuns from '../admin/EmptyPromptRuns';
 import PromptRunsTable from '../admin/PromptRunsTable';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import MultiProjectMessage from './MultiProjectMessage';
 
 interface ProjectManagerContentProps {
   loading: boolean;
@@ -85,8 +86,12 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
         
         {Object.entries(rooferGroups).map(([rooferName, runs]) => (
           <Card key={rooferName} className="overflow-hidden">
-            <CardHeader className="bg-muted/50">
+            <CardHeader className="bg-muted/50 flex flex-row items-center justify-between">
               <CardTitle className="text-lg">{rooferName}</CardTitle>
+              <MultiProjectMessage 
+                rooferName={rooferName} 
+                projects={runs} 
+              />
             </CardHeader>
             <CardContent className="p-0">
               <PromptRunsTable 
