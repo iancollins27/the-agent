@@ -30,6 +30,9 @@ serve(async (req) => {
 
     console.log(`Generating multi-project message for roofer: ${rooferName}, projects: ${projectIds.length}`);
 
+    // Debug: Log the project IDs we're trying to fetch
+    console.log(`Project IDs: ${JSON.stringify(projectIds)}`);
+
     // 1. Fetch project data for all provided project IDs
     const { data: projects, error: projectError } = await supabase
       .from('projects')
@@ -37,11 +40,26 @@ serve(async (req) => {
       .in('id', projectIds);
 
     if (projectError) {
+      console.error(`Error fetching projects: ${JSON.stringify(projectError)}`);
       throw new Error(`Error fetching projects: ${projectError.message}`);
     }
 
     if (!projects || projects.length === 0) {
-      throw new Error('No projects found with the provided IDs');
+      // If no projects found, let's check if the IDs exist at all
+      const { data: checkProjects, error: checkError } = await supabase
+        .from('projects')
+        .select('id')
+        .limit(1);
+        
+      if (checkError) {
+        console.error(`Error checking projects table: ${JSON.stringify(checkError)}`);
+        throw new Error(`Error accessing projects table: ${checkError.message}`);
+      }
+      
+      console.log(`Projects check result: ${JSON.stringify(checkProjects)}`);
+      console.log(`Looking for project IDs: ${JSON.stringify(projectIds)}`);
+      
+      throw new Error('No projects found with the provided IDs. Please check if the IDs are valid.');
     }
 
     console.log(`Found ${projects.length} projects`);
@@ -57,9 +75,7 @@ serve(async (req) => {
       throw new Error(`Error fetching prompt runs: ${promptRunsError.message}`);
     }
 
-    if (!promptRuns || promptRuns.length === 0) {
-      throw new Error('No prompt runs found for the provided projects');
-    }
+    // Continue even if there are no prompt runs
 
     // 3. Fetch related action records
     const { data: actionRecords, error: actionsError } = await supabase
@@ -84,15 +100,15 @@ serve(async (req) => {
 
     // Organize data for each project
     const projectData = projects.map(project => {
-      const relatedRuns = promptRuns.filter(run => run.project_id === project.id);
-      const relatedActions = actionRecords?.filter(action => action.project_id === project.id) || [];
+      const relatedRuns = promptRuns ? promptRuns.filter(run => run.project_id === project.id) : [];
+      const relatedActions = actionRecords ? actionRecords.filter(action => action.project_id === project.id) : [];
       
       return {
         id: project.id,
         address: project.Address,
         summary: project.summary,
         nextStep: project.next_step,
-        latestRun: relatedRuns[0] || null,
+        latestRun: relatedRuns.length > 0 ? relatedRuns[0] : null,
         pendingActions: relatedActions
       };
     });
@@ -144,6 +160,12 @@ serve(async (req) => {
       }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
     const data = await response.json();
     
     if (!data.choices || !data.choices[0]) {
@@ -188,6 +210,11 @@ function createClient(supabaseUrl: string, supabaseKey: string) {
           order: (column: string, { ascending }: { ascending: boolean }) => new Promise((resolve) => {
             // Mock implementation for type checking - this will be replaced by actual Supabase client
             resolve({ data: [], error: null });
+          }),
+          limit: (limit: number) => ({
+            single: () => new Promise((resolve) => {
+              resolve({ data: null, error: null });
+            })
           })
         })
       })

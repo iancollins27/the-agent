@@ -24,9 +24,13 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
   const [hasGenerated, setHasGenerated] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [consolidatedMessage, setConsolidatedMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const projectIds = projects.map(p => p.project_id).filter(Boolean) as string[];
+  // Extract projectIds and ensure they are valid strings
+  const projectIds = projects
+    .map(p => p.project_id)
+    .filter((id): id is string => Boolean(id));
 
   const handleGenerateMessage = async () => {
     if (projectIds.length === 0) {
@@ -39,8 +43,11 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
     }
 
     setIsGenerating(true);
+    setError(null);
     
     try {
+      console.log(`Generating message for roofer ${rooferName} with projects:`, projectIds);
+      
       // Call the edge function to generate a consolidated message
       const { data, error } = await supabase.functions.invoke('generate-multi-project-message', {
         body: { 
@@ -51,6 +58,10 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
       
       if (error) throw error;
       
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
       setConsolidatedMessage(data.message);
       setHasGenerated(true);
       toast({
@@ -59,6 +70,7 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
       });
     } catch (error) {
       console.error('Error generating multi-project message:', error);
+      setError(error instanceof Error ? error.message : String(error));
       toast({
         variant: "destructive",
         title: "Error",
@@ -111,6 +123,10 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
 
   return (
     <div className="flex space-x-2">
+      {error && (
+        <p className="text-xs text-red-500">Error: {error}</p>
+      )}
+      
       {!hasGenerated ? (
         <Button 
           variant="outline"
