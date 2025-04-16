@@ -46,12 +46,45 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
     setError(null);
     
     try {
-      console.log(`Generating message for roofer ${rooferName} with projects:`, projectIds);
+      console.log(`Checking for projects with pending actions for roofer ${rooferName}`);
+      
+      // First, fetch action records to filter only projects that need roofer action
+      const { data: actionData, error: actionError } = await supabase
+        .from('action_records')
+        .select('project_id, action_type, status')
+        .in('project_id', projectIds)
+        .eq('status', 'pending');
+        
+      if (actionError) {
+        console.error('Error fetching action records:', actionError);
+        throw new Error('Failed to check for pending actions');
+      }
+      
+      // Filter to get projects that have pending actions
+      const projectsWithPendingActions = new Set(
+        actionData.map(action => action.project_id)
+      );
+      
+      const filteredProjectIds = projectIds.filter(id => 
+        projectsWithPendingActions.has(id)
+      );
+      
+      if (filteredProjectIds.length === 0) {
+        setIsGenerating(false);
+        toast({
+          variant: "destructive",
+          title: "No action required",
+          description: "None of the selected projects require action from this roofer.",
+        });
+        return;
+      }
+      
+      console.log(`Generating message for roofer ${rooferName} with ${filteredProjectIds.length} projects that need action`);
       
       // Call the edge function to generate a consolidated message
       const { data, error } = await supabase.functions.invoke('generate-multi-project-message', {
         body: { 
-          projectIds: projectIds,
+          projectIds: filteredProjectIds,
           rooferName: rooferName
         }
       });
@@ -73,7 +106,7 @@ const MultiProjectMessage: React.FC<MultiProjectMessageProps> = ({ rooferName, p
       setHasGenerated(true);
       toast({
         title: "Message generated",
-        description: "Multi-project message has been generated successfully.",
+        description: `Multi-project message for ${filteredProjectIds.length} project(s) has been generated successfully.`,
       });
     } catch (error) {
       console.error('Error generating multi-project message:', error);

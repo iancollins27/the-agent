@@ -31,9 +31,6 @@ serve(async (req) => {
 
     console.log(`Generating multi-project message for roofer: ${rooferName}, projects: ${projectIds.length}`);
 
-    // Debug: Log the project IDs we're trying to fetch
-    console.log(`Project IDs: ${JSON.stringify(projectIds)}`);
-
     // 1. Fetch project data for all provided project IDs
     const { data: projects, error: projectError } = await supabase
       .from('projects')
@@ -46,20 +43,6 @@ serve(async (req) => {
     }
 
     if (!projects || projects.length === 0) {
-      // If no projects found, let's check if the IDs exist at all
-      const { data: checkProjects, error: checkError } = await supabase
-        .from('projects')
-        .select('id')
-        .limit(1);
-        
-      if (checkError) {
-        console.error(`Error checking projects table: ${JSON.stringify(checkError)}`);
-        throw new Error(`Error accessing projects table: ${checkError.message}`);
-      }
-      
-      console.log(`Projects check result: ${JSON.stringify(checkProjects)}`);
-      console.log(`Looking for project IDs: ${JSON.stringify(projectIds)}`);
-      
       throw new Error('No projects found with the provided IDs. Please check if the IDs are valid.');
     }
 
@@ -76,9 +59,7 @@ serve(async (req) => {
       throw new Error(`Error fetching prompt runs: ${promptRunsError.message}`);
     }
 
-    // Continue even if there are no prompt runs
-
-    // 3. Fetch related action records
+    // 3. Fetch related action records - specifically pending actions
     const { data: actionRecords, error: actionsError } = await supabase
       .from('action_records')
       .select('*')
@@ -89,6 +70,18 @@ serve(async (req) => {
     if (actionsError) {
       throw new Error(`Error fetching action records: ${actionsError.message}`);
     }
+
+    if (!actionRecords || actionRecords.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'No pending actions found for these projects',
+          projectCount: 0
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Found ${actionRecords.length} pending actions`);
 
     // 4. Use AI to generate a consolidated message based on the collected data
     console.log('Preparing data for AI processing');
@@ -104,6 +97,11 @@ serve(async (req) => {
       const relatedRuns = promptRuns ? promptRuns.filter(run => run.project_id === project.id) : [];
       const relatedActions = actionRecords ? actionRecords.filter(action => action.project_id === project.id) : [];
       
+      // Only include projects that have pending actions
+      if (relatedActions.length === 0) {
+        return null;
+      }
+      
       return {
         id: project.id,
         address: project.Address,
@@ -112,11 +110,21 @@ serve(async (req) => {
         latestRun: relatedRuns.length > 0 ? relatedRuns[0] : null,
         pendingActions: relatedActions
       };
-    });
+    }).filter(Boolean); // Remove null entries
+    
+    if (projectData.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'No projects with pending actions found',
+          projectCount: 0
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Create a prompt for the AI to generate a consolidated message
     const promptContent = `
-    You need to create a consolidated message to send to a roofer named ${rooferName} regarding multiple projects.
+    You need to create a consolidated message to send to a roofer named ${rooferName} regarding multiple projects that require their attention.
     
     These are the projects and their details:
     ${JSON.stringify(projectData, null, 2)}
@@ -132,6 +140,7 @@ serve(async (req) => {
        - Maintains a professional but friendly tone
        - Ends with an appropriate closing
        - Keeps the message under 500 words
+       - ONLY includes actionable items that require the roofer's attention
     
     Return ONLY the final message text, with no additional explanations.
     `;
@@ -150,7 +159,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are an AI assistant that helps project managers communicate effectively with roofers.'
+            content: 'You are an AI assistant that helps project managers communicate effectively with roofers about pending actions.'
           },
           {
             role: 'user',
@@ -181,7 +190,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         message,
-        projectCount: projects.length
+        projectCount: projectData.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
