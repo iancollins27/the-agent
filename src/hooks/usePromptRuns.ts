@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -139,15 +140,21 @@ export const usePromptRuns = ({
             description: "Failed to filter out reminder actions",
           });
         } else {
-          const reminderActionRunIds = new Set(
+          // Filter out both reminder actions and NO_ACTION type
+          const filteredActionRunIds = new Set(
             actionData
-              .filter(action => action.action_type === 'set_future_reminder')
+              .filter(action => 
+                action.action_type === 'set_future_reminder' || 
+                action.action_type === 'NO_ACTION'
+              )
               .map(action => action.prompt_run_id)
           );
 
           formattedData = formattedData.filter(
-            run => !reminderActionRunIds.has(run.id)
+            run => !filteredActionRunIds.has(run.id)
           );
+          
+          console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
         }
       }
 

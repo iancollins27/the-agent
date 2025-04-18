@@ -4,11 +4,14 @@ import { Loader2 } from "lucide-react";
 import { PromptRun } from '../admin/types';
 import EmptyPromptRuns from '../admin/EmptyPromptRuns';
 import PromptRunsTable from '../admin/PromptRunsTable';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import MultiProjectMessage from './MultiProjectMessage';
 
 interface ProjectManagerContentProps {
   loading: boolean;
   promptRuns: PromptRun[];
   hideReviewed: boolean;
+  groupByRoofer?: boolean;
   getEmptyStateMessage: () => string;
   debugInfo: {
     userId?: string;
@@ -27,6 +30,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   loading,
   promptRuns,
   hideReviewed,
+  groupByRoofer = false,
   getEmptyStateMessage,
   debugInfo,
   onViewDetails,
@@ -59,6 +63,51 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
 
+  // Group by roofer if option is enabled
+  if (groupByRoofer) {
+    const rooferGroups: Record<string, PromptRun[]> = {};
+    
+    // Group runs by roofer
+    displayedRuns.forEach(run => {
+      const rooferName = run.project_roofer_contact || 'Unassigned';
+      if (!rooferGroups[rooferName]) {
+        rooferGroups[rooferName] = [];
+      }
+      rooferGroups[rooferName].push(run);
+    });
+    
+    return (
+      <div className="space-y-8">
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-muted-foreground">
+            Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({displayedRuns.length} {displayedRuns.length === 1 ? 'prompt run' : 'prompt runs'})
+          </p>
+        </div>
+        
+        {Object.entries(rooferGroups).map(([rooferName, runs]) => (
+          <Card key={rooferName} className="overflow-hidden">
+            <CardHeader className="bg-muted/50 flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">{rooferName}</CardTitle>
+              <MultiProjectMessage 
+                rooferName={rooferName} 
+                projects={runs} 
+              />
+            </CardHeader>
+            <CardContent className="p-0">
+              <PromptRunsTable 
+                promptRuns={runs} 
+                onRatingChange={onRatingChange} 
+                onViewDetails={onViewDetails}
+                onRunReviewed={onRunReviewed}
+                hideReviewed={hideReviewed}
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -68,7 +117,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
       </div>
       
       <PromptRunsTable 
-        promptRuns={promptRuns} 
+        promptRuns={displayedRuns} 
         onRatingChange={onRatingChange} 
         onViewDetails={onViewDetails}
         onRunReviewed={onRunReviewed}

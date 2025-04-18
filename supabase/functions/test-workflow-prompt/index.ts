@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { callAIProvider, callAIProviderWithMCP } from "./ai-providers.ts";
@@ -172,9 +171,13 @@ serve(async (req) => {
                 reminderSet = true;
                 console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
                 
+                // Store the action type properly for filtering
+                const actionType = actionData.action_type === "NO_ACTION" ? 
+                  "NO_ACTION" : "set_future_reminder";
+                
                 actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
                   ...actionData,
-                  action_type: "set_future_reminder"
+                  action_type: actionType
                 });
               } catch (reminderError) {
                 console.error("Error setting reminder:", reminderError);
@@ -303,9 +306,13 @@ serve(async (req) => {
                 }
                 
                 try {
+                  // Store the action type properly for filtering
+                  const actionType = actionData.action_type === "NO_ACTION" ? 
+                    "NO_ACTION" : "set_future_reminder";
+                  
                   actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
                     ...actionData,
-                    action_type: "set_future_reminder"
+                    action_type: actionType
                   });
                   console.log("Created reminder action record:", actionRecordId || "Failed to create action record");
                 } catch (createActionError) {

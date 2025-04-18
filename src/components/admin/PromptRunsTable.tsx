@@ -21,7 +21,8 @@ interface PromptRunsTableProps {
   onRatingChange: (promptRunId: string, rating: number | null) => void;
   onViewDetails: (promptRun: PromptRun) => void;
   onRunReviewed?: (promptRunId: string) => void;
-  hideReviewed?: boolean;
+  reviewFilter?: string;
+  hideReviewed?: boolean; // Kept for backward compatibility
 }
 
 const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
@@ -29,7 +30,8 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   onRatingChange, 
   onViewDetails,
   onRunReviewed,
-  hideReviewed = false
+  reviewFilter = "all", // Default to showing all
+  hideReviewed = false // Deprecated, kept for backward compatibility
 }) => {
   // Function to render stars for rating
   const renderStars = (promptRun: PromptRun) => {
@@ -79,10 +81,17 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     }
   };
 
-  // Filter out reviewed items if hideReviewed is true
-  const filteredPromptRuns = hideReviewed 
-    ? promptRuns.filter(run => !run.reviewed) 
-    : promptRuns;
+  // Filter runs based on the reviewFilter prop
+  const filteredPromptRuns = promptRuns.filter(run => {
+    if (reviewFilter === "all") return true;
+    if (reviewFilter === "reviewed") return run.reviewed === true;
+    if (reviewFilter === "not-reviewed") return run.reviewed !== true;
+    
+    // For backward compatibility
+    if (hideReviewed) return !run.reviewed;
+    
+    return true;
+  });
 
   return (
     <Table>
@@ -91,6 +100,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
         <TableRow>
           <TableHead>Address</TableHead>
           <TableHead>Next Step</TableHead>
+          <TableHead>Roofer</TableHead>
           <TableHead>Time</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -99,8 +109,10 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableBody>
         {filteredPromptRuns.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center py-6">
-              {hideReviewed 
+            <TableCell colSpan={6} className="text-center py-6">
+              {reviewFilter === "reviewed" 
+                ? "No reviewed prompt runs found." 
+                : reviewFilter === "not-reviewed"
                 ? "All prompt runs have been reviewed. Great job!" 
                 : "No prompt runs found matching your criteria."}
             </TableCell>
@@ -110,6 +122,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
             <TableRow key={run.id}>
               <TableCell>{run.project_address || 'N/A'}</TableCell>
               <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
+              <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
               <TableCell>{renderStars(run)}</TableCell>
               <TableCell className="text-right space-x-2">

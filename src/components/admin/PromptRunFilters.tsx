@@ -22,6 +22,7 @@ interface PromptRunFiltersProps {
   projectManagerFilter: string | null;
   onProjectManagerFilterChange: (value: string | null) => void;
   onRefresh: () => void;
+  hideStatusFilter?: boolean; // New optional prop
 }
 
 const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
@@ -33,7 +34,8 @@ const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
   onMyProjectsChange,
   projectManagerFilter,
   onProjectManagerFilterChange,
-  onRefresh
+  onRefresh,
+  hideStatusFilter = false // Default to false
 }) => {
   return (
     <div className="flex flex-wrap gap-2 items-center">
@@ -64,20 +66,22 @@ const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
       
-      <Select 
-        value={statusFilter || "all"} 
-        onValueChange={(value) => onStatusFilterChange(value === "all" ? null : value)}
-      >
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Filter by status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
-          <SelectItem value="PENDING">Pending</SelectItem>
-          <SelectItem value="COMPLETED">Completed</SelectItem>
-          <SelectItem value="ERROR">Error</SelectItem>
-        </SelectContent>
-      </Select>
+      {!hideStatusFilter && (
+        <Select 
+          value={statusFilter || "all"} 
+          onValueChange={(value) => onStatusFilterChange(value === "all" ? null : value)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+            <SelectItem value="COMPLETED">Completed</SelectItem>
+            <SelectItem value="ERROR">Error</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
       
       <Button onClick={onRefresh} variant="outline" size="icon">
         <RefreshCw className="h-4 w-4" />

@@ -2,7 +2,11 @@
 import React from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import PromptRunFilters from '../admin/PromptRunFilters';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Filter, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ProjectManagerSelector from "@/components/admin/ProjectManagerSelector";
 
 interface ProjectManagerFiltersProps {
   hideReviewed: boolean;
@@ -17,6 +21,10 @@ interface ProjectManagerFiltersProps {
   setOnlyMyProjects: (value: boolean) => void;
   projectManagerFilter: string | null;
   setProjectManagerFilter: (value: string | null) => void;
+  groupByRoofer: boolean;
+  setGroupByRoofer: (value: boolean) => void;
+  sortRooferAlphabetically: boolean;
+  setSortRooferAlphabetically: (value: boolean) => void;
   onRefresh: () => void;
 }
 
@@ -33,10 +41,14 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   setOnlyMyProjects,
   projectManagerFilter,
   setProjectManagerFilter,
+  groupByRoofer,
+  setGroupByRoofer,
+  sortRooferAlphabetically,
+  setSortRooferAlphabetically,
   onRefresh
 }) => {
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-4 flex-wrap">
       <div className="flex items-center space-x-2">
         <Switch
           id="hide-reviewed"
@@ -52,20 +64,75 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           checked={excludeReminderActions}
           onCheckedChange={setExcludeReminderActions}
         />
-        <Label htmlFor="exclude-reminder-actions">Exclude Reminder Actions</Label>
+        <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
       </div>
+
+      {/* Show text for time filter */}
+      <span className="text-sm text-muted-foreground">Show:</span>
       
-      <PromptRunFilters
-        timeFilter={timeFilter}
-        onTimeFilterChange={setTimeFilter}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        onlyShowMyProjects={onlyMyProjects}
-        onMyProjectsChange={setOnlyMyProjects}
-        projectManagerFilter={projectManagerFilter}
-        onProjectManagerFilterChange={setProjectManagerFilter}
-        onRefresh={onRefresh}
+      {/* Time filter select */}
+      <Select 
+        value={timeFilter} 
+        onValueChange={setTimeFilter}
+      >
+        <SelectTrigger className="w-[160px]">
+          <SelectValue placeholder="Select time range" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="last_hour">Last Hour</SelectItem>
+          <SelectItem value="last_24_hours">Last 24 Hours</SelectItem>
+          <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+          <SelectItem value="all">All Time</SelectItem>
+        </SelectContent>
+      </Select>
+      
+      {/* Project Manager filter */}
+      <ProjectManagerSelector 
+        value={projectManagerFilter} 
+        onChange={setProjectManagerFilter}
       />
+      
+      {/* Combined filter dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Filters
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[240px]">
+          <DropdownMenuCheckboxItem
+            checked={onlyMyProjects}
+            onCheckedChange={setOnlyMyProjects}
+          >
+            Only My Projects
+          </DropdownMenuCheckboxItem>
+          
+          <DropdownMenuSeparator />
+          
+          <DropdownMenuCheckboxItem
+            checked={groupByRoofer}
+            onCheckedChange={setGroupByRoofer}
+          >
+            Group by Roofer
+          </DropdownMenuCheckboxItem>
+          
+          {groupByRoofer && (
+            <DropdownMenuCheckboxItem
+              checked={sortRooferAlphabetically}
+              onCheckedChange={setSortRooferAlphabetically}
+              className="pl-8"
+            >
+              Sort Alphabetically
+            </DropdownMenuCheckboxItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      
+      {/* Refresh button */}
+      <Button onClick={onRefresh} variant="outline" size="icon">
+        <RefreshCw className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

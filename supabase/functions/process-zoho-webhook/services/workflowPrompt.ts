@@ -89,21 +89,48 @@ export async function runWorkflowPrompt(
     const { generateSummary } = await import('../ai.ts');
     const apiKey = getApiKey(aiProvider);
     
-    // Log the prompt run in the database
-    const { logPromptRun, updatePromptRunWithResult } = await import('../database.ts');
-    const promptRunId = await logPromptRun(supabase, {
-      project_id: projectId,
-      prompt_input: prompt,
-      ai_provider: aiProvider,
-      ai_model: aiModel
-    });
+    // Import the database functions correctly
+    // This was the source of the error - we need to use the properly structured imports
+    const promptRunId = await supabase
+      .from('prompt_runs')
+      .insert({
+        project_id: projectId,
+        prompt_input: prompt,
+        ai_provider: aiProvider,
+        ai_model: aiModel,
+        status: 'PENDING'
+      })
+      .select()
+      .single()
+      .then(({ data }) => data?.id)
+      .catch(error => {
+        console.error("Error logging prompt run:", error);
+        return null;
+      });
+    
+    console.log(`Created prompt run with ID: ${promptRunId || "Failed to create"}`);
     
     // Generate the summary
     const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
     
     // Update the prompt run with the result
-    await updatePromptRunWithResult(supabase, promptRunId, summary);
-    
+    if (promptRunId) {
+      try {
+        await supabase
+          .from('prompt_runs')
+          .update({
+            prompt_output: summary,
+            status: 'COMPLETED',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', promptRunId);
+        
+        console.log(`Updated prompt run ${promptRunId} with result`);
+      } catch (updateError) {
+        console.error("Error updating prompt run:", updateError);
+      }
+    }
+      
     // Update the project with the new summary
     await supabase
       .from('projects')

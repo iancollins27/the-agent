@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -8,27 +9,48 @@ import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
+import { useFilterPersistence } from "@/hooks/useFilterPersistence";
 
-// Import new components
+// Import components
 import ProjectManagerHeader from '../components/project-manager/ProjectManagerHeader';
 import ProjectManagerFilters from '../components/project-manager/ProjectManagerFilters';
 import ProjectManagerContent from '../components/project-manager/ProjectManagerContent';
 
 const ProjectManager: React.FC = () => {
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [onlyMyProjects, setOnlyMyProjects] = useState(false);
-  const [projectManagerFilter, setProjectManagerFilter] = useState<string | null>(null);
-  const [hideReviewed, setHideReviewed] = useState(true);
-  const [excludeReminderActions, setExcludeReminderActions] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  // Explicitly set the default to ALL to ensure it's used
-  const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
+  const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
+  
+  // Filter persistence
+  const { filters, updateFilter } = useFilterPersistence({
+    hideReviewed: true,
+    excludeReminderActions: false,
+    timeFilter: TIME_FILTERS.ALL,
+    statusFilter: null,
+    onlyMyProjects: false,
+    projectManagerFilter: null,
+    groupByRoofer: false,
+    sortRooferAlphabetically: true
+  });
+  
+  // Use persisted filters
+  const hideReviewed = filters.hideReviewed;
+  const excludeReminderActions = filters.excludeReminderActions;
+  const timeFilter = filters.timeFilter;
+  const statusFilter = filters.statusFilter;
+  const onlyMyProjects = filters.onlyMyProjects;
+  const projectManagerFilter = filters.projectManagerFilter;
+  const groupByRoofer = filters.groupByRoofer;
+  const sortRooferAlphabetically = filters.sortRooferAlphabetically;
+  
+  // Sync raw timeFilter with persisted filters
+  useEffect(() => {
+    rawSetTimeFilter(timeFilter);
+  }, [timeFilter]);
 
-  // Fetch user profile when component mounts
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
@@ -54,21 +76,18 @@ const ProjectManager: React.FC = () => {
     fetchUserProfile();
   }, [user]);
 
-  // Reset project manager filter when "only my projects" is checked
   useEffect(() => {
     if (onlyMyProjects) {
-      setProjectManagerFilter(null);
+      updateFilter('projectManagerFilter', null);
     }
   }, [onlyMyProjects]);
 
-  // Reset "only my projects" when project manager filter is set
   useEffect(() => {
     if (projectManagerFilter) {
-      setOnlyMyProjects(false);
+      updateFilter('onlyMyProjects', false);
     }
   }, [projectManagerFilter]);
 
-  // Use the custom hook to fetch prompt runs, only showing the latest run for each project
   const { 
     promptRuns, 
     loading, 
@@ -96,7 +115,6 @@ const ProjectManager: React.FC = () => {
   };
 
   const handleRunReviewed = (promptRunId: string) => {
-    // Update the local state to mark the run as reviewed
     setPromptRuns(prev => 
       prev.map(run => 
         run.id === promptRunId ? { ...run, reviewed: true } : run
@@ -132,7 +150,20 @@ const ProjectManager: React.FC = () => {
     return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
 
-  // Force a refresh on component mount to ensure latest data
+  const processedPromptRuns = React.useMemo(() => {
+    let runs = [...promptRuns];
+
+    if (sortRooferAlphabetically) {
+      runs.sort((a, b) => {
+        const rooferA = a.project_roofer_contact || 'zzz'; // Put empty values at the end
+        const rooferB = b.project_roofer_contact || 'zzz';
+        return rooferA.localeCompare(rooferB);
+      });
+    }
+    
+    return runs;
+  }, [promptRuns, sortRooferAlphabetically]);
+
   useEffect(() => {
     if (userProfile) {
       console.log("Forcing a data refresh on component mount");
@@ -149,26 +180,31 @@ const ProjectManager: React.FC = () => {
           <ProjectManagerHeader title="Project Manager Dashboard" />
           <ProjectManagerFilters 
             hideReviewed={hideReviewed}
-            setHideReviewed={setHideReviewed}
+            setHideReviewed={(value) => updateFilter('hideReviewed', value)}
             excludeReminderActions={excludeReminderActions}
-            setExcludeReminderActions={setExcludeReminderActions}
+            setExcludeReminderActions={(value) => updateFilter('excludeReminderActions', value)}
             timeFilter={timeFilter}
-            setTimeFilter={setTimeFilter}
+            setTimeFilter={(value) => updateFilter('timeFilter', value)}
             statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
+            setStatusFilter={(value) => updateFilter('statusFilter', value)}
             onlyMyProjects={onlyMyProjects}
-            setOnlyMyProjects={setOnlyMyProjects}
+            setOnlyMyProjects={(value) => updateFilter('onlyMyProjects', value)}
             projectManagerFilter={projectManagerFilter}
-            setProjectManagerFilter={setProjectManagerFilter}
+            setProjectManagerFilter={(value) => updateFilter('projectManagerFilter', value)}
+            groupByRoofer={groupByRoofer}
+            setGroupByRoofer={(value) => updateFilter('groupByRoofer', value)}
+            sortRooferAlphabetically={sortRooferAlphabetically}
+            setSortRooferAlphabetically={(value) => updateFilter('sortRooferAlphabetically', value)}
             onRefresh={fetchPromptRuns}
           />
         </div>
 
         <ProjectManagerContent 
           loading={loading}
-          promptRuns={promptRuns}
+          promptRuns={processedPromptRuns}
           hideReviewed={hideReviewed}
           getEmptyStateMessage={getEmptyStateMessage}
+          groupByRoofer={groupByRoofer}
           debugInfo={{
             userId: user?.id,
             companyId: userProfile?.profile_associated_company,
