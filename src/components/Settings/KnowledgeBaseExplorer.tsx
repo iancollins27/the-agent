@@ -7,13 +7,19 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/providers/SettingsProvider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Json } from "@/integrations/supabase/types";
 
 type KnowledgeBaseEntry = {
   id: string;
-  title: string;
+  title: string | null;
   content: string;
-  url: string;
-  created_at: string;
+  url: string | null;
+  company_id: string;
+  source_id: string;
+  source_type: string;
+  last_updated: string | null;
+  metadata: Json | null;
+  embedding?: string | null;
   selected?: boolean;
 };
 
@@ -29,10 +35,14 @@ export const KnowledgeBaseExplorer = () => {
 
   const fetchKnowledgeBaseEntries = async () => {
     try {
+      if (!companySettings?.id) {
+        throw new Error("No company ID available");
+      }
+      
       const { data, error } = await supabase
         .from('knowledge_base_embeddings')
         .select('*')
-        .eq('company_id', companySettings?.id);
+        .eq('company_id', companySettings.id);
 
       if (error) throw error;
 
@@ -75,7 +85,7 @@ export const KnowledgeBaseExplorer = () => {
                     onCheckedChange={() => toggleEntrySelection(entry.id)}
                   />
                   <div>
-                    <h3 className="font-medium">{entry.title}</h3>
+                    <h3 className="font-medium">{entry.title || 'Untitled Entry'}</h3>
                     <p className="text-sm text-gray-500 mt-1">
                       {entry.content.substring(0, 150)}...
                     </p>
