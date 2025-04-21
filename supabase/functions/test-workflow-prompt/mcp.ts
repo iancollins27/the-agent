@@ -1,4 +1,3 @@
-
 /**
  * Model Context Protocol (MCP) implementation for structured AI interactions
  */
@@ -87,40 +86,6 @@ export const getDefaultTools = (): MCPTool[] => [
         }
       },
       required: ['decision', 'reason']
-    }
-  },
-  {
-    name: 'knowledge_base_lookup',
-    description: 'Queries the knowledge base for relevant information',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'The query to search for in the knowledge base'
-        },
-        project_id: {
-          type: 'string',
-          description: 'The project ID to scope the knowledge base search'
-        }
-      },
-      required: ['query', 'project_id']
-    },
-    return_value: {
-      type: 'object',
-      properties: {
-        results: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              content: { type: 'string' },
-              relevance: { type: 'number' }
-            }
-          }
-        }
-      }
     }
   }
 ];

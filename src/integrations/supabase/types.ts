@@ -1018,6 +1018,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      match_documents: {
+        Args: { embedding: string; k: number; _company_id: string }
+        Returns: {
+          id: string
+          title: string
+          content: string
+          url: string
+          similarity: number
+        }[]
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown

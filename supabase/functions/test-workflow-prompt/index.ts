@@ -63,7 +63,7 @@ serve(async (req) => {
       aiProvider, 
       aiModel, 
       workflowPromptId,
-      useMCP = false // New flag to determine whether to use MCP or legacy approach
+      useMCP = false 
     } = requestBody;
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
@@ -101,7 +101,6 @@ serve(async (req) => {
       
       console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
       
-      // Update the latest_prompt_run_ID field on the project if this is an action detection prompt
       if (promptType === "action_detection_execution" && projectId && promptRunId) {
         try {
           const { error: updateError } = await supabase
@@ -131,29 +130,22 @@ serve(async (req) => {
     let knowledgeResults: any[] = [];
     
     try {
-      // Process differently based on whether we're using MCP or not
       if (useMCP && (aiProvider === "openai" || aiProvider === "claude")) {
-        // Create initial MCP context
         const systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
         let mcpContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
         
-        // Call AI with MCP format
         rawResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
         
-        // Extract tool calls based on provider
         const toolCalls = aiProvider === "openai" 
           ? extractToolCallsFromOpenAI(rawResponse)
           : extractToolCallsFromClaude(rawResponse);
         
-        // Process each tool call
         for (const toolCall of toolCalls) {
           if (toolCall.name === "detect_action") {
             const actionData = toolCall.arguments;
             
-            // Log the detected action
             console.log("Detected action:", actionData);
             
-            // Handle action based on decision
             if (actionData.decision === "ACTION_NEEDED" && projectId) {
               try {
                 actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
@@ -171,7 +163,6 @@ serve(async (req) => {
                 reminderSet = true;
                 console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
                 
-                // Store the action type properly for filtering
                 const actionType = actionData.action_type === "NO_ACTION" ? 
                   "NO_ACTION" : "set_future_reminder";
                 
@@ -190,13 +181,11 @@ serve(async (req) => {
                   projectId
                 );
                 
-                // Add knowledge results to context
                 const formattedKnowledge = formatKnowledgeResults(knowledgeResults);
                 mcpContext = addToolResult(mcpContext, "knowledge_base_lookup", {
                   results: knowledgeResults
                 });
                 
-                // Make another call to get final action with knowledge included
                 mcpContext = addAssistantMessage(mcpContext, 
                   "I've queried the knowledge base. Let me analyze this information and determine the appropriate action."
                 );
@@ -252,29 +241,31 @@ serve(async (req) => {
               }
             }
           } else if (toolCall.name === "knowledge_base_lookup") {
-            try {
-              knowledgeResults = await queryKnowledgeBase(
-                supabase,
-                toolCall.arguments.query,
-                projectId || ""
-              );
-              
-              mcpContext = addToolResult(mcpContext, "knowledge_base_lookup", {
-                results: knowledgeResults
-              });
-            } catch (kbError) {
-              console.error("Error in knowledge base lookup tool:", kbError);
+            const resp = await fetch(`${supabaseUrl}/functions/v1/tool-kb-search`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                query: toolCall.arguments.query,
+                company_id: projectId,
+                top_k: toolCall.arguments.top_k ?? 5
+              })
+            });
+            
+            if (!resp.ok) {
+              throw new Error(`KB search failed: ${await resp.text()}`);
             }
+
+            const { results } = await resp.json();
+            mcpContext = addToolResult(mcpContext, "knowledge_base_lookup", { results });
+            continue;
           }
         }
         
-        // Format a textual result from the structured response
         result = JSON.stringify({
           actionData: toolCalls.length > 0 ? toolCalls[0].arguments : { decision: "NO_ACTION" },
           knowledgeResults: knowledgeResults.length > 0 ? knowledgeResults : []
         }, null, 2);
       } else {
-        // Legacy approach
         result = await callAIProvider(aiProvider, aiModel, finalPrompt);
         console.log("Raw AI response:", result);
         
@@ -306,7 +297,6 @@ serve(async (req) => {
                 }
                 
                 try {
-                  // Store the action type properly for filtering
                   const actionType = actionData.action_type === "NO_ACTION" ? 
                     "NO_ACTION" : "set_future_reminder";
                   
