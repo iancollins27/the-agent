@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/providers/SettingsProvider";
+import { KnowledgeBaseExplorer } from "./KnowledgeBaseExplorer";
+import { KnowledgeBaseChat } from "./KnowledgeBaseChat";
 
 const KnowledgeBaseSettings: React.FC = () => {
   const { companySettings, updateCompanySettings } = useSettings();
@@ -88,45 +90,50 @@ const KnowledgeBaseSettings: React.FC = () => {
   };
 
   return (
-    <div className="mt-6 space-y-4">
-      <h3 className="text-lg font-medium">Notion Integration</h3>
-      
-      <div className="space-y-4">
-        <div className="grid gap-2">
-          <Label htmlFor="notion_token">Notion API Token</Label>
-          <Input
-            id="notion_token"
-            type="password"
-            value={notionToken}
-            onChange={(e) => setNotionToken(e.target.value)}
-            placeholder="Enter your Notion integration token"
-          />
-        </div>
+    <div className="space-y-6">
+      <div className="mt-6 space-y-4">
+        <h3 className="text-lg font-medium">Notion Integration</h3>
         
-        <div className="grid gap-2">
-          <Label htmlFor="notion_database_id">Notion Database ID (Optional)</Label>
-          <Input
-            id="notion_database_id"
-            value={notionDatabaseId}
-            onChange={(e) => setNotionDatabaseId(e.target.value)}
-            placeholder="Enter Notion database ID to sync"
-          />
+        <div className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="notion_token">Notion API Token</Label>
+            <Input
+              id="notion_token"
+              type="password"
+              value={notionToken}
+              onChange={(e) => setNotionToken(e.target.value)}
+              placeholder="Enter your Notion integration token"
+            />
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="notion_database_id">Notion Database ID (Optional)</Label>
+            <Input
+              id="notion_database_id"
+              value={notionDatabaseId}
+              onChange={(e) => setNotionDatabaseId(e.target.value)}
+              placeholder="Enter Notion database ID to sync"
+            />
+          </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="notion_page_id">Notion Page ID (Optional)</Label>
+            <Input
+              id="notion_page_id"
+              value={notionPageId}
+              onChange={(e) => setNotionPageId(e.target.value)}
+              placeholder="Enter specific Notion page ID"
+            />
+          </div>
+          
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Changes"}
+          </Button>
         </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="notion_page_id">Notion Page ID (Optional)</Label>
-          <Input
-            id="notion_page_id"
-            value={notionPageId}
-            onChange={(e) => setNotionPageId(e.target.value)}
-            placeholder="Enter specific Notion page ID"
-          />
-        </div>
-        
-        <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save Changes"}
-        </Button>
       </div>
+
+      <KnowledgeBaseExplorer />
+      <KnowledgeBaseChat />
     </div>
   );
 };
