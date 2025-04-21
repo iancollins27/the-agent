@@ -77,10 +77,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       // Handle merging nested knowledge_base_settings
       if (updates.knowledge_base_settings && companySettings.knowledge_base_settings) {
-        // Ensure we're doing a deep merge
+        const currentSettings = typeof companySettings.knowledge_base_settings === 'object' ? 
+                               companySettings.knowledge_base_settings : {};
+        const updateSettings = typeof updates.knowledge_base_settings === 'object' ?
+                              updates.knowledge_base_settings : {};
+                              
+        // Create merged object of the two objects
         updates.knowledge_base_settings = {
-          ...companySettings.knowledge_base_settings,
-          ...updates.knowledge_base_settings
+          ...(currentSettings as object),
+          ...(updateSettings as object)
         } as Json;
       }
       
