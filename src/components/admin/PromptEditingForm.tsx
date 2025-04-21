@@ -28,6 +28,10 @@ const PromptEditingForm = ({
     onChange(template);
   };
 
+  const handleSave = () => {
+    updatePromptMutation.mutate(editingPrompt);
+  };
+
   return (
     <div className="space-y-4">
       <Textarea
@@ -43,7 +47,7 @@ const PromptEditingForm = ({
       
       <div className="flex gap-2">
         <Button 
-          onClick={() => updatePromptMutation.mutate(editingPrompt)}
+          onClick={handleSave}
           disabled={updatePromptMutation.isPending}
         >
           {updatePromptMutation.isPending ? (
