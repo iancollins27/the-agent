@@ -9,12 +9,6 @@ interface CompanySettings {
   id?: string;
   name?: string;
   knowledge_base_settings?: Json;
-  notion_settings?: {
-    token: string;
-    database_id: string;
-    page_id: string;
-    last_sync?: string | null;
-  };
   default_email_provider?: string;
   default_phone_provider?: string;
   communication_settings?: Json;
@@ -81,11 +75,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     
     try {
-      // For notion_settings, merge with existing settings
-      if (updates.notion_settings && companySettings.notion_settings) {
-        updates.notion_settings = {
-          ...companySettings.notion_settings,
-          ...updates.notion_settings
+      // Handle merging nested knowledge_base_settings
+      if (updates.knowledge_base_settings && companySettings.knowledge_base_settings) {
+        // Ensure we're doing a deep merge
+        updates.knowledge_base_settings = {
+          ...companySettings.knowledge_base_settings,
+          ...updates.knowledge_base_settings
         };
       }
       

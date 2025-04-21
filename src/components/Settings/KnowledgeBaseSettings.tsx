@@ -15,48 +15,51 @@ const KnowledgeBaseSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (companySettings?.notion_settings) {
-      const settings = companySettings.notion_settings;
-      setNotionToken(settings.token || '');
-      setNotionDatabaseId(settings.database_id || '');
-      setNotionPageId(settings.page_id || '');
+    // Get Notion settings from knowledge_base_settings.notion
+    if (companySettings?.knowledge_base_settings?.notion) {
+      const notionSettings = companySettings.knowledge_base_settings.notion;
+      setNotionToken(notionSettings.token || '');
+      setNotionDatabaseId(notionSettings.database_id || '');
+      setNotionPageId(notionSettings.page_id || '');
     }
   }, [companySettings]);
 
   // Safely access notion settings properties with type checking
-  const getNotionSettingsSafely = (settings: any) => {
-    if (!settings) return { token: '', database_id: '', page_id: '', last_sync: null };
-    
-    if (Array.isArray(settings)) {
-      console.warn('Notion settings is unexpectedly an array:', settings);
+  const getNotionSettingsSafely = () => {
+    if (!companySettings?.knowledge_base_settings?.notion) {
       return { token: '', database_id: '', page_id: '', last_sync: null };
     }
     
-    if (typeof settings !== 'object') {
-      console.warn('Notion settings is not an object:', settings);
+    const notionSettings = companySettings.knowledge_base_settings.notion;
+    
+    if (typeof notionSettings !== 'object') {
+      console.warn('Notion settings is not an object:', notionSettings);
       return { token: '', database_id: '', page_id: '', last_sync: null };
     }
     
     return {
-      token: settings.token || '',
-      database_id: settings.database_id || '',
-      page_id: settings.page_id || '',
-      last_sync: settings.last_sync || null
+      token: notionSettings.token || '',
+      database_id: notionSettings.database_id || '',
+      page_id: notionSettings.page_id || '',
+      last_sync: notionSettings.last_sync || null
     };
   };
 
   // Use safe accessor instead of direct property access
-  const notionConfig = getNotionSettingsSafely(companySettings?.notion_settings);
+  const notionConfig = getNotionSettingsSafely();
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Update knowledge_base_settings.notion instead of notion_settings
       await updateCompanySettings({
-        notion_settings: {
-          token: notionToken,
-          database_id: notionDatabaseId,
-          page_id: notionPageId,
-          last_sync: notionConfig.last_sync
+        knowledge_base_settings: {
+          notion: {
+            token: notionToken,
+            database_id: notionDatabaseId || null,
+            page_id: notionPageId || null,
+            last_sync: notionConfig.last_sync
+          }
         }
       });
       
@@ -93,7 +96,7 @@ const KnowledgeBaseSettings: React.FC = () => {
         </div>
         
         <div className="grid gap-2">
-          <Label htmlFor="notion_database_id">Notion Database ID</Label>
+          <Label htmlFor="notion_database_id">Notion Database ID (Optional)</Label>
           <Input
             id="notion_database_id"
             value={notionDatabaseId}
@@ -108,7 +111,7 @@ const KnowledgeBaseSettings: React.FC = () => {
             id="notion_page_id"
             value={notionPageId}
             onChange={(e) => setNotionPageId(e.target.value)}
-            placeholder="Enter specific Notion page ID (optional)"
+            placeholder="Enter specific Notion page ID"
           />
         </div>
         
