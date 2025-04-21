@@ -16,32 +16,40 @@ const KnowledgeBaseSettings: React.FC = () => {
 
   useEffect(() => {
     // Get Notion settings from knowledge_base_settings.notion
-    if (companySettings?.knowledge_base_settings?.notion) {
+    if (companySettings?.knowledge_base_settings && 
+        typeof companySettings.knowledge_base_settings === 'object' && 
+        companySettings.knowledge_base_settings !== null &&
+        'notion' in companySettings.knowledge_base_settings) {
       const notionSettings = companySettings.knowledge_base_settings.notion;
-      setNotionToken(notionSettings.token || '');
-      setNotionDatabaseId(notionSettings.database_id || '');
-      setNotionPageId(notionSettings.page_id || '');
+      if (typeof notionSettings === 'object' && notionSettings !== null) {
+        setNotionToken((notionSettings as any).token || '');
+        setNotionDatabaseId((notionSettings as any).database_id || '');
+        setNotionPageId((notionSettings as any).page_id || '');
+      }
     }
   }, [companySettings]);
 
   // Safely access notion settings properties with type checking
   const getNotionSettingsSafely = () => {
-    if (!companySettings?.knowledge_base_settings?.notion) {
+    if (!companySettings?.knowledge_base_settings || 
+        typeof companySettings.knowledge_base_settings !== 'object' ||
+        companySettings.knowledge_base_settings === null ||
+        !('notion' in companySettings.knowledge_base_settings)) {
       return { token: '', database_id: '', page_id: '', last_sync: null };
     }
     
     const notionSettings = companySettings.knowledge_base_settings.notion;
     
-    if (typeof notionSettings !== 'object') {
+    if (typeof notionSettings !== 'object' || notionSettings === null) {
       console.warn('Notion settings is not an object:', notionSettings);
       return { token: '', database_id: '', page_id: '', last_sync: null };
     }
     
     return {
-      token: notionSettings.token || '',
-      database_id: notionSettings.database_id || '',
-      page_id: notionSettings.page_id || '',
-      last_sync: notionSettings.last_sync || null
+      token: (notionSettings as any).token || '',
+      database_id: (notionSettings as any).database_id || '',
+      page_id: (notionSettings as any).page_id || '',
+      last_sync: (notionSettings as any).last_sync || null
     };
   };
 

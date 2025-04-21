@@ -81,7 +81,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updates.knowledge_base_settings = {
           ...companySettings.knowledge_base_settings,
           ...updates.knowledge_base_settings
-        };
+        } as Json;
       }
       
       console.log('Updating company settings:', updates);
