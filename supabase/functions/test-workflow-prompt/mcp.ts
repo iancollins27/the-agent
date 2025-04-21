@@ -87,6 +87,43 @@ export const getDefaultTools = (): MCPTool[] => [
       },
       required: ['decision', 'reason']
     }
+  },
+  {
+    name: 'knowledge_base_lookup',
+    description: 'Searches the knowledge base for relevant information using semantic similarity',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query to find relevant knowledge base entries'
+        },
+        top_k: {
+          type: 'integer',
+          description: 'Number of results to return (default: 5)',
+          default: 5
+        }
+      },
+      required: ['query']
+    },
+    return_value: {
+      type: 'object',
+      properties: {
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              title: { type: 'string' },
+              content: { type: 'string' },
+              url: { type: 'string' },
+              similarity: { type: 'number' }
+            }
+          }
+        }
+      }
+    }
   }
 ];
 
