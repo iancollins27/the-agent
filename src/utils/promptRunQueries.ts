@@ -28,8 +28,7 @@ export const getPromptRunsWithPendingActions = async () => {
     // Handle the count properly, ensuring it's a number
     const pendingActionsCount = run.action_records && 
                               run.action_records[0] && 
-                              typeof run.action_records[0].count === 'number' ? 
-                              run.action_records[0].count : 0;
+                              Number(run.action_records[0].count) || 0;
                               
     return {
       ...run,

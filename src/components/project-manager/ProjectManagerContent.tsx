@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Loader2 } from "lucide-react";
 import { PromptRun } from '../admin/types';
@@ -45,16 +44,16 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
 
-  // Calculate the displayed projects count (after filtering for hideReviewed)
-  const displayedRuns = hideReviewed 
-    ? promptRuns.filter(run => !run.reviewed)
-    : promptRuns;
+  // Filter out records with no pending actions first, then apply hideReviewed filter
+  const filteredRuns = promptRuns
+    .filter(run => (run.pending_actions || 0) > 0)
+    .filter(run => !hideReviewed || !run.reviewed);
   
-  // Get unique project IDs to show actual project count
-  const uniqueProjectIds = new Set(displayedRuns.map(run => run.project_id).filter(Boolean));
+  // Calculate the displayed projects count (after all filtering)
+  const uniqueProjectIds = new Set(filteredRuns.map(run => run.project_id).filter(Boolean));
   const projectCount = uniqueProjectIds.size;
 
-  if (promptRuns.length === 0) {
+  if (filteredRuns.length === 0) {
     return (
       <EmptyPromptRuns
         message={getEmptyStateMessage()}
@@ -68,7 +67,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     const rooferGroups: Record<string, PromptRun[]> = {};
     
     // Group runs by roofer
-    displayedRuns.forEach(run => {
+    filteredRuns.forEach(run => {
       const rooferName = run.project_roofer_contact || 'Unassigned';
       if (!rooferGroups[rooferName]) {
         rooferGroups[rooferName] = [];
@@ -80,7 +79,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
       <div className="space-y-8">
         <div className="flex justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({displayedRuns.length} {displayedRuns.length === 1 ? 'prompt run' : 'prompt runs'})
+            Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({filteredRuns.length} {filteredRuns.length === 1 ? 'prompt run' : 'prompt runs'})
           </p>
         </div>
         
@@ -112,12 +111,12 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({displayedRuns.length} {displayedRuns.length === 1 ? 'prompt run' : 'prompt runs'})
+          Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({filteredRuns.length} {filteredRuns.length === 1 ? 'prompt run' : 'prompt runs'})
         </p>
       </div>
       
       <PromptRunsTable 
-        promptRuns={displayedRuns} 
+        promptRuns={filteredRuns} 
         onRatingChange={onRatingChange} 
         onViewDetails={onViewDetails}
         onRunReviewed={onRunReviewed}
