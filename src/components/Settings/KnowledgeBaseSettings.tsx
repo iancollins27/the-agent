@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/providers/SettingsProvider";
 import { KnowledgeBaseExplorer } from "./KnowledgeBaseExplorer";
 import { KnowledgeBaseChat } from "./KnowledgeBaseChat";
+import { KnowledgeBaseUploader } from "./KnowledgeBaseUploader";
 import { supabase } from "@/integrations/supabase/client";
 
 const KnowledgeBaseSettings: React.FC = () => {
@@ -152,6 +153,8 @@ const KnowledgeBaseSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <KnowledgeBaseUploader />
+
       <div className="mt-6 space-y-4">
         <h3 className="text-lg font-medium">Notion Integration</h3>
         
