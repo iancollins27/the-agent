@@ -30,10 +30,21 @@ export const getPromptRunsWithPendingActions = async () => {
     let pendingActionsCount = 0;
     
     if (run.action_records && 
-        run.action_records[0] && 
-        run.action_records[0].count !== undefined) {
-      // Convert the count to a number, regardless of the returned type
-      pendingActionsCount = parseInt(String(run.action_records[0].count), 10);
+        Array.isArray(run.action_records) && 
+        run.action_records.length > 0) {
+      // The count could be in different formats depending on the Supabase response
+      const countValue = run.action_records[0];
+      
+      if (typeof countValue === 'object' && countValue !== null && 'count' in countValue) {
+        // Handle object with count property
+        pendingActionsCount = parseInt(String(countValue.count), 10) || 0;
+      } else if (typeof countValue === 'number') {
+        // Handle direct number value
+        pendingActionsCount = countValue;
+      } else if (typeof countValue === 'string') {
+        // Handle string value that might represent a number
+        pendingActionsCount = parseInt(countValue, 10) || 0;
+      }
     }
                               
     return {
