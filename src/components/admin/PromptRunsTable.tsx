@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Table, 
@@ -10,7 +9,6 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Star, ExternalLink, Eye, CheckSquare } from "lucide-react";
 import { PromptRun } from './types';
 import { formatDistanceToNow } from 'date-fns';
@@ -23,7 +21,7 @@ interface PromptRunsTableProps {
   onViewDetails: (promptRun: PromptRun) => void;
   onRunReviewed?: (promptRunId: string) => void;
   reviewFilter?: string;
-  hideReviewed?: boolean; // Kept for backward compatibility
+  hideReviewed?: boolean;
 }
 
 const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
@@ -31,10 +29,9 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   onRatingChange, 
   onViewDetails,
   onRunReviewed,
-  reviewFilter = "all", // Default to showing all
-  hideReviewed = false // Deprecated, kept for backward compatibility
+  reviewFilter = "all",
+  hideReviewed = false
 }) => {
-  // Function to render stars for rating
   const renderStars = (promptRun: PromptRun) => {
     const rating = promptRun.feedback_rating || 0;
     return (
@@ -54,7 +51,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
 
   const handleMarkAsReviewed = async (promptRun: PromptRun) => {
     try {
-      // Update the database to mark the prompt run as reviewed
       const { error } = await supabase
         .from('prompt_runs')
         .update({ reviewed: true })
@@ -82,15 +78,11 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     }
   };
 
-  // Filter runs based on the reviewFilter prop
   const filteredPromptRuns = promptRuns.filter(run => {
     if (reviewFilter === "all") return true;
     if (reviewFilter === "reviewed") return run.reviewed === true;
     if (reviewFilter === "not-reviewed") return run.reviewed !== true;
-    
-    // For backward compatibility
     if (hideReviewed) return !run.reviewed;
-    
     return true;
   });
 
@@ -103,7 +95,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
           <TableHead>Next Step</TableHead>
           <TableHead>Roofer</TableHead>
           <TableHead>Time</TableHead>
-          <TableHead>Pending Actions</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -111,7 +102,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableBody>
         {filteredPromptRuns.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-6">
+            <TableCell colSpan={6} className="text-center py-6">
               {reviewFilter === "reviewed" 
                 ? "No reviewed prompt runs found." 
                 : reviewFilter === "not-reviewed"
@@ -126,11 +117,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
               <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
-              <TableCell>
-                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                  Pending
-                </Badge>
-              </TableCell>
               <TableCell>{renderStars(run)}</TableCell>
               <TableCell className="text-right space-x-2">
                 <Button 
