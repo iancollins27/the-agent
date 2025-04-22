@@ -1,0 +1,206 @@
+
+import React, { useState, useEffect } from 'react';
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/providers/SettingsProvider";
+
+interface NotionIntegrationFormProps {
+  companySettings: any;
+  updateCompanySettings: (updates: any) => Promise<void>;
+}
+
+export const NotionIntegrationForm: React.FC<NotionIntegrationFormProps> = ({
+  companySettings,
+  updateCompanySettings
+}) => {
+  const { toast } = useToast();
+  const [notionToken, setNotionToken] = useState('');
+  const [notionDatabaseId, setNotionDatabaseId] = useState('');
+  const [notionPageId, setNotionPageId] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (companySettings?.knowledge_base_settings &&
+        typeof companySettings.knowledge_base_settings === 'object' &&
+        companySettings.knowledge_base_settings !== null &&
+        'notion' in companySettings.knowledge_base_settings) {
+      const notionSettings = companySettings.knowledge_base_settings.notion;
+      if (typeof notionSettings === 'object' && notionSettings !== null) {
+        setNotionToken((notionSettings as any).token || '');
+        setNotionDatabaseId((notionSettings as any).database_id || '');
+        setNotionPageId((notionSettings as any).page_id || '');
+      }
+    }
+  }, [companySettings]);
+
+  const getNotionSettingsSafely = () => {
+    if (!companySettings?.knowledge_base_settings ||
+        typeof companySettings.knowledge_base_settings !== 'object' ||
+        companySettings.knowledge_base_settings === null ||
+        !('notion' in companySettings.knowledge_base_settings)) {
+      return { token: '', database_id: '', page_id: '', last_sync: null };
+    }
+    const notionSettings = companySettings.knowledge_base_settings.notion;
+    if (typeof notionSettings !== 'object' || notionSettings === null) {
+      return { token: '', database_id: '', page_id: '', last_sync: null };
+    }
+    return {
+      token: (notionSettings as any).token || '',
+      database_id: (notionSettings as any).database_id || '',
+      page_id: (notionSettings as any).page_id || '',
+      last_sync: (notionSettings as any).last_sync || null
+    };
+  };
+
+  const notionConfig = getNotionSettingsSafely();
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateCompanySettings({
+        knowledge_base_settings: {
+          notion: {
+            token: notionToken,
+            database_id: notionDatabaseId || null,
+            page_id: notionPageId || null,
+            last_sync: notionConfig.last_sync
+          }
+        }
+      });
+      toast({
+        title: "Success",
+        description: "Notion settings updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating Notion settings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update Notion settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (!companySettings?.id) {
+      toast({
+        title: "Error",
+        description: "Company settings not loaded yet",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const rawDatabaseId = notionDatabaseId;
+      const rawPageId = notionPageId;
+      const payload = {
+        companyId: companySettings.id,
+        notionToken: notionToken,
+        notionDatabaseId: rawDatabaseId,
+        notionPageId: rawPageId
+      };
+
+      const { data, error } = await supabase.functions.invoke('process-notion-integration', {
+        body: payload
+      });
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Notion sync started successfully. This may take a few minutes.",
+      });
+
+      const now = new Date().toISOString();
+      await updateCompanySettings({
+        knowledge_base_settings: {
+          notion: {
+            token: notionToken,
+            database_id: rawDatabaseId,
+            page_id: rawPageId,
+            last_sync: now
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error syncing with Notion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start Notion sync: " + (error.message || "Unknown error"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 space-y-4">
+      <h3 className="text-lg font-medium">Notion Integration</h3>
+      <div className="space-y-4">
+        <div className="grid gap-2">
+          <Label htmlFor="notion_token">Notion API Token</Label>
+          <Input
+            id="notion_token"
+            type="password"
+            value={notionToken}
+            onChange={(e) => setNotionToken(e.target.value)}
+            placeholder="Enter your Notion integration token"
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="notion_database_id">Notion Database ID (Optional)</Label>
+          <Input
+            id="notion_database_id"
+            value={notionDatabaseId}
+            onChange={(e) => setNotionDatabaseId(e.target.value)}
+            placeholder="Enter Notion database ID to sync"
+          />
+          <p className="text-sm text-muted-foreground">
+            Important: Enter the database ID exactly as it appears in Notion URL or API. The integration will use this ID without modification.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="notion_page_id">Notion Page ID (Optional)</Label>
+          <Input
+            id="notion_page_id"
+            value={notionPageId}
+            onChange={(e) => setNotionPageId(e.target.value)}
+            placeholder="Enter specific Notion page ID"
+          />
+        </div>
+
+        <div className="flex space-x-2">
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Changes"}
+          </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={handleSync} 
+            disabled={isSyncing || !notionToken || !companySettings?.id}
+          >
+            {isSyncing ? "Syncing..." : "Sync with Notion"}
+          </Button>
+        </div>
+
+        {notionConfig.last_sync && (
+          <p className="text-sm text-gray-500">
+            Last synced: {new Date(notionConfig.last_sync).toLocaleString()}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default NotionIntegrationForm;
