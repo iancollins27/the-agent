@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const openAIApiKey = Deno.env.get("OPENAI_API_KEY") || "";
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -18,6 +19,17 @@ serve(async (req) => {
   }
 
   try {
+    if (!openAIApiKey) {
+      console.error("OpenAI API key is not configured");
+      return new Response(
+        JSON.stringify({ error: "OpenAI API key is not configured" }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500
+        }
+      );
+    }
+
     const { query, company_id, top_k = 5 } = await req.json();
 
     if (!query || !company_id) {
@@ -30,7 +42,7 @@ serve(async (req) => {
     const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
+        "Authorization": `Bearer ${openAIApiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
