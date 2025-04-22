@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -99,20 +98,19 @@ const KnowledgeBaseSettings: React.FC = () => {
 
     setIsSyncing(true);
     try {
-      // Log the exact values being sent to the edge function
-      console.log('SYNC REQUEST - Sending database ID:', notionDatabaseId);
-      console.log('SYNC REQUEST - Database ID type:', typeof notionDatabaseId);
-      console.log('SYNC REQUEST - Database ID length:', notionDatabaseId?.length);
-      console.log('SYNC REQUEST - Database ID contains hyphens:', notionDatabaseId?.includes('-'));
-      console.log('SYNC REQUEST - Page ID:', notionPageId);
-      console.log('SYNC REQUEST - Page ID type:', typeof notionPageId);
+      // Store the raw database ID and page ID without any modifications
+      const rawDatabaseId = notionDatabaseId;
+      const rawPageId = notionPageId;
+      
+      console.log('SYNC REQUEST - Sending database ID (raw):', rawDatabaseId);
+      console.log('SYNC REQUEST - Sending page ID (raw):', rawPageId);
 
-      // Preserve exactly what the user entered without any modifications
+      // Send the IDs exactly as entered by the user without any transformations
       const payload = {
         companyId: companySettings.id,
         notionToken: notionToken,
-        notionDatabaseId: notionDatabaseId,
-        notionPageId: notionPageId
+        notionDatabaseId: rawDatabaseId,
+        notionPageId: rawPageId
       };
 
       console.log('SYNC REQUEST - Full payload:', JSON.stringify(payload));
@@ -133,8 +131,8 @@ const KnowledgeBaseSettings: React.FC = () => {
         knowledge_base_settings: {
           notion: {
             token: notionToken,
-            database_id: notionDatabaseId,
-            page_id: notionPageId,
+            database_id: rawDatabaseId,
+            page_id: rawPageId,
             last_sync: now
           }
         }
@@ -175,14 +173,14 @@ const KnowledgeBaseSettings: React.FC = () => {
               id="notion_database_id"
               value={notionDatabaseId}
               onChange={(e) => {
-                // Log raw input without any processing
+                // Store exactly what the user types without any processing
                 console.log('Raw database ID input:', e.target.value);
                 setNotionDatabaseId(e.target.value);
               }}
               placeholder="Enter Notion database ID to sync"
             />
             <p className="text-sm text-muted-foreground">
-              Important: Enter the ID exactly as it appears in Notion. Do not add or remove hyphens.
+              Important: Enter the database ID exactly as it appears in Notion URL or API. The integration will use this ID without modification.
             </p>
           </div>
           
@@ -192,7 +190,7 @@ const KnowledgeBaseSettings: React.FC = () => {
               id="notion_page_id"
               value={notionPageId}
               onChange={(e) => {
-                // Log raw input without any processing
+                // Store exactly what the user types without any processing
                 console.log('Raw page ID input:', e.target.value);
                 setNotionPageId(e.target.value);
               }}

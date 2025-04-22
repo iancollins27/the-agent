@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -94,14 +93,13 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
   try {
     console.log(`Processing Notion database with exact ID: "${databaseId}"`);
     
-    // Log the exact URL being used for the API call
-    const apiUrl = `https://api.notion.com/v1/databases/${databaseId}/query`;
-    console.log(`Making Notion API request to: ${apiUrl}`);
-    console.log(`Using headers: Authorization: Bearer ${notionToken.substring(0, 5)}... (truncated), Notion-Version: 2022-06-28`);
+    // IMPORTANT: Use the raw database ID without any manipulation
+    // Construct the API URL directly without any string manipulation that might add hyphens
+    const rawDatabaseId = databaseId; // Use the ID exactly as provided by the user
+    const apiUrl = `https://api.notion.com/v1/databases/${rawDatabaseId}/query`;
     
-    // Extra logging to check if URL transformation is happening
-    console.log('Database ID just before fetch call:', databaseId);
-    console.log('Full API URL just before fetch call:', apiUrl);
+    console.log(`Making Notion API request with raw ID: ${rawDatabaseId}`);
+    console.log(`Full API URL: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -141,11 +139,12 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
   try {
     console.log(`Processing Notion page with exact ID: "${pageId}"`);
     
-    // Log the exact URL being used for the API call
-    const apiUrl = `https://api.notion.com/v1/blocks/${pageId}/children`;
-    console.log(`Making Notion API request to: ${apiUrl}`);
-    console.log('Page ID just before fetch call:', pageId);
-    console.log('Full API URL just before fetch call:', apiUrl);
+    // Use the pageId exactly as received, without any modifications
+    const rawPageId = pageId;
+    const apiUrl = `https://api.notion.com/v1/blocks/${rawPageId}/children`;
+    
+    console.log(`Making Notion API request with raw page ID: ${rawPageId}`);
+    console.log(`Full API URL: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -163,10 +162,9 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
       throw new Error(`Notion API error: ${JSON.stringify(errorData)}`);
     }
 
-    const pageInfoUrl = `https://api.notion.com/v1/pages/${pageId}`;
+    // For page info, use the same raw ID approach
+    const pageInfoUrl = `https://api.notion.com/v1/pages/${rawPageId}`;
     console.log(`Making Notion API request for page info to: ${pageInfoUrl}`);
-    console.log('Page ID just before page info fetch call:', pageId);
-    console.log('Full page info API URL just before fetch call:', pageInfoUrl);
     
     const pageInfoResponse = await fetch(pageInfoUrl, {
       method: 'GET',
@@ -228,7 +226,8 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
           content: chunkContent,
           embedding: embedding,
           title: pageTitle,
-          url: `https://notion.so/${pageId.replace(/-/g, '')}`,
+          // Use the page ID exactly as received, without any replace() operations
+          url: `https://notion.so/${pageId}`, 
           metadata: {
             chunk_index: i,
             total_chunks: chunks.length
