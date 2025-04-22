@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/providers/SettingsProvider";
 import { KnowledgeBaseExplorer } from "./KnowledgeBaseExplorer";
 import { KnowledgeBaseChat } from "./KnowledgeBaseChat";
+import { supabase } from "@/integrations/supabase/client";
 
 const KnowledgeBaseSettings: React.FC = () => {
   const { companySettings, updateCompanySettings } = useSettings();
@@ -15,6 +16,7 @@ const KnowledgeBaseSettings: React.FC = () => {
   const [notionPageId, setNotionPageId] = useState('');
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     // Get Notion settings from knowledge_base_settings.notion
@@ -89,6 +91,56 @@ const KnowledgeBaseSettings: React.FC = () => {
     }
   };
 
+  const handleSync = async () => {
+    if (!companySettings?.id) {
+      toast({
+        title: "Error",
+        description: "Company settings not loaded yet",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-notion-integration', {
+        body: {
+          company_id: companySettings.id
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Notion sync started successfully. This may take a few minutes.",
+      });
+      
+      // Update the last_sync time in settings
+      const now = new Date().toISOString();
+      await updateCompanySettings({
+        knowledge_base_settings: {
+          notion: {
+            token: notionToken,
+            database_id: notionDatabaseId || null,
+            page_id: notionPageId || null,
+            last_sync: now
+          }
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error syncing with Notion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start Notion sync.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="mt-6 space-y-4">
@@ -126,9 +178,25 @@ const KnowledgeBaseSettings: React.FC = () => {
             />
           </div>
           
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? "Saving..." : "Save Changes"}
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={handleSync} 
+              disabled={isSyncing || !notionToken || !companySettings?.id}
+            >
+              {isSyncing ? "Syncing..." : "Sync with Notion"}
+            </Button>
+          </div>
+          
+          {notionConfig.last_sync && (
+            <p className="text-sm text-gray-500">
+              Last synced: {new Date(notionConfig.last_sync).toLocaleString()}
+            </p>
+          )}
         </div>
       </div>
 

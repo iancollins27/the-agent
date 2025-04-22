@@ -30,8 +30,11 @@ export const KnowledgeBaseExplorer = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchKnowledgeBaseEntries();
-  }, []);
+    // Only fetch knowledge base entries when companySettings is available
+    if (companySettings?.id) {
+      fetchKnowledgeBaseEntries();
+    }
+  }, [companySettings]); // Re-fetch when companySettings changes
 
   const fetchKnowledgeBaseEntries = async () => {
     try {
@@ -39,6 +42,7 @@ export const KnowledgeBaseExplorer = () => {
         throw new Error("No company ID available");
       }
       
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('knowledge_base_embeddings')
         .select('*')
@@ -74,8 +78,10 @@ export const KnowledgeBaseExplorer = () => {
         <div className="space-y-4">
           {isLoading ? (
             <p>Loading knowledge base entries...</p>
-          ) : entries.length === 0 ? (
+          ) : companySettings?.id && entries.length === 0 ? (
             <p>No entries found in the knowledge base. Try syncing with Notion first.</p>
+          ) : !companySettings?.id ? (
+            <p>Waiting for company settings to load...</p>
           ) : (
             <div className="space-y-4">
               {entries.map((entry) => (

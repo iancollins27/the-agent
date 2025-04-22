@@ -16,7 +16,16 @@ export const KnowledgeBaseChat = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || !companySettings?.id) {
+      if (!companySettings?.id) {
+        toast({
+          title: "Error",
+          description: "Company settings not loaded yet",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -25,7 +34,7 @@ export const KnowledgeBaseChat = () => {
           promptType: "knowledge_query",
           contextData: {
             query: query,
-            company_id: companySettings?.id
+            company_id: companySettings.id
           },
           useMCP: true
         }
@@ -62,7 +71,7 @@ export const KnowledgeBaseChat = () => {
             />
           </div>
           
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || !companySettings?.id}>
             {isLoading ? "Processing..." : "Send Query"}
           </Button>
 
