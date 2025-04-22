@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -10,7 +9,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -39,7 +37,6 @@ serve(async (req) => {
       throw new Error('Notion token is required');
     }
 
-    // Store Notion credentials in company settings
     const { error: settingsError } = await supabase
       .from('companies')
       .update({
@@ -59,15 +56,10 @@ serve(async (req) => {
       throw settingsError;
     }
 
-    // Start the background processing of Notion content
     if (notionDatabaseId) {
-      // Format the database ID by removing hyphens for Notion API
-      const formattedDatabaseId = formatNotionId(notionDatabaseId);
-      await processNotionDatabase(supabase, companyId, notionToken, formattedDatabaseId, openaiApiKey);
+      await processNotionDatabase(supabase, companyId, notionToken, notionDatabaseId, openaiApiKey);
     } else if (notionPageId) {
-      // Format the page ID by removing hyphens for Notion API
-      const formattedPageId = formatNotionId(notionPageId);
-      await processNotionPage(supabase, companyId, notionToken, formattedPageId, openaiApiKey);
+      await processNotionPage(supabase, companyId, notionToken, notionPageId, openaiApiKey);
     }
 
     return new Response(JSON.stringify({ 
@@ -89,19 +81,10 @@ serve(async (req) => {
   }
 });
 
-// Helper function to format Notion IDs correctly
-function formatNotionId(id: string): string {
-  // If the ID contains hyphens, ensure it's properly formatted
-  // Some Notion APIs require IDs without hyphens, others with specific hyphen patterns
-  return id.replace(/-/g, '');
-}
-
-// Process a Notion database 
 async function processNotionDatabase(supabase, companyId, notionToken, databaseId, openaiApiKey) {
   try {
     console.log(`Processing Notion database with ID: ${databaseId}`);
     
-    // Fetch database items from Notion API
     const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
       method: 'POST',
       headers: {
@@ -123,7 +106,6 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
     const data = await response.json();
     console.log(`Processing ${data.results.length} pages from Notion database`);
 
-    // Process each page in the database
     for (const page of data.results) {
       await processNotionPage(supabase, companyId, notionToken, page.id, openaiApiKey);
     }
@@ -135,12 +117,10 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
   }
 }
 
-// Process a single Notion page
 async function processNotionPage(supabase, companyId, notionToken, pageId, openaiApiKey) {
   try {
     console.log(`Processing Notion page with ID: ${pageId}`);
     
-    // Fetch page content from Notion API
     const response = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
       method: 'GET',
       headers: {
@@ -155,7 +135,6 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
       throw new Error(`Notion API error: ${errorData.message || 'Unknown error'}`);
     }
 
-    // Get page info for title
     const pageInfoResponse = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
       method: 'GET',
       headers: {
@@ -167,7 +146,6 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
     const pageInfo = await pageInfoResponse.json();
     const pageData = await response.json();
     
-    // Extract page title
     let pageTitle = "Untitled";
     if (pageInfo.properties && pageInfo.properties.title) {
       const titleProperty = pageInfo.properties.title;
@@ -176,11 +154,9 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
       }
     }
 
-    // Extract and process text content from page blocks
     let fullContent = extractTextFromBlocks(pageData.results);
     console.log(`Extracted ${fullContent.length} characters from page`);
 
-    // Delete any existing embeddings for this page
     const { error: deleteError } = await supabase
       .from('knowledge_base_embeddings')
       .delete()
@@ -192,20 +168,16 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
       console.error('Error deleting existing embeddings:', deleteError);
     }
 
-    // Split content into chunks for embedding (to stay within token limits)
-    const chunks = chunk(fullContent, 1000); // ~1000 chars per chunk
+    const chunks = chunk(fullContent, 1000);
     console.log(`Split content into ${chunks.length} chunks`);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunkContent = chunks[i];
       
-      // Skip empty chunks
       if (!chunkContent.trim()) continue;
       
-      // Generate embeddings using OpenAI
       const embedding = await generateEmbedding(chunkContent, openaiApiKey);
       
-      // Store the chunk and its embedding
       const { error: insertError } = await supabase
         .from('knowledge_base_embeddings')
         .insert({
@@ -235,7 +207,6 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
   }
 }
 
-// Extract text from Notion blocks
 function extractTextFromBlocks(blocks) {
   let text = '';
   
@@ -275,7 +246,6 @@ function extractTextFromBlocks(blocks) {
       text += '> ' + block.callout.rich_text.map(t => t.plain_text).join('') + '\n\n';
     }
     else if (block.type === 'table' && block.has_children) {
-      // For tables, we'd need to fetch the children separately in a production app
       text += '[Table content - see original in Notion]\n\n';
     }
   }
@@ -283,7 +253,6 @@ function extractTextFromBlocks(blocks) {
   return text;
 }
 
-// Generate embedding using OpenAI
 async function generateEmbedding(text, apiKey) {
   try {
     const response = await fetch('https://api.openai.com/v1/embeddings', {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,6 @@ const KnowledgeBaseSettings: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    // Get Notion settings from knowledge_base_settings.notion
     if (companySettings?.knowledge_base_settings && 
         typeof companySettings.knowledge_base_settings === 'object' && 
         companySettings.knowledge_base_settings !== null &&
@@ -33,7 +31,6 @@ const KnowledgeBaseSettings: React.FC = () => {
     }
   }, [companySettings]);
 
-  // Safely access notion settings properties with type checking
   const getNotionSettingsSafely = () => {
     if (!companySettings?.knowledge_base_settings || 
         typeof companySettings.knowledge_base_settings !== 'object' ||
@@ -57,13 +54,11 @@ const KnowledgeBaseSettings: React.FC = () => {
     };
   };
 
-  // Use safe accessor instead of direct property access
   const notionConfig = getNotionSettingsSafely();
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Update knowledge_base_settings.notion instead of notion_settings
       await updateCompanySettings({
         knowledge_base_settings: {
           notion: {
@@ -103,30 +98,11 @@ const KnowledgeBaseSettings: React.FC = () => {
 
     setIsSyncing(true);
     try {
-      // Make sure we're passing the database ID in the correct format
-      let databaseId = notionDatabaseId;
-      // If ID contains hyphens but not in Notion's expected format, fix it
-      if (databaseId && databaseId.includes('-')) {
-        // Ensure consistent format for database IDs
-        databaseId = databaseId.replace(/[-]/g, '');
-        // Re-format with hyphens in correct positions if needed
-        if (databaseId.length === 32) {
-          databaseId = 
-            databaseId.substring(0, 8) + '-' + 
-            databaseId.substring(8, 12) + '-' + 
-            databaseId.substring(12, 16) + '-' + 
-            databaseId.substring(16, 20) + '-' + 
-            databaseId.substring(20);
-        }
-        // Update the state with the formatted ID
-        setNotionDatabaseId(databaseId);
-      }
-      
       const { data, error } = await supabase.functions.invoke('process-notion-integration', {
         body: {
           companyId: companySettings.id,
           notionToken: notionToken,
-          notionDatabaseId: databaseId || null,
+          notionDatabaseId: notionDatabaseId || null,
           notionPageId: notionPageId || null
         }
       });
@@ -138,13 +114,12 @@ const KnowledgeBaseSettings: React.FC = () => {
         description: "Notion sync started successfully. This may take a few minutes.",
       });
       
-      // Update the last_sync time in settings
       const now = new Date().toISOString();
       await updateCompanySettings({
         knowledge_base_settings: {
           notion: {
             token: notionToken,
-            database_id: databaseId || null,
+            database_id: notionDatabaseId || null,
             page_id: notionPageId || null,
             last_sync: now
           }
