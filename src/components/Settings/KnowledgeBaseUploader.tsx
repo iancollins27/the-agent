@@ -64,13 +64,14 @@ export const KnowledgeBaseUploader: React.FC = () => {
     }
 
     // Insert entry into `knowledge_base_embeddings` as "pending"
+    // Fix: Use a valid source_type value - 'document' instead of 'file'
     const { error: insertError } = await supabase
       .from("knowledge_base_embeddings")
       .insert([{
         company_id: companySettings.id,
         source_id: filePath,
-        source_type: "file",
-        content: "",
+        source_type: "document", // Changed from 'file' to 'document' to match the constraint
+        content: "", // Empty content initially, will be filled by the processing function
         title: file.name,
         url: null,
         file_name: file.name,
