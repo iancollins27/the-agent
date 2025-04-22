@@ -29,6 +29,16 @@ export const KnowledgeBaseChat = () => {
 
     setIsLoading(true);
     try {
+      console.log('Querying with:', {
+        promptType: "knowledge_query",
+        contextData: {
+          query: query,
+          company_id: companySettings.id
+        },
+        useMCP: true,
+        promptText: `Answer the following question using the provided knowledge base context.\n\nQuestion: ${query}`
+      });
+      
       const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
         body: {
           promptType: "knowledge_query",
@@ -36,12 +46,13 @@ export const KnowledgeBaseChat = () => {
             query: query,
             company_id: companySettings.id
           },
-          useMCP: true
+          useMCP: true,
+          promptText: `Answer the following question using the provided knowledge base context.\n\nQuestion: ${query}`
         }
       });
 
       if (error) throw error;
-
+      console.log('Knowledge base response:', data);
       setResponse(data.output);
     } catch (error) {
       console.error('Error querying knowledge base:', error);

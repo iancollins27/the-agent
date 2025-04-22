@@ -40,10 +40,19 @@ serve(async (req) => {
     });
 
     if (!embeddingResponse.ok) {
-      throw new Error("Failed to generate embedding: " + await embeddingResponse.text());
+      const errorText = await embeddingResponse.text();
+      console.error("OpenAI API error:", errorText);
+      throw new Error("Failed to generate embedding: " + errorText);
     }
 
-    const { data: [{ embedding }] } = await embeddingResponse.json();
+    const { data: embeddingData } = await embeddingResponse.json();
+    
+    if (!embeddingData || !embeddingData[0] || !embeddingData[0].embedding) {
+      console.error("Invalid embedding response:", embeddingData);
+      throw new Error("Failed to get valid embedding from OpenAI");
+    }
+    
+    const embedding = embeddingData[0].embedding;
 
     // Call match_documents RPC
     const { data: results, error } = await supabase.rpc(
@@ -55,7 +64,12 @@ serve(async (req) => {
       }
     );
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error calling match_documents:", error);
+      throw error;
+    }
+
+    console.log(`Found ${results?.length || 0} matching documents`);
 
     return new Response(
       JSON.stringify({ results }),
