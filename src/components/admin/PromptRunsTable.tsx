@@ -128,7 +128,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
               <TableCell>
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                  {run.pending_actions} pending
+                  Pending
                 </Badge>
               </TableCell>
               <TableCell>{renderStars(run)}</TableCell>
