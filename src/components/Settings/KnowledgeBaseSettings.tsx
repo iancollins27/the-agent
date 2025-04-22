@@ -103,12 +103,30 @@ const KnowledgeBaseSettings: React.FC = () => {
 
     setIsSyncing(true);
     try {
-      // Modified to explicitly pass the company ID as a separate property
+      // Make sure we're passing the database ID in the correct format
+      let databaseId = notionDatabaseId;
+      // If ID contains hyphens but not in Notion's expected format, fix it
+      if (databaseId && databaseId.includes('-')) {
+        // Ensure consistent format for database IDs
+        databaseId = databaseId.replace(/[-]/g, '');
+        // Re-format with hyphens in correct positions if needed
+        if (databaseId.length === 32) {
+          databaseId = 
+            databaseId.substring(0, 8) + '-' + 
+            databaseId.substring(8, 12) + '-' + 
+            databaseId.substring(12, 16) + '-' + 
+            databaseId.substring(16, 20) + '-' + 
+            databaseId.substring(20);
+        }
+        // Update the state with the formatted ID
+        setNotionDatabaseId(databaseId);
+      }
+      
       const { data, error } = await supabase.functions.invoke('process-notion-integration', {
         body: {
           companyId: companySettings.id,
           notionToken: notionToken,
-          notionDatabaseId: notionDatabaseId || null,
+          notionDatabaseId: databaseId || null,
           notionPageId: notionPageId || null
         }
       });
@@ -126,7 +144,7 @@ const KnowledgeBaseSettings: React.FC = () => {
         knowledge_base_settings: {
           notion: {
             token: notionToken,
-            database_id: notionDatabaseId || null,
+            database_id: databaseId || null,
             page_id: notionPageId || null,
             last_sync: now
           }
@@ -137,7 +155,7 @@ const KnowledgeBaseSettings: React.FC = () => {
       console.error("Error syncing with Notion:", error);
       toast({
         title: "Error",
-        description: "Failed to start Notion sync.",
+        description: "Failed to start Notion sync: " + (error.message || "Unknown error"),
         variant: "destructive",
       });
     } finally {
@@ -170,6 +188,9 @@ const KnowledgeBaseSettings: React.FC = () => {
               onChange={(e) => setNotionDatabaseId(e.target.value)}
               placeholder="Enter Notion database ID to sync"
             />
+            <p className="text-sm text-muted-foreground">
+              Format example: 19598163ae514377bbcf8e91de4a2156 or 19598163-ae51-4377-bbcf-8e91de4a2156
+            </p>
           </div>
           
           <div className="grid gap-2">

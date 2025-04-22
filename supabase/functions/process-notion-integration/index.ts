@@ -61,9 +61,13 @@ serve(async (req) => {
 
     // Start the background processing of Notion content
     if (notionDatabaseId) {
-      await processNotionDatabase(supabase, companyId, notionToken, notionDatabaseId, openaiApiKey);
+      // Format the database ID by removing hyphens for Notion API
+      const formattedDatabaseId = formatNotionId(notionDatabaseId);
+      await processNotionDatabase(supabase, companyId, notionToken, formattedDatabaseId, openaiApiKey);
     } else if (notionPageId) {
-      await processNotionPage(supabase, companyId, notionToken, notionPageId, openaiApiKey);
+      // Format the page ID by removing hyphens for Notion API
+      const formattedPageId = formatNotionId(notionPageId);
+      await processNotionPage(supabase, companyId, notionToken, formattedPageId, openaiApiKey);
     }
 
     return new Response(JSON.stringify({ 
@@ -85,9 +89,18 @@ serve(async (req) => {
   }
 });
 
+// Helper function to format Notion IDs correctly
+function formatNotionId(id: string): string {
+  // If the ID contains hyphens, ensure it's properly formatted
+  // Some Notion APIs require IDs without hyphens, others with specific hyphen patterns
+  return id.replace(/-/g, '');
+}
+
 // Process a Notion database 
 async function processNotionDatabase(supabase, companyId, notionToken, databaseId, openaiApiKey) {
   try {
+    console.log(`Processing Notion database with ID: ${databaseId}`);
+    
     // Fetch database items from Notion API
     const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
       method: 'POST',
@@ -125,6 +138,8 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
 // Process a single Notion page
 async function processNotionPage(supabase, companyId, notionToken, pageId, openaiApiKey) {
   try {
+    console.log(`Processing Notion page with ID: ${pageId}`);
+    
     // Fetch page content from Notion API
     const response = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
       method: 'GET',
