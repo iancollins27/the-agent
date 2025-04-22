@@ -29,6 +29,8 @@ serve(async (req) => {
     const requestData = await req.json();
     const { companyId, notionToken, notionDatabaseId, notionPageId } = requestData;
 
+    console.log('Request data:', { companyId, notionDatabaseId, notionPageId });
+
     if (!companyId) {
       throw new Error('Company ID is required');
     }
@@ -58,7 +60,6 @@ serve(async (req) => {
     }
 
     // Start the background processing of Notion content
-    // This is a simplified example - in a production app, you'd use a queue system
     if (notionDatabaseId) {
       await processNotionDatabase(supabase, companyId, notionToken, notionDatabaseId, openaiApiKey);
     } else if (notionPageId) {

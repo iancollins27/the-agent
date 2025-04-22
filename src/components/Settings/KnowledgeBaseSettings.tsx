@@ -103,9 +103,13 @@ const KnowledgeBaseSettings: React.FC = () => {
 
     setIsSyncing(true);
     try {
+      // Modified to explicitly pass the company ID as a separate property
       const { data, error } = await supabase.functions.invoke('process-notion-integration', {
         body: {
-          company_id: companySettings.id
+          companyId: companySettings.id,
+          notionToken: notionToken,
+          notionDatabaseId: notionDatabaseId || null,
+          notionPageId: notionPageId || null
         }
       });
       
