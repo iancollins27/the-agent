@@ -3,10 +3,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../types';
+import { getPromptRunsWithPendingActions } from '@/utils/promptRunQueries';
 
-// Define a type that includes the roofer_contact property
 interface PromptRunDbResult extends Record<string, any> {
   roofer_contact?: string | null;
+  pending_actions: number;
 }
 
 export const usePromptRunData = (statusFilter: string | null) => {
@@ -17,28 +18,11 @@ export const usePromptRunData = (statusFilter: string | null) => {
   const fetchPromptRuns = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('prompt_runs')
-        .select(`
-          *,
-          projects:project_id (crm_id, Address),
-          workflow_prompts:workflow_prompt_id (type)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (statusFilter) {
-        query = query.eq('status', statusFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      // Get all project IDs to fetch roofer contacts
-      if (data && data.length > 0) {
-        const projectIds = data.map(run => run.project_id).filter(Boolean);
+      // Get prompt runs with pending actions
+      const runsWithPending = await getPromptRunsWithPendingActions();
+      
+      if (runsWithPending && runsWithPending.length > 0) {
+        const projectIds = runsWithPending.map(run => run.project_id).filter(Boolean);
         const uniqueProjectIds = [...new Set(projectIds)];
         
         // Get roofer contacts for each project
@@ -66,8 +50,8 @@ export const usePromptRunData = (statusFilter: string | null) => {
           }
         }
         
-        // Cast data to our extended type
-        const dataWithRoofer = data as PromptRunDbResult[];
+        // Cast data to our extended type and include pending_actions count
+        const dataWithRoofer = runsWithPending as PromptRunDbResult[];
         
         // Format data to include project, workflow information and properly cast to PromptRun type
         const formattedData = dataWithRoofer.map(run => {
@@ -80,11 +64,11 @@ export const usePromptRunData = (statusFilter: string | null) => {
             project_address: run.projects?.Address || null,
             project_roofer_contact: rooferContact || null,
             workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
-            // Make sure it matches our PromptRun type
             workflow_type: run.workflow_prompts?.type,
             prompt_text: run.prompt_input,
             result: run.prompt_output,
-            reviewed: run.reviewed === true // Convert to boolean, handle null/undefined
+            reviewed: run.reviewed === true,
+            pending_actions: run.pending_actions || 0
           } as PromptRun;
         });
 

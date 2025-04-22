@@ -10,6 +10,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Star, ExternalLink, Eye, CheckSquare } from "lucide-react";
 import { PromptRun } from './types';
 import { formatDistanceToNow } from 'date-fns';
@@ -95,13 +96,14 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
 
   return (
     <Table>
-      <TableCaption>List of recent prompt runs from your projects</TableCaption>
+      <TableCaption>List of prompt runs with pending actions</TableCaption>
       <TableHeader>
         <TableRow>
           <TableHead>Address</TableHead>
           <TableHead>Next Step</TableHead>
           <TableHead>Roofer</TableHead>
           <TableHead>Time</TableHead>
+          <TableHead>Pending Actions</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
@@ -109,12 +111,12 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableBody>
         {filteredPromptRuns.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-center py-6">
+            <TableCell colSpan={7} className="text-center py-6">
               {reviewFilter === "reviewed" 
                 ? "No reviewed prompt runs found." 
                 : reviewFilter === "not-reviewed"
                 ? "All prompt runs have been reviewed. Great job!" 
-                : "No prompt runs found matching your criteria."}
+                : "No prompt runs found with pending actions."}
             </TableCell>
           </TableRow>
         ) : (
@@ -124,6 +126,11 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
               <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
+              <TableCell>
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                  {run.pending_actions} pending
+                </Badge>
+              </TableCell>
               <TableCell>{renderStars(run)}</TableCell>
               <TableCell className="text-right space-x-2">
                 <Button 

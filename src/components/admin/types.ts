@@ -47,7 +47,7 @@ export interface PromptRun {
   project_address?: string;
   project_crm_url?: string;
   project_next_step?: string;
-  project_roofer_contact?: string; // Added this property for roofer contact name
+  project_roofer_contact?: string;
   workflow_prompt_type?: string;
   ai_provider?: string;
   ai_model?: string;
@@ -55,4 +55,5 @@ export interface PromptRun {
   prompt_text?: string;
   result?: string;
   reviewed: boolean;
+  pending_actions: number; // Added this field
 }
