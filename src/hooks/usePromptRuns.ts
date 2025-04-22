@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -124,6 +123,34 @@ export const usePromptRuns = ({
         console.log(`Skipping latest runs filter, showing all ${formattedData.length} runs`);
       }
 
+      if (formattedData.length > 0) {
+        const promptRunIds = formattedData.map(run => run.id);
+        
+        const { data: actionData, error: actionError } = await supabase
+          .from('action_records')
+          .select('prompt_run_id, status')
+          .in('prompt_run_id', promptRunIds)
+          .eq('status', 'pending');
+        
+        if (!actionError && actionData) {
+          const pendingActionCounts = new Map<string, number>();
+          
+          actionData.forEach(action => {
+            const currentCount = pendingActionCounts.get(action.prompt_run_id) || 0;
+            pendingActionCounts.set(action.prompt_run_id, currentCount + 1);
+          });
+          
+          formattedData = formattedData.map(run => ({
+            ...run,
+            pending_actions: pendingActionCounts.get(run.id) || 0
+          }));
+          
+          console.log("Added pending action counts to prompt runs");
+        } else {
+          console.error('Error fetching pending actions:', actionError);
+        }
+      }
+
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
@@ -140,7 +167,6 @@ export const usePromptRuns = ({
             description: "Failed to filter out reminder actions",
           });
         } else {
-          // Filter out both reminder actions and NO_ACTION type
           const filteredActionRunIds = new Set(
             actionData
               .filter(action => 
