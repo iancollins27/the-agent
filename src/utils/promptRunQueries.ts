@@ -25,11 +25,16 @@ export const getPromptRunsWithPendingActions = async () => {
   }
 
   return (data || []).map(run => {
-    // Safely handle the count, ensuring it's a number
-    const pendingActionsCount = run.action_records && 
-                              run.action_records[0] && 
-                              typeof run.action_records[0].count !== 'undefined' ? 
-                              parseInt(run.action_records[0].count, 10) : 0;
+    // Get the count from the nested action_records array
+    // The count field returned by Supabase could be of various types depending on the query
+    let pendingActionsCount = 0;
+    
+    if (run.action_records && 
+        run.action_records[0] && 
+        run.action_records[0].count !== undefined) {
+      // Convert the count to a number, regardless of the returned type
+      pendingActionsCount = parseInt(String(run.action_records[0].count), 10);
+    }
                               
     return {
       ...run,
