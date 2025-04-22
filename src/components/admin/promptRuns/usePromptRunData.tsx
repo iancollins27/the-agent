@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../types';
 
+// Define a type that includes the roofer_contact property
 interface PromptRunDbResult extends Record<string, any> {
   roofer_contact?: string | null;
 }
@@ -16,26 +17,6 @@ export const usePromptRunData = (statusFilter: string | null) => {
   const fetchPromptRuns = async () => {
     setLoading(true);
     try {
-      // First get prompt runs that have pending actions
-      const { data: promptRunsWithPendingActions, error: pendingError } = await supabase
-        .from('action_records')
-        .select('prompt_run_id')
-        .eq('status', 'pending')
-        .not('prompt_run_id', 'is', null);
-
-      if (pendingError) {
-        throw pendingError;
-      }
-
-      // Get unique prompt run IDs
-      const promptRunIds = [...new Set(promptRunsWithPendingActions.map(a => a.prompt_run_id))];
-
-      if (promptRunIds.length === 0) {
-        setPromptRuns([]);
-        setLoading(false);
-        return;
-      }
-
       let query = supabase
         .from('prompt_runs')
         .select(`
@@ -43,7 +24,6 @@ export const usePromptRunData = (statusFilter: string | null) => {
           projects:project_id (crm_id, Address),
           workflow_prompts:workflow_prompt_id (type)
         `)
-        .in('id', promptRunIds)
         .order('created_at', { ascending: false });
 
       if (statusFilter) {
@@ -100,10 +80,11 @@ export const usePromptRunData = (statusFilter: string | null) => {
             project_address: run.projects?.Address || null,
             project_roofer_contact: rooferContact || null,
             workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
+            // Make sure it matches our PromptRun type
             workflow_type: run.workflow_prompts?.type,
             prompt_text: run.prompt_input,
             result: run.prompt_output,
-            reviewed: run.reviewed === true
+            reviewed: run.reviewed === true // Convert to boolean, handle null/undefined
           } as PromptRun;
         });
 
@@ -123,6 +104,7 @@ export const usePromptRunData = (statusFilter: string | null) => {
     }
   };
 
+  // Fetch prompt runs when component mounts or statusFilter changes
   useEffect(() => {
     fetchPromptRuns();
   }, [statusFilter]);
