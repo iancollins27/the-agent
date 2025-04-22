@@ -100,17 +100,25 @@ const KnowledgeBaseSettings: React.FC = () => {
     setIsSyncing(true);
     try {
       // Log the exact values being sent to the edge function
-      console.log('Sending to edge function - Database ID:', notionDatabaseId);
-      console.log('Sending to edge function - Database ID type:', typeof notionDatabaseId);
-      console.log('Sending to edge function - Page ID:', notionPageId);
+      console.log('SYNC REQUEST - Sending database ID:', notionDatabaseId);
+      console.log('SYNC REQUEST - Database ID type:', typeof notionDatabaseId);
+      console.log('SYNC REQUEST - Database ID length:', notionDatabaseId?.length);
+      console.log('SYNC REQUEST - Database ID contains hyphens:', notionDatabaseId?.includes('-'));
+      console.log('SYNC REQUEST - Page ID:', notionPageId);
+      console.log('SYNC REQUEST - Page ID type:', typeof notionPageId);
+
+      // Preserve exactly what the user entered without any modifications
+      const payload = {
+        companyId: companySettings.id,
+        notionToken: notionToken,
+        notionDatabaseId: notionDatabaseId,
+        notionPageId: notionPageId
+      };
+
+      console.log('SYNC REQUEST - Full payload:', JSON.stringify(payload));
 
       const { data, error } = await supabase.functions.invoke('process-notion-integration', {
-        body: {
-          companyId: companySettings.id,
-          notionToken: notionToken,
-          notionDatabaseId: notionDatabaseId,
-          notionPageId: notionPageId
-        }
+        body: payload
       });
       
       if (error) throw error;
@@ -167,13 +175,14 @@ const KnowledgeBaseSettings: React.FC = () => {
               id="notion_database_id"
               value={notionDatabaseId}
               onChange={(e) => {
+                // Log raw input without any processing
                 console.log('Raw database ID input:', e.target.value);
                 setNotionDatabaseId(e.target.value);
               }}
               placeholder="Enter Notion database ID to sync"
             />
             <p className="text-sm text-muted-foreground">
-              Format example: 19598163ae514377bbcf8e91de4a2156 or 19598163-ae51-4377-bbcf-8e91de4a2156
+              Important: Enter the ID exactly as it appears in Notion. Do not add or remove hyphens.
             </p>
           </div>
           
@@ -183,6 +192,7 @@ const KnowledgeBaseSettings: React.FC = () => {
               id="notion_page_id"
               value={notionPageId}
               onChange={(e) => {
+                // Log raw input without any processing
                 console.log('Raw page ID input:', e.target.value);
                 setNotionPageId(e.target.value);
               }}

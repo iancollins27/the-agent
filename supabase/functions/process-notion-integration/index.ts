@@ -99,6 +99,10 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
     console.log(`Making Notion API request to: ${apiUrl}`);
     console.log(`Using headers: Authorization: Bearer ${notionToken.substring(0, 5)}... (truncated), Notion-Version: 2022-06-28`);
     
+    // Extra logging to check if URL transformation is happening
+    console.log('Database ID just before fetch call:', databaseId);
+    console.log('Full API URL just before fetch call:', apiUrl);
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -116,7 +120,7 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Notion API error:', errorData);
-      throw new Error(`Notion API error: ${errorData.message || 'Unknown error'}`);
+      throw new Error(`Notion API error: ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
@@ -140,6 +144,8 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
     // Log the exact URL being used for the API call
     const apiUrl = `https://api.notion.com/v1/blocks/${pageId}/children`;
     console.log(`Making Notion API request to: ${apiUrl}`);
+    console.log('Page ID just before fetch call:', pageId);
+    console.log('Full API URL just before fetch call:', apiUrl);
     
     const response = await fetch(apiUrl, {
       method: 'GET',
@@ -154,11 +160,13 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Notion API error:', errorData);
-      throw new Error(`Notion API error: ${errorData.message || 'Unknown error'}`);
+      throw new Error(`Notion API error: ${JSON.stringify(errorData)}`);
     }
 
     const pageInfoUrl = `https://api.notion.com/v1/pages/${pageId}`;
     console.log(`Making Notion API request for page info to: ${pageInfoUrl}`);
+    console.log('Page ID just before page info fetch call:', pageId);
+    console.log('Full page info API URL just before fetch call:', pageInfoUrl);
     
     const pageInfoResponse = await fetch(pageInfoUrl, {
       method: 'GET',
@@ -169,6 +177,12 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
     });
 
     console.log(`Notion API response status for page info: ${pageInfoResponse.status}`);
+
+    if (!pageInfoResponse.ok) {
+      const errorData = await pageInfoResponse.json();
+      console.error('Notion API error for page info:', errorData);
+      throw new Error(`Notion API error for page info: ${JSON.stringify(errorData)}`);
+    }
 
     const pageInfo = await pageInfoResponse.json();
     const pageData = await response.json();
