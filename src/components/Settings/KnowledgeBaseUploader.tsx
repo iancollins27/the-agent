@@ -45,57 +45,64 @@ export const KnowledgeBaseUploader: React.FC = () => {
 
     setUploading(true);
 
-    const filePath = `${companySettings.id}/${Date.now()}-${file.name}`;
-    const { data, error } = await supabase.storage
-      .from("knowledge_base_documents")
-      .upload(filePath, file, {
-        contentType: file.type,
-        upsert: false,
-      });
+    try {
+      // First step: Upload the file to Supabase Storage
+      const filePath = `${companySettings.id}/${Date.now()}-${file.name}`;
+      const { data, error } = await supabase.storage
+        .from("knowledge_base_documents")
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: false,
+        });
 
-    if (error) {
+      if (error) {
+        throw new Error(`Storage upload failed: ${error.message}`);
+      }
+
+      // Second step: Create record in knowledge_base_embeddings
+      // Using an allowed source_type value - explicitly use 'document'
+      const { error: insertError } = await supabase
+        .from("knowledge_base_embeddings")
+        .insert({
+          company_id: companySettings.id,
+          source_id: filePath,
+          source_type: "document", // Make sure this matches an allowed value in the constraint
+          content: "", // Will be filled by the processing function
+          title: file.name,
+          file_name: file.name,
+          file_type: file.type,
+          metadata: { 
+            uploaded_by: "user", 
+            status: "pending",
+            upload_date: new Date().toISOString() 
+          },
+          last_updated: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        // If insert fails, try to delete the uploaded file to avoid orphaned files
+        await supabase.storage
+          .from("knowledge_base_documents")
+          .remove([filePath]);
+          
+        throw new Error(`Database insert failed: ${insertError.message}`);
+      }
+
+      toast({
+        title: "Success!",
+        description: "File uploaded. It will be processed and added to your knowledge base.",
+      });
+      setFile(null);
+    } catch (error) {
+      console.error("Upload process failed:", error);
       toast({
         title: "Upload failed",
-        description: error.message,
+        description: error.message || "An unknown error occurred",
         variant: "destructive",
       });
+    } finally {
       setUploading(false);
-      return;
     }
-
-    // Insert entry into `knowledge_base_embeddings` as "pending"
-    // Fix: Use a valid source_type value - 'document' instead of 'file'
-    const { error: insertError } = await supabase
-      .from("knowledge_base_embeddings")
-      .insert([{
-        company_id: companySettings.id,
-        source_id: filePath,
-        source_type: "document", // Changed from 'file' to 'document' to match the constraint
-        content: "", // Empty content initially, will be filled by the processing function
-        title: file.name,
-        url: null,
-        file_name: file.name,
-        file_type: file.type,
-        metadata: { uploaded_by: "user", status: "pending" },
-        last_updated: new Date().toISOString(),
-      }]);
-
-    setUploading(false);
-
-    if (insertError) {
-      toast({
-        title: "Failed to store document info",
-        description: insertError.message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    toast({
-      title: "Success!",
-      description: "File uploaded. It will be processed and added to your knowledge base.",
-    });
-    setFile(null);
   };
 
   return (
