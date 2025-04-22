@@ -68,7 +68,8 @@ export const usePromptRunData = (statusFilter: string | null) => {
             prompt_text: run.prompt_input,
             result: run.prompt_output,
             reviewed: run.reviewed === true,
-            pending_actions: run.pending_actions || 0
+            // Ensure pending_actions is always a number (0 if null/undefined)
+            pending_actions: typeof run.pending_actions === 'number' ? run.pending_actions : 0
           } as PromptRun;
         });
 

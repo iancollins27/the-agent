@@ -24,8 +24,16 @@ export const getPromptRunsWithPendingActions = async () => {
     throw error;
   }
 
-  return (data || []).map(run => ({
-    ...run,
-    pending_actions: run.action_records?.[0]?.count || 0
-  })) as PromptRunWithPending[];
+  return (data || []).map(run => {
+    // Handle the count properly, ensuring it's a number
+    const pendingActionsCount = run.action_records && 
+                              run.action_records[0] && 
+                              typeof run.action_records[0].count === 'number' ? 
+                              run.action_records[0].count : 0;
+                              
+    return {
+      ...run,
+      pending_actions: pendingActionsCount
+    };
+  }) as PromptRunWithPending[];
 };

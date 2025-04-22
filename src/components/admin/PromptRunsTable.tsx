@@ -121,10 +121,12 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
               <TableCell>
-                {run.pending_actions > 0 && (
+                {(run.pending_actions > 0) ? (
                   <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                     {run.pending_actions}
                   </Badge>
+                ) : (
+                  <span className="text-gray-500">0</span>
                 )}
               </TableCell>
               <TableCell>{renderStars(run)}</TableCell>
