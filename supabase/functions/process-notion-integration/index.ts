@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -27,7 +28,13 @@ serve(async (req) => {
     const requestData = await req.json();
     const { companyId, notionToken, notionDatabaseId, notionPageId } = requestData;
 
-    console.log('Request data:', { companyId, notionDatabaseId, notionPageId });
+    console.log('Received request data:', { 
+      companyId, 
+      notionDatabaseId: notionDatabaseId || 'null', 
+      notionDatabaseIdType: typeof notionDatabaseId,
+      notionPageId: notionPageId || 'null',
+      notionPageIdType: typeof notionPageId
+    });
 
     if (!companyId) {
       throw new Error('Company ID is required');
@@ -57,8 +64,10 @@ serve(async (req) => {
     }
 
     if (notionDatabaseId) {
+      console.log(`About to process Notion database with exact ID: "${notionDatabaseId}"`);
       await processNotionDatabase(supabase, companyId, notionToken, notionDatabaseId, openaiApiKey);
     } else if (notionPageId) {
+      console.log(`About to process Notion page with exact ID: "${notionPageId}"`);
       await processNotionPage(supabase, companyId, notionToken, notionPageId, openaiApiKey);
     }
 
@@ -83,9 +92,14 @@ serve(async (req) => {
 
 async function processNotionDatabase(supabase, companyId, notionToken, databaseId, openaiApiKey) {
   try {
-    console.log(`Processing Notion database with ID: ${databaseId}`);
+    console.log(`Processing Notion database with exact ID: "${databaseId}"`);
     
-    const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    // Log the exact URL being used for the API call
+    const apiUrl = `https://api.notion.com/v1/databases/${databaseId}/query`;
+    console.log(`Making Notion API request to: ${apiUrl}`);
+    console.log(`Using headers: Authorization: Bearer ${notionToken.substring(0, 5)}... (truncated), Notion-Version: 2022-06-28`);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${notionToken}`,
@@ -97,6 +111,8 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
       })
     });
 
+    console.log(`Notion API response status: ${response.status}`);
+    
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Notion API error:', errorData);
@@ -119,15 +135,21 @@ async function processNotionDatabase(supabase, companyId, notionToken, databaseI
 
 async function processNotionPage(supabase, companyId, notionToken, pageId, openaiApiKey) {
   try {
-    console.log(`Processing Notion page with ID: ${pageId}`);
+    console.log(`Processing Notion page with exact ID: "${pageId}"`);
     
-    const response = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
+    // Log the exact URL being used for the API call
+    const apiUrl = `https://api.notion.com/v1/blocks/${pageId}/children`;
+    console.log(`Making Notion API request to: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${notionToken}`,
         'Notion-Version': '2022-06-28'
       }
     });
+
+    console.log(`Notion API response status for page content: ${response.status}`);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -135,13 +157,18 @@ async function processNotionPage(supabase, companyId, notionToken, pageId, opena
       throw new Error(`Notion API error: ${errorData.message || 'Unknown error'}`);
     }
 
-    const pageInfoResponse = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    const pageInfoUrl = `https://api.notion.com/v1/pages/${pageId}`;
+    console.log(`Making Notion API request for page info to: ${pageInfoUrl}`);
+    
+    const pageInfoResponse = await fetch(pageInfoUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${notionToken}`,
         'Notion-Version': '2022-06-28'
       }
     });
+
+    console.log(`Notion API response status for page info: ${pageInfoResponse.status}`);
 
     const pageInfo = await pageInfoResponse.json();
     const pageData = await response.json();

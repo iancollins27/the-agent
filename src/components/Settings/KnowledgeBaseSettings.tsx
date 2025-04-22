@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -98,12 +99,17 @@ const KnowledgeBaseSettings: React.FC = () => {
 
     setIsSyncing(true);
     try {
+      // Log the exact values being sent to the edge function
+      console.log('Sending to edge function - Database ID:', notionDatabaseId);
+      console.log('Sending to edge function - Database ID type:', typeof notionDatabaseId);
+      console.log('Sending to edge function - Page ID:', notionPageId);
+
       const { data, error } = await supabase.functions.invoke('process-notion-integration', {
         body: {
           companyId: companySettings.id,
           notionToken: notionToken,
-          notionDatabaseId: notionDatabaseId || null,
-          notionPageId: notionPageId || null
+          notionDatabaseId: notionDatabaseId,
+          notionPageId: notionPageId
         }
       });
       
@@ -119,8 +125,8 @@ const KnowledgeBaseSettings: React.FC = () => {
         knowledge_base_settings: {
           notion: {
             token: notionToken,
-            database_id: notionDatabaseId || null,
-            page_id: notionPageId || null,
+            database_id: notionDatabaseId,
+            page_id: notionPageId,
             last_sync: now
           }
         }
@@ -160,7 +166,10 @@ const KnowledgeBaseSettings: React.FC = () => {
             <Input
               id="notion_database_id"
               value={notionDatabaseId}
-              onChange={(e) => setNotionDatabaseId(e.target.value)}
+              onChange={(e) => {
+                console.log('Raw database ID input:', e.target.value);
+                setNotionDatabaseId(e.target.value);
+              }}
               placeholder="Enter Notion database ID to sync"
             />
             <p className="text-sm text-muted-foreground">
@@ -173,7 +182,10 @@ const KnowledgeBaseSettings: React.FC = () => {
             <Input
               id="notion_page_id"
               value={notionPageId}
-              onChange={(e) => setNotionPageId(e.target.value)}
+              onChange={(e) => {
+                console.log('Raw page ID input:', e.target.value);
+                setNotionPageId(e.target.value);
+              }}
               placeholder="Enter specific Notion page ID"
             />
           </div>
