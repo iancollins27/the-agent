@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,6 @@ export const KnowledgeBaseChat = () => {
     withoutEmbeddings: number;
   } | null>(null);
 
-  // Fetch AI configuration on component mount
   useEffect(() => {
     const fetchAIConfig = async () => {
       try {
@@ -65,7 +63,6 @@ export const KnowledgeBaseChat = () => {
 
     setCheckingStatus(true);
     try {
-      // Get total documents
       const { data: totalDocs, error: totalError } = await supabase
         .from('knowledge_base_embeddings')
         .select('id', { count: 'exact' })
@@ -73,7 +70,6 @@ export const KnowledgeBaseChat = () => {
 
       if (totalError) throw totalError;
       
-      // Get documents with embeddings
       const { data: docsWithEmbeddings, error: embeddingsError } = await supabase
         .from('knowledge_base_embeddings')
         .select('id', { count: 'exact' })
@@ -118,7 +114,6 @@ export const KnowledgeBaseChat = () => {
     try {
       console.log('Searching knowledge base with query:', query);
       
-      // First, search the knowledge base directly using the tool-kb-search function
       const { data, error } = await supabase.functions.invoke('tool-kb-search', {
         body: {
           query: query,
@@ -176,7 +171,6 @@ export const KnowledgeBaseChat = () => {
     setDiagnostic(null);
     
     try {
-      // First search the knowledge base to get relevant content
       const results = await searchKnowledgeBase();
       
       if (!results || results.length === 0) {
@@ -185,7 +179,6 @@ export const KnowledgeBaseChat = () => {
         return;
       }
       
-      // Extract content from search results to use as context
       const context = results.map(r => `[Source: ${r.metadata?.source || 'Unknown'}, Similarity: ${r.similarity.toFixed(2)}]\n${r.content}`).join('\n\n');
       
       if (!aiConfig?.provider || !aiConfig?.model) {
@@ -244,35 +237,19 @@ export const KnowledgeBaseChat = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {vectorStatus && (
-          <div className="mb-4 p-3 bg-muted rounded-md">
-            <h3 className="text-sm font-medium mb-1">Knowledge Base Status</h3>
-            <p className="text-sm">
-              Total documents: <span className="font-medium">{vectorStatus.total}</span>
-            </p>
-            <p className="text-sm">
-              Documents with embeddings: <span className="font-medium">{vectorStatus.withEmbeddings}</span>{' '}
-              ({Math.round((vectorStatus.withEmbeddings / vectorStatus.total) * 100) || 0}%)
-            </p>
-            <p className="text-sm">
-              Documents without embeddings: <span className="font-medium">{vectorStatus.withoutEmbeddings}</span>
-            </p>
-            
-            {vectorStatus.withoutEmbeddings > 0 && (
-              <Alert className="mt-2" variant="warning">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Vectorization incomplete</AlertTitle>
-                <AlertDescription>
-                  Some documents haven't been vectorized yet. This is usually processed in the background.
-                  You may need to wait a bit longer or check if there's an issue with the embedding process.
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
+        {vectorStatus && vectorStatus.withoutEmbeddings > 0 && (
+          <Alert variant="default">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Vectorization incomplete</AlertTitle>
+            <AlertDescription>
+              Some documents haven't been vectorized yet. This is usually processed in the background.
+              You may need to wait a bit longer or check if there's an issue with the embedding process.
+            </AlertDescription>
+          </Alert>
         )}
         
         {diagnostic && (
-          <Alert className="mb-4" variant="destructive">
+          <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Knowledge Base Issue</AlertTitle>
             <AlertDescription>{diagnostic}</AlertDescription>
