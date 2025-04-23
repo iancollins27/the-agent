@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "../types";
 import { toast } from "sonner";
@@ -43,11 +42,9 @@ export async function setProjectReminder(
   checkReason: string,
   actionId: string
 ): Promise<void> {
-  // Calculate the next check date based on days_until_check
   const nextCheckDate = new Date();
   nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
   
-  // Update the project with the next check date
   const { error } = await supabase
     .from('projects')
     .update({
@@ -59,7 +56,6 @@ export async function setProjectReminder(
     throw error;
   }
   
-  // Record the execution result
   await supabase
     .from('action_records')
     .update({
@@ -121,7 +117,6 @@ export async function sendCommunication(
   
   console.log('Communication sent successfully:', data);
   
-  // Record the execution success if needed
   return data;
 }
 
@@ -146,38 +141,21 @@ export async function recordCommunicationFailure(
 }
 
 export async function processNotionIntegration(
-  actionId: string,
-  companyId: string | null,
-  notionToken: string,
-  notionDatabaseId?: string,
-  notionPageId?: string
-): Promise<any> {
-  const { data, error } = await supabase.functions.invoke('process-notion-integration', {
-    body: { 
-      companyId,
-      notionToken,
-      notionDatabaseId,
-      notionPageId
-    }
-  });
-  
-  if (error) {
-    throw error;
-  }
-  
-  // Record the execution result
+  actionId: string
+): Promise<void> {
   await supabase
     .from('action_records')
     .update({
       execution_result: {
-        status: 'notion_integration_started',
+        status: 'notion_deprecated',
         timestamp: new Date().toISOString(),
-        details: data
-      }
+        details: 'Notion integration has been deprecated.'
+      },
+      status: 'rejected'
     })
     .eq('id', actionId);
     
-  return data;
+  throw new Error('Notion integration has been deprecated');
 }
 
 export async function getCompanyIdFromProject(projectId: string): Promise<string | null> {
@@ -197,7 +175,6 @@ export async function getCompanyIdFromProject(projectId: string): Promise<string
   return data.company_id;
 }
 
-// Function to execute the appropriate action based on action type
 export async function executeAction(action: ActionRecord): Promise<void> {
   if (!action) return;
   
@@ -205,10 +182,8 @@ export async function executeAction(action: ActionRecord): Promise<void> {
     console.log('Executing action:', action);
     const actionPayload = action.action_payload as Record<string, any>;
     
-    // First update the action status
     await updateActionStatus(action.id, true);
     
-    // Then execute the specific action based on type
     switch (action.action_type) {
       case 'data_update':
         if (action.project_id) {
@@ -235,7 +210,6 @@ export async function executeAction(action: ActionRecord): Promise<void> {
         break;
         
       case 'message':
-        // Prepare recipient data
         const recipient = {
           id: action.recipient_id,
           name: action.recipient_name,
@@ -243,7 +217,6 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           email: actionPayload.recipient_email || actionPayload.email
         };
 
-        // Prepare sender data
         const sender = {
           id: action.sender_ID,
           name: action.sender_name,
@@ -251,7 +224,6 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           email: action.sender?.email || actionPayload.sender_email
         };
 
-        // Determine communication channel
         let channel: 'sms' | 'email' | 'call' = 'sms';
         if (actionPayload.channel) {
           channel = actionPayload.channel as 'sms' | 'email' | 'call';
@@ -259,7 +231,6 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           channel = 'email';
         }
 
-        // Get message content
         const messageContent = action.message || 
                               actionPayload.message_content || 
                               actionPayload.content || 
@@ -291,20 +262,23 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           console.error('Error sending communication:', commError);
           toast.error(commError.message || "Failed to send the message");
           await recordCommunicationFailure(action.id, commError.message || "Unknown error");
-          throw commError; // Re-throw so the caller knows there was an error
+          throw commError;
         }
         break;
         
       case 'notion_integration':
-        const companyId = await getCompanyIdFromProject(action.project_id || '');
-        await processNotionIntegration(
-          action.id,
-          companyId,
-          actionPayload.notion_token,
-          actionPayload.notion_database_id,
-          actionPayload.notion_page_id
-        );
-        toast.success("Notion integration started. Content will be processed in the background.");
+        toast.error("Notion integration has been deprecated");
+        await updateActionStatus(action.id, false);
+        await supabase
+          .from('action_records')
+          .update({
+            execution_result: {
+              status: 'notion_deprecated',
+              timestamp: new Date().toISOString(),
+              details: 'Notion integration has been deprecated.'
+            }
+          })
+          .eq('id', action.id);
         break;
         
       default:
