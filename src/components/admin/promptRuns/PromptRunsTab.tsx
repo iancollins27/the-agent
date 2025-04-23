@@ -64,22 +64,8 @@ const PromptRunsTab: React.FC = () => {
         // Now separately fetch pending action counts for each prompt run
         const promptRunIds = runsData.map((run: any) => run.id);
         
-        const { data: actionsData, error: actionsError } = await supabase
-          .from('action_records')
-          .select('prompt_run_id, count')
-          .in('prompt_run_id', promptRunIds)
-          .eq('status', 'pending')
-          .throwOnError();
-
-        if (actionsError) throw actionsError;
-        
-        // Create a map of prompt run IDs to pending action counts
-        const pendingActionCounts = new Map();
-        actionsData?.forEach((action: any) => {
-          const runId = action.prompt_run_id;
-          const count = pendingActionCounts.get(runId) || 0;
-          pendingActionCounts.set(runId, count + 1);
-        });
+        // Use a separate query to get action counts
+        const actionCounts = await fetchActionCountsForPromptRuns(promptRunIds);
         
         // Format data to include project information
         return runsData.map((run: any) => ({
@@ -87,7 +73,7 @@ const PromptRunsTab: React.FC = () => {
           project_name: run.projects?.crm_id || 'Unknown Project',
           project_address: run.projects?.Address || null,
           workflow_prompt_type: 'Unknown Type', // Not fetched in this query
-          pending_actions: pendingActionCounts.get(run.id) || 0
+          pending_actions: actionCounts[run.id] || 0
         })) as PromptRun[];
       } catch (error) {
         console.error('Error fetching prompt runs:', error);
@@ -96,6 +82,64 @@ const PromptRunsTab: React.FC = () => {
     },
     refetchOnWindowFocus: false
   });
+  
+  // Separate function to fetch action counts
+  const fetchActionCountsForPromptRuns = async (promptRunIds: string[]) => {
+    if (!promptRunIds.length) return {};
+    
+    try {
+      // Create a query to count pending actions per prompt run
+      const { data, error } = await supabase.rpc('count_pending_actions_per_run', {
+        run_ids: promptRunIds
+      });
+      
+      if (error) {
+        console.error('Error fetching action counts:', error);
+        return {};
+      }
+      
+      // Create a map of prompt run IDs to pending action counts
+      const actionCountMap: Record<string, number> = {};
+      
+      // If the RPC function isn't available, we'll use a fallback approach
+      if (!data || data.length === 0) {
+        // Fallback: fetch action records in batches
+        const batchSize = 20;
+        for (let i = 0; i < promptRunIds.length; i += batchSize) {
+          const batchIds = promptRunIds.slice(i, i + batchSize);
+          
+          const { data: batchData, error: batchError } = await supabase
+            .from('action_records')
+            .select('prompt_run_id')
+            .in('prompt_run_id', batchIds)
+            .eq('status', 'pending');
+            
+          if (batchError) {
+            console.error('Error fetching action records batch:', batchError);
+            continue;
+          }
+          
+          // Count actions per prompt run
+          batchData?.forEach(record => {
+            const runId = record.prompt_run_id;
+            actionCountMap[runId] = (actionCountMap[runId] || 0) + 1;
+          });
+        }
+      } else {
+        // Use the RPC function results
+        data.forEach((item: any) => {
+          if (item.prompt_run_id && item.count) {
+            actionCountMap[item.prompt_run_id] = item.count;
+          }
+        });
+      }
+      
+      return actionCountMap;
+    } catch (error) {
+      console.error('Error in fetchActionCountsForPromptRuns:', error);
+      return {};
+    }
+  };
   
   // Handle any errors from React Query
   if (error) {
