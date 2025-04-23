@@ -38,6 +38,73 @@ serve(async (req) => {
 
     console.log(`Searching KB for company ${company_id} with query: ${query}`);
 
+    // First, check if there are any embeddings at all for this company
+    const { data: embeddingCheck, error: checkError } = await supabase
+      .from('knowledge_base_embeddings')
+      .select('id, embedding')
+      .eq('company_id', company_id)
+      .limit(1);
+
+    if (checkError) {
+      console.error("Error checking embeddings:", checkError);
+      throw new Error(`Failed to check embeddings: ${checkError.message}`);
+    }
+
+    if (!embeddingCheck || embeddingCheck.length === 0) {
+      console.log("No embeddings found for this company. Check if documents have been properly processed.");
+      return new Response(
+        JSON.stringify({ 
+          results: [],
+          diagnostic: "No embeddings found for this company. Please make sure documents have been uploaded and properly processed." 
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
+    }
+
+    // Check if the embeddings are actually vectors and not null
+    if (!embeddingCheck[0].embedding) {
+      console.log("Embeddings exist but are null. Documents may need to be reprocessed.");
+      
+      // Count documents with null embeddings
+      const { data: nullEmbeddingsCount, error: nullCountError } = await supabase
+        .from('knowledge_base_embeddings')
+        .select('id', { count: 'exact' })
+        .eq('company_id', company_id)
+        .is('embedding', null);
+      
+      if (nullCountError) {
+        console.error("Error counting null embeddings:", nullCountError);
+      } else {
+        console.log(`Found ${nullEmbeddingsCount?.length || 0} documents with null embeddings`);
+      }
+      
+      // Count total documents
+      const { data: totalCount, error: totalCountError } = await supabase
+        .from('knowledge_base_embeddings')
+        .select('id', { count: 'exact' })
+        .eq('company_id', company_id);
+      
+      if (totalCountError) {
+        console.error("Error counting total documents:", totalCountError);
+      } else {
+        console.log(`Total documents: ${totalCount?.length || 0}`);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          results: [],
+          diagnostic: "Documents exist but embeddings are null. They need to be processed with the OpenAI embedding API." 
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
+    }
+
     // Generate embedding for the query
     try {
       const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
