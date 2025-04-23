@@ -60,12 +60,13 @@ export const KnowledgeBaseUploader: React.FC = () => {
       }
 
       // Second step: Create record in knowledge_base_embeddings
+      // Using 'file' for source_type instead of 'document' to meet the constraint
       const { data: insertData, error: insertError } = await supabase
         .from("knowledge_base_embeddings")
         .insert({
           company_id: companySettings.id,
           source_id: filePath,
-          source_type: "document",  // Using valid value for the constraint
+          source_type: "file",  // Changed from 'document' to 'file'
           content: " ",
           title: file.name,
           file_name: file.name,
