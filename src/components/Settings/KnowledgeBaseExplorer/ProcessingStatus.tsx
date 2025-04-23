@@ -36,11 +36,15 @@ export const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
   const handleReprocess = async () => {
     setIsProcessing(true);
     try {
+      console.log('Reprocessing document:', documentId);
       const { error } = await supabase.functions.invoke('process-document-embedding', {
         body: { record_id: documentId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error reprocessing document:', error);
+        throw error;
+      }
 
       toast({
         title: "Reprocessing started",

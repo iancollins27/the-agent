@@ -1,6 +1,5 @@
 
-import { createRemoteJWKSet } from "https://deno.land/x/jose@v4.9.1/index.ts";
-
+// Remove the unnecessary import
 export async function extractTextFromPDF(pdfData: Blob): Promise<string> {
   try {
     const arrayBuffer = await pdfData.arrayBuffer();

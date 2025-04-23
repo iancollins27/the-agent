@@ -37,36 +37,10 @@ serve(async (req) => {
       .single();
 
     if (docError || !doc) {
-      throw new Error(`Failed to fetch document: ${docError?.message}`);
+      throw new Error(`Failed to fetch document: ${docError?.message || 'Document not found'}`);
     }
 
-    // Get the file content
-    const { data: fileData, error: fileError } = await supabase
-      .storage
-      .from('knowledge_base_documents')
-      .download(doc.source_id);
-
-    if (fileError || !fileData) {
-      throw new Error(`Failed to download file: ${fileError?.message}`);
-    }
-
-    // Convert file content to text based on file type
-    let text = '';
-    if (doc.file_type === 'application/pdf') {
-      text = await extractTextFromPDF(fileData);
-    } else if (doc.file_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      // For DOCX, we'll use the text content for now
-      // TODO: Implement better DOCX parsing if needed
-      text = await fileData.text();
-    } else {
-      throw new Error(`Unsupported file type: ${doc.file_type}`);
-    }
-
-    if (!text.trim()) {
-      throw new Error('No text content could be extracted from the document');
-    }
-
-    // Update the processing status
+    // Update status to processing
     await supabase
       .from('knowledge_base_embeddings')
       .update({
@@ -78,10 +52,81 @@ serve(async (req) => {
       })
       .eq('id', record_id);
 
+    // Get the file content
+    const { data: fileData, error: fileError } = await supabase
+      .storage
+      .from('knowledge_base_documents')
+      .download(doc.source_id);
+
+    if (fileError || !fileData) {
+      // Update status to failed
+      await supabase
+        .from('knowledge_base_embeddings')
+        .update({
+          metadata: {
+            ...doc.metadata,
+            processing_status: 'failed',
+            error: `Failed to download file: ${fileError?.message || 'Unknown error'}`,
+            failed_at: new Date().toISOString()
+          }
+        })
+        .eq('id', record_id);
+        
+      throw new Error(`Failed to download file: ${fileError?.message || 'Unknown error'}`);
+    }
+
+    // Convert file content to text based on file type
+    let text = '';
+    try {
+      if (doc.file_type === 'application/pdf') {
+        text = await extractTextFromPDF(fileData);
+      } else if (doc.file_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        // For DOCX, we'll use the text content for now
+        // TODO: Implement better DOCX parsing if needed
+        text = await fileData.text();
+      } else {
+        throw new Error(`Unsupported file type: ${doc.file_type}`);
+      }
+    } catch (error) {
+      // Update status to failed
+      await supabase
+        .from('knowledge_base_embeddings')
+        .update({
+          metadata: {
+            ...doc.metadata,
+            processing_status: 'failed',
+            error: `Text extraction failed: ${error.message}`,
+            failed_at: new Date().toISOString()
+          }
+        })
+        .eq('id', record_id);
+        
+      throw error;
+    }
+
+    if (!text.trim()) {
+      // Update status to failed
+      await supabase
+        .from('knowledge_base_embeddings')
+        .update({
+          metadata: {
+            ...doc.metadata,
+            processing_status: 'failed',
+            error: 'No text content could be extracted from the document',
+            failed_at: new Date().toISOString()
+          }
+        })
+        .eq('id', record_id);
+        
+      throw new Error('No text content could be extracted from the document');
+    }
+
     // Split text into chunks
     const chunks = chunk(text, 1000);
     console.log(`Split content into ${chunks.length} chunks`);
 
+    let success = false;
+    
     for (let i = 0; i < chunks.length; i++) {
       const chunkContent = chunks[i];
       
@@ -102,8 +147,8 @@ serve(async (req) => {
         });
 
         if (!embeddingResponse.ok) {
-          const error = await embeddingResponse.text();
-          throw new Error(`OpenAI API error: ${error}`);
+          const errorText = await embeddingResponse.text();
+          throw new Error(`OpenAI API error: ${errorText}`);
         }
 
         const embeddingData = await embeddingResponse.json();
@@ -128,10 +173,12 @@ serve(async (req) => {
         if (updateError) {
           throw updateError;
         }
-
+        
+        success = true;
         console.log(`Processed chunk ${i + 1}/${chunks.length}`);
       } catch (error) {
         console.error(`Error processing chunk ${i + 1}:`, error);
+        
         // Update status to failed but continue with other chunks
         await supabase
           .from('knowledge_base_embeddings')
@@ -139,12 +186,26 @@ serve(async (req) => {
             metadata: {
               ...doc.metadata,
               processing_status: 'failed',
-              error: error.message,
+              error: `Error processing chunk ${i + 1}: ${error.message}`,
               failed_at: new Date().toISOString()
             }
           })
           .eq('id', record_id);
       }
+    }
+
+    if (success) {
+      // Final update to completed status if any chunk succeeded
+      await supabase
+        .from('knowledge_base_embeddings')
+        .update({
+          metadata: {
+            ...doc.metadata,
+            processing_status: 'completed',
+            processed_at: new Date().toISOString()
+          }
+        })
+        .eq('id', record_id);
     }
 
     return new Response(JSON.stringify({ 
@@ -157,6 +218,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in process-document-embedding:', error);
+    
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message 
