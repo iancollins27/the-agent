@@ -78,15 +78,19 @@ serve(async (req) => {
     // Convert file content to text based on file type
     let text = '';
     try {
+      console.log(`Processing file of type: ${doc.file_type}`);
       if (doc.file_type === 'application/pdf') {
+        console.log('Extracting text from PDF');
         text = await extractTextFromPDF(fileData);
       } else if (doc.file_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
         // For DOCX, we'll use the text content for now
-        // TODO: Implement better DOCX parsing if needed
+        console.log('Extracting text from DOCX');
         text = await fileData.text();
       } else {
         throw new Error(`Unsupported file type: ${doc.file_type}`);
       }
+      
+      console.log(`Extracted ${text.length} characters of text`);
     } catch (error) {
       // Update status to failed
       await supabase
@@ -126,91 +130,144 @@ serve(async (req) => {
     console.log(`Split content into ${chunks.length} chunks`);
 
     let success = false;
+    let processedChunks = 0;
     
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkContent = chunks[i];
+    // First, create additional records for chunks if needed
+    if (chunks.length > 1) {
+      console.log(`Creating ${chunks.length - 1} additional records for chunks`);
       
-      if (!chunkContent.trim()) continue;
+      // For chunks beyond the first one, create new records
+      const additionalChunks = [];
       
-      try {
-        // Generate embedding using OpenAI
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: chunkContent
-          })
+      for (let i = 1; i < chunks.length; i++) {
+        additionalChunks.push({
+          company_id: doc.company_id,
+          source_id: doc.source_id,
+          source_type: doc.source_type,
+          content: '',
+          title: `${doc.title} (chunk ${i+1}/${chunks.length})`,
+          file_name: doc.file_name,
+          file_type: doc.file_type,
+          metadata: {
+            ...doc.metadata,
+            parent_id: doc.id,
+            chunk_index: i,
+            total_chunks: chunks.length,
+            processing_status: 'pending'
+          }
         });
-
-        if (!embeddingResponse.ok) {
-          const errorText = await embeddingResponse.text();
-          throw new Error(`OpenAI API error: ${errorText}`);
-        }
-
-        const embeddingData = await embeddingResponse.json();
-        const embedding = embeddingData.data[0].embedding;
-
-        // Update the document with content and embedding
-        const { error: updateError } = await supabase
+      }
+      
+      if (additionalChunks.length > 0) {
+        const { error: insertError } = await supabase
           .from('knowledge_base_embeddings')
-          .update({
-            content: chunkContent,
-            embedding: embedding,
-            metadata: {
-              ...doc.metadata,
-              chunk_index: i,
-              total_chunks: chunks.length,
-              processed_at: new Date().toISOString(),
-              processing_status: 'completed'
-            }
-          })
-          .eq('id', record_id);
-
-        if (updateError) {
-          throw updateError;
+          .insert(additionalChunks);
+          
+        if (insertError) {
+          console.error('Error creating additional chunk records:', insertError);
+        } else {
+          console.log(`Successfully created ${additionalChunks.length} additional chunk records`);
         }
-        
-        success = true;
-        console.log(`Processed chunk ${i + 1}/${chunks.length}`);
-      } catch (error) {
-        console.error(`Error processing chunk ${i + 1}:`, error);
-        
-        // Update status to failed but continue with other chunks
-        await supabase
-          .from('knowledge_base_embeddings')
-          .update({
-            metadata: {
-              ...doc.metadata,
-              processing_status: 'failed',
-              error: `Error processing chunk ${i + 1}: ${error.message}`,
-              failed_at: new Date().toISOString()
-            }
-          })
-          .eq('id', record_id);
       }
     }
+    
+    // Process the first chunk for this record
+    try {
+      const chunkContent = chunks[0];
+      
+      if (!chunkContent.trim()) {
+        console.log('First chunk is empty, skipping');
+        continue;
+      }
+      
+      console.log(`Processing chunk 1/${chunks.length} with ${chunkContent.length} characters`);
+      
+      // Generate embedding using OpenAI
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: chunkContent
+        })
+      });
 
-    if (success) {
-      // Final update to completed status if any chunk succeeded
+      if (!embeddingResponse.ok) {
+        const errorText = await embeddingResponse.text();
+        throw new Error(`OpenAI API error: ${errorText}`);
+      }
+
+      const embeddingData = await embeddingResponse.json();
+      const embedding = embeddingData.data[0].embedding;
+
+      // Update the document with content and embedding
+      const { error: updateError } = await supabase
+        .from('knowledge_base_embeddings')
+        .update({
+          content: chunkContent,
+          embedding: embedding,
+          metadata: {
+            ...doc.metadata,
+            chunk_index: 0,
+            total_chunks: chunks.length,
+            processed_at: new Date().toISOString(),
+            processing_status: 'completed'
+          }
+        })
+        .eq('id', record_id);
+
+      if (updateError) {
+        throw updateError;
+      }
+      
+      processedChunks++;
+      success = true;
+      console.log(`Successfully processed chunk 1/${chunks.length}`);
+      
+    } catch (error) {
+      console.error(`Error processing first chunk:`, error);
+      
+      // Update status to failed
       await supabase
         .from('knowledge_base_embeddings')
         .update({
           metadata: {
             ...doc.metadata,
-            processing_status: 'completed',
-            processed_at: new Date().toISOString()
+            processing_status: 'failed',
+            error: `Error processing chunk: ${error.message}`,
+            failed_at: new Date().toISOString()
           }
         })
         .eq('id', record_id);
     }
 
+    // Final status update
+    if (success) {
+      await supabase
+        .from('knowledge_base_embeddings')
+        .update({
+          metadata: {
+            ...doc.metadata,
+            processing_status: chunks.length === 1 ? 'completed' : 'partial',
+            chunks_processed: processedChunks,
+            total_chunks: chunks.length,
+            processed_at: new Date().toISOString()
+          }
+        })
+        .eq('id', record_id);
+        
+      console.log(`Document processing completed with status: ${chunks.length === 1 ? 'completed' : 'partial'}`);
+      console.log(`Processed ${processedChunks}/${chunks.length} chunks`);
+    }
+
     return new Response(JSON.stringify({ 
       success: true,
-      message: `Successfully processed document with ${chunks.length} chunks` 
+      message: `Successfully processed document with ${chunks.length} chunks`,
+      chunks_processed: processedChunks,
+      total_chunks: chunks.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200

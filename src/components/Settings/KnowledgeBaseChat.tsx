@@ -25,6 +25,7 @@ export const KnowledgeBaseChat = () => {
     withoutEmbeddings: number;
   } | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [statusCheckPerformed, setStatusCheckPerformed] = useState(false);
 
   useEffect(() => {
     const fetchAIConfig = async () => {
@@ -65,12 +66,21 @@ export const KnowledgeBaseChat = () => {
 
     setCheckingStatus(true);
     try {
+      // Clear previous status first to ensure UI update is visible
+      setVectorStatus(null);
+      setStatusCheckPerformed(false);
+      
+      console.log('Checking vector status for company:', companySettings.id);
+      
       const { data: totalDocs, error: totalError } = await supabase
         .from('knowledge_base_embeddings')
         .select('id', { count: 'exact' })
         .eq('company_id', companySettings.id);
 
-      if (totalError) throw totalError;
+      if (totalError) {
+        console.error('Error getting total documents:', totalError);
+        throw totalError;
+      }
       
       const { data: docsWithEmbeddings, error: embeddingsError } = await supabase
         .from('knowledge_base_embeddings')
@@ -78,24 +88,35 @@ export const KnowledgeBaseChat = () => {
         .eq('company_id', companySettings.id)
         .not('embedding', 'is', null);
       
-      if (embeddingsError) throw embeddingsError;
+      if (embeddingsError) {
+        console.error('Error getting documents with embeddings:', embeddingsError);
+        throw embeddingsError;
+      }
 
       const total = totalDocs?.length || 0;
       const withEmbeddings = docsWithEmbeddings?.length || 0;
       
-      setVectorStatus({
+      const newStatus = {
         total,
         withEmbeddings,
         withoutEmbeddings: total - withEmbeddings
-      });
+      };
       
-      console.log(`Vector status: ${withEmbeddings}/${total} documents have embeddings`);
+      console.log('Vector status:', newStatus);
+      setVectorStatus(newStatus);
+      setStatusCheckPerformed(true);
+      
+      toast({
+        title: "Status Check Complete",
+        description: `${withEmbeddings} of ${total} documents have been vectorized.`,
+        variant: withEmbeddings < total ? "default" : "default",
+      });
       
     } catch (error) {
       console.error('Error checking vector status:', error);
       toast({
         title: "Error",
-        description: "Failed to check knowledge base status",
+        description: "Failed to check knowledge base status: " + (error.message || "Unknown error"),
         variant: "destructive",
       });
     } finally {
@@ -275,13 +296,35 @@ export const KnowledgeBaseChat = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {vectorStatus && vectorStatus.withoutEmbeddings > 0 && (
-          <Alert variant="default">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Vectorization incomplete</AlertTitle>
+        {vectorStatus && (
+          <Alert variant={vectorStatus.withoutEmbeddings > 0 ? "default" : "default"} 
+                className={`mb-4 ${vectorStatus.withoutEmbeddings > 0 ? 'bg-amber-50' : 'bg-green-50'}`}>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Vectorization Status</AlertTitle>
             <AlertDescription>
-              Some documents haven't been vectorized yet. This is usually processed in the background.
-              You may need to wait a bit longer or check if there's an issue with the embedding process.
+              {vectorStatus.total > 0 ? (
+                <>
+                  <p><strong>{vectorStatus.withEmbeddings}</strong> of <strong>{vectorStatus.total}</strong> documents have been vectorized.</p>
+                  {vectorStatus.withoutEmbeddings > 0 && (
+                    <p className="mt-1">
+                      {vectorStatus.withoutEmbeddings} document(s) are pending processing. 
+                      This is usually done in the background and may take a few moments.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p>No documents found in your knowledge base.</p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {!statusCheckPerformed && !vectorStatus && !checkingStatus && (
+          <Alert variant="default" className="mb-4 bg-blue-50">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Check Your Vectorization Status</AlertTitle>
+            <AlertDescription>
+              Click the "Check Vector Status" button above to see if all your documents have been successfully vectorized.
             </AlertDescription>
           </Alert>
         )}
