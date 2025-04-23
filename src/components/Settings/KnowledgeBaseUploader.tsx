@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -48,34 +47,25 @@ export const KnowledgeBaseUploader: React.FC = () => {
     try {
       // First step: Upload the file to Supabase Storage
       const filePath = `${companySettings.id}/${Date.now()}-${file.name}`;
-      const { data, error } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("knowledge_base_documents")
         .upload(filePath, file, {
           contentType: file.type,
           upsert: false,
         });
 
-      if (error) {
-        throw new Error(`Storage upload failed: ${error.message}`);
+      if (uploadError) {
+        throw new Error(`Storage upload failed: ${uploadError.message}`);
       }
 
-      // Get list of allowed source_type values from database
-      const { data: tableInfo, error: tableInfoError } = await supabase.rpc(
-        'get_table_info',
-        { table_name: 'knowledge_base_embeddings' }
-      );
-
-      // Log constraints for debugging
-      console.log("Table constraints:", tableInfo);
-
-      // Second step: Create record in knowledge_base_embeddings with only the required fields
-      const { error: insertError } = await supabase
+      // Second step: Create record in knowledge_base_embeddings
+      const { data: insertData, error: insertError } = await supabase
         .from("knowledge_base_embeddings")
         .insert({
           company_id: companySettings.id,
           source_id: filePath,
-          source_type: "notion", // Try using a different source type that might be allowed
-          content: " ", // Non-empty content
+          source_type: "page",
+          content: " ",
           title: file.name,
           file_name: file.name,
           file_type: file.type,
@@ -85,57 +75,41 @@ export const KnowledgeBaseUploader: React.FC = () => {
             upload_date: new Date().toISOString() 
           },
           last_updated: new Date().toISOString(),
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) {
-        // If first attempt fails, try with a different source_type
-        console.log("First attempt failed, trying with alternative source_type:", insertError);
-        
-        const { error: secondInsertError } = await supabase
-          .from("knowledge_base_embeddings")
-          .insert({
-            company_id: companySettings.id,
-            source_id: filePath,
-            source_type: "page", // Try another potential value
-            content: " ", // Non-empty content
-            title: file.name,
-            file_name: file.name,
-            file_type: file.type,
-            metadata: { 
-              uploaded_by: "user", 
-              status: "pending",
-              upload_date: new Date().toISOString() 
-            },
-            last_updated: new Date().toISOString(),
-          });
-
-        if (secondInsertError) {
-          // Both attempts failed, clean up and throw error
-          await supabase.storage
-            .from("knowledge_base_documents")
-            .remove([filePath]);
-            
-          console.error("Insert errors:", { insertError, secondInsertError });
-          
-          // Check column info for source_type
-          const { data: columnInfo, error: columnInfoError } = await supabase.rpc(
-            'get_column_info',
-            { 
-              table_name: 'knowledge_base_embeddings',
-              column_name: 'source_type'
-            }
-          );
-          
-          console.log("source_type column info:", columnInfo);
-          
-          throw new Error(`Database insert failed: ${secondInsertError.message}`);
-        }
+        // Clean up the uploaded file if database insert fails
+        await supabase.storage
+          .from("knowledge_base_documents")
+          .remove([filePath]);
+        throw insertError;
       }
 
-      toast({
-        title: "Success!",
-        description: "File uploaded. It will be processed and added to your knowledge base.",
-      });
+      // Third step: Trigger the embedding process
+      const { error: processError } = await supabase.functions.invoke(
+        'process-document-embedding',
+        {
+          body: { record_id: insertData.id }
+        }
+      );
+
+      if (processError) {
+        console.warn('Warning: Document uploaded but processing failed:', processError);
+        toast({
+          title: "File uploaded",
+          description: "File uploaded but processing delayed. Check back later.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Success!",
+          description: "File uploaded and processing started.",
+          variant: "default",
+        });
+      }
+
       setFile(null);
     } catch (error) {
       console.error("Upload process failed:", error);
