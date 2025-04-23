@@ -1,12 +1,12 @@
 
-// Remove the unnecessary import
+// Use ESM import format for pdf-parse
 export async function extractTextFromPDF(pdfData: Blob): Promise<string> {
   try {
     const arrayBuffer = await pdfData.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Import pdf-parse dynamically since it's an ESM module
-    const PDFParser = await import('pdf-parse');
+    // Import pdf-parse dynamically with the proper ESM syntax for Deno
+    const PDFParser = await import('npm:pdf-parse');
     
     const data = await PDFParser.default(uint8Array);
     
