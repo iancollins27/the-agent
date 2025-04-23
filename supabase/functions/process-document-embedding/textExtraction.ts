@@ -1,12 +1,30 @@
 
+import { createRemoteJWKSet } from "https://deno.land/x/jose@v4.9.1/index.ts";
+
 export async function extractTextFromPDF(pdfData: Blob): Promise<string> {
   try {
-    // For now, we'll use a simple text extraction
-    // In a production environment, you might want to use a more robust PDF parser
-    const text = await pdfData.text();
-    return text.trim();
+    const arrayBuffer = await pdfData.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Import pdf-parse dynamically since it's an ESM module
+    const PDFParser = await import('pdf-parse');
+    
+    const data = await PDFParser.default(uint8Array);
+    
+    // Remove extra whitespace and normalize text
+    const normalizedText = data.text
+      .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+      .replace(/[\r\n]+/g, '\n')  // Normalize line breaks
+      .trim();
+
+    if (!normalizedText) {
+      throw new Error('No text content extracted from PDF');
+    }
+
+    console.log(`Successfully extracted ${normalizedText.length} characters from PDF`);
+    return normalizedText;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
-    throw new Error('Failed to extract text from PDF');
+    throw new Error(`Failed to extract text from PDF: ${error.message}`);
   }
 }
