@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { chunk } from './utils.ts';
+import { extractTextFromPDF } from './textExtraction.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +29,7 @@ serve(async (req) => {
     const { record_id } = await req.json();
     console.log('Processing document with record ID:', record_id);
 
-    // Get the document record from the database
+    // Get the document record
     const { data: doc, error: docError } = await supabase
       .from('knowledge_base_embeddings')
       .select('*')
@@ -39,7 +40,7 @@ serve(async (req) => {
       throw new Error(`Failed to fetch document: ${docError?.message}`);
     }
 
-    // Get the file content from storage
+    // Get the file content
     const { data: fileData, error: fileError } = await supabase
       .storage
       .from('knowledge_base_documents')
@@ -52,16 +53,30 @@ serve(async (req) => {
     // Convert file content to text based on file type
     let text = '';
     if (doc.file_type === 'application/pdf') {
-      // For PDF files, we'll need to extract text
-      const pdfText = await fileData.text();
-      text = pdfText;
+      text = await extractTextFromPDF(fileData);
     } else if (doc.file_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      // For DOCX files, extract text
-      const docxText = await fileData.text();
-      text = docxText;
+      // For DOCX, we'll use the text content for now
+      // TODO: Implement better DOCX parsing if needed
+      text = await fileData.text();
     } else {
       throw new Error(`Unsupported file type: ${doc.file_type}`);
     }
+
+    if (!text.trim()) {
+      throw new Error('No text content could be extracted from the document');
+    }
+
+    // Update the processing status
+    await supabase
+      .from('knowledge_base_embeddings')
+      .update({
+        metadata: {
+          ...doc.metadata,
+          processing_status: 'processing',
+          started_at: new Date().toISOString()
+        }
+      })
+      .eq('id', record_id);
 
     // Split text into chunks
     const chunks = chunk(text, 1000);
@@ -72,47 +87,64 @@ serve(async (req) => {
       
       if (!chunkContent.trim()) continue;
       
-      // Generate embedding using OpenAI
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: chunkContent
-        })
-      });
+      try {
+        // Generate embedding using OpenAI
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: chunkContent
+          })
+        });
 
-      if (!embeddingResponse.ok) {
-        const error = await embeddingResponse.text();
-        throw new Error(`OpenAI API error: ${error}`);
+        if (!embeddingResponse.ok) {
+          const error = await embeddingResponse.text();
+          throw new Error(`OpenAI API error: ${error}`);
+        }
+
+        const embeddingData = await embeddingResponse.json();
+        const embedding = embeddingData.data[0].embedding;
+
+        // Update the document with content and embedding
+        const { error: updateError } = await supabase
+          .from('knowledge_base_embeddings')
+          .update({
+            content: chunkContent,
+            embedding: embedding,
+            metadata: {
+              ...doc.metadata,
+              chunk_index: i,
+              total_chunks: chunks.length,
+              processed_at: new Date().toISOString(),
+              processing_status: 'completed'
+            }
+          })
+          .eq('id', record_id);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        console.log(`Processed chunk ${i + 1}/${chunks.length}`);
+      } catch (error) {
+        console.error(`Error processing chunk ${i + 1}:`, error);
+        // Update status to failed but continue with other chunks
+        await supabase
+          .from('knowledge_base_embeddings')
+          .update({
+            metadata: {
+              ...doc.metadata,
+              processing_status: 'failed',
+              error: error.message,
+              failed_at: new Date().toISOString()
+            }
+          })
+          .eq('id', record_id);
       }
-
-      const embeddingData = await embeddingResponse.json();
-      const embedding = embeddingData.data[0].embedding;
-
-      // Update the document with content and embedding
-      const { error: updateError } = await supabase
-        .from('knowledge_base_embeddings')
-        .update({
-          content: chunkContent,
-          embedding: embedding,
-          metadata: {
-            ...doc.metadata,
-            chunk_index: i,
-            total_chunks: chunks.length,
-            processed_at: new Date().toISOString()
-          }
-        })
-        .eq('id', record_id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      console.log(`Processed chunk ${i + 1}/${chunks.length}`);
     }
 
     return new Response(JSON.stringify({ 
