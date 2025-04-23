@@ -8,6 +8,8 @@ import { MCPContext, formatForOpenAI, formatForClaude, extractToolCallsFromOpenA
  * Calls the appropriate AI provider based on the specified provider and model
  */
 export async function callAIProvider(aiProvider: string, aiModel: string, prompt: string): Promise<string> {
+  console.log(`Calling ${aiProvider} model ${aiModel} with prompt length: ${prompt.length}`);
+  
   switch (aiProvider) {
     case "openai":
       if (openaiApiKey) {
@@ -40,6 +42,8 @@ export async function callAIProviderWithMCP(
   aiModel: string, 
   mcpContext: MCPContext
 ): Promise<any> {
+  console.log(`Calling ${aiProvider} model ${aiModel} with MCP`);
+  
   switch (aiProvider) {
     case "openai":
       if (openaiApiKey) {
@@ -62,64 +66,91 @@ export async function callAIProviderWithMCP(
  * Calls the OpenAI API with the given prompt and model
  */
 async function callOpenAI(prompt: string, model: string = "gpt-4o-mini") {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-    }),
-  });
-  
-  const data = await response.json();
-  if (data.error) {
-    console.error("OpenAI API error:", data.error);
-    throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+  try {
+    console.log(`Calling OpenAI API with model ${model}`);
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error (${response.status}):`, errorText);
+      throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) {
+      console.error("OpenAI API error:", data.error);
+      throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+    }
+    
+    console.log("OpenAI API call successful");
+    return data.choices?.[0]?.message?.content || "Error: No response from OpenAI";
+  } catch (error) {
+    console.error("Error in callOpenAI:", error);
+    throw error;
   }
-  
-  return data.choices?.[0]?.message?.content || "Error: No response from OpenAI";
 }
 
 /**
  * Calls the OpenAI API with MCP formatting
  */
 async function callOpenAIWithMCP(mcpContext: MCPContext, model: string = "gpt-4o") {
-  const requestBody = formatForOpenAI(mcpContext);
-  
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      ...requestBody,
-      temperature: 0.2,
-      max_tokens: 1500,
-    }),
-  });
-  
-  const data = await response.json();
-  if (data.error) {
-    console.error("OpenAI API error:", data.error);
-    throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+  try {
+    console.log(`Calling OpenAI API with MCP and model ${model}`);
+    const requestBody = formatForOpenAI(mcpContext);
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        ...requestBody,
+        temperature: 0.2,
+        max_tokens: 1500,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error (${response.status}):`, errorText);
+      throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) {
+      console.error("OpenAI API error:", data.error);
+      throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+    }
+    
+    console.log("OpenAI MCP API call successful");
+    return data;
+  } catch (error) {
+    console.error("Error in callOpenAIWithMCP:", error);
+    throw error;
   }
-  
-  return data;
 }
 
 /**

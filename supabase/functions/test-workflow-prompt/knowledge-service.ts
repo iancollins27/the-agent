@@ -13,17 +13,20 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  */
 export async function searchKnowledgeBase(query: string, companyId: string, limit: number = 5): Promise<any[]> {
   try {
+    console.log(`Starting knowledge base search for company ${companyId} with query: ${query}`);
+    
     if (!openAIApiKey) {
+      console.error('OpenAI API key is not configured');
       throw new Error('OpenAI API key is not configured');
     }
 
     if (!query || !companyId) {
+      console.error('Missing required parameters: query and company_id');
       throw new Error('Missing required parameters: query and company_id');
     }
 
-    console.log(`Searching knowledge base for company ${companyId} with query: ${query}`);
-
     // First, check if there are any embeddings at all for this company
+    console.log('Checking if embeddings exist for this company');
     const { data: embeddingCheck, error: checkError } = await supabase
       .from('knowledge_base_embeddings')
       .select('id, embedding')
@@ -31,6 +34,7 @@ export async function searchKnowledgeBase(query: string, companyId: string, limi
       .limit(1);
 
     if (checkError) {
+      console.error('Failed to check embeddings:', checkError);
       throw new Error(`Failed to check embeddings: ${checkError.message}`);
     }
 
@@ -45,6 +49,7 @@ export async function searchKnowledgeBase(query: string, companyId: string, limi
       return [];
     }
 
+    console.log('Generating embedding for query using OpenAI API');
     // Generate embedding for the query
     const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
@@ -60,18 +65,22 @@ export async function searchKnowledgeBase(query: string, companyId: string, limi
 
     if (!embeddingResponse.ok) {
       const errorText = await embeddingResponse.text();
+      console.error('Failed to generate embedding:', errorText);
       throw new Error(`Failed to generate embedding: ${errorText}`);
     }
 
-    const { data: embeddingData } = await embeddingResponse.json();
+    const embeddingData = await embeddingResponse.json();
     
-    if (!embeddingData || !embeddingData[0] || !embeddingData[0].embedding) {
+    if (!embeddingData || !embeddingData.data || !embeddingData.data[0] || !embeddingData.data[0].embedding) {
+      console.error('Failed to get valid embedding from OpenAI', embeddingData);
       throw new Error('Failed to get valid embedding from OpenAI');
     }
     
-    const embedding = embeddingData[0].embedding;
+    const embedding = embeddingData.data[0].embedding;
+    console.log('Successfully generated embedding vector');
 
     // Call match_documents RPC
+    console.log('Calling match_documents RPC with the generated embedding');
     const { data: results, error } = await supabase.rpc(
       'match_documents',
       { 
@@ -82,6 +91,7 @@ export async function searchKnowledgeBase(query: string, companyId: string, limi
     );
 
     if (error) {
+      console.error('Error calling match_documents:', error);
       throw error;
     }
 

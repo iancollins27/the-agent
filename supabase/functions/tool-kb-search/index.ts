@@ -14,15 +14,18 @@ export const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('Received request to tool-kb-search');
+    
     if (!openAIApiKey) {
       console.error("OpenAI API key is not configured");
       return new Response(
-        JSON.stringify({ error: "OpenAI API key is not configured" }),
+        JSON.stringify({ error: "OpenAI API key is not configured", diagnostic: "OpenAI API key is not configured" }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500
@@ -30,15 +33,18 @@ serve(async (req) => {
       );
     }
 
-    const { query, company_id, top_k = 5 } = await req.json();
+    const requestData = await req.json();
+    const { query, company_id, top_k = 5 } = requestData;
+
+    console.log(`Received request with query: "${query}" for company: ${company_id}`);
 
     if (!query || !company_id) {
+      console.error("Missing required parameters");
       throw new Error("Missing required parameters: query and company_id");
     }
 
-    console.log(`Searching KB for company ${company_id} with query: ${query}`);
-
     // First, check if there are any embeddings at all for this company
+    console.log('Checking if embeddings exist');
     const { data: embeddingCheck, error: checkError } = await supabase
       .from('knowledge_base_embeddings')
       .select('id, embedding')
@@ -51,7 +57,7 @@ serve(async (req) => {
     }
 
     if (!embeddingCheck || embeddingCheck.length === 0) {
-      console.log("No embeddings found for this company. Check if documents have been properly processed.");
+      console.log("No embeddings found for this company");
       return new Response(
         JSON.stringify({ 
           results: [],
@@ -66,7 +72,7 @@ serve(async (req) => {
 
     // Check if the embeddings are actually vectors and not null
     if (!embeddingCheck[0].embedding) {
-      console.log("Embeddings exist but are null. Documents may need to be reprocessed.");
+      console.log("Embeddings exist but are null");
       
       // Count documents with null embeddings
       const { data: nullEmbeddingsCount, error: nullCountError } = await supabase
@@ -106,6 +112,7 @@ serve(async (req) => {
     }
 
     // Generate embedding for the query
+    console.log('Generating embedding for query');
     try {
       const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
@@ -125,16 +132,18 @@ serve(async (req) => {
         throw new Error("Failed to generate embedding: " + errorText);
       }
 
-      const { data: embeddingData } = await embeddingResponse.json();
+      const embeddingData = await embeddingResponse.json();
       
-      if (!embeddingData || !embeddingData[0] || !embeddingData[0].embedding) {
+      if (!embeddingData || !embeddingData.data || !embeddingData.data[0] || !embeddingData.data[0].embedding) {
         console.error("Invalid embedding response:", embeddingData);
         throw new Error("Failed to get valid embedding from OpenAI");
       }
       
-      const embedding = embeddingData[0].embedding;
+      const embedding = embeddingData.data[0].embedding;
+      console.log('Successfully generated embedding vector');
 
       // Call match_documents RPC
+      console.log('Calling match_documents RPC');
       const { data: results, error } = await supabase.rpc(
         'match_documents',
         { 
@@ -161,7 +170,10 @@ serve(async (req) => {
     } catch (error) {
       console.error("Error in OpenAI embedding request:", error);
       return new Response(
-        JSON.stringify({ error: `KB search failed: ${JSON.stringify(error)}` }),
+        JSON.stringify({ 
+          error: `KB search failed: ${error.message}`, 
+          diagnostic: `Error generating or using embedding: ${error.message}`
+        }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500
@@ -171,7 +183,10 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in tool-kb-search:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        diagnostic: `General error in knowledge base search: ${error.message}` 
+      }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500

@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/providers/SettingsProvider";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Info } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const KnowledgeBaseChat = () => {
@@ -24,6 +24,7 @@ export const KnowledgeBaseChat = () => {
     withEmbeddings: number;
     withoutEmbeddings: number;
   } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAIConfig = async () => {
@@ -112,6 +113,8 @@ export const KnowledgeBaseChat = () => {
       return null;
     }
 
+    setDebugInfo(null);
+
     try {
       console.log('Searching knowledge base with query:', query);
       
@@ -125,6 +128,7 @@ export const KnowledgeBaseChat = () => {
 
       if (error) {
         console.error('Error searching knowledge base:', error);
+        setDebugInfo(`Knowledge base search error: ${error.message}`);
         toast({
           title: "Error",
           description: "Failed to search knowledge base",
@@ -146,6 +150,7 @@ export const KnowledgeBaseChat = () => {
       
     } catch (error) {
       console.error('Error searching knowledge base:', error);
+      setDebugInfo(`Knowledge base search exception: ${error.message}`);
       toast({
         title: "Error",
         description: "Failed to search knowledge base",
@@ -171,6 +176,7 @@ export const KnowledgeBaseChat = () => {
     setIsLoading(true);
     setDiagnostic(null);
     setResponse(null);
+    setDebugInfo(null);
     
     try {
       const results = await searchKnowledgeBase();
@@ -195,7 +201,7 @@ export const KnowledgeBaseChat = () => {
           company_id: companySettings.id,
           context: context
         },
-        useMCP: true,
+        useMCP: false, // Use direct query first for better debugging
         promptText: `Answer the following question using the provided knowledge base context.\n\nContext:\n${context}\n\nQuestion: ${query}`,
         aiProvider: aiConfig.provider,
         aiModel: aiConfig.model
@@ -207,11 +213,41 @@ export const KnowledgeBaseChat = () => {
         body: requestBody
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error invoking test-workflow-prompt:', error);
+        setDebugInfo(`Function invoke error: ${error.message}`);
+        throw error;
+      }
+      
       console.log('Knowledge base response:', data);
-      setResponse(data.output);
+      
+      if (data.output && data.output.includes("Mock result for unknown prompt type")) {
+        // If we get a mock result error, try again with MCP (opposite of our first try)
+        setDebugInfo("First attempt failed. Trying with MCP enabled...");
+        
+        const mcpRequestBody = {
+          ...requestBody,
+          useMCP: true
+        };
+        
+        console.log('Retrying with MCP:', mcpRequestBody);
+        
+        const { data: mcpData, error: mcpError } = await supabase.functions.invoke('test-workflow-prompt', {
+          body: mcpRequestBody
+        });
+        
+        if (mcpError) {
+          throw mcpError;
+        }
+        
+        console.log('MCP response:', mcpData);
+        setResponse(mcpData.output);
+      } else {
+        setResponse(data.output);
+      }
     } catch (error) {
       console.error('Error querying knowledge base:', error);
+      setDebugInfo(`Final error: ${error.message}`);
       toast({
         title: "Error",
         description: "Failed to query knowledge base",
@@ -255,6 +291,14 @@ export const KnowledgeBaseChat = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Knowledge Base Issue</AlertTitle>
             <AlertDescription>{diagnostic}</AlertDescription>
+          </Alert>
+        )}
+
+        {debugInfo && (
+          <Alert variant="default" className="mb-4 bg-amber-50">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Debug Information</AlertTitle>
+            <AlertDescription className="whitespace-pre-wrap">{debugInfo}</AlertDescription>
           </Alert>
         )}
 
