@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/providers/SettingsProvider";
-import { Loader2, AlertCircle, Info } from "lucide-react";
+import { Loader2, AlertCircle, Info, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const KnowledgeBaseChat = () => {
@@ -23,9 +23,13 @@ export const KnowledgeBaseChat = () => {
     total: number;
     withEmbeddings: number;
     withoutEmbeddings: number;
+    pendingChunks: number;
+    totalChunks: number;
+    documentsWithPendingChunks: any[];
   } | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [statusCheckPerformed, setStatusCheckPerformed] = useState(false);
+  const [processingChunks, setProcessingChunks] = useState(false);
 
   useEffect(() => {
     const fetchAIConfig = async () => {
@@ -54,6 +58,56 @@ export const KnowledgeBaseChat = () => {
     }
   }, [companySettings?.id]);
 
+  const processAllPendingChunks = async () => {
+    if (!vectorStatus?.documentsWithPendingChunks?.length) {
+      toast({
+        title: "No pending chunks",
+        description: "There are no pending document chunks to process.",
+        variant: "default",
+      });
+      return;
+    }
+
+    setProcessingChunks(true);
+    try {
+      let processed = 0;
+      
+      for (const doc of vectorStatus.documentsWithPendingChunks) {
+        const { error } = await supabase.functions.invoke('process-document-embedding', {
+          body: {
+            record_id: doc.id,
+            process_all_chunks: true
+          }
+        });
+        
+        if (!error) {
+          processed++;
+        }
+      }
+      
+      toast({
+        title: "Processing started",
+        description: `Started processing ${processed} of ${vectorStatus.documentsWithPendingChunks.length} documents with pending chunks.`,
+        variant: "default",
+      });
+      
+      // Wait a moment before rechecking status to give processing time to start
+      setTimeout(() => {
+        checkVectorStatus();
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error processing pending chunks:', error);
+      toast({
+        title: "Processing failed",
+        description: "Failed to start processing pending chunks.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingChunks(false);
+    }
+  };
+
   const checkVectorStatus = async () => {
     if (!companySettings?.id) {
       toast({
@@ -72,19 +126,21 @@ export const KnowledgeBaseChat = () => {
       
       console.log('Checking vector status for company:', companySettings.id);
       
-      const { data: totalDocs, error: totalError } = await supabase
+      // Get all documents
+      const { data: allDocs, error: allDocsError } = await supabase
         .from('knowledge_base_embeddings')
-        .select('id', { count: 'exact' })
+        .select('id, metadata, title')
         .eq('company_id', companySettings.id);
 
-      if (totalError) {
-        console.error('Error getting total documents:', totalError);
-        throw totalError;
+      if (allDocsError) {
+        console.error('Error getting all documents:', allDocsError);
+        throw allDocsError;
       }
       
+      // Filter documents with embeddings
       const { data: docsWithEmbeddings, error: embeddingsError } = await supabase
         .from('knowledge_base_embeddings')
-        .select('id', { count: 'exact' })
+        .select('id')
         .eq('company_id', companySettings.id)
         .not('embedding', 'is', null);
       
@@ -93,13 +149,44 @@ export const KnowledgeBaseChat = () => {
         throw embeddingsError;
       }
 
-      const total = totalDocs?.length || 0;
+      // Calculate stats
+      const total = allDocs?.length || 0;
       const withEmbeddings = docsWithEmbeddings?.length || 0;
+      const withoutEmbeddings = total - withEmbeddings;
+      
+      // Check for parent documents with pending chunks
+      const documentsWithPendingChunks = allDocs.filter(doc => 
+        !doc.metadata?.parent_id && // Only parent documents
+        doc.metadata?.total_chunks > 1 && // Has multiple chunks
+        doc.metadata?.processing_status === 'partial' // Partially processed
+      );
+      
+      // Calculate total chunks and pending chunks
+      let totalChunks = 0;
+      let pendingChunks = 0;
+      
+      allDocs.forEach(doc => {
+        if (doc.metadata?.total_chunks) {
+          totalChunks += doc.metadata.total_chunks;
+          if (doc.metadata?.processing_status !== 'completed') {
+            pendingChunks++;
+          }
+        } else {
+          // Count it as a single chunk
+          totalChunks++;
+          if (doc.metadata?.processing_status !== 'completed') {
+            pendingChunks++;
+          }
+        }
+      });
       
       const newStatus = {
         total,
         withEmbeddings,
-        withoutEmbeddings: total - withEmbeddings
+        withoutEmbeddings,
+        pendingChunks,
+        totalChunks,
+        documentsWithPendingChunks
       };
       
       console.log('Vector status:', newStatus);
@@ -108,8 +195,8 @@ export const KnowledgeBaseChat = () => {
       
       toast({
         title: "Status Check Complete",
-        description: `${withEmbeddings} of ${total} documents have been vectorized.`,
-        variant: withEmbeddings < total ? "default" : "default",
+        description: `${withEmbeddings} of ${total} documents have been vectorized. ${pendingChunks} of ${totalChunks} chunks are still pending.`,
+        variant: withoutEmbeddings > 0 ? "default" : "default",
       });
       
     } catch (error) {
@@ -284,15 +371,29 @@ export const KnowledgeBaseChat = () => {
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           Test Knowledge Base
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={checkVectorStatus} 
-            disabled={checkingStatus || !companySettings?.id}
-          >
-            {checkingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Check Vector Status
-          </Button>
+          <div className="flex gap-2">
+            {vectorStatus?.pendingChunks > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={processAllPendingChunks}
+                disabled={processingChunks || !vectorStatus?.documentsWithPendingChunks?.length}
+                className="flex items-center gap-1"
+              >
+                {processingChunks ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Process All Pending Chunks ({vectorStatus.pendingChunks})
+              </Button>
+            )}
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={checkVectorStatus} 
+              disabled={checkingStatus || !companySettings?.id}
+            >
+              {checkingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Check Vector Status
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -303,15 +404,30 @@ export const KnowledgeBaseChat = () => {
             <AlertTitle>Vectorization Status</AlertTitle>
             <AlertDescription>
               {vectorStatus.total > 0 ? (
-                <>
+                <div className="space-y-1">
                   <p><strong>{vectorStatus.withEmbeddings}</strong> of <strong>{vectorStatus.total}</strong> documents have been vectorized.</p>
-                  {vectorStatus.withoutEmbeddings > 0 && (
-                    <p className="mt-1">
-                      {vectorStatus.withoutEmbeddings} document(s) are pending processing. 
-                      This is usually done in the background and may take a few moments.
+                  
+                  <p><strong>{vectorStatus.totalChunks - vectorStatus.pendingChunks}</strong> of <strong>{vectorStatus.totalChunks}</strong> document chunks have been processed.</p>
+                  
+                  {vectorStatus.documentsWithPendingChunks.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium mt-2">Documents with pending chunks:</p>
+                      <ul className="text-xs list-disc list-inside">
+                        {vectorStatus.documentsWithPendingChunks.map(doc => (
+                          <li key={doc.id}>{doc.title}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {vectorStatus.pendingChunks > 0 && (
+                    <p className="mt-1 text-sm">
+                      {vectorStatus.pendingChunks} chunk(s) are pending processing.
+                      Use the "Process All Pending Chunks" button above to process them now,
+                      or they will be processed in the background over time.
                     </p>
                   )}
-                </>
+                </div>
               ) : (
                 <p>No documents found in your knowledge base.</p>
               )}

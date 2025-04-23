@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSettings } from "@/providers/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -15,6 +17,7 @@ export const KnowledgeBaseUploader: React.FC = () => {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [processAllChunks, setProcessAllChunks] = useState(true);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -94,7 +97,10 @@ export const KnowledgeBaseUploader: React.FC = () => {
       const { error: processError } = await supabase.functions.invoke(
         'process-document-embedding',
         {
-          body: { record_id: insertData.id }
+          body: { 
+            record_id: insertData.id,
+            process_all_chunks: processAllChunks
+          }
         }
       );
 
@@ -108,7 +114,9 @@ export const KnowledgeBaseUploader: React.FC = () => {
       } else {
         toast({
           title: "Success!",
-          description: "File uploaded and processing started.",
+          description: processAllChunks 
+            ? "File uploaded and full processing started. This may take a moment for large documents."
+            : "File uploaded and initial processing started. Additional chunks will be processed in the background.",
           variant: "default",
         });
       }
@@ -132,6 +140,24 @@ export const KnowledgeBaseUploader: React.FC = () => {
       <p className="text-sm text-muted-foreground">
         Add PDF or DOCX documents to your knowledge base for AI to reference when answering questions.
       </p>
+      
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="process-all-chunks"
+          checked={processAllChunks}
+          onCheckedChange={setProcessAllChunks}
+        />
+        <Label htmlFor="process-all-chunks" className="text-sm">
+          Process all document chunks immediately
+        </Label>
+      </div>
+      
+      <p className="text-xs text-muted-foreground">
+        {processAllChunks 
+          ? "Large documents will be fully processed at once. This may take longer but ensures complete vectorization."
+          : "Large documents will be processed in chunks. The first chunk will be processed immediately, while others will be processed in the background."}
+      </p>
+      
       <input
         type="file"
         accept=".pdf, .docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
