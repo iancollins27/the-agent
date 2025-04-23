@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAIProvider, callAIProviderWithMCP } from "./ai-providers.ts";
-import { logPromptRun, updatePromptRunStatus, createActionRecord } from "./database/prompt-runs.ts";
+import { logPromptRun, createActionRecord } from "./database/prompt-runs.ts";
 import { getProject } from "./database/projects.ts";
 import { searchKnowledgeBase } from "./knowledge-service.ts";
 import { sendHumanReviewRequest } from "./human-service.ts";
@@ -125,10 +125,22 @@ Question: ${contextData.query}`;
 
     if (promptRunId) {
       try {
-        await updatePromptRunStatus(promptRunId, {
-          status: 'COMPLETED',
-          promptOutput: output
-        });
+        // Update the prompt run status directly in the database
+        const { data, error } = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/prompt_runs`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+          },
+          body: JSON.stringify({
+            status: 'COMPLETED',
+            prompt_output: output,
+            id: promptRunId
+          })
+        }).then(res => res.json());
+
+        if (error) console.error('Failed to update prompt run:', error);
       } catch (updateError) {
         console.error('Failed to update prompt run:', updateError);
       }

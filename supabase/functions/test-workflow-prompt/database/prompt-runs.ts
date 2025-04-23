@@ -1,87 +1,68 @@
 
-export async function logPromptRun(
-  supabase: SupabaseClient,
-  projectId: string | null, 
-  workflowPromptId: string | null, 
-  promptInput: string,
-  aiProvider: string,
-  aiModel: string
-) {
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+type PromptRunData = {
+  projectId: string;
+  promptInput: string;
+  aiProvider: string;
+  aiModel: string;
+  initiatedBy: string;
+  contextData?: any;
+};
+
+/**
+ * Log a new prompt run in the database
+ */
+export async function logPromptRun(data: PromptRunData): Promise<string | null> {
   try {
-    console.log("Logging prompt run with data:", {
-      project_id: projectId,
-      workflow_prompt_id: workflowPromptId,
-      prompt_input: promptInput.substring(0, 100) + "...", // Log just the beginning for brevity
-      ai_provider: aiProvider,
-      ai_model: aiModel,
-    });
-
-    // Create base insert object
-    const insertData: any = {
-      project_id: projectId,
-      workflow_prompt_id: workflowPromptId,
-      prompt_input: promptInput,
-      status: 'PENDING',
-      ai_provider: aiProvider,
-      ai_model: aiModel,
-    };
-
-    // Insert the prompt run record
-    const { data, error } = await supabase
+    const { data: promptRun, error } = await supabase
       .from('prompt_runs')
-      .insert(insertData)
-      .select()
+      .insert({
+        project_id: data.projectId,
+        prompt_input: data.promptInput,
+        ai_provider: data.aiProvider,
+        ai_model: data.aiModel,
+        initiated_by: data.initiatedBy,
+        context_data: data.contextData || {},
+        status: 'PROCESSING'
+      })
+      .select('id')
       .single();
-      
+
     if (error) {
-      console.error("Error logging prompt run:", error);
-      throw new Error(`Failed to log prompt run: ${error.message}`);
+      throw error;
     }
-    
-    return data.id;
+
+    return promptRun?.id || null;
   } catch (error) {
-    console.error("Error logging prompt run:", error);
+    console.error('Error logging prompt run:', error);
     return null;
   }
 }
 
-export async function updatePromptRunWithResult(
-  supabase: SupabaseClient,
-  promptRunId: string,
-  result: string,
-  isError: boolean = false
-) {
+/**
+ * Create a new action record
+ */
+export async function createActionRecord(data: any): Promise<string | null> {
   try {
-    if (!promptRunId) {
-      throw new Error("Cannot update prompt run: promptRunId is required");
-    }
-    
-    console.log(`Updating prompt run ${promptRunId} with ${isError ? 'error' : 'result'}`);
-    
-    const updateData: any = {
-      status: isError ? 'ERROR' : 'COMPLETED',
-      completed_at: new Date().toISOString()
-    };
-    
-    if (isError) {
-      updateData.error_message = result;
-    } else {
-      updateData.prompt_output = result;
-    }
-    
-    const { error } = await supabase
-      .from('prompt_runs')
-      .update(updateData)
-      .eq('id', promptRunId);
-    
+    const { data: actionRecord, error } = await supabase
+      .from('action_records')
+      .insert(data)
+      .select('id')
+      .single();
+
     if (error) {
-      console.error("Error updating prompt run:", error);
-      throw new Error(`Failed to update prompt run: ${error.message}`);
+      throw error;
     }
-    
-    return true;
+
+    return actionRecord?.id || null;
   } catch (error) {
-    console.error("Error updating prompt run with result:", error);
-    return false;
+    console.error('Error creating action record:', error);
+    return null;
   }
 }
