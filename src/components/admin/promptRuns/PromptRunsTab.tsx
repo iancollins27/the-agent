@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import PromptRunsTable from '../PromptRunsTable';
@@ -12,6 +11,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { usePromptRunActions } from './usePromptRunActions';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { usePagination } from '@/hooks/usePagination';
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationNext, 
+  PaginationPrevious 
+} from "@/components/ui/pagination";
 
 const PromptRunsTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -19,18 +25,18 @@ const PromptRunsTab: React.FC = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState("not-reviewed");
   const { toast } = useToast();
+  const pagination = usePagination({ pageSize: 20 });
 
-  // Use React Query to handle data fetching and error handling
   const {
-    data: promptRuns = [],
+    data: promptRunsResponse,
     isLoading: loading,
     refetch: fetchPromptRuns,
     error
   } = useQuery({
-    queryKey: ['promptRuns', statusFilter],
+    queryKey: ['promptRuns', statusFilter, pagination.currentPage],
     queryFn: async () => {
       try {
-        // First, get prompt runs data
+        // First, get prompt runs data with pagination
         let query = supabase
           .from('prompt_runs')
           .select(`
@@ -50,31 +56,47 @@ const PromptRunsTab: React.FC = () => {
             ai_provider,
             ai_model,
             projects:project_id (crm_id, Address)
-          `);
+          `, { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(pagination.from, pagination.to);
             
         if (statusFilter) {
           query = query.eq('status', statusFilter);
         }
         
-        const { data: runsData, error: runsError } = await query
-          .order('created_at', { ascending: false });
-          
+        const { data: runsData, error: runsError, count } = await query;
+        
         if (runsError) throw runsError;
         
-        // Now separately fetch pending action counts for each prompt run
-        const promptRunIds = runsData.map((run: any) => run.id);
+        // Get all prompt run IDs for the current page
+        const promptRunIds = runsData?.map((run: any) => run.id) || [];
         
-        // Use a separate query to get action counts
-        const actionCounts = await fetchActionCountsForPromptRuns(promptRunIds);
+        // Get pending actions count for each prompt run
+        const { data: actionCounts, error: actionsError } = await supabase
+          .from('action_records')
+          .select('prompt_run_id')
+          .eq('status', 'pending')
+          .in('prompt_run_id', promptRunIds);
+
+        if (actionsError) throw actionsError;
+
+        // Count pending actions per prompt run
+        const pendingActionsMap: Record<string, number> = {};
+        actionCounts?.forEach(action => {
+          const runId = action.prompt_run_id;
+          pendingActionsMap[runId] = (pendingActionsMap[runId] || 0) + 1;
+        });
         
         // Format data to include project information
-        return runsData.map((run: any) => ({
+        const formattedData = runsData?.map((run: any) => ({
           ...run,
           project_name: run.projects?.crm_id || 'Unknown Project',
           project_address: run.projects?.Address || null,
-          workflow_prompt_type: 'Unknown Type', // Not fetched in this query
-          pending_actions: actionCounts[run.id] || 0
+          workflow_prompt_type: 'Unknown Type',
+          pending_actions: pendingActionsMap[run.id] || 0
         })) as PromptRun[];
+
+        return { data: formattedData, totalCount: count };
       } catch (error) {
         console.error('Error fetching prompt runs:', error);
         throw error;
@@ -82,65 +104,7 @@ const PromptRunsTab: React.FC = () => {
     },
     refetchOnWindowFocus: false
   });
-  
-  // Separate function to fetch action counts
-  const fetchActionCountsForPromptRuns = async (promptRunIds: string[]) => {
-    if (!promptRunIds.length) return {};
-    
-    try {
-      // Create a query to count pending actions per prompt run
-      const { data, error } = await supabase.rpc('count_pending_actions_per_run', {
-        run_ids: promptRunIds
-      });
-      
-      if (error) {
-        console.error('Error fetching action counts:', error);
-        return {};
-      }
-      
-      // Create a map of prompt run IDs to pending action counts
-      const actionCountMap: Record<string, number> = {};
-      
-      // If the RPC function isn't available, we'll use a fallback approach
-      if (!data || data.length === 0) {
-        // Fallback: fetch action records in batches
-        const batchSize = 20;
-        for (let i = 0; i < promptRunIds.length; i += batchSize) {
-          const batchIds = promptRunIds.slice(i, i + batchSize);
-          
-          const { data: batchData, error: batchError } = await supabase
-            .from('action_records')
-            .select('prompt_run_id')
-            .in('prompt_run_id', batchIds)
-            .eq('status', 'pending');
-            
-          if (batchError) {
-            console.error('Error fetching action records batch:', batchError);
-            continue;
-          }
-          
-          // Count actions per prompt run
-          batchData?.forEach(record => {
-            const runId = record.prompt_run_id;
-            actionCountMap[runId] = (actionCountMap[runId] || 0) + 1;
-          });
-        }
-      } else {
-        // Use the RPC function results
-        data.forEach((item: any) => {
-          if (item.prompt_run_id && item.count) {
-            actionCountMap[item.prompt_run_id] = item.count;
-          }
-        });
-      }
-      
-      return actionCountMap;
-    } catch (error) {
-      console.error('Error in fetchActionCountsForPromptRuns:', error);
-      return {};
-    }
-  };
-  
+
   // Handle any errors from React Query
   if (error) {
     toast({
@@ -155,8 +119,8 @@ const PromptRunsTab: React.FC = () => {
     (updater) => {
       // This is a safer way to update state based on a function
       // that doesn't create a dependency on promptRuns
-      if (promptRuns) {
-        const updatedRuns = updater(promptRuns);
+      if (promptRunsResponse?.data) {
+        const updatedRuns = updater(promptRunsResponse.data);
         // No need to set state here, just return the updated runs
         return updatedRuns;
       }
@@ -177,14 +141,18 @@ const PromptRunsTab: React.FC = () => {
 
   // Filter runs based on review status
   const filteredPromptRuns = React.useMemo(() => {
-    if (!promptRuns) return [];
+    if (!promptRunsResponse?.data) return [];
     
-    if (reviewFilter === "all") return promptRuns;
-    if (reviewFilter === "reviewed") return promptRuns.filter(run => run.reviewed);
-    if (reviewFilter === "not-reviewed") return promptRuns.filter(run => !run.reviewed);
+    if (reviewFilter === "all") return promptRunsResponse.data;
+    if (reviewFilter === "reviewed") return promptRunsResponse.data.filter(run => run.reviewed);
+    if (reviewFilter === "not-reviewed") return promptRunsResponse.data.filter(run => !run.reviewed);
     
-    return promptRuns;
-  }, [promptRuns, reviewFilter]);
+    return promptRunsResponse.data;
+  }, [promptRunsResponse?.data, reviewFilter]);
+
+  const totalPages = promptRunsResponse?.totalCount 
+    ? Math.ceil(promptRunsResponse.totalCount / pagination.pageSize)
+    : 1;
 
   return (
     <div className="space-y-6">
@@ -222,13 +190,32 @@ const PromptRunsTab: React.FC = () => {
       ) : filteredPromptRuns.length === 0 ? (
         <EmptyPromptRunsState />
       ) : (
-        <PromptRunsTable 
-          promptRuns={filteredPromptRuns} 
-          onRatingChange={handleRatingChange} 
-          onViewDetails={viewPromptRunDetails} 
-          onRunReviewed={handleRunReviewed}
-          reviewFilter={reviewFilter}
-        />
+        <>
+          <PromptRunsTable 
+            promptRuns={filteredPromptRuns} 
+            onRatingChange={handleRatingChange} 
+            onViewDetails={viewPromptRunDetails} 
+            onRunReviewed={handleRunReviewed}
+            reviewFilter={reviewFilter}
+          />
+          <Pagination>
+            <PaginationContent>
+              <PaginationPrevious 
+                onClick={pagination.previousPage}
+                disabled={pagination.currentPage === 1}
+              />
+              <div className="flex items-center mx-4">
+                <span className="text-sm text-muted-foreground">
+                  Page {pagination.currentPage} of {totalPages}
+                </span>
+              </div>
+              <PaginationNext 
+                onClick={pagination.nextPage}
+                disabled={pagination.currentPage >= totalPages}
+              />
+            </PaginationContent>
+          </Pagination>
+        </>
       )}
 
       <PromptRunDetails 
