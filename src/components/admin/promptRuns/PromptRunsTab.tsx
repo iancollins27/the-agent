@@ -20,12 +20,6 @@ const PromptRunsTab: React.FC = () => {
   const [reviewFilter, setReviewFilter] = useState("not-reviewed");
   const { toast } = useToast();
 
-  // Custom hook for prompt run actions
-  const { handleRatingChange, handleFeedbackChange } = usePromptRunActions(
-    (runs) => setPromptRuns(runs),
-    setSelectedRun
-  );
-  
   // Use React Query to handle data fetching and error handling
   const {
     data: promptRuns = [],
@@ -112,14 +106,20 @@ const PromptRunsTab: React.FC = () => {
     });
   }
 
-  const [promptRunsState, setPromptRuns] = useState<PromptRun[]>(promptRuns);
-
-  // Update state when promptRuns from query changes
-  React.useEffect(() => {
-    if (promptRuns) {
-      setPromptRuns(promptRuns);
-    }
-  }, [promptRuns]);
+  // Custom hook for prompt run actions
+  const { handleRatingChange, handleFeedbackChange } = usePromptRunActions(
+    (updater) => {
+      // This is a safer way to update state based on a function
+      // that doesn't create a dependency on promptRuns
+      if (promptRuns) {
+        const updatedRuns = updater(promptRuns);
+        // No need to set state here, just return the updated runs
+        return updatedRuns;
+      }
+      return [];
+    },
+    setSelectedRun
+  );
 
   const viewPromptRunDetails = (run: PromptRun) => {
     setSelectedRun(run);
@@ -127,13 +127,20 @@ const PromptRunsTab: React.FC = () => {
   };
 
   const handleRunReviewed = (promptRunId: string) => {
-    // Update the local state to mark the run as reviewed
-    setPromptRuns(prev => 
-      prev.map(run => 
-        run.id === promptRunId ? { ...run, reviewed: true } : run
-      )
-    );
+    // We should fetch the data again to stay consistent
+    fetchPromptRuns();
   };
+
+  // Filter runs based on review status
+  const filteredPromptRuns = React.useMemo(() => {
+    if (!promptRuns) return [];
+    
+    if (reviewFilter === "all") return promptRuns;
+    if (reviewFilter === "reviewed") return promptRuns.filter(run => run.reviewed);
+    if (reviewFilter === "not-reviewed") return promptRuns.filter(run => !run.reviewed);
+    
+    return promptRuns;
+  }, [promptRuns, reviewFilter]);
 
   return (
     <div className="space-y-6">
@@ -168,11 +175,11 @@ const PromptRunsTab: React.FC = () => {
 
       {loading ? (
         <PromptRunLoader />
-      ) : promptRunsState.length === 0 ? (
+      ) : filteredPromptRuns.length === 0 ? (
         <EmptyPromptRunsState />
       ) : (
         <PromptRunsTable 
-          promptRuns={promptRunsState} 
+          promptRuns={filteredPromptRuns} 
           onRatingChange={handleRatingChange} 
           onViewDetails={viewPromptRunDetails} 
           onRunReviewed={handleRunReviewed}

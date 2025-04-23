@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../types';
 
 export const usePromptRunActions = (
-  setPromptRuns: React.Dispatch<React.SetStateAction<PromptRun[]>>,
+  updatePromptRuns: (updater: (prevRuns: PromptRun[]) => PromptRun[]) => void,
   setSelectedRun: React.Dispatch<React.SetStateAction<PromptRun | null>>
 ) => {
   const { toast } = useToast();
@@ -20,13 +20,6 @@ export const usePromptRunActions = (
       if (error) {
         throw error;
       }
-
-      // Update local state to reflect the change
-      setPromptRuns(prev => 
-        prev.map(run => 
-          run.id === promptRunId ? { ...run, feedback_rating: rating } : run
-        )
-      );
 
       // Update selected run if it's the one being rated
       setSelectedRun(prev => prev && prev.id === promptRunId ? { ...prev, feedback_rating: rating } : prev);
@@ -60,19 +53,6 @@ export const usePromptRunActions = (
       if (error) {
         throw error;
       }
-
-      // Update local state to reflect the change
-      setPromptRuns(prev => 
-        prev.map(run => 
-          run.id === promptRunId 
-            ? { 
-                ...run, 
-                feedback_description: feedback.description || null, 
-                feedback_tags: feedback.tags || null 
-              } 
-            : run
-        )
-      );
 
       // Update selected run if it's the one being modified
       setSelectedRun(prev => 
