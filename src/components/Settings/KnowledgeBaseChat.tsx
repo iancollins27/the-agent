@@ -170,6 +170,7 @@ export const KnowledgeBaseChat = () => {
 
     setIsLoading(true);
     setDiagnostic(null);
+    setResponse(null);
     
     try {
       const results = await searchKnowledgeBase();
@@ -180,7 +181,7 @@ export const KnowledgeBaseChat = () => {
         return;
       }
       
-      const context = results.map(r => `[Source: ${r.metadata?.source || 'Unknown'}, Similarity: ${r.similarity.toFixed(2)}]\n${r.content}`).join('\n\n');
+      const context = results.map(r => `[Source: ${r.title || 'Unknown'}, Similarity: ${r.similarity.toFixed(2)}]\n${r.content}`).join('\n\n');
       
       if (!aiConfig?.provider || !aiConfig?.model) {
         setResponse("AI provider or model not configured. Please set up the AI configuration first.");
