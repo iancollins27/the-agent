@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -59,12 +60,13 @@ export const KnowledgeBaseUploader: React.FC = () => {
       }
 
       // Second step: Create record in knowledge_base_embeddings
+      // Fix: Changed source_type from "page" to "document" to comply with the constraint
       const { data: insertData, error: insertError } = await supabase
         .from("knowledge_base_embeddings")
         .insert({
           company_id: companySettings.id,
           source_id: filePath,
-          source_type: "page",
+          source_type: "document",  // Changed from "page" to "document"
           content: " ",
           title: file.name,
           file_name: file.name,
@@ -72,6 +74,7 @@ export const KnowledgeBaseUploader: React.FC = () => {
           metadata: { 
             uploaded_by: "user", 
             status: "pending",
+            processing_status: "pending",
             upload_date: new Date().toISOString() 
           },
           last_updated: new Date().toISOString(),
