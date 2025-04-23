@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -276,7 +277,7 @@ export const KnowledgeBaseChat = () => {
           </Button>
 
           {!aiConfig && (
-            <Alert className="mt-4" variant="warning">
+            <Alert variant="default">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>AI Configuration Missing</AlertTitle>
               <AlertDescription>
