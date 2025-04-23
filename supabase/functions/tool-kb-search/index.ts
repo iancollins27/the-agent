@@ -39,58 +39,68 @@ serve(async (req) => {
     console.log(`Searching KB for company ${company_id} with query: ${query}`);
 
     // Generate embedding for the query
-    const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: query
-      })
-    });
+    try {
+      const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openAIApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "text-embedding-3-small",
+          input: query
+        })
+      });
 
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text();
-      console.error("OpenAI API error:", errorText);
-      throw new Error("Failed to generate embedding: " + errorText);
-    }
-
-    const { data: embeddingData } = await embeddingResponse.json();
-    
-    if (!embeddingData || !embeddingData[0] || !embeddingData[0].embedding) {
-      console.error("Invalid embedding response:", embeddingData);
-      throw new Error("Failed to get valid embedding from OpenAI");
-    }
-    
-    const embedding = embeddingData[0].embedding;
-
-    // Call match_documents RPC
-    const { data: results, error } = await supabase.rpc(
-      'match_documents',
-      { 
-        embedding,
-        k: top_k,
-        _company_id: company_id
+      if (!embeddingResponse.ok) {
+        const errorText = await embeddingResponse.text();
+        console.error("OpenAI API error:", errorText);
+        throw new Error("Failed to generate embedding: " + errorText);
       }
-    );
 
-    if (error) {
-      console.error("Error calling match_documents:", error);
-      throw error;
-    }
-
-    console.log(`Found ${results?.length || 0} matching documents`);
-
-    return new Response(
-      JSON.stringify({ results }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200
+      const { data: embeddingData } = await embeddingResponse.json();
+      
+      if (!embeddingData || !embeddingData[0] || !embeddingData[0].embedding) {
+        console.error("Invalid embedding response:", embeddingData);
+        throw new Error("Failed to get valid embedding from OpenAI");
       }
-    );
+      
+      const embedding = embeddingData[0].embedding;
 
+      // Call match_documents RPC
+      const { data: results, error } = await supabase.rpc(
+        'match_documents',
+        { 
+          embedding,
+          k: top_k,
+          _company_id: company_id
+        }
+      );
+
+      if (error) {
+        console.error("Error calling match_documents:", error);
+        throw error;
+      }
+
+      console.log(`Found ${results?.length || 0} matching documents`);
+
+      return new Response(
+        JSON.stringify({ results }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
+    } catch (error) {
+      console.error("Error in OpenAI embedding request:", error);
+      return new Response(
+        JSON.stringify({ error: `KB search failed: ${JSON.stringify(error)}` }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500
+        }
+      );
+    }
   } catch (error) {
     console.error("Error in tool-kb-search:", error);
     return new Response(

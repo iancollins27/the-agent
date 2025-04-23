@@ -15,6 +15,7 @@ export const KnowledgeBaseChat = () => {
   const { companySettings } = useSettings();
   const { toast } = useToast();
   const [aiConfig, setAiConfig] = useState<{ provider: string, model: string } | null>(null);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   // Fetch AI configuration on component mount
   useEffect(() => {
@@ -41,6 +42,53 @@ export const KnowledgeBaseChat = () => {
     fetchAIConfig();
   }, []);
 
+  const searchKnowledgeBase = async () => {
+    if (!query.trim() || !companySettings?.id) {
+      toast({
+        title: "Error",
+        description: !companySettings?.id ? "Company settings not loaded yet" : "Please enter a query",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    try {
+      console.log('Searching knowledge base with query:', query);
+      
+      // First, search the knowledge base directly using the tool-kb-search function
+      const { data, error } = await supabase.functions.invoke('tool-kb-search', {
+        body: {
+          query: query,
+          company_id: companySettings.id,
+          top_k: 5
+        }
+      });
+
+      if (error) {
+        console.error('Error searching knowledge base:', error);
+        toast({
+          title: "Error",
+          description: "Failed to search knowledge base",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      console.log('Knowledge base search results:', data?.results || []);
+      setSearchResults(data?.results || []);
+      return data?.results || [];
+      
+    } catch (error) {
+      console.error('Error searching knowledge base:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search knowledge base",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim() || !companySettings?.id) {
@@ -56,14 +104,27 @@ export const KnowledgeBaseChat = () => {
 
     setIsLoading(true);
     try {
+      // First search the knowledge base to get relevant content
+      const results = await searchKnowledgeBase();
+      
+      if (!results || results.length === 0) {
+        setResponse("No relevant information found in the knowledge base.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Extract content from search results to use as context
+      const context = results.map(r => `[Source: ${r.metadata?.source || 'Unknown'}, Similarity: ${r.similarity.toFixed(2)}]\n${r.content}`).join('\n\n');
+      
       const requestBody = {
         promptType: "knowledge_query",
         contextData: {
           query: query,
-          company_id: companySettings.id
+          company_id: companySettings.id,
+          context: context
         },
         useMCP: true,
-        promptText: `Answer the following question using the provided knowledge base context.\n\nQuestion: ${query}`,
+        promptText: `Answer the following question using the provided knowledge base context.\n\nContext:\n${context}\n\nQuestion: ${query}`,
         aiProvider: aiConfig?.provider || 'openai',
         aiModel: aiConfig?.model || 'gpt-4o'
       };
@@ -113,6 +174,12 @@ export const KnowledgeBaseChat = () => {
               </>
             ) : "Send Query"}
           </Button>
+
+          {searchResults.length > 0 && (
+            <div className="mt-4 p-2">
+              <p className="text-sm font-medium">Found {searchResults.length} relevant document(s)</p>
+            </div>
+          )}
 
           {response && (
             <div className="mt-4 p-4 bg-muted rounded-lg">
