@@ -8,6 +8,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/providers/SettingsProvider";
 import { Loader2, AlertCircle, Info, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Json } from "@/integrations/supabase/types";
+
+// Define proper types for the metadata
+interface DocumentMetadata {
+  parent_id?: string;
+  chunk_index?: number;
+  total_chunks?: number;
+  processing_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'partial';
+  status?: string;
+  uploaded_by?: string;
+  upload_date?: string;
+  error?: string;
+  started_at?: string;
+  processed_at?: string;
+  failed_at?: string;
+}
+
+interface KnowledgeBaseDocument {
+  id: string;
+  title: string;
+  metadata: DocumentMetadata | null;
+}
+
+interface VectorStatus {
+  total: number;
+  withEmbeddings: number;
+  withoutEmbeddings: number;
+  pendingChunks: number;
+  totalChunks: number;
+  documentsWithPendingChunks: KnowledgeBaseDocument[];
+}
 
 export const KnowledgeBaseChat = () => {
   const [query, setQuery] = useState('');
@@ -19,14 +50,7 @@ export const KnowledgeBaseChat = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
-  const [vectorStatus, setVectorStatus] = useState<{
-    total: number;
-    withEmbeddings: number;
-    withoutEmbeddings: number;
-    pendingChunks: number;
-    totalChunks: number;
-    documentsWithPendingChunks: any[];
-  } | null>(null);
+  const [vectorStatus, setVectorStatus] = useState<VectorStatus | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [statusCheckPerformed, setStatusCheckPerformed] = useState(false);
   const [processingChunks, setProcessingChunks] = useState(false);
@@ -155,38 +179,40 @@ export const KnowledgeBaseChat = () => {
       const withoutEmbeddings = total - withEmbeddings;
       
       // Check for parent documents with pending chunks
-      const documentsWithPendingChunks = allDocs.filter(doc => 
-        !doc.metadata?.parent_id && // Only parent documents
-        doc.metadata?.total_chunks > 1 && // Has multiple chunks
-        doc.metadata?.processing_status === 'partial' // Partially processed
-      );
+      const documentsWithPendingChunks = allDocs.filter(doc => {
+        const metadata = doc.metadata as DocumentMetadata | null;
+        return !metadata?.parent_id && // Only parent documents
+               metadata?.total_chunks && metadata.total_chunks > 1 && // Has multiple chunks
+               metadata?.processing_status === 'partial'; // Partially processed
+      });
       
       // Calculate total chunks and pending chunks
       let totalChunks = 0;
       let pendingChunks = 0;
       
       allDocs.forEach(doc => {
-        if (doc.metadata?.total_chunks) {
-          totalChunks += doc.metadata.total_chunks;
-          if (doc.metadata?.processing_status !== 'completed') {
+        const metadata = doc.metadata as DocumentMetadata | null;
+        if (metadata?.total_chunks) {
+          totalChunks += metadata.total_chunks;
+          if (metadata?.processing_status !== 'completed') {
             pendingChunks++;
           }
         } else {
           // Count it as a single chunk
           totalChunks++;
-          if (doc.metadata?.processing_status !== 'completed') {
+          if (metadata?.processing_status !== 'completed') {
             pendingChunks++;
           }
         }
       });
       
-      const newStatus = {
+      const newStatus: VectorStatus = {
         total,
         withEmbeddings,
         withoutEmbeddings,
         pendingChunks,
         totalChunks,
-        documentsWithPendingChunks
+        documentsWithPendingChunks: documentsWithPendingChunks as KnowledgeBaseDocument[]
       };
       
       console.log('Vector status:', newStatus);
