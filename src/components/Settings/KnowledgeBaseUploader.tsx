@@ -65,7 +65,7 @@ export const KnowledgeBaseUploader: React.FC = () => {
         .insert({
           company_id: companySettings.id,
           source_id: filePath,
-          source_type: "document",  // Using "document" to comply with the constraint
+          source_type: "document",  // Using valid value for the constraint
           content: " ",
           title: file.name,
           file_name: file.name,

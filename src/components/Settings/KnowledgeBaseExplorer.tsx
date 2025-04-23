@@ -27,7 +27,7 @@ export const KnowledgeBaseExplorer = () => {
         .from('knowledge_base_embeddings')
         .select('*')
         .eq('company_id', companySettings.id)
-        .order('created_at', { ascending: false });
+        .order('last_updated', { ascending: false });
 
       if (error) {
         console.error('Error fetching documents:', error);
