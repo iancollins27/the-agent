@@ -136,7 +136,8 @@ export const usePromptRuns = ({
           }
         });
         
-        const latestRuns = Array.from(latestRunsByProject.values());
+        // Convert the Map values back to an array
+        const latestRuns: PromptRun[] = Array.from(latestRunsByProject.values());
         
         latestRuns.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
