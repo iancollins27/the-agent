@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAIProvider, callAIProviderWithMCP } from "./ai-providers.ts";
 import { logPromptRun, createActionRecord } from "./database/prompt-runs.ts";
@@ -50,7 +49,7 @@ serve(async (req) => {
         aiProvider,
         aiModel,
         initiatedBy,
-        contextData
+        contextData  // This will be handled in the function, not directly inserted
       });
       console.log(`Created prompt run: ${promptRunId}`);
     } catch (logError) {
@@ -200,17 +199,17 @@ Question: ${contextData.query}`;
           // Process the action based on the decision
           if (decision === 'ACTION_NEEDED' || decision === 'SET_FUTURE_REMINDER') {
             const actionResponse = await createActionRecord({
-              promptRunId,
-              projectId,
-              actionType: jsonOutput.action_type || 'NO_ACTION',
-              actionPayload: jsonOutput,
+              prompt_run_id: promptRunId,  // Use snake_case for consistency
+              project_id: projectId,       // Use snake_case for consistency
+              action_type: jsonOutput.action_type || 'NO_ACTION',  // Use snake_case
+              action_payload: jsonOutput,  // Use correct column name
               message: jsonOutput.message_text || null,
               status: decision === 'ACTION_NEEDED' ? 'pending' : 'scheduled',
-              requiresApproval: true
+              requires_approval: true
             });
             
             if (actionResponse) {
-              actionRecordId = actionResponse.id;
+              actionRecordId = actionResponse;
               console.log(`Created action record: ${actionRecordId}`);
             }
             

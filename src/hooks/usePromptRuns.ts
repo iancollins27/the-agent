@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -94,11 +93,9 @@ export const usePromptRuns = ({
       
       const timeConstraint = timeFilter !== TIME_FILTERS.ALL ? getDateFilter() : null;
       
-      // Calculate the range for pagination
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
       
-      // Add range parameter to the fetchFilteredPromptRuns call
       const data = await fetchFilteredPromptRuns(
         projectIds, 
         statusFilter, 
@@ -107,12 +104,10 @@ export const usePromptRuns = ({
         to
       );
       
-      // Use the formatted data from the utility function
       let formattedData = formatPromptRunData(data);
 
       console.log(`Total prompt runs before filtering: ${formattedData.length}`);
 
-      // Initialize pending_actions with default value to avoid undefined
       formattedData = formattedData.map(run => ({
         ...run,
         pending_actions: run.pending_actions || 0
@@ -136,8 +131,12 @@ export const usePromptRuns = ({
           }
         });
         
-        // Convert the Map values back to an array
-        const latestRuns: PromptRun[] = Array.from(latestRunsByProject.values());
+        const latestRuns = Array.from(latestRunsByProject.values()).map(run => ({
+          ...run,
+          project_manager: run.project_manager || null,
+          pm_name: run.pm_name || 'Unknown',
+          pending_actions: run.pending_actions || 0
+        })) as PromptRun[];
         
         latestRuns.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -145,13 +144,11 @@ export const usePromptRuns = ({
         
         console.log(`Total prompt runs after filtering for latest only: ${latestRuns.length}`);
         
-        // Update formattedData with the latest runs only
         formattedData = latestRuns;
       } else {
         console.log(`Showing all ${formattedData.length} runs`);
       }
 
-      // Fetch pending actions for all prompt runs
       if (formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
@@ -163,7 +160,6 @@ export const usePromptRuns = ({
             .in('prompt_run_id', promptRunIds);
           
           if (!actionError && actionData) {
-            // Count occurrences of each prompt_run_id
             const pendingActionCounts = new Map<string, number>();
             
             actionData.forEach(action => {
@@ -171,7 +167,6 @@ export const usePromptRuns = ({
               pendingActionCounts.set(action.prompt_run_id, currentCount + 1);
             });
             
-            // Update the pending_actions count for each run
             formattedData = formattedData.map(run => ({
               ...run,
               pending_actions: pendingActionCounts.get(run.id) || 0
@@ -184,7 +179,6 @@ export const usePromptRuns = ({
         }
       }
 
-      // Apply filtering for excluding reminder actions if needed
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
@@ -211,7 +205,6 @@ export const usePromptRuns = ({
                 .map(action => action.prompt_run_id)
             );
   
-            // Filter out reminder actions
             formattedData = formattedData.filter(run => !filteredActionRunIds.has(run.id));
             
             console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);

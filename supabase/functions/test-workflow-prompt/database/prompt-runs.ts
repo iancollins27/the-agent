@@ -20,6 +20,7 @@ type PromptRunData = {
  */
 export async function logPromptRun(data: PromptRunData): Promise<string | null> {
   try {
+    // Map the input data to match the database column names
     const { data: promptRun, error } = await supabase
       .from('prompt_runs')
       .insert({
@@ -28,13 +29,14 @@ export async function logPromptRun(data: PromptRunData): Promise<string | null> 
         ai_provider: data.aiProvider,
         ai_model: data.aiModel,
         initiated_by: data.initiatedBy,
-        context_data: data.contextData || {},
+        // Remove the context_data field as it doesn't exist in the schema
         status: 'PROCESSING'
       })
       .select('id')
       .single();
 
     if (error) {
+      console.error('Error in logPromptRun:', error);
       throw error;
     }
 
@@ -50,13 +52,22 @@ export async function logPromptRun(data: PromptRunData): Promise<string | null> 
  */
 export async function createActionRecord(data: any): Promise<string | null> {
   try {
+    // Ensure we're using action_payload instead of actionPayload
+    // Map the data to match the column name in the database
     const { data: actionRecord, error } = await supabase
       .from('action_records')
-      .insert(data)
+      .insert({
+        ...data,
+        // If data contains actionPayload, rename it to action_payload
+        action_payload: data.actionPayload || data.action_payload,
+        // Delete the actionPayload property if it exists to avoid conflicts
+        ...(data.actionPayload && { actionPayload: undefined })
+      })
       .select('id')
       .single();
 
     if (error) {
+      console.error('Error in createActionRecord:', error);
       throw error;
     }
 
