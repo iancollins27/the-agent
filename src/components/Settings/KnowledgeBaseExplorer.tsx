@@ -7,6 +7,7 @@ import { useSettings } from "@/providers/SettingsProvider";
 import { Button } from "@/components/ui/button";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Json } from "@/integrations/supabase/types";
 
 // Define explicit types for our document data
 interface DocumentMetadata {
@@ -18,6 +19,24 @@ interface DocumentMetadata {
   error?: string;
 }
 
+// Supabase document data structure
+interface SupabaseDocument {
+  id: string;
+  title?: string | null;
+  content: string;
+  file_type?: string | null;
+  metadata: DocumentMetadata | null;
+  created_at?: string;
+  last_updated?: string | null;
+  company_id: string;
+  embedding?: string | null;
+  file_name?: string | null;
+  source_id: string;
+  source_type: string;
+  url?: string | null;
+}
+
+// Our frontend document model 
 interface DocumentChunk {
   id: string;
   title: string;
@@ -68,8 +87,8 @@ export const KnowledgeBaseExplorer = () => {
       }
 
       // For each parent document, get its chunks
-      const docsWithChunks = await Promise.all(
-        (parentDocs || []).map(async (doc) => {
+      const docsWithChunks: Document[] = await Promise.all(
+        (parentDocs || []).map(async (doc: SupabaseDocument) => {
           const { data: chunks, error: chunksError } = await supabase
             .from('knowledge_base_embeddings')
             .select('*')
@@ -78,10 +97,38 @@ export const KnowledgeBaseExplorer = () => {
             
           if (chunksError) {
             console.error(`Error fetching chunks for document ${doc.id}:`, chunksError);
-            return { ...doc, chunks: [] };
+            return {
+              id: doc.id,
+              title: doc.title || 'Untitled Document',
+              content: doc.content,
+              file_type: doc.file_type || 'unknown',
+              metadata: doc.metadata || {},
+              created_at: doc.created_at || new Date().toISOString(),
+              last_updated: doc.last_updated || new Date().toISOString(),
+              chunks: []
+            };
           }
           
-          return { ...doc, chunks: chunks || [] };
+          // Map chunks to our DocumentChunk interface
+          const mappedChunks: DocumentChunk[] = (chunks || []).map((chunk: SupabaseDocument) => ({
+            id: chunk.id,
+            title: chunk.title || `Chunk ${chunk.metadata?.chunk_index || 0}`,
+            content: chunk.content,
+            metadata: chunk.metadata || {},
+            created_at: chunk.created_at || new Date().toISOString()
+          }));
+          
+          // Return the document with its chunks
+          return {
+            id: doc.id,
+            title: doc.title || 'Untitled Document',
+            content: doc.content,
+            file_type: doc.file_type || 'unknown',
+            metadata: doc.metadata || {},
+            created_at: doc.created_at || new Date().toISOString(),
+            last_updated: doc.last_updated || new Date().toISOString(),
+            chunks: mappedChunks
+          };
         })
       );
       
