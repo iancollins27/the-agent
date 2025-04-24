@@ -11,6 +11,7 @@ import {
   addAssistantMessage, 
   getDefaultTools 
 } from "./mcp.ts";
+import { replaceVariables } from "./utils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,7 +58,8 @@ serve(async (req) => {
     }
 
     let output = '';
-    let finalPrompt = promptText;
+    // Apply variable replacement to the prompt text before processing
+    let finalPrompt = replaceVariables(promptText, contextData);
     let actionRecordId = null;
     let reminderSet = false;
     let nextCheckDateInfo = null;
@@ -132,7 +134,8 @@ Question: ${contextData.query}`;
           }
           
           // Create the MCP context with proper system and user prompts
-          const mcpContext = createMCPContext(systemPrompt, promptText, getDefaultTools());
+          // Use the finalPrompt which has variables replaced instead of the original promptText
+          const mcpContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
           
           console.log('MCP Context created with tools. Calling AI with MCP...');
           usedMCP = true;
@@ -148,7 +151,8 @@ Question: ${contextData.query}`;
             throw new Error('Invalid response from AI provider');
           }
         } else {
-          output = await callAIProvider(aiProvider, aiModel, promptText);
+          // Use the finalPrompt which has variables replaced instead of the original promptText
+          output = await callAIProvider(aiProvider, aiModel, finalPrompt);
         }
         
       } catch (aiError) {

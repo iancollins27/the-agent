@@ -138,6 +138,9 @@ export function createMCPContext(
   const sanitizedSystemPrompt = systemPrompt || "You are an AI assistant processing project data.";
   const sanitizedUserPrompt = userPrompt || "Please analyze the following data.";
   
+  console.log(`Creating MCP context with system prompt: ${sanitizedSystemPrompt.substring(0, 50)}...`);
+  console.log(`User prompt length: ${sanitizedUserPrompt.length}`);
+  
   // Create a properly structured MCP context with messages array
   const context: MCPContext = {
     messages: [
@@ -155,6 +158,17 @@ export function createMCPContext(
   // Add tools only if they exist
   if (tools && tools.length > 0) {
     context.tools = tools;
+    console.log(`Added ${tools.length} tools to MCP context`);
+  }
+  
+  // Verify that the context is properly structured
+  if (!context.messages || context.messages.length === 0) {
+    console.error("Created an invalid MCP context with no messages");
+    // Ensure we have valid messages by setting defaults if needed
+    context.messages = [
+      { role: 'system', content: 'You are an AI assistant.' },
+      { role: 'user', content: 'Please provide a response.' }
+    ];
   }
   
   return context;

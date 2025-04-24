@@ -1,4 +1,3 @@
-
 /**
  * Replaces variables in a text with values from a variables object
  */
@@ -16,16 +15,38 @@ export function replaceVariables(promptText: string, contextData: Record<string,
   // Log what context variables are available
   console.log('Context variables available:', Object.keys(contextData));
   
-  // Replace each variable with its value from contextData if available
-  for (const [key, value] of Object.entries(contextData)) {
-    const varPattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-    if (varPattern.test(finalPrompt)) {
-      // Check if the template actually contains this variable
-      const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+  // First flattening the context data to handle nested objects
+  const flattenedData = flattenObject(contextData);
+  console.log('Flattened context data:', Object.keys(flattenedData));
+  
+  // Replace each variable with its value
+  variables.forEach(variable => {
+    const varPattern = new RegExp(`\\{\\{${variable}\\}\\}`, 'g');
+    
+    // Check if variable exists in data
+    if (variable in flattenedData) {
+      const value = flattenedData[variable];
+      const stringValue = typeof value === 'string' ? value : 
+                          value === null ? '' : 
+                          typeof value === 'object' ? JSON.stringify(value) : String(value);
+      
       finalPrompt = finalPrompt.replace(varPattern, stringValue || '');
-      console.log(`Replaced {{${key}}} with value (length: ${stringValue?.length || 0})`);
+      console.log(`Replaced {{${variable}}} with value (length: ${stringValue?.length || 0})`);
+    } else if (variable in contextData) {
+      // For direct matches in the top-level object
+      const value = contextData[variable];
+      const stringValue = typeof value === 'string' ? value : 
+                          value === null ? '' : 
+                          typeof value === 'object' ? JSON.stringify(value) : String(value);
+      
+      finalPrompt = finalPrompt.replace(varPattern, stringValue || '');
+      console.log(`Replaced {{${variable}}} with value (length: ${stringValue?.length || 0})`);
+    } else {
+      console.warn(`Variable {{${variable}}} not found in context data`);
+      // If variable not found, replace with empty string or keep as is
+      finalPrompt = finalPrompt.replace(varPattern, '');
     }
-  }
+  });
   
   // Check for any remaining unreplaced variables
   const remainingVars = (finalPrompt.match(/\{\{([^}]+)\}\}/g) || [])
@@ -36,6 +57,31 @@ export function replaceVariables(promptText: string, contextData: Record<string,
   }
   
   return finalPrompt;
+}
+
+/**
+ * Helper function to flatten nested objects for easier variable replacement
+ * Example: { user: { name: 'John' } } becomes { 'user.name': 'John' }
+ */
+function flattenObject(obj: Record<string, any>, prefix: string = ''): Record<string, any> {
+  const flattened: Record<string, any> = {};
+  
+  for (const [key, value] of Object.entries(obj)) {
+    const newKey = prefix ? `${prefix}.${key}` : key;
+    
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // Recursively flatten nested objects
+      Object.assign(flattened, flattenObject(value, newKey));
+    } else {
+      // Add non-object properties directly
+      flattened[newKey] = value;
+    }
+    
+    // Also add the key itself for direct matching
+    flattened[key] = value;
+  }
+  
+  return flattened;
 }
 
 /**
