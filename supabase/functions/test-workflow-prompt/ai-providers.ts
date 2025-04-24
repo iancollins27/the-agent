@@ -45,6 +45,12 @@ export async function callAIProviderWithMCP(
 ): Promise<any> {
   console.log(`Calling ${aiProvider} model ${aiModel} with MCP`);
   
+  // Validate the MCP context before proceeding
+  if (!mcpContext || !mcpContext.messages || mcpContext.messages.length === 0) {
+    console.error("Invalid MCP context: Missing or empty messages array");
+    throw new Error("Invalid MCP context: Missing messages");
+  }
+  
   switch (aiProvider) {
     case "openai":
       if (openaiApiKey) {
@@ -119,9 +125,11 @@ async function callOpenAI(prompt: string, model: string = "gpt-4o-mini") {
 async function callOpenAIWithMCP(mcpContext: MCPContext, model: string = "gpt-4o") {
   try {
     console.log(`Calling OpenAI API with MCP and model ${model}`);
+    
+    // Format the MCP context for OpenAI
     const requestBody = formatForOpenAI(mcpContext);
     
-    // Debug the request body 
+    // Debug the request structure
     console.log("MCP Request structure:", JSON.stringify({
       model: requestBody.model,
       messageCount: requestBody.messages?.length,
@@ -133,6 +141,11 @@ async function callOpenAIWithMCP(mcpContext: MCPContext, model: string = "gpt-4o
     if (!requestBody.messages || requestBody.messages.length === 0) {
       console.error("Error: MCP context has no messages");
       throw new Error("MCP context has no messages");
+    }
+    
+    // Log a sample of the messages to debug
+    if (requestBody.messages.length > 0) {
+      console.log("First message sample:", JSON.stringify(requestBody.messages[0], null, 2));
     }
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -179,77 +192,111 @@ async function callClaude(prompt: string, model: string = "claude-3-5-haiku-2024
     throw new Error("Claude API key is not set");
   }
   
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": claudeApiKey,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 500,
-    }),
-  });
-  
-  const data = await response.json();
-  if (data.error) {
-    console.error("Claude API error:", data.error);
-    throw new Error(`Claude API error: ${data.error.message || data.error}`);
+  try {
+    console.log(`Calling Claude API with model ${model}`);
+    
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": claudeApiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 500,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Claude API error (${response.status}):`, errorText);
+      throw new Error(`Claude API error (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) {
+      console.error("Claude API error:", data.error);
+      throw new Error(`Claude API error: ${data.error.message || data.error}`);
+    }
+    
+    console.log("Claude API call successful");
+    return data.content?.[0]?.text || "Error: No response from Claude";
+  } catch (error) {
+    console.error("Error in callClaude:", error);
+    throw error;
   }
-  
-  return data.content?.[0]?.text || "Error: No response from Claude";
 }
 
 /**
  * Calls the Claude API with MCP formatting
  */
 async function callClaudeWithMCP(mcpContext: MCPContext, model: string = "claude-3-5-haiku-20241022") {
-  const requestBody = formatForClaude(mcpContext);
-  
-  // Debug Claude MCP request
-  console.log("Claude MCP Request structure:", JSON.stringify({
-    model: requestBody.model,
-    messageCount: requestBody.messages?.length,
-    toolsCount: requestBody.tools?.length,
-    hasTools: !!requestBody.tools
-  }));
-  
-  // Validate the messages array is present and not empty
-  if (!requestBody.messages || requestBody.messages.length === 0) {
-    console.error("Error: MCP context has no messages for Claude");
-    throw new Error("MCP context has no messages for Claude");
+  try {
+    console.log(`Calling Claude API with MCP and model ${model}`);
+    
+    // Format the MCP context for Claude
+    const requestBody = formatForClaude(mcpContext);
+    
+    // Debug the request structure
+    console.log("Claude MCP Request structure:", JSON.stringify({
+      model: requestBody.model,
+      messageCount: requestBody.messages?.length,
+      toolsCount: requestBody.tools?.length,
+      hasTools: !!requestBody.tools
+    }));
+    
+    // Validate the messages array is present and not empty
+    if (!requestBody.messages || requestBody.messages.length === 0) {
+      console.error("Error: MCP context has no messages for Claude");
+      throw new Error("MCP context has no messages for Claude");
+    }
+    
+    // Log a sample of the messages to debug
+    if (requestBody.messages.length > 0) {
+      console.log("First Claude message sample:", JSON.stringify(requestBody.messages[0], null, 2));
+    }
+    
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": claudeApiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: requestBody.model || model,
+        messages: requestBody.messages,
+        tools: requestBody.tools,
+        max_tokens: 1500,
+        temperature: 0.2,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Claude API error (${response.status}):`, errorText);
+      throw new Error(`Claude API error (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) {
+      console.error("Claude API error:", data.error);
+      throw new Error(`Claude API error: ${data.error.message || data.error}`);
+    }
+    
+    console.log("Claude MCP API call successful");
+    return data;
+  } catch (error) {
+    console.error("Error in callClaudeWithMCP:", error);
+    throw error;
   }
-  
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": claudeApiKey,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: requestBody.model || model,
-      messages: requestBody.messages,
-      tools: requestBody.tools,
-      max_tokens: 1500,
-      temperature: 0.2,
-    }),
-  });
-  
-  const data = await response.json();
-  if (data.error) {
-    console.error("Claude API error:", data.error);
-    throw new Error(`Claude API error: ${data.error.message || data.error}`);
-  }
-  
-  return data;
 }
 
 /**
@@ -260,34 +307,48 @@ async function callDeepseek(prompt: string, model: string = "deepseek-chat") {
     throw new Error("DeepSeek API key is not set");
   }
   
-  const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${deepseekApiKey}`,
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-    }),
-  });
-  
-  const data = await response.json();
-  if (data.error) {
-    console.error("DeepSeek API error:", data.error);
-    throw new Error(`DeepSeek API error: ${data.error.message || data.error}`);
+  try {
+    console.log(`Calling DeepSeek API with model ${model}`);
+    
+    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${deepseekApiKey}`,
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that processes project information and provides relevant outputs based on the request type."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`DeepSeek API error (${response.status}):`, errorText);
+      throw new Error(`DeepSeek API error (${response.status}): ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) {
+      console.error("DeepSeek API error:", data.error);
+      throw new Error(`DeepSeek API error: ${data.error.message || data.error}`);
+    }
+    
+    console.log("DeepSeek API call successful");
+    return data.choices?.[0]?.message?.content || "Error: No response from DeepSeek";
+  } catch (error) {
+    console.error("Error in callDeepseek:", error);
+    throw error;
   }
-  
-  return data.choices?.[0]?.message?.content || "Error: No response from DeepSeek";
 }

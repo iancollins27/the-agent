@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -20,6 +21,8 @@ interface UsePromptRunsProps {
   getDateFilter: () => string | null;
   onlyShowLatestRuns?: boolean;
   excludeReminderActions?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export const usePromptRuns = ({
@@ -30,7 +33,9 @@ export const usePromptRuns = ({
   timeFilter,
   getDateFilter,
   onlyShowLatestRuns = false,
-  excludeReminderActions = false
+  excludeReminderActions = false,
+  page = 1,
+  pageSize = 20
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +53,9 @@ export const usePromptRuns = ({
     projectManagerFilter, 
     timeFilter, 
     onlyShowLatestRuns,
-    excludeReminderActions
+    excludeReminderActions,
+    page,
+    pageSize
   ]);
 
   const fetchPromptRuns = async () => {
@@ -87,12 +94,22 @@ export const usePromptRuns = ({
       
       const timeConstraint = timeFilter !== TIME_FILTERS.ALL ? getDateFilter() : null;
       
-      const data = await fetchFilteredPromptRuns(projectIds, statusFilter, timeConstraint);
+      // Calculate the range for pagination
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      // Add range parameter to the fetchFilteredPromptRuns call
+      const data = await fetchFilteredPromptRuns(
+        projectIds, 
+        statusFilter, 
+        timeConstraint,
+        from,
+        to
+      );
       
       let formattedData = formatPromptRunData(data);
 
       console.log(`Total prompt runs before filtering: ${formattedData.length}`);
-      console.log(`onlyShowLatestRuns is set to: ${onlyShowLatestRuns}`);
 
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
         console.log("Filtering to show only latest runs per project");
@@ -120,67 +137,73 @@ export const usePromptRuns = ({
         
         console.log(`Total prompt runs after filtering for latest only: ${formattedData.length}`);
       } else {
-        console.log(`Skipping latest runs filter, showing all ${formattedData.length} runs`);
+        console.log(`Showing all ${formattedData.length} runs`);
       }
 
       if (formattedData.length > 0) {
+        // Fetch pending actions for all prompt runs
         const promptRunIds = formattedData.map(run => run.id);
         
-        const { data: actionData, error: actionError } = await supabase
-          .from('action_records')
-          .select('prompt_run_id, status')
-          .in('prompt_run_id', promptRunIds)
-          .eq('status', 'pending');
-        
-        if (!actionError && actionData) {
-          const pendingActionCounts = new Map<string, number>();
+        if (promptRunIds.length > 0) {
+          const { data: actionData, error: actionError } = await supabase
+            .from('action_records')
+            .select('prompt_run_id')
+            .eq('status', 'pending')
+            .in('prompt_run_id', promptRunIds);
           
-          actionData.forEach(action => {
-            const currentCount = pendingActionCounts.get(action.prompt_run_id) || 0;
-            pendingActionCounts.set(action.prompt_run_id, currentCount + 1);
-          });
-          
-          formattedData = formattedData.map(run => ({
-            ...run,
-            pending_actions: pendingActionCounts.get(run.id) || 0
-          }));
-          
-          console.log("Added pending action counts to prompt runs");
-        } else {
-          console.error('Error fetching pending actions:', actionError);
+          if (!actionError && actionData) {
+            // Count occurrences of each prompt_run_id
+            const pendingActionCounts = new Map<string, number>();
+            
+            actionData.forEach(action => {
+              const currentCount = pendingActionCounts.get(action.prompt_run_id) || 0;
+              pendingActionCounts.set(action.prompt_run_id, currentCount + 1);
+            });
+            
+            formattedData = formattedData.map(run => ({
+              ...run,
+              pending_actions: pendingActionCounts.get(run.id) || 0
+            }));
+            
+            console.log("Added pending action counts to prompt runs");
+          } else {
+            console.error('Error fetching pending actions:', actionError);
+          }
         }
       }
 
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
-        const { data: actionData, error: actionError } = await supabase
-          .from('action_records')
-          .select('prompt_run_id, action_type')
-          .in('prompt_run_id', promptRunIds);
-
-        if (actionError) {
-          console.error('Error fetching action records:', actionError);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Failed to filter out reminder actions",
-          });
-        } else {
-          const filteredActionRunIds = new Set(
-            actionData
-              .filter(action => 
-                action.action_type === 'set_future_reminder' || 
-                action.action_type === 'NO_ACTION'
-              )
-              .map(action => action.prompt_run_id)
-          );
-
-          formattedData = formattedData.filter(
-            run => !filteredActionRunIds.has(run.id)
-          );
-          
-          console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
+        if (promptRunIds.length > 0) {
+          const { data: actionData, error: actionError } = await supabase
+            .from('action_records')
+            .select('prompt_run_id, action_type')
+            .in('prompt_run_id', promptRunIds);
+  
+          if (actionError) {
+            console.error('Error fetching action records:', actionError);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Failed to filter out reminder actions",
+            });
+          } else if (actionData) {
+            const filteredActionRunIds = new Set(
+              actionData
+                .filter(action => 
+                  action.action_type === 'set_future_reminder' || 
+                  action.action_type === 'NO_ACTION'
+                )
+                .map(action => action.prompt_run_id)
+            );
+  
+            formattedData = formattedData.filter(
+              run => !filteredActionRunIds.has(run.id)
+            );
+            
+            console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
+          }
         }
       }
 

@@ -159,6 +159,17 @@ export function addToolResult(
   toolName: string,
   result: any
 ): MCPContext {
+  // Ensure context and messages are properly initialized
+  if (!context || !context.messages) {
+    console.error("Invalid MCP context provided to addToolResult");
+    return {
+      messages: [
+        { role: 'system', content: 'System context was missing or invalid.' },
+        { role: 'user', content: 'Please provide a valid response.' }
+      ]
+    };
+  }
+  
   return {
     ...context,
     messages: [
@@ -177,6 +188,17 @@ export function addAssistantMessage(
   context: MCPContext,
   content: string
 ): MCPContext {
+  // Ensure context and messages are properly initialized
+  if (!context || !context.messages) {
+    console.error("Invalid MCP context provided to addAssistantMessage");
+    return {
+      messages: [
+        { role: 'system', content: 'System context was missing or invalid.' },
+        { role: 'user', content: 'Please provide a valid response.' }
+      ]
+    };
+  }
+  
   return {
     ...context,
     messages: [
@@ -203,6 +225,11 @@ export function formatForOpenAI(context: MCPContext): any {
       ]
     };
   }
+  
+  // Log the first few messages for debugging
+  const messagesToLog = context.messages.slice(0, 3);
+  console.log("First few messages:", JSON.stringify(messagesToLog, null, 2));
+  console.log(`Total messages: ${context.messages.length}`);
   
   return {
     model: "gpt-4o",
@@ -234,6 +261,11 @@ export function formatForClaude(context: MCPContext): any {
     };
   }
   
+  // Log the first few messages for debugging
+  const messagesToLog = context.messages.slice(0, 3);
+  console.log("First few messages for Claude:", JSON.stringify(messagesToLog, null, 2));
+  console.log(`Total Claude messages: ${context.messages.length}`);
+  
   // Claude has a different format for tools, so we need to adapt
   return {
     model: "claude-3-haiku-20240307",
@@ -248,33 +280,49 @@ export function formatForClaude(context: MCPContext): any {
 
 // Extracts tool calls from OpenAI response
 export function extractToolCallsFromOpenAI(response: any): any[] {
-  if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+  if (!response || !response.choices || !response.choices[0] || !response.choices[0].message) {
+    console.error("Invalid OpenAI response format in extractToolCallsFromOpenAI");
     return [];
   }
   
   const message = response.choices[0].message;
   if (!message.tool_calls || !Array.isArray(message.tool_calls)) {
+    console.log("No tool calls found in OpenAI response");
     return [];
   }
   
-  return message.tool_calls.map(toolCall => ({
-    name: toolCall.function.name,
-    arguments: JSON.parse(toolCall.function.arguments)
-  }));
+  try {
+    return message.tool_calls.map(toolCall => ({
+      name: toolCall.function.name,
+      arguments: JSON.parse(toolCall.function.arguments)
+    }));
+  } catch (error) {
+    console.error("Error parsing tool call arguments:", error);
+    return [];
+  }
 }
 
 // Extracts tool calls from Claude response
 export function extractToolCallsFromClaude(response: any): any[] {
-  if (!response.content || !Array.isArray(response.content)) {
+  if (!response || !response.content || !Array.isArray(response.content)) {
+    console.error("Invalid Claude response format in extractToolCallsFromClaude");
     return [];
   }
   
   const toolCalls = response.content
     .filter(item => item.type === 'tool_use')
-    .map(item => ({
-      name: item.name,
-      arguments: item.input
-    }));
+    .map(item => {
+      try {
+        return {
+          name: item.name,
+          arguments: item.input
+        };
+      } catch (error) {
+        console.error("Error processing Claude tool call:", error);
+        return null;
+      }
+    })
+    .filter(Boolean); // Remove nulls
   
   return toolCalls;
 }
