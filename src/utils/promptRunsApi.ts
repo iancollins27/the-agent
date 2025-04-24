@@ -144,7 +144,6 @@ export const formatPromptRunData = (promptRunsData: any[]) => {
       feedback_rating: run.feedback_rating,
       feedback_description: run.feedback_description,
       feedback_tags: run.feedback_tags,
-      project_name: run.projects?.crm_id || 'Unknown Project',
       project_address: run.projects?.Address || 'Unknown Address',
       workflow_prompt_type: run.workflow_prompts?.type || 'unknown',
       workflow_type: run.workflow_prompts?.type,

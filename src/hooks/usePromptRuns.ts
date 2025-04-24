@@ -107,30 +107,8 @@ export const usePromptRuns = ({
         to
       );
       
-      // Cast the data to PromptRun type with all required properties
-      const formattedData: PromptRun[] = data.map(run => ({
-        id: run.id,
-        project_id: run.project_id,
-        workflow_prompt_id: run.workflow_prompt_id,
-        prompt_input: run.prompt_input || '', // Add this missing property
-        prompt_output: run.prompt_output,
-        error_message: run.error_message,
-        status: run.status,
-        created_at: run.created_at,
-        completed_at: run.completed_at,
-        feedback_rating: run.feedback_rating,
-        feedback_description: run.feedback_description,
-        feedback_tags: run.feedback_tags,
-        project_name: run.projects?.crm_id || 'Unknown Project',
-        project_address: run.projects?.Address || null,
-        project_roofer_contact: null, // Will be populated later if needed
-        workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
-        workflow_type: run.workflow_prompts?.type,
-        prompt_text: run.prompt_input || '',
-        result: run.prompt_output,
-        reviewed: run.reviewed === true, // Add this missing property
-        pending_actions: 0 // Will be updated later
-      }));
+      // Use the formatted data from the utility function
+      const formattedData = formatPromptRunData(data);
 
       console.log(`Total prompt runs before filtering: ${formattedData.length}`);
 
