@@ -46,6 +46,7 @@ export const useDocuments = (companyId?: string) => {
             };
           }
           
+          // Map chunks with explicit type annotations to avoid deep type instantiation
           const mappedChunks: DocumentChunk[] = (chunks || []).map((chunk: any) => ({
             id: chunk.id,
             title: chunk.title || `Chunk ${parseMetadata(chunk.metadata)?.chunk_index || 0}`,
