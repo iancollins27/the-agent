@@ -19,22 +19,18 @@ interface DocumentMetadata {
   error?: string;
 }
 
-// Supabase document data structure
-interface SupabaseDocument {
-  id: string;
-  title?: string | null;
-  content: string;
-  file_type?: string | null;
-  metadata: DocumentMetadata | null;
-  created_at?: string;
-  last_updated?: string | null;
-  company_id: string;
-  embedding?: string | null;
-  file_name?: string | null;
-  source_id: string;
-  source_type: string;
-  url?: string | null;
-}
+// Type helper to convert Json to DocumentMetadata
+const parseMetadata = (metadata: Json | null): DocumentMetadata => {
+  if (!metadata) return {};
+  
+  // If it's an object, cast it directly
+  if (typeof metadata === 'object' && metadata !== null) {
+    return metadata as unknown as DocumentMetadata;
+  }
+  
+  // Return empty metadata if it's not an object
+  return {};
+};
 
 // Our frontend document model 
 interface DocumentChunk {
@@ -88,7 +84,7 @@ export const KnowledgeBaseExplorer = () => {
 
       // For each parent document, get its chunks
       const docsWithChunks: Document[] = await Promise.all(
-        (parentDocs || []).map(async (doc: SupabaseDocument) => {
+        (parentDocs || []).map(async (doc: any) => {
           const { data: chunks, error: chunksError } = await supabase
             .from('knowledge_base_embeddings')
             .select('*')
@@ -102,7 +98,7 @@ export const KnowledgeBaseExplorer = () => {
               title: doc.title || 'Untitled Document',
               content: doc.content,
               file_type: doc.file_type || 'unknown',
-              metadata: doc.metadata || {},
+              metadata: parseMetadata(doc.metadata),
               created_at: doc.created_at || new Date().toISOString(),
               last_updated: doc.last_updated || new Date().toISOString(),
               chunks: []
@@ -110,11 +106,11 @@ export const KnowledgeBaseExplorer = () => {
           }
           
           // Map chunks to our DocumentChunk interface
-          const mappedChunks: DocumentChunk[] = (chunks || []).map((chunk: SupabaseDocument) => ({
+          const mappedChunks: DocumentChunk[] = (chunks || []).map((chunk: any) => ({
             id: chunk.id,
-            title: chunk.title || `Chunk ${chunk.metadata?.chunk_index || 0}`,
+            title: chunk.title || `Chunk ${parseMetadata(chunk.metadata)?.chunk_index || 0}`,
             content: chunk.content,
-            metadata: chunk.metadata || {},
+            metadata: parseMetadata(chunk.metadata),
             created_at: chunk.created_at || new Date().toISOString()
           }));
           
@@ -124,7 +120,7 @@ export const KnowledgeBaseExplorer = () => {
             title: doc.title || 'Untitled Document',
             content: doc.content,
             file_type: doc.file_type || 'unknown',
-            metadata: doc.metadata || {},
+            metadata: parseMetadata(doc.metadata),
             created_at: doc.created_at || new Date().toISOString(),
             last_updated: doc.last_updated || new Date().toISOString(),
             chunks: mappedChunks
