@@ -1,3 +1,4 @@
+
 const openaiApiKey = Deno.env.get("OPENAI_API_KEY") || "";
 const claudeApiKey = Deno.env.get("CLAUDE_API_KEY") || "";
 const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "";
@@ -120,6 +121,20 @@ async function callOpenAIWithMCP(mcpContext: MCPContext, model: string = "gpt-4o
     console.log(`Calling OpenAI API with MCP and model ${model}`);
     const requestBody = formatForOpenAI(mcpContext);
     
+    // Debug the request body 
+    console.log("MCP Request structure:", JSON.stringify({
+      model: requestBody.model,
+      messageCount: requestBody.messages?.length,
+      toolsCount: requestBody.tools?.length,
+      hasTools: !!requestBody.tools
+    }));
+    
+    // Validate the messages array is present and not empty
+    if (!requestBody.messages || requestBody.messages.length === 0) {
+      console.error("Error: MCP context has no messages");
+      throw new Error("MCP context has no messages");
+    }
+    
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -127,7 +142,10 @@ async function callOpenAIWithMCP(mcpContext: MCPContext, model: string = "gpt-4o
         "Authorization": `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
-        ...requestBody,
+        model: requestBody.model || model,
+        messages: requestBody.messages,
+        tools: requestBody.tools,
+        tool_choice: requestBody.tool_choice,
         temperature: 0.2,
         max_tokens: 1500,
       }),
@@ -195,6 +213,20 @@ async function callClaude(prompt: string, model: string = "claude-3-5-haiku-2024
 async function callClaudeWithMCP(mcpContext: MCPContext, model: string = "claude-3-5-haiku-20241022") {
   const requestBody = formatForClaude(mcpContext);
   
+  // Debug Claude MCP request
+  console.log("Claude MCP Request structure:", JSON.stringify({
+    model: requestBody.model,
+    messageCount: requestBody.messages?.length,
+    toolsCount: requestBody.tools?.length,
+    hasTools: !!requestBody.tools
+  }));
+  
+  // Validate the messages array is present and not empty
+  if (!requestBody.messages || requestBody.messages.length === 0) {
+    console.error("Error: MCP context has no messages for Claude");
+    throw new Error("MCP context has no messages for Claude");
+  }
+  
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -203,7 +235,9 @@ async function callClaudeWithMCP(mcpContext: MCPContext, model: string = "claude
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-      ...requestBody,
+      model: requestBody.model || model,
+      messages: requestBody.messages,
+      tools: requestBody.tools,
       max_tokens: 1500,
       temperature: 0.2,
     }),

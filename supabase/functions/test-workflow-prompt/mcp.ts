@@ -1,3 +1,4 @@
+
 /**
  * Model Context Protocol (MCP) implementation for structured AI interactions
  */
@@ -133,15 +134,19 @@ export function createMCPContext(
   userPrompt: string,
   tools: MCPTool[] = []
 ): MCPContext {
+  // Ensure that both prompts are non-empty strings
+  const sanitizedSystemPrompt = systemPrompt || "You are an AI assistant processing project data.";
+  const sanitizedUserPrompt = userPrompt || "Please analyze the following data.";
+  
   return {
     messages: [
       {
         role: 'system',
-        content: systemPrompt
+        content: sanitizedSystemPrompt
       },
       {
         role: 'user',
-        content: userPrompt
+        content: sanitizedUserPrompt
       }
     ],
     tools: tools.length > 0 ? tools : undefined
@@ -186,6 +191,19 @@ export function addAssistantMessage(
 
 // Formats the MCP context for OpenAI API
 export function formatForOpenAI(context: MCPContext): any {
+  // Validate context before formatting
+  if (!context.messages || context.messages.length === 0) {
+    console.error("Invalid MCP context: missing or empty messages array");
+    // Provide a fallback minimal context
+    return {
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are an AI assistant." },
+        { role: "user", content: "Please provide a helpful response." }
+      ]
+    };
+  }
+  
   return {
     model: "gpt-4o",
     messages: context.messages,
@@ -204,6 +222,18 @@ export function formatForOpenAI(context: MCPContext): any {
 
 // Formats the MCP context for Claude API
 export function formatForClaude(context: MCPContext): any {
+  // Validate context before formatting
+  if (!context.messages || context.messages.length === 0) {
+    console.error("Invalid MCP context: missing or empty messages array for Claude");
+    // Provide a fallback minimal context
+    return {
+      model: "claude-3-haiku-20240307",
+      messages: [
+        { role: "user", content: "Please provide a helpful response." }
+      ]
+    };
+  }
+  
   // Claude has a different format for tools, so we need to adapt
   return {
     model: "claude-3-haiku-20240307",
