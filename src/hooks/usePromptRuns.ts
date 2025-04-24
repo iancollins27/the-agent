@@ -107,7 +107,30 @@ export const usePromptRuns = ({
         to
       );
       
-      let formattedData = formatPromptRunData(data);
+      // Cast the data to PromptRun type with all required properties
+      const formattedData: PromptRun[] = data.map(run => ({
+        id: run.id,
+        project_id: run.project_id,
+        workflow_prompt_id: run.workflow_prompt_id,
+        prompt_input: run.prompt_input || '', // Add this missing property
+        prompt_output: run.prompt_output,
+        error_message: run.error_message,
+        status: run.status,
+        created_at: run.created_at,
+        completed_at: run.completed_at,
+        feedback_rating: run.feedback_rating,
+        feedback_description: run.feedback_description,
+        feedback_tags: run.feedback_tags,
+        project_name: run.projects?.crm_id || 'Unknown Project',
+        project_address: run.projects?.Address || null,
+        project_roofer_contact: null, // Will be populated later if needed
+        workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
+        workflow_type: run.workflow_prompts?.type,
+        prompt_text: run.prompt_input || '',
+        result: run.prompt_output,
+        reviewed: run.reviewed === true, // Add this missing property
+        pending_actions: 0 // Will be updated later
+      }));
 
       console.log(`Total prompt runs before filtering: ${formattedData.length}`);
 
@@ -129,15 +152,19 @@ export const usePromptRuns = ({
           }
         });
         
-        formattedData = Array.from(latestRunsByProject.values());
+        const latestRuns = Array.from(latestRunsByProject.values());
         
-        formattedData.sort((a, b) => 
+        latestRuns.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         
-        console.log(`Total prompt runs after filtering for latest only: ${formattedData.length}`);
+        console.log(`Total prompt runs after filtering for latest only: ${latestRuns.length}`);
+        
+        // Update formattedData with the latest runs only
+        setPromptRuns(latestRuns);
       } else {
         console.log(`Showing all ${formattedData.length} runs`);
+        setPromptRuns(formattedData);
       }
 
       if (formattedData.length > 0) {
@@ -160,10 +187,13 @@ export const usePromptRuns = ({
               pendingActionCounts.set(action.prompt_run_id, currentCount + 1);
             });
             
-            formattedData = formattedData.map(run => ({
-              ...run,
-              pending_actions: pendingActionCounts.get(run.id) || 0
-            }));
+            // Update the pending_actions count for each run
+            setPromptRuns(prevRuns => 
+              prevRuns.map(run => ({
+                ...run,
+                pending_actions: pendingActionCounts.get(run.id) || 0
+              }))
+            );
             
             console.log("Added pending action counts to prompt runs");
           } else {
@@ -198,16 +228,15 @@ export const usePromptRuns = ({
                 .map(action => action.prompt_run_id)
             );
   
-            formattedData = formattedData.filter(
-              run => !filteredActionRunIds.has(run.id)
+            // Filter out reminder actions
+            setPromptRuns(prevRuns => 
+              prevRuns.filter(run => !filteredActionRunIds.has(run.id))
             );
             
-            console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
+            console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${promptRuns.length}`);
           }
         }
       }
-
-      setPromptRuns(formattedData);
     } catch (error) {
       console.error('Error fetching prompt runs:', error);
       toast({

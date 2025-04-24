@@ -82,9 +82,13 @@ export const fetchFilteredPromptRuns = async (
         ai_provider,
         ai_model,
         workflow_prompt_id,
+        prompt_input,
+        prompt_output,
+        error_message,
         feedback_rating,
         feedback_description,
         feedback_tags,
+        reviewed,
         workflow_prompts (
           type
         ),
@@ -130,21 +134,27 @@ export const formatPromptRunData = (promptRunsData: any[]) => {
     return promptRunsData.map(run => ({
       id: run.id,
       project_id: run.project_id,
+      workflow_prompt_id: run.workflow_prompt_id,
+      prompt_input: run.prompt_input || '',
+      prompt_output: run.prompt_output,
+      error_message: run.error_message,
+      status: run.status,
       created_at: run.created_at,
       completed_at: run.completed_at,
-      status: run.status,
-      ai_provider: run.ai_provider,
-      ai_model: run.ai_model,
-      type: run.workflow_prompts?.type || 'unknown',
       feedback_rating: run.feedback_rating,
       feedback_description: run.feedback_description,
       feedback_tags: run.feedback_tags,
+      project_name: run.projects?.crm_id || 'Unknown Project',
       project_address: run.projects?.Address || 'Unknown Address',
+      workflow_prompt_type: run.workflow_prompts?.type || 'unknown',
+      workflow_type: run.workflow_prompts?.type,
+      reviewed: run.reviewed === true,
       project_manager: run.projects?.project_manager || null,
+      project_roofer_contact: null,
       pm_name: run.projects?.profiles 
         ? `${run.projects.profiles.profile_fname || ''} ${run.projects.profiles.profile_lname || ''}`.trim() 
         : 'Unknown',
-      pending_actions: 0 // This will be populated later
+      pending_actions: 0
     }));
   } catch (e) {
     console.error("Error in formatPromptRunData:", e);
