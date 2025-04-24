@@ -138,7 +138,8 @@ export function createMCPContext(
   const sanitizedSystemPrompt = systemPrompt || "You are an AI assistant processing project data.";
   const sanitizedUserPrompt = userPrompt || "Please analyze the following data.";
   
-  return {
+  // Create a properly structured MCP context with messages array
+  const context: MCPContext = {
     messages: [
       {
         role: 'system',
@@ -148,9 +149,15 @@ export function createMCPContext(
         role: 'user',
         content: sanitizedUserPrompt
       }
-    ],
-    tools: tools.length > 0 ? tools : undefined
+    ]
   };
+  
+  // Add tools only if they exist
+  if (tools && tools.length > 0) {
+    context.tools = tools;
+  }
+  
+  return context;
 }
 
 // Formats a tool call result to add to the MCP context
@@ -159,9 +166,10 @@ export function addToolResult(
   toolName: string,
   result: any
 ): MCPContext {
-  // Ensure context and messages are properly initialized
+  // Validate the context before proceeding
   if (!context || !context.messages) {
     console.error("Invalid MCP context provided to addToolResult");
+    // Return a minimal valid context as fallback
     return {
       messages: [
         { role: 'system', content: 'System context was missing or invalid.' },
@@ -170,6 +178,7 @@ export function addToolResult(
     };
   }
   
+  // Create a new context with the tool result added
   return {
     ...context,
     messages: [
@@ -188,9 +197,10 @@ export function addAssistantMessage(
   context: MCPContext,
   content: string
 ): MCPContext {
-  // Ensure context and messages are properly initialized
+  // Validate the context before proceeding
   if (!context || !context.messages) {
     console.error("Invalid MCP context provided to addAssistantMessage");
+    // Return a minimal valid context as fallback
     return {
       messages: [
         { role: 'system', content: 'System context was missing or invalid.' },
@@ -199,6 +209,7 @@ export function addAssistantMessage(
     };
   }
   
+  // Create a new context with the assistant message added
   return {
     ...context,
     messages: [
@@ -231,20 +242,29 @@ export function formatForOpenAI(context: MCPContext): any {
   console.log("First few messages:", JSON.stringify(messagesToLog, null, 2));
   console.log(`Total messages: ${context.messages.length}`);
   
-  return {
+  // Format the context for OpenAI
+  const formatted = {
     model: "gpt-4o",
-    messages: context.messages,
-    tools: context.tools ? context.tools.map(tool => ({
+    messages: context.messages
+  };
+  
+  // Add tools only if they exist
+  if (context.tools && context.tools.length > 0) {
+    formatted.tools = context.tools.map(tool => ({
       type: "function",
       function: {
         name: tool.name,
         description: tool.description,
         parameters: tool.parameters
       }
-    })) : undefined,
-    tool_choice: context.tools && context.tools.length === 1 ? 
-      { type: "function", function: { name: context.tools[0].name } } : "auto"
-  };
+    }));
+    
+    // Set tool choice if there's exactly one tool
+    formatted.tool_choice = context.tools.length === 1 ? 
+      { type: "function", function: { name: context.tools[0].name } } : "auto";
+  }
+  
+  return formatted;
 }
 
 // Formats the MCP context for Claude API
@@ -266,16 +286,22 @@ export function formatForClaude(context: MCPContext): any {
   console.log("First few messages for Claude:", JSON.stringify(messagesToLog, null, 2));
   console.log(`Total Claude messages: ${context.messages.length}`);
   
-  // Claude has a different format for tools, so we need to adapt
-  return {
+  // Format the context for Claude
+  const formatted = {
     model: "claude-3-haiku-20240307",
-    messages: context.messages,
-    tools: context.tools ? context.tools.map(tool => ({
+    messages: context.messages
+  };
+  
+  // Add tools only if they exist
+  if (context.tools && context.tools.length > 0) {
+    formatted.tools = context.tools.map(tool => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.parameters
-    })) : undefined
-  };
+    }));
+  }
+  
+  return formatted;
 }
 
 // Extracts tool calls from OpenAI response
