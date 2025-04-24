@@ -56,4 +56,6 @@ export interface PromptRun {
   result?: string;
   reviewed: boolean;
   pending_actions: number; // Added this field
+  project_manager?: string | null; // Added this field
+  pm_name?: string | null; // Added this field
 }

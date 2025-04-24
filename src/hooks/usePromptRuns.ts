@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -131,12 +132,14 @@ export const usePromptRuns = ({
           }
         });
         
-        const latestRuns = Array.from(latestRunsByProject.values()).map(run => ({
-          ...run,
-          project_manager: run.project_manager || null,
-          pm_name: run.pm_name || 'Unknown',
-          pending_actions: run.pending_actions || 0
-        })) as PromptRun[];
+        const latestRuns = Array.from(latestRunsByProject.values()).map(run => {
+          return {
+            ...run,
+            project_manager: run.project_manager || null,
+            pm_name: run.pm_name || 'Unknown',
+            pending_actions: run.pending_actions || 0
+          } as PromptRun;
+        });
         
         latestRuns.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()

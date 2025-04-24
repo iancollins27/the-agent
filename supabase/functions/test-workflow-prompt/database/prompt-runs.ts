@@ -12,7 +12,6 @@ type PromptRunData = {
   aiProvider: string;
   aiModel: string;
   initiatedBy: string;
-  contextData?: any;
 };
 
 /**
@@ -29,7 +28,6 @@ export async function logPromptRun(data: PromptRunData): Promise<string | null> 
         ai_provider: data.aiProvider,
         ai_model: data.aiModel,
         initiated_by: data.initiatedBy,
-        // Remove the context_data field as it doesn't exist in the schema
         status: 'PROCESSING'
       })
       .select('id')
