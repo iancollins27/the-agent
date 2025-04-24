@@ -3,6 +3,17 @@ import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { Document, DocumentChunk, parseMetadata } from "./types";
 
+// Define a simplified type for raw database documents to avoid deep type instantiation
+type RawDatabaseDoc = {
+  id: string;
+  title?: string;
+  content?: string;
+  file_type?: string;
+  metadata: any; // Using any here to avoid deep type inference
+  created_at?: string;
+  last_updated?: string;
+};
+
 export const useDocuments = (companyId?: string) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +36,7 @@ export const useDocuments = (companyId?: string) => {
       }
 
       const docsWithChunks: Document[] = await Promise.all(
-        (parentDocs || []).map(async (doc: any) => {
+        (parentDocs || []).map(async (doc: RawDatabaseDoc) => {
           const { data: chunks, error: chunksError } = await supabase
             .from('knowledge_base_embeddings')
             .select('*')
@@ -47,7 +58,7 @@ export const useDocuments = (companyId?: string) => {
           }
           
           // Map chunks with explicit type annotations to avoid deep type instantiation
-          const mappedChunks: DocumentChunk[] = (chunks || []).map((chunk: any) => ({
+          const mappedChunks: DocumentChunk[] = (chunks || []).map((chunk: RawDatabaseDoc) => ({
             id: chunk.id,
             title: chunk.title || `Chunk ${parseMetadata(chunk.metadata)?.chunk_index || 0}`,
             content: chunk.content,
