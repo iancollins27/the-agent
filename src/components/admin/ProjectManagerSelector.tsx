@@ -77,11 +77,15 @@ const ProjectManagerSelector: React.FC<ProjectManagerSelectorProps> = ({ value, 
     fetchProjectManagers();
   }, []);
 
+  const handleChange = (newValue: string) => {
+    onChange(newValue === "all" ? null : newValue);
+  };
+
   return (
     <div className="min-w-[200px]">
       <Select 
         value={value || "all"} 
-        onValueChange={(val) => onChange(val === "all" ? null : val)}
+        onValueChange={handleChange}
       >
         <SelectTrigger className="w-full">
           {loading ? (

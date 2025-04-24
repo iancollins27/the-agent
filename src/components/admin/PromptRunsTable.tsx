@@ -14,13 +14,15 @@ import { Badge } from "@/components/ui/badge";
 import { Star, ExternalLink, Eye, CheckSquare } from "lucide-react";
 import { PromptRun } from './types';
 import { formatDistanceToNow } from 'date-fns';
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface PromptRunsTableProps {
   promptRuns: PromptRun[];
+  loading?: boolean;
   onRatingChange: (promptRunId: string, rating: number | null) => void;
-  onViewDetails: (promptRun: PromptRun) => void;
+  onFeedbackChange?: (promptRunId: string, feedback: { description?: string; tags?: string[] }) => void;
+  onViewDetails?: (promptRun: PromptRun) => void;
   onRunReviewed?: (promptRunId: string) => void;
   reviewFilter?: string;
   hideReviewed?: boolean;
@@ -28,12 +30,15 @@ interface PromptRunsTableProps {
 
 const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
   promptRuns, 
+  loading = false,
   onRatingChange, 
   onViewDetails,
   onRunReviewed,
   reviewFilter = "all",
   hideReviewed = false
 }) => {
+  const { toast } = useToast();
+
   const renderStars = (promptRun: PromptRun) => {
     const rating = promptRun.feedback_rating || 0;
     return (
@@ -80,6 +85,12 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     }
   };
 
+  const handleViewDetails = (run: PromptRun) => {
+    if (onViewDetails) {
+      onViewDetails(run);
+    }
+  };
+
   const filteredPromptRuns = promptRuns.filter(run => {
     if (reviewFilter === "all") return true;
     if (reviewFilter === "reviewed") return run.reviewed === true;
@@ -87,6 +98,31 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     if (hideReviewed) return !run.reviewed;
     return true;
   });
+
+  if (loading) {
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Address</TableHead>
+            <TableHead>Next Step</TableHead>
+            <TableHead>Roofer</TableHead>
+            <TableHead>Time</TableHead>
+            <TableHead>Pending Actions</TableHead>
+            <TableHead>Rating</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell colSpan={7} className="text-center py-6">
+              Loading prompt runs...
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    );
+  }
 
   return (
     <Table>
@@ -134,7 +170,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => onViewDetails(run)}
+                  onClick={() => handleViewDetails(run)}
                 >
                   <Eye className="h-4 w-4 mr-1" />
                   View

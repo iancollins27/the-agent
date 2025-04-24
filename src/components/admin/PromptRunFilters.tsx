@@ -14,39 +14,47 @@ import ProjectManagerSelector from './ProjectManagerSelector';
 
 interface PromptRunFiltersProps {
   timeFilter: string;
-  onTimeFilterChange: (value: string) => void;
+  setTimeFilter: (value: string) => void;
   statusFilter: string | null;
-  onStatusFilterChange: (value: string | null) => void;
+  setStatusFilter: (value: string | null) => void;
   onlyShowMyProjects: boolean;
-  onMyProjectsChange: (value: boolean) => void;
+  setOnlyShowMyProjects: (value: boolean) => void;
   projectManagerFilter: string | null;
-  onProjectManagerFilterChange: (value: string | null) => void;
-  onRefresh: () => void;
-  hideStatusFilter?: boolean; // New optional prop
+  setProjectManagerFilter: (value: string | null) => void;
+  refreshData: () => void;
+  isRefreshing: boolean;
+  excludeReminders: boolean;
+  setExcludeReminders: (value: boolean) => void;
+  onlyShowLatest: boolean;
+  setOnlyShowLatest: (value: boolean) => void;
 }
 
 const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
   timeFilter,
-  onTimeFilterChange,
+  setTimeFilter,
   statusFilter,
-  onStatusFilterChange,
+  setStatusFilter,
   onlyShowMyProjects,
-  onMyProjectsChange,
+  setOnlyShowMyProjects,
   projectManagerFilter,
-  onProjectManagerFilterChange,
-  onRefresh,
-  hideStatusFilter = false // Default to false
+  setProjectManagerFilter,
+  refreshData,
+  isRefreshing,
+  excludeReminders,
+  setExcludeReminders,
+  onlyShowLatest,
+  setOnlyShowLatest
 }) => {
   return (
     <div className="flex flex-wrap gap-2 items-center">
       <TimeFilterSelect
         value={timeFilter}
-        onChange={onTimeFilterChange}
+        onChange={setTimeFilter}
       />
       
       <ProjectManagerSelector 
         value={projectManagerFilter} 
-        onChange={onProjectManagerFilterChange} 
+        onChange={setProjectManagerFilter} 
       />
       
       <DropdownMenu>
@@ -59,32 +67,47 @@ const PromptRunFilters: React.FC<PromptRunFiltersProps> = ({
         <DropdownMenuContent align="end" className="w-[200px]">
           <DropdownMenuCheckboxItem
             checked={onlyShowMyProjects}
-            onCheckedChange={onMyProjectsChange}
+            onCheckedChange={setOnlyShowMyProjects}
           >
             Only My Projects
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
+            checked={excludeReminders}
+            onCheckedChange={setExcludeReminders}
+          >
+            Exclude Reminders
+          </DropdownMenuCheckboxItem>
+          <DropdownMenuCheckboxItem
+            checked={onlyShowLatest}
+            onCheckedChange={setOnlyShowLatest}
+          >
+            Only Latest Runs
           </DropdownMenuCheckboxItem>
         </DropdownMenuContent>
       </DropdownMenu>
       
-      {!hideStatusFilter && (
-        <Select 
-          value={statusFilter || "all"} 
-          onValueChange={(value) => onStatusFilterChange(value === "all" ? null : value)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="ERROR">Error</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
+      <Select 
+        value={statusFilter || "all"} 
+        onValueChange={(value) => setStatusFilter(value === "all" ? null : value)}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Filter by status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Statuses</SelectItem>
+          <SelectItem value="PENDING">Pending</SelectItem>
+          <SelectItem value="COMPLETED">Completed</SelectItem>
+          <SelectItem value="ERROR">Error</SelectItem>
+        </SelectContent>
+      </Select>
       
-      <Button onClick={onRefresh} variant="outline" size="icon">
-        <RefreshCw className="h-4 w-4" />
+      <Button 
+        onClick={refreshData} 
+        variant="outline" 
+        size="icon"
+        disabled={isRefreshing}
+      >
+        <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
       </Button>
     </div>
   );
