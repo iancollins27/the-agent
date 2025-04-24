@@ -8,8 +8,37 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+// Define explicit types for our document data
+interface DocumentMetadata {
+  parent_id?: string;
+  processing_status?: string;
+  chunk_index?: number;
+  has_chunks?: boolean;
+  total_chunks?: number;
+  error?: string;
+}
+
+interface DocumentChunk {
+  id: string;
+  title: string;
+  content?: string;
+  metadata: DocumentMetadata;
+  created_at: string;
+}
+
+interface Document {
+  id: string;
+  title: string;
+  content?: string;
+  file_type: string;
+  metadata: DocumentMetadata;
+  created_at: string;
+  last_updated: string;
+  chunks: DocumentChunk[];
+}
+
 export const KnowledgeBaseExplorer = () => {
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [expandedDocs, setExpandedDocs] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const { companySettings } = useSettings();
@@ -131,7 +160,7 @@ export const KnowledgeBaseExplorer = () => {
                 {expandedDocs[doc.id] && doc.chunks && doc.chunks.length > 0 && (
                   <div className="mt-3 pl-6 border-l border-gray-200">
                     <p className="text-sm font-medium mb-2">Document Chunks:</p>
-                    {doc.chunks.map((chunk: any) => (
+                    {doc.chunks.map((chunk: DocumentChunk) => (
                       <div key={chunk.id} className="p-2 border-t">
                         <div className="flex justify-between">
                           <div>
