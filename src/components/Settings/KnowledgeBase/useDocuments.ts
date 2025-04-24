@@ -46,10 +46,11 @@ export const useDocuments = (companyId?: string) => {
         const doc = parentDocs[i];
         
         // Fetch chunks for this document
+        // Important fix: Use string comparison for the JSON field
         const { data: rawChunks, error: chunksError } = await supabase
           .from('knowledge_base_embeddings')
           .select('*')
-          .eq('metadata->parent_id', doc.id)
+          .filter('metadata->parent_id', 'eq', doc.id)
           .order('metadata->chunk_index', { ascending: true });
           
         if (chunksError) {
