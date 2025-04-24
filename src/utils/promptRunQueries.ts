@@ -12,7 +12,7 @@ export const getPromptRunsWithPendingActions = async () => {
     .from('prompt_runs')
     .select(`
       *,
-      projects:project_id (crm_id, Address),
+      projects!prompt_runs_project_id_fkey(crm_id, Address),
       workflow_prompts:workflow_prompt_id (type),
       action_records:id(count)
     `)

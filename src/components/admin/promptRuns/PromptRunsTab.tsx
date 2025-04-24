@@ -115,7 +115,7 @@ const PromptRunsTab: React.FC = () => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (
+          projects!prompt_runs_project_id_fkey (
             Address,
             project_manager,
             next_step,

@@ -92,7 +92,7 @@ export const fetchFilteredPromptRuns = async (
         workflow_prompts (
           type
         ),
-        projects (
+        projects!prompt_runs_project_id_fkey (
           Address,
           project_manager,
           profiles (
