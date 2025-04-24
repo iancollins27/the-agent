@@ -108,9 +108,15 @@ export const usePromptRuns = ({
       );
       
       // Use the formatted data from the utility function
-      const formattedData = formatPromptRunData(data);
+      let formattedData = formatPromptRunData(data);
 
       console.log(`Total prompt runs before filtering: ${formattedData.length}`);
+
+      // Initialize pending_actions with default value to avoid undefined
+      formattedData = formattedData.map(run => ({
+        ...run,
+        pending_actions: run.pending_actions || 0
+      }));
 
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
         console.log("Filtering to show only latest runs per project");
@@ -139,14 +145,13 @@ export const usePromptRuns = ({
         console.log(`Total prompt runs after filtering for latest only: ${latestRuns.length}`);
         
         // Update formattedData with the latest runs only
-        setPromptRuns(latestRuns);
+        formattedData = latestRuns;
       } else {
         console.log(`Showing all ${formattedData.length} runs`);
-        setPromptRuns(formattedData);
       }
 
+      // Fetch pending actions for all prompt runs
       if (formattedData.length > 0) {
-        // Fetch pending actions for all prompt runs
         const promptRunIds = formattedData.map(run => run.id);
         
         if (promptRunIds.length > 0) {
@@ -166,20 +171,19 @@ export const usePromptRuns = ({
             });
             
             // Update the pending_actions count for each run
-            setPromptRuns(prevRuns => 
-              prevRuns.map(run => ({
-                ...run,
-                pending_actions: pendingActionCounts.get(run.id) || 0
-              }))
-            );
+            formattedData = formattedData.map(run => ({
+              ...run,
+              pending_actions: pendingActionCounts.get(run.id) || 0
+            }));
             
             console.log("Added pending action counts to prompt runs");
-          } else {
+          } else if (actionError) {
             console.error('Error fetching pending actions:', actionError);
           }
         }
       }
 
+      // Apply filtering for excluding reminder actions if needed
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
@@ -207,14 +211,14 @@ export const usePromptRuns = ({
             );
   
             // Filter out reminder actions
-            setPromptRuns(prevRuns => 
-              prevRuns.filter(run => !filteredActionRunIds.has(run.id))
-            );
+            formattedData = formattedData.filter(run => !filteredActionRunIds.has(run.id));
             
-            console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${promptRuns.length}`);
+            console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
           }
         }
       }
+      
+      setPromptRuns(formattedData);
     } catch (error) {
       console.error('Error fetching prompt runs:', error);
       toast({
@@ -222,6 +226,7 @@ export const usePromptRuns = ({
         title: "Error",
         description: "Failed to load prompt runs data",
       });
+      setPromptRuns([]);
     } finally {
       setLoading(false);
     }

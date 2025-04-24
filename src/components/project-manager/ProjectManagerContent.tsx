@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Loader2 } from "lucide-react";
 import { PromptRun } from '../admin/types';
@@ -44,9 +45,8 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
 
-  // Filter out records with no pending actions first, then apply hideReviewed filter
+  // Only apply hideReviewed filter, but don't filter by pending actions
   const filteredRuns = promptRuns
-    .filter(run => (run.pending_actions || 0) > 0)
     .filter(run => !hideReviewed || !run.reviewed);
   
   // Calculate the displayed projects count (after all filtering)
