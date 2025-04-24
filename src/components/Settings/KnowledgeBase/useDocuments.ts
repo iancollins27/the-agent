@@ -3,16 +3,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { Document, DocumentChunk, parseMetadata } from "./types";
 
-// Define a simplified type for raw database documents to avoid deep type instantiation
-type RawDatabaseDoc = {
+// Use a very simple type with 'any' for metadata to avoid deep type instantiation
+interface SimpleDoc {
   id: string;
   title?: string;
   content?: string;
   file_type?: string;
-  metadata: any; // Using any here to avoid deep type inference
+  metadata: any;
   created_at?: string;
   last_updated?: string;
-};
+}
 
 export const useDocuments = (companyId?: string) => {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -23,7 +23,7 @@ export const useDocuments = (companyId?: string) => {
     
     setIsLoading(true);
     try {
-      // Cast the response data to our simplified type to avoid deep type instantiation
+      // First, fetch parent documents
       const { data: rawParentDocs, error: parentError } = await supabase
         .from('knowledge_base_embeddings')
         .select('*')
@@ -33,16 +33,19 @@ export const useDocuments = (companyId?: string) => {
 
       if (parentError) {
         console.error('Error fetching parent documents:', parentError);
+        setIsLoading(false);
         return;
       }
 
-      // Explicitly typing the parentDocs to break the type recursion
-      const parentDocs: RawDatabaseDoc[] = rawParentDocs || [];
-      
+      // Cast to simple type and initialize result array
+      const parentDocs = (rawParentDocs || []) as SimpleDoc[];
       const docsWithChunks: Document[] = [];
       
-      // Use a regular for loop instead of Promise.all with map to avoid type recursion
-      for (const doc of parentDocs) {
+      // Process each document sequentially to avoid type recursion
+      for (let i = 0; i < parentDocs.length; i++) {
+        const doc = parentDocs[i];
+        
+        // Fetch chunks for this document
         const { data: rawChunks, error: chunksError } = await supabase
           .from('knowledge_base_embeddings')
           .select('*')
@@ -64,18 +67,23 @@ export const useDocuments = (companyId?: string) => {
           continue;
         }
         
-        // Explicitly cast chunks to our simplified type
-        const chunks: RawDatabaseDoc[] = rawChunks || [];
+        // Process chunks with explicit casting to break type recursion
+        const chunks = (rawChunks || []) as SimpleDoc[];
+        const mappedChunks: DocumentChunk[] = [];
         
-        // Map chunks with explicit type annotations to avoid deep type instantiation
-        const mappedChunks: DocumentChunk[] = chunks.map((chunk) => ({
-          id: chunk.id,
-          title: chunk.title || `Chunk ${parseMetadata(chunk.metadata)?.chunk_index || 0}`,
-          content: chunk.content,
-          metadata: parseMetadata(chunk.metadata),
-          created_at: chunk.created_at || new Date().toISOString()
-        }));
+        // Convert chunks one by one to avoid deep type instantiation
+        for (let j = 0; j < chunks.length; j++) {
+          const chunk = chunks[j];
+          mappedChunks.push({
+            id: chunk.id,
+            title: chunk.title || `Chunk ${parseMetadata(chunk.metadata)?.chunk_index || 0}`,
+            content: chunk.content,
+            metadata: parseMetadata(chunk.metadata),
+            created_at: chunk.created_at || new Date().toISOString()
+          });
+        }
         
+        // Add the document with its chunks to the result array
         docsWithChunks.push({
           id: doc.id,
           title: doc.title || 'Untitled Document',
