@@ -2,7 +2,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { chunk } from './utils.ts';
+import { chunk, estimateTokenCount } from './utils.ts';
 import { extractTextFromPDF } from './textExtraction.ts';
 
 const corsHeaders = {
@@ -26,7 +26,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key is required');
     }
 
-    const { record_id, process_all_chunks = false } = await req.json();
+    const { record_id, process_all_chunks = false, chunk_size: requestedChunkSize } = await req.json();
     console.log('Processing document with record ID:', record_id, 'process_all_chunks:', process_all_chunks);
 
     // Get the document record
@@ -39,6 +39,10 @@ serve(async (req) => {
     if (docError || !doc) {
       throw new Error(`Failed to fetch document: ${docError?.message || 'Document not found'}`);
     }
+
+    // Determine chunk size (use requested size, metadata, or default)
+    const chunkSize = requestedChunkSize || doc.metadata?.chunk_size || 1000;
+    console.log(`Using chunk size: ${chunkSize}`);
 
     // If this is a child chunk and not a direct process request, check if we should process it
     if (doc.metadata?.parent_id && !process_all_chunks) {
@@ -148,8 +152,8 @@ serve(async (req) => {
         throw new Error('No text content could be extracted from the document');
       }
 
-      // Split text into chunks
-      chunks = chunk(text, 1000);
+      // Split text into chunks using improved chunking algorithm
+      chunks = chunk(text, chunkSize);
       console.log(`Split content into ${chunks.length} chunks`);
 
       // First, create additional records for chunks if needed
@@ -173,7 +177,8 @@ serve(async (req) => {
               parent_id: doc.id,
               chunk_index: i,
               total_chunks: chunks.length,
-              processing_status: 'pending'
+              processing_status: 'pending',
+              chunk_size: chunkSize
             }
           });
         }
@@ -194,7 +199,7 @@ serve(async (req) => {
               console.log('Processing all chunks in parallel');
               const processingPromises = insertedChunks.map(chunk => {
                 return supabase.functions.invoke('process-document-embedding', {
-                  body: { record_id: chunk.id, process_all_chunks: true }
+                  body: { record_id: chunk.id, process_all_chunks: true, chunk_size: chunkSize }
                 });
               });
               
@@ -205,6 +210,21 @@ serve(async (req) => {
             }
           }
         }
+        
+        // Update the parent document to show it has chunks
+        await supabase
+          .from('knowledge_base_embeddings')
+          .update({
+            metadata: {
+              ...doc.metadata,
+              has_chunks: true,
+              total_chunks: chunks.length,
+              chunk_size: chunkSize,
+              processing_status: 'completed',
+              processed_at: new Date().toISOString()
+            }
+          })
+          .eq('id', record_id);
       }
     } else {
       // This is a child chunk, so we need to get its content from the parent
@@ -265,7 +285,9 @@ serve(async (req) => {
           throw new Error(`Unsupported file type: ${parentDoc.file_type}`);
         }
         
-        chunks = chunk(text, 1000);
+        // Get chunk size from metadata or use default
+        const chunkSizeToUse = doc.metadata.chunk_size || parentDoc.metadata?.chunk_size || 1000;
+        chunks = chunk(text, chunkSizeToUse);
         
         if (doc.metadata.chunk_index >= chunks.length) {
           throw new Error(`Chunk index out of bounds: ${doc.metadata.chunk_index} >= ${chunks.length}`);
@@ -325,6 +347,9 @@ serve(async (req) => {
       const embeddingData = await embeddingResponse.json();
       const embedding = embeddingData.data[0].embedding;
 
+      // Calculate token information
+      const estimatedTokens = estimateTokenCount(chunkContent);
+
       // Update the document with content and embedding
       const { error: updateError } = await supabase
         .from('knowledge_base_embeddings')
@@ -336,7 +361,9 @@ serve(async (req) => {
             chunk_index: doc.metadata?.chunk_index || 0,
             total_chunks: doc.metadata?.total_chunks || chunks.length,
             processed_at: new Date().toISOString(),
-            processing_status: 'completed'
+            processing_status: 'completed',
+            estimated_tokens: estimatedTokens,
+            content_length: chunkContent.length
           }
         })
         .eq('id', record_id);

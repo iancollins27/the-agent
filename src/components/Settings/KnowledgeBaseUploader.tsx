@@ -6,6 +6,7 @@ import { useSettings } from "@/providers/SettingsProvider";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -18,6 +19,7 @@ export const KnowledgeBaseUploader: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [processAllChunks, setProcessAllChunks] = useState(true);
+  const [chunkSize, setChunkSize] = useState(800);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
@@ -78,7 +80,8 @@ export const KnowledgeBaseUploader: React.FC = () => {
             uploaded_by: "user", 
             status: "pending",
             processing_status: "pending",
-            upload_date: new Date().toISOString() 
+            upload_date: new Date().toISOString(),
+            chunk_size: chunkSize
           },
           last_updated: new Date().toISOString(),
         })
@@ -99,7 +102,8 @@ export const KnowledgeBaseUploader: React.FC = () => {
         {
           body: { 
             record_id: insertData.id,
-            process_all_chunks: processAllChunks
+            process_all_chunks: processAllChunks,
+            chunk_size: chunkSize
           }
         }
       );
@@ -150,6 +154,24 @@ export const KnowledgeBaseUploader: React.FC = () => {
         <Label htmlFor="process-all-chunks" className="text-sm">
           Process all document chunks immediately
         </Label>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="chunk-size" className="text-sm">
+          Chunk Size: {chunkSize} tokens (approx. {Math.round(chunkSize * 4)} characters)
+        </Label>
+        <Slider 
+          id="chunk-size"
+          defaultValue={[chunkSize]} 
+          min={400} 
+          max={2000} 
+          step={100}
+          onValueChange={(values) => setChunkSize(values[0])}
+          className="w-full max-w-xs"
+        />
+        <p className="text-xs text-muted-foreground">
+          Smaller chunks are more precise but may lose context. Larger chunks retain more context but may be less specific.
+        </p>
       </div>
       
       <p className="text-xs text-muted-foreground">
