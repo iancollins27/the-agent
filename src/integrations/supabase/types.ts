@@ -474,6 +474,8 @@ export type Database = {
           company_id: string
           content: string
           embedding: string | null
+          file_name: string | null
+          file_type: string | null
           id: string
           last_updated: string | null
           metadata: Json | null
@@ -486,6 +488,8 @@ export type Database = {
           company_id: string
           content: string
           embedding?: string | null
+          file_name?: string | null
+          file_type?: string | null
           id?: string
           last_updated?: string | null
           metadata?: Json | null
@@ -498,6 +502,8 @@ export type Database = {
           company_id?: string
           content?: string
           embedding?: string | null
+          file_name?: string | null
+          file_type?: string | null
           id?: string
           last_updated?: string | null
           metadata?: Json | null
@@ -1017,6 +1023,16 @@ export type Database = {
           p_source_ip: string
         }
         Returns: undefined
+      }
+      match_documents: {
+        Args: { embedding: string; k: number; _company_id: string }
+        Returns: {
+          id: string
+          title: string
+          content: string
+          url: string
+          similarity: number
+        }[]
       }
       sparsevec_out: {
         Args: { "": unknown }

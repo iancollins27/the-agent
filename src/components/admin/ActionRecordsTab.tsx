@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +19,9 @@ import { ActionRecord } from "@/components/admin/types";
 import ActionRecordsTable from "./ActionRecordsTable";
 import { Json } from "@/integrations/supabase/types";
 import ActionDetailModal from "./ActionDetailModal";
+import TablePagination from './tables/TablePagination';
+
+const ITEMS_PER_PAGE = 10;
 
 type JoinedActionRecord = {
   id: string;
@@ -52,6 +54,7 @@ const ActionRecordsTab = () => {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [actionDetailOpen, setActionDetailOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchActions = useCallback(async () => {
     setIsLoading(true);
@@ -115,6 +118,18 @@ const ActionRecordsTab = () => {
       (action.project_address && action.project_address.toLowerCase().includes(term))
     );
   });
+
+  const paginatedActions = filteredActions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  
+  const totalPages = Math.ceil(filteredActions.length / ITEMS_PER_PAGE);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleRowSelectionChange = (newSelection: Record<string, boolean>) => {
     setRowSelection(newSelection);
@@ -315,13 +330,22 @@ const ActionRecordsTab = () => {
             />
           </div>
           <ActionRecordsTable
-            data={filteredActions}
+            data={paginatedActions}
             rowSelection={rowSelection}
             setRowSelection={handleRowSelectionChange}
             onApprove={handleApproveAction}
             onReject={handleRejectAction}
             onViewDetails={handleViewActionDetails}
           />
+          
+          <div className="flex justify-center mt-4">
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+          
           <div className="flex justify-between items-center">
             <Button
               variant="destructive"

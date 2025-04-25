@@ -1,11 +1,13 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2 } from "lucide-react";
 import { PromptRun } from '../admin/types';
 import EmptyPromptRuns from '../admin/EmptyPromptRuns';
 import PromptRunsTable from '../admin/PromptRunsTable';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import MultiProjectMessage from './MultiProjectMessage';
+import TablePagination from '../admin/tables/TablePagination';
+
+const ITEMS_PER_PAGE = 10;
 
 interface ProjectManagerContentProps {
   loading: boolean;
@@ -37,6 +39,13 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   onRatingChange,
   onRunReviewed
 }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [hideReviewed, groupByRoofer]);
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -45,10 +54,18 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
 
-  // Calculate the displayed projects count (after filtering for hideReviewed)
   const displayedRuns = hideReviewed 
     ? promptRuns.filter(run => !run.reviewed)
     : promptRuns;
+
+  const paginatedRuns = displayedRuns.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  
+  const totalPages = Math.ceil(displayedRuns.length / ITEMS_PER_PAGE);
+
+  // Calculate the displayed projects count (after filtering for hideReviewed)
   
   // Get unique project IDs to show actual project count
   const uniqueProjectIds = new Set(displayedRuns.map(run => run.project_id).filter(Boolean));
@@ -63,11 +80,9 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
 
-  // Group by roofer if option is enabled
   if (groupByRoofer) {
     const rooferGroups: Record<string, PromptRun[]> = {};
     
-    // Group runs by roofer
     displayedRuns.forEach(run => {
       const rooferName = run.project_roofer_contact || 'Unassigned';
       if (!rooferGroups[rooferName]) {
@@ -117,12 +132,20 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
       </div>
       
       <PromptRunsTable 
-        promptRuns={displayedRuns} 
+        promptRuns={paginatedRuns} 
         onRatingChange={onRatingChange} 
         onViewDetails={onViewDetails}
         onRunReviewed={onRunReviewed}
         hideReviewed={hideReviewed}
       />
+      
+      <div className="flex justify-center mt-4">
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      </div>
     </div>
   );
 };

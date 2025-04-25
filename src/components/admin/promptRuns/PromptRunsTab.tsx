@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import PromptRunsTable from '../PromptRunsTable';
 import PromptRunDetails from '../PromptRunDetails';
@@ -10,14 +9,17 @@ import { usePromptRunData } from './usePromptRunData';
 import { usePromptRunActions } from './usePromptRunActions';
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import TablePagination from '../tables/TablePagination';
+
+const ITEMS_PER_PAGE = 10;
 
 const PromptRunsTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState("not-reviewed");
+  const [currentPage, setCurrentPage] = useState(1);
   
-  // Custom hooks for data fetching and actions
   const { promptRuns, setPromptRuns, loading, fetchPromptRuns } = usePromptRunData(statusFilter);
   const { handleRatingChange, handleFeedbackChange } = usePromptRunActions(setPromptRuns, setSelectedRun);
 
@@ -27,13 +29,19 @@ const PromptRunsTab: React.FC = () => {
   };
 
   const handleRunReviewed = (promptRunId: string) => {
-    // Update the local state to mark the run as reviewed
     setPromptRuns(prev => 
       prev.map(run => 
         run.id === promptRunId ? { ...run, reviewed: true } : run
       )
     );
   };
+
+  const paginatedPromptRuns = promptRuns.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  
+  const totalPages = Math.ceil(promptRuns.length / ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -71,13 +79,23 @@ const PromptRunsTab: React.FC = () => {
       ) : promptRuns.length === 0 ? (
         <EmptyPromptRunsState />
       ) : (
-        <PromptRunsTable 
-          promptRuns={promptRuns} 
-          onRatingChange={handleRatingChange} 
-          onViewDetails={viewPromptRunDetails} 
-          onRunReviewed={handleRunReviewed}
-          reviewFilter={reviewFilter}
-        />
+        <div className="space-y-4">
+          <PromptRunsTable 
+            promptRuns={paginatedPromptRuns} 
+            onRatingChange={handleRatingChange} 
+            onViewDetails={viewPromptRunDetails} 
+            onRunReviewed={handleRunReviewed}
+            reviewFilter={reviewFilter}
+          />
+          
+          <div className="flex justify-center mt-4">
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        </div>
       )}
 
       <PromptRunDetails 
