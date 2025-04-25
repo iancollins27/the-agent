@@ -27,7 +27,7 @@ export async function logPromptRun(data: PromptRunData): Promise<string | null> 
         prompt_input: data.promptInput,
         ai_provider: data.aiProvider,
         ai_model: data.aiModel,
-        initiated_by: data.initiatedBy,
+        // Removed initiated_by as it doesn't exist in the schema
         status: 'PROCESSING'
       })
       .select('id')
