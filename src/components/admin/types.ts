@@ -4,7 +4,7 @@ export interface PromptRun {
   project_id?: string;
   project_name?: string;
   project_address?: string;
-  project_roofer_contact?: string;
+  project_roofer_contact?: string | null;
   project_crm_url?: string | null;
   prompt_text?: string;
   result?: string;
@@ -18,6 +18,7 @@ export interface PromptRun {
   prompt_input?: string;
   prompt_output?: string;
   error_message?: string;
+  workflow_prompt_type?: string;
 }
 
 export interface ActionRecord {
