@@ -4,11 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../types';
 
-// Define a type that includes the roofer_contact property
-interface PromptRunDbResult extends Record<string, any> {
-  roofer_contact?: string | null;
-}
-
 export const usePromptRunData = (statusFilter: string | null) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +16,15 @@ export const usePromptRunData = (statusFilter: string | null) => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (crm_id, Address),
+          projects:project_id (
+            crm_id, 
+            Address,
+            project_manager (
+              id,
+              profile_fname,
+              profile_lname
+            )
+          ),
           workflow_prompts:workflow_prompt_id (type)
         `)
         .order('created_at', { ascending: false });
@@ -36,57 +39,21 @@ export const usePromptRunData = (statusFilter: string | null) => {
         throw error;
       }
 
-      // Get all project IDs to fetch roofer contacts
-      if (data && data.length > 0) {
-        const projectIds = data.map(run => run.project_id).filter(Boolean);
-        const uniqueProjectIds = [...new Set(projectIds)];
-        
-        // Get roofer contacts for each project
-        const rooferContactMap = new Map();
-        
-        if (uniqueProjectIds.length > 0) {
-          const { data: contactsData, error: contactsError } = await supabase
-            .from('project_contacts')
-            .select(`
-              project_id,
-              contacts:contact_id (
-                id, full_name, role
-              )
-            `)
-            .in('project_id', uniqueProjectIds);
-          
-          if (!contactsError && contactsData) {
-            contactsData.forEach(item => {
-              if (item.contacts && item.contacts.role === 'Roofer') {
-                rooferContactMap.set(item.project_id, item.contacts.full_name);
-              }
-            });
-          } else {
-            console.error("Error fetching roofer contacts:", contactsError);
-          }
-        }
-        
-        // Cast data to our extended type
-        const dataWithRoofer = data as PromptRunDbResult[];
-        
-        // Format data to include project, workflow information and properly cast to PromptRun type
-        const formattedData = dataWithRoofer.map(run => {
-          const projectId = run.project_id;
-          const rooferContact = projectId ? rooferContactMap.get(projectId) : null;
-          
-          return {
-            ...run,
-            project_name: run.projects?.crm_id || 'Unknown Project',
-            project_address: run.projects?.Address || null,
-            project_roofer_contact: rooferContact || null,
-            workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
-            // Make sure it matches our PromptRun type
-            workflow_type: run.workflow_prompts?.type,
-            prompt_text: run.prompt_input,
-            result: run.prompt_output,
-            reviewed: run.reviewed === true // Convert to boolean, handle null/undefined
-          } as PromptRun;
-        });
+      if (data) {
+        const formattedData = data.map(run => ({
+          ...run,
+          id: run.id,
+          created_at: run.created_at,
+          project_name: run.projects?.crm_id || 'Unknown Project',
+          project_address: run.projects?.Address || null,
+          project_manager: run.projects?.project_manager ? 
+            `${run.projects.project_manager.profile_fname || ''} ${run.projects.project_manager.profile_lname || ''}`.trim() || 'Unnamed Manager' 
+            : null,
+          workflow_type: run.workflow_prompts?.type,
+          prompt_text: run.prompt_input,
+          result: run.prompt_output,
+          reviewed: run.reviewed === true
+        })) as PromptRun[];
 
         setPromptRuns(formattedData);
       } else {
@@ -104,7 +71,6 @@ export const usePromptRunData = (statusFilter: string | null) => {
     }
   };
 
-  // Fetch prompt runs when component mounts or statusFilter changes
   useEffect(() => {
     fetchPromptRuns();
   }, [statusFilter]);
