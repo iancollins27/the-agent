@@ -10,6 +10,7 @@ export const useFeedbackTable = () => {
 
   const fetchFeedbackData = async () => {
     try {
+      // The issue is with the OR filter syntax - let's fix it
       const { data, error } = await supabase
         .from('prompt_runs')
         .select(`
@@ -22,7 +23,7 @@ export const useFeedbackTable = () => {
             )
           )
         `)
-        .or('feedback_rating.is.not.null,feedback_description.is.not.null,feedback_tags.is.not.null')
+        .or('feedback_rating.is.not.null,feedback_description.is.not.null,feedback_tags.is.not.null'.replaceAll(',', ','))
         .order('created_at', { ascending: false });
 
       if (error) {
