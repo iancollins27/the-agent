@@ -1,5 +1,4 @@
-
-export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution' | 'multi_project_analysis';
+export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 'multi_project_message_generation';
 
 export type WorkflowPrompt = {
   id: string;
@@ -59,7 +58,8 @@ export const workflowTitles: Record<WorkflowType, string> = {
   action_detection: "Action Detection",
   action_execution: "Action Execution",
   action_detection_execution: "Action Detection & Execution",
-  multi_project_analysis: "Multi-Project Analysis"
+  multi_project_analysis: "Multi-Project Analysis",
+  multi_project_message_generation: "Multi-Project Message Generation"
 };
 
 export const availableVariables = {
@@ -112,6 +112,12 @@ export const availableVariables = {
     { name: "communication_content", description: "Content of the communication" },
     { name: "communication_participants", description: "Participants in the communication" },
     { name: "projects_data", description: "List of projects to analyze against" },
+    { name: "current_date", description: "Today's date" }
+  ],
+  multi_project_message_generation: [
+    { name: "matched_projects", description: "Projects that matched the communication" },
+    { name: "communication_details", description: "Details about the communication" },
+    { name: "analysis_result", description: "Result of the multi-project analysis" },
     { name: "current_date", description: "Today's date" }
   ]
 };
