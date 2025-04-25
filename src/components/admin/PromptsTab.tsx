@@ -17,7 +17,7 @@ const PromptsTab = () => {
     'summary_update', 
     'action_detection_execution',
     'multi_project_analysis',
-    'multi_project_message_generation'  // Added new prompt type
+    'multi_project_message_generation'  // Ensure this is included
   ];
 
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
