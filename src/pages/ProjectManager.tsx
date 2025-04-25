@@ -9,6 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
 import { useFilterPersistence } from "@/hooks/useFilterPersistence";
+import ProjectManagerHeader from "../components/project-manager/ProjectManagerHeader";
+import ProjectManagerFilters from "../components/project-manager/ProjectManagerFilters";
+import ProjectManagerContent from "../components/project-manager/ProjectManagerContent";
 
 const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
