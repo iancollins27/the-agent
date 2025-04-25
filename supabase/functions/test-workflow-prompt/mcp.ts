@@ -1,4 +1,3 @@
-
 /**
  * Model Context Protocol (MCP) implementation for structured AI interactions
  */
