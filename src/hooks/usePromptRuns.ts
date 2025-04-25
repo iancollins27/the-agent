@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '@/components/admin/types';
 import { fetchFilteredPromptRuns } from '@/services/promptRunsService';
 import { useProjectData } from './useProjectData';
 import { usePromptRunFormatting } from './usePromptRunFormatting';
+import { supabase } from "@/integrations/supabase/client";
 
 interface UsePromptRunsProps {
   userProfile: any;

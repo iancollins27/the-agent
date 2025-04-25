@@ -9,6 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
 import { useFilterPersistence } from "@/hooks/useFilterPersistence";
+import ProjectManagerHeader from "../components/project-manager/ProjectManagerHeader";
+import ProjectManagerFilters from "../components/project-manager/ProjectManagerFilters";
+import ProjectManagerContent from "../components/project-manager/ProjectManagerContent";
 
 const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
@@ -111,6 +114,32 @@ const ProjectManager: React.FC = () => {
       prev.map(run => 
         run.id === promptRunId ? { ...run, reviewed: true } : run
       )
+    );
+  };
+
+  const handleRatingChange = (promptRunId: string, rating: number | null) => {
+    setPromptRuns(prev =>
+      prev.map(run =>
+        run.id === promptRunId ? { ...run, feedback_rating: rating } : run
+      )
+    );
+  };
+
+  const handleFeedbackChange = (promptRunId: string, feedback: { 
+    description?: string; 
+    tags?: string[] 
+  }) => {
+    setPromptRuns(prev =>
+      prev.map(run => {
+        if (run.id === promptRunId) {
+          return { 
+            ...run, 
+            feedback_description: feedback.description || run.feedback_description,
+            feedback_tags: feedback.tags || run.feedback_tags
+          };
+        }
+        return run;
+      })
     );
   };
 
