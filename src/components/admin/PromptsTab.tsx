@@ -1,11 +1,11 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { WorkflowPrompt } from "@/types/workflow";
+import { WorkflowPrompt, WorkflowType } from "@/types/workflow";
 import PromptEditor from "./PromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button";
 const PromptsTab = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
-  const [missingPrompts, setMissingPrompts] = useState<string[]>([]);
+  const [missingPrompts, setMissingPrompts] = useState<WorkflowType[]>([]);
 
-  const allowedPromptTypes = [
+  const allowedPromptTypes: WorkflowType[] = [
     'summary_generation', 
     'summary_update', 
     'action_detection_execution',
@@ -38,7 +38,7 @@ const PromptsTab = () => {
       }
       
       const filteredPrompts = data?.filter(prompt => 
-        allowedPromptTypes.includes(prompt.type)
+        allowedPromptTypes.includes(prompt.type as WorkflowType)
       ) || [];
       
       // Log which prompt types we found and which are missing
@@ -47,7 +47,7 @@ const PromptsTab = () => {
       
       const missingTypes = allowedPromptTypes.filter(
         type => !foundTypes.includes(type)
-      );
+      ) as WorkflowType[];
       console.log('Missing prompt types:', missingTypes);
       setMissingPrompts(missingTypes);
       
@@ -82,14 +82,32 @@ const PromptsTab = () => {
   });
 
   const createPromptMutation = useMutation({
-    mutationFn: async (promptType: string) => {
-      const defaultPromptText = `This is a placeholder prompt for ${promptType}. Please update it with appropriate content.`;
-      
+    mutationFn: async (promptType: WorkflowType) => {
       const { data, error } = await supabase
         .from('workflow_prompts')
         .insert({ 
-          type: promptType, 
-          prompt_text: defaultPromptText 
+          type: promptType,
+          prompt_text: promptType === 'multi_project_message_generation' 
+            ? `You need to create a consolidated message to send to a roofer named {{rooferName}} regarding multiple projects that require their attention.
+
+These are the projects and their details:
+{{projectData}}
+
+Your task:
+1. Analyze each project's latest prompt run and pending actions
+2. Group projects with similar required actions or status
+3. Create a concise but comprehensive message that:
+   - Greets the roofer by name
+   - Mentions each project (using the address as identifier)
+   - Clearly states what is needed from the roofer for each project
+   - Groups similar actions when possible
+   - Maintains a professional but friendly tone
+   - Ends with an appropriate closing
+   - Keeps the message under 500 words
+   - ONLY includes actionable items that require the roofer's attention
+
+Return ONLY the final message text, with no additional explanations.`
+            : `This is a placeholder prompt for ${promptType}. Please update it with appropriate content.`
         })
         .select();
       
@@ -112,7 +130,7 @@ const PromptsTab = () => {
     }
   });
 
-  const handleCreateMissingPrompt = (promptType: string) => {
+  const handleCreateMissingPrompt = (promptType: WorkflowType) => {
     createPromptMutation.mutate(promptType);
   };
 
@@ -148,7 +166,7 @@ const PromptsTab = () => {
   return (
     <div className="grid gap-6">
       {missingPrompts.length > 0 && (
-        <Alert variant="warning" className="mb-6 bg-yellow-50 border-yellow-200">
+        <Alert className="mb-6 border-yellow-200 bg-yellow-50">
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
             <p className="mb-2">Some expected prompts are missing from the database:</p>
@@ -174,7 +192,7 @@ const PromptsTab = () => {
         </Alert>
       )}
 
-      {prompts.map((prompt) => (
+      {prompts?.map((prompt) => (
         <PromptEditor
           key={prompt.id}
           prompt={prompt}

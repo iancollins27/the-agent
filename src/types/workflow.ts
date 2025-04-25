@@ -115,9 +115,8 @@ export const availableVariables = {
     { name: "current_date", description: "Today's date" }
   ],
   multi_project_message_generation: [
-    { name: "matched_projects", description: "Projects that matched the communication" },
-    { name: "communication_details", description: "Details about the communication" },
-    { name: "analysis_result", description: "Result of the multi-project analysis" },
+    { name: "rooferName", description: "The name of the roofer" },
+    { name: "projectData", description: "Array of projects and their details" },
     { name: "current_date", description: "Today's date" }
   ]
 };
