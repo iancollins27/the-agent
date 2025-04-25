@@ -90,10 +90,11 @@ const ActionConfirmDialog: React.FC<ActionConfirmationProps> = ({
         );
       
       case 'notion_integration':
-        // Return a deprecation notice for notion integration
         return (
           <NotionAction 
-            description="Notion integration has been deprecated. This action cannot be processed."
+            databaseId={actionPayload.notion_database_id} 
+            pageId={actionPayload.notion_page_id}
+            description={actionPayload.description}
           />
         );
       
@@ -132,13 +133,13 @@ const ActionConfirmDialog: React.FC<ActionConfirmationProps> = ({
           <Button 
             variant="outline" 
             onClick={() => handleActionResponse(false)}
-            disabled={isProcessing || action.action_type === 'notion_integration'}
+            disabled={isProcessing}
           >
             Reject
           </Button>
           <Button 
             onClick={() => handleActionResponse(true)}
-            disabled={isProcessing || action.action_type === 'notion_integration'}
+            disabled={isProcessing}
           >
             <Check className="h-4 w-4 mr-2" /> 
             {isProcessing ? "Processing..." : "Approve"}

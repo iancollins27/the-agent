@@ -9,6 +9,12 @@ interface CompanySettings {
   id?: string;
   name?: string;
   knowledge_base_settings?: Json;
+  notion_settings?: {
+    token: string;
+    database_id: string;
+    page_id: string;
+    last_sync?: string | null;
+  };
   default_email_provider?: string;
   default_phone_provider?: string;
   communication_settings?: Json;
@@ -75,18 +81,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     
     try {
-      // Handle merging nested knowledge_base_settings
-      if (updates.knowledge_base_settings && companySettings.knowledge_base_settings) {
-        const currentSettings = typeof companySettings.knowledge_base_settings === 'object' ? 
-                               companySettings.knowledge_base_settings : {};
-        const updateSettings = typeof updates.knowledge_base_settings === 'object' ?
-                              updates.knowledge_base_settings : {};
-                              
-        // Create merged object of the two objects
-        updates.knowledge_base_settings = {
-          ...(currentSettings as object),
-          ...(updateSettings as object)
-        } as Json;
+      // For notion_settings, merge with existing settings
+      if (updates.notion_settings && companySettings.notion_settings) {
+        updates.notion_settings = {
+          ...companySettings.notion_settings,
+          ...updates.notion_settings
+        };
       }
       
       console.log('Updating company settings:', updates);

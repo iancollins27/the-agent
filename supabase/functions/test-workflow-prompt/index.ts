@@ -1,423 +1,395 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { callAIProvider, callAIProviderWithMCP } from "./ai-providers.ts";
-import { logPromptRun, createActionRecord } from "./database/prompt-runs.ts";
-import { getProject } from "./database/projects.ts";
-import { searchKnowledgeBase } from "./knowledge-service.ts";
-import { sendHumanReviewRequest } from "./human-service.ts";
 import { 
-  addToolResult, 
+  logPromptRun, 
+  updatePromptRunWithResult, 
+  createActionRecord, 
+  setNextCheckDate 
+} from "./database/index.ts";
+import { 
+  replaceVariables, 
+  generateMockResult, 
+  extractJsonFromResponse 
+} from "./utils.ts";
+import { 
   createMCPContext, 
-  addAssistantMessage, 
-  getDefaultTools 
+  getDefaultTools, 
+  addToolResult, 
+  addAssistantMessage,
+  extractToolCallsFromOpenAI,
+  extractToolCallsFromClaude
 } from "./mcp.ts";
-import { replaceVariables } from "./utils.ts";
+import { 
+  queryKnowledgeBase, 
+  formatKnowledgeResults 
+} from "./knowledge-service.ts";
+import {
+  createHumanReviewRequest,
+  evaluateNeedForHumanReview
+} from "./human-service.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
-
+  
   try {
-    const requestData = await req.json();
-    const { 
-      promptText, 
-      promptType, 
-      projectId, 
-      contextData = {},
-      aiProvider = 'openai',
-      aiModel = 'gpt-4o-mini',
-      workflowPromptId,
-      initiatedBy = 'manual-test',
-      isMultiProjectTest = false,
-      useMCP = false,
-      humanReviewEmail = null
-    } = requestData;
-
-    console.log(`Processing ${promptType} prompt with ${aiProvider} ${aiModel}`);
-    console.log(`Using MCP: ${useMCP}`);
-
-    let promptRunId = null;
+    let requestBody;
     try {
-      promptRunId = await logPromptRun({
-        projectId,
-        promptInput: promptText,
-        aiProvider,
-        aiModel,
-        initiatedBy,
-        contextData  // This will be handled in the function, not directly inserted
-      });
-      console.log(`Created prompt run: ${promptRunId}`);
-    } catch (logError) {
-      console.error('Failed to log prompt run:', logError);
-    }
-
-    let output = '';
-    // Apply variable replacement to the prompt text before processing
-    let finalPrompt = replaceVariables(promptText, contextData);
-    let actionRecordId = null;
-    let reminderSet = false;
-    let nextCheckDateInfo = null;
-    let humanReviewRequestId = null;
-    let knowledgeResults = 0;
-    let usedMCP = false;
-
-    if (promptType === 'knowledge_query') {
-      try {
-        console.log("Handling knowledge query...");
-        
-        if (useMCP) {
-          console.log("Using MCP for knowledge query");
-          output = await handleKnowledgeQueryWithMCP(promptText, contextData, aiProvider, aiModel);
-        } else {
-          console.log(`Searching knowledge base for query: "${contextData.query}" in company: ${contextData.company_id}`);
-          const searchResults = await searchKnowledgeBase(contextData.query, contextData.company_id);
-          knowledgeResults = searchResults?.length || 0;
-          console.log(`Found ${knowledgeResults} search results`);
-          
-          if (searchResults && searchResults.length > 0) {
-            const context = searchResults.map(r => 
-              `[Source: ${r.title || 'Unknown'}, Similarity: ${r.similarity.toFixed(2)}]
-${r.content}`).join('\n\n');
-              
-            finalPrompt = `Answer the following question using the provided knowledge base context.
-            
-Context:
-${context}
-
-Question: ${contextData.query}`;
-            
-            console.log("Calling AI provider with knowledge context");
-            output = await callAIProvider(aiProvider, aiModel, finalPrompt);
-            console.log("Received AI response for knowledge query");
-          } else {
-            output = "No relevant information found in the knowledge base.";
-            console.log("No relevant information found in knowledge base");
-          }
-        }
-      } catch (kbError) {
-        console.error('Error in knowledge base query:', kbError);
-        output = `Mock result for unknown prompt type\n\nNote: There was an error using the ${aiProvider} API: ${kbError.message || JSON.stringify(kbError)}`;
-      }
-    } else if (promptType === 'human_review_request' && humanReviewEmail) {
-      try {
-        humanReviewRequestId = await sendHumanReviewRequest({
-          projectId,
-          promptRunId,
-          reviewerEmail: humanReviewEmail,
-          content: contextData.content || promptText,
-          reason: contextData.reason || 'Manual review request',
-          requestedBy: initiatedBy
-        });
-        
-        output = `Human review request sent to ${humanReviewEmail}`;
-      } catch (reviewError) {
-        console.error('Error sending human review request:', reviewError);
-        output = `Failed to send human review request: ${reviewError.message}`;
-      }
-    } else {
-      try {
-        if (useMCP && (aiProvider === 'openai' || aiProvider === 'claude')) {
-          console.log('Creating MCP context for prompt...');
-          
-          // Create a system prompt tailored to the type of prompt
-          let systemPrompt = "You are an AI assistant processing a workflow prompt.";
-          if (promptType === 'action_detection_execution') {
-            systemPrompt = "You are an AI assistant responsible for analyzing project details and determining if any automated actions should be taken.";
-          } else if (promptType === 'summary_update' || promptType === 'summary_generation') {
-            systemPrompt = "You are an AI assistant tasked with summarizing project information and updates.";
-          }
-          
-          // Create the MCP context with proper system and user prompts
-          // Use the finalPrompt which has variables replaced instead of the original promptText
-          const mcpContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
-          
-          console.log('MCP Context created with tools. Calling AI with MCP...');
-          usedMCP = true;
-          
-          // Call the AI with MCP formatting
-          const mcpResult = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
-          
-          if (mcpResult && (mcpResult.choices?.[0]?.message?.content || mcpResult.content)) {
-            output = mcpResult.choices?.[0]?.message?.content || mcpResult.content?.[0]?.text || "No output returned";
-            console.log('Received AI response with MCP');
-          } else {
-            console.error('Invalid MCP result structure:', mcpResult);
-            throw new Error('Invalid response from AI provider');
-          }
-        } else {
-          // Use the finalPrompt which has variables replaced instead of the original promptText
-          output = await callAIProvider(aiProvider, aiModel, finalPrompt);
-        }
-        
-      } catch (aiError) {
-        console.error('Error calling AI provider:', aiError);
-        output = `Error: ${aiError.message || JSON.stringify(aiError)}`;
-      }
-    }
-
-    if (promptRunId) {
-      try {
-        // Update the prompt run status directly in the database
-        const { data, error } = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/prompt_runs`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
-            prompt_output: output,
-            status: 'COMPLETED',
-            completed_at: new Date().toISOString()
-          }),
-        });
-        
-        if (error) {
-          console.error('Error updating prompt run:', error);
-        }
-      } catch (updateError) {
-        console.error('Error updating prompt run status:', updateError);
-      }
+      requestBody = await req.json();
+      console.log("Received request with body:", JSON.stringify(requestBody, null, 2).substring(0, 500) + "...");
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error("Invalid JSON in request body");
     }
     
-    // If the prompt type is action_detection_execution, try to create an action record
-    if (promptType === 'action_detection_execution' && projectId) {
-      try {
-        // Detect JSON in the output string
-        const jsonOutput = extractJsonFromString(output);
+    const { 
+      promptType, 
+      promptText, 
+      projectId, 
+      contextData, 
+      aiProvider, 
+      aiModel, 
+      workflowPromptId,
+      useMCP = false // New flag to determine whether to use MCP or legacy approach
+    } = requestBody;
+    
+    console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
+    console.log(`Using AI provider: ${aiProvider}, model: ${aiModel}`);
+    console.log(`Using MCP: ${useMCP}`);
+    
+    if (requestBody.initiatedBy) {
+      console.log(`Initiated by: ${requestBody.initiatedBy}`);
+    }
+    
+    console.log("Context data provided:", contextData);
+    
+    if (!promptText) {
+      throw new Error("Prompt text is required");
+    }
+    
+    let finalPrompt = replaceVariables(promptText, contextData);
+    console.log("Final prompt after variable replacement:", finalPrompt);
+    
+    let promptRunId = null;
+    
+    try {
+      if (!projectId) {
+        console.warn("Warning: projectId is missing, prompt run may not be logged correctly");
+      }
+      
+      promptRunId = await logPromptRun(
+        supabase, 
+        projectId, 
+        workflowPromptId, 
+        finalPrompt, 
+        aiProvider, 
+        aiModel
+      );
+      
+      console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
+      
+      // Update the latest_prompt_run_ID field on the project if this is an action detection prompt
+      if (promptType === "action_detection_execution" && projectId && promptRunId) {
+        try {
+          const { error: updateError } = await supabase
+            .from('projects')
+            .update({ latest_prompt_run_ID: promptRunId })
+            .eq('id', projectId);
+            
+          if (updateError) {
+            console.error("Error updating project with latest_prompt_run_ID:", updateError);
+          } else {
+            console.log(`Successfully updated project ${projectId} with latest_prompt_run_ID: ${promptRunId}`);
+          }
+        } catch (updateProjectError) {
+          console.error("Exception updating project latest_prompt_run_ID:", updateProjectError);
+        }
+      }
+    } catch (promptRunError) {
+      console.error("Error creating prompt run:", promptRunError);
+    }
+    
+    let result: string;
+    let rawResponse: any = null;
+    let actionRecordId: string | null = null;
+    let reminderSet: boolean = false;
+    let nextCheckDateInfo = null;
+    let humanReviewRequestId: string | null = null;
+    let knowledgeResults: any[] = [];
+    
+    try {
+      // Process differently based on whether we're using MCP or not
+      if (useMCP && (aiProvider === "openai" || aiProvider === "claude")) {
+        // Create initial MCP context
+        const systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
+        let mcpContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
         
-        // If valid JSON was detected, check for action decision
-        if (jsonOutput && typeof jsonOutput === 'object') {
-          const decision = jsonOutput.decision;
-          
-          // Process the action based on the decision
-          if (decision === 'ACTION_NEEDED' || decision === 'SET_FUTURE_REMINDER') {
-            const actionResponse = await createActionRecord({
-              prompt_run_id: promptRunId,  // Use snake_case for consistency
-              project_id: projectId,       // Use snake_case for consistency
-              action_type: jsonOutput.action_type || 'NO_ACTION',  // Use snake_case
-              action_payload: jsonOutput,  // Use correct column name
-              message: jsonOutput.message_text || null,
-              status: decision === 'ACTION_NEEDED' ? 'pending' : 'scheduled',
-              requires_approval: true
-            });
+        // Call AI with MCP format
+        rawResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
+        
+        // Extract tool calls based on provider
+        const toolCalls = aiProvider === "openai" 
+          ? extractToolCallsFromOpenAI(rawResponse)
+          : extractToolCallsFromClaude(rawResponse);
+        
+        // Process each tool call
+        for (const toolCall of toolCalls) {
+          if (toolCall.name === "detect_action") {
+            const actionData = toolCall.arguments;
             
-            if (actionResponse) {
-              actionRecordId = actionResponse;
-              console.log(`Created action record: ${actionRecordId}`);
-            }
+            // Log the detected action
+            console.log("Detected action:", actionData);
             
-            if (decision === 'SET_FUTURE_REMINDER' && jsonOutput.days_until_check) {
-              reminderSet = true;
-              const nextCheckDate = new Date();
-              nextCheckDate.setDate(nextCheckDate.getDate() + jsonOutput.days_until_check);
-              nextCheckDateInfo = {
-                days: jsonOutput.days_until_check,
-                date: nextCheckDate.toISOString()
-              };
-              
-              // Update the project with the next check date
+            // Handle action based on decision
+            if (actionData.decision === "ACTION_NEEDED" && projectId) {
               try {
-                if (projectId) {
-                  const { error } = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/projects`, {
-                    method: 'PATCH',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                      'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-                      'Prefer': 'return=minimal'
-                    },
-                    body: JSON.stringify({
-                      next_check_date: nextCheckDate.toISOString(),
-                      last_action_check: new Date().toISOString()
-                    }),
+                actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
+                console.log("Created action record:", actionRecordId);
+              } catch (actionError) {
+                console.error("Error creating action record:", actionError);
+              }
+            } else if (actionData.decision === "SET_FUTURE_REMINDER" && projectId) {
+              const daysToAdd = actionData.days_until_check || 7;
+              const nextCheckDate = new Date();
+              nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+              
+              try {
+                nextCheckDateInfo = await setNextCheckDate(supabase, projectId, nextCheckDate.toISOString());
+                reminderSet = true;
+                console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
+                
+                // Store the action type properly for filtering
+                const actionType = actionData.action_type === "NO_ACTION" ? 
+                  "NO_ACTION" : "set_future_reminder";
+                
+                actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
+                  ...actionData,
+                  action_type: actionType
+                });
+              } catch (reminderError) {
+                console.error("Error setting reminder:", reminderError);
+              }
+            } else if (actionData.decision === "QUERY_KNOWLEDGE_BASE" && projectId) {
+              try {
+                knowledgeResults = await queryKnowledgeBase(
+                  supabase,
+                  actionData.query || contextData.summary,
+                  projectId
+                );
+                
+                // Add knowledge results to context
+                const formattedKnowledge = formatKnowledgeResults(knowledgeResults);
+                mcpContext = addToolResult(mcpContext, "knowledge_base_lookup", {
+                  results: knowledgeResults
+                });
+                
+                // Make another call to get final action with knowledge included
+                mcpContext = addAssistantMessage(mcpContext, 
+                  "I've queried the knowledge base. Let me analyze this information and determine the appropriate action."
+                );
+                
+                const knowledgeResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
+                const knowledgeToolCalls = aiProvider === "openai" 
+                  ? extractToolCallsFromOpenAI(knowledgeResponse)
+                  : extractToolCallsFromClaude(knowledgeResponse);
+                
+                for (const ktoolCall of knowledgeToolCalls) {
+                  if (ktoolCall.name === "detect_action") {
+                    const kactionData = ktoolCall.arguments;
+                    console.log("Knowledge-informed action:", kactionData);
                     
-                  });
-                  
-                  if (error) {
-                    console.error('Error updating project next_check_date:', error);
+                    if (kactionData.decision === "ACTION_NEEDED" && projectId) {
+                      actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, kactionData);
+                    } else if (kactionData.decision === "SET_FUTURE_REMINDER" && projectId) {
+                      const kdaysToAdd = kactionData.days_until_check || 7;
+                      const knextCheckDate = new Date();
+                      knextCheckDate.setDate(knextCheckDate.getDate() + kdaysToAdd);
+                      
+                      nextCheckDateInfo = await setNextCheckDate(supabase, projectId, knextCheckDate.toISOString());
+                      reminderSet = true;
+                      
+                      actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
+                        ...kactionData,
+                        action_type: "set_future_reminder"
+                      });
+                    }
                   }
                 }
-              } catch (err) {
-                console.error('Error updating project with next check date:', err);
+              } catch (knowledgeError) {
+                console.error("Error in knowledge base query:", knowledgeError);
+              }
+            } else if (actionData.decision === "REQUEST_HUMAN_REVIEW" && projectId) {
+              try {
+                const humanReviewData = await createHumanReviewRequest(
+                  supabase,
+                  projectId,
+                  promptRunId || "",
+                  {
+                    reason: actionData.reason,
+                    requested_by: requestBody.initiatedBy || "system",
+                    context: contextData.summary,
+                    suggested_actions: actionData.suggested_actions || []
+                  }
+                );
+                
+                humanReviewRequestId = humanReviewData.id;
+                console.log("Created human review request:", humanReviewRequestId);
+              } catch (reviewError) {
+                console.error("Error creating human review request:", reviewError);
               }
             }
+          } else if (toolCall.name === "knowledge_base_lookup") {
+            try {
+              knowledgeResults = await queryKnowledgeBase(
+                supabase,
+                toolCall.arguments.query,
+                projectId || ""
+              );
+              
+              mcpContext = addToolResult(mcpContext, "knowledge_base_lookup", {
+                results: knowledgeResults
+              });
+            } catch (kbError) {
+              console.error("Error in knowledge base lookup tool:", kbError);
+            }
           }
-        } else {
-          console.log('No valid JSON detected in output, skipping action creation');
         }
-      } catch (actionError) {
-        console.error('Error creating action record:', actionError);
+        
+        // Format a textual result from the structured response
+        result = JSON.stringify({
+          actionData: toolCalls.length > 0 ? toolCalls[0].arguments : { decision: "NO_ACTION" },
+          knowledgeResults: knowledgeResults.length > 0 ? knowledgeResults : []
+        }, null, 2);
+      } else {
+        // Legacy approach
+        result = await callAIProvider(aiProvider, aiModel, finalPrompt);
+        console.log("Raw AI response:", result);
+        
+        if (promptType === "action_detection_execution" && projectId) {
+          try {
+            console.log("Checking for action data in result");
+            const actionData = extractJsonFromResponse(result);
+            console.log("Parsed action data:", actionData ? JSON.stringify(actionData, null, 2) : "No action data found");
+            
+            if (actionData) {
+              if (actionData.decision === "ACTION_NEEDED") {
+                try {
+                  actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
+                  console.log("Created action record:", actionRecordId || "Failed to create action record");
+                } catch (createActionError) {
+                  console.error("Error creating action record:", createActionError);
+                }
+              } else if (actionData.decision === "SET_FUTURE_REMINDER") {
+                const daysToAdd = actionData.days_until_check || 7;
+                const nextCheckDate = new Date();
+                nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
+                
+                try {
+                  nextCheckDateInfo = await setNextCheckDate(supabase, projectId, nextCheckDate.toISOString());
+                  reminderSet = true;
+                  console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
+                } catch (setDateError) {
+                  console.error("Error setting next check date:", setDateError);
+                }
+                
+                try {
+                  // Store the action type properly for filtering
+                  const actionType = actionData.action_type === "NO_ACTION" ? 
+                    "NO_ACTION" : "set_future_reminder";
+                  
+                  actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
+                    ...actionData,
+                    action_type: actionType
+                  });
+                  console.log("Created reminder action record:", actionRecordId || "Failed to create action record");
+                } catch (createActionError) {
+                  console.error("Error creating reminder action record:", createActionError);
+                }
+              } else {
+                console.log("No action needed based on decision:", actionData.decision);
+              }
+            } else {
+              console.log("No action data found or invalid format");
+            }
+          } catch (parseError) {
+            console.error("Error parsing or processing action data:", parseError);
+          }
+        }
+      }
+      
+      if (promptRunId) {
+        try {
+          await updatePromptRunWithResult(supabase, promptRunId, result);
+          console.log("Updated prompt run with result");
+        } catch (updateError) {
+          console.error("Error updating prompt run:", updateError);
+        }
+      }
+    } catch (error) {
+      console.error(`Error calling AI provider (${aiProvider}):`, error);
+      result = generateMockResult(promptType, contextData);
+      result += `\n\nNote: There was an error using the ${aiProvider} API: ${error.message}`;
+      
+      if (promptRunId) {
+        try {
+          await updatePromptRunWithResult(supabase, promptRunId, error.message, true);
+        } catch (updateError) {
+          console.error("Error updating prompt run with error:", updateError);
+        }
       }
     }
-
-    // If the prompt type is summary_update or summary_generation, update the project summary
-    if ((promptType === 'summary_update' || promptType === 'summary_generation') && projectId) {
-      try {
-        // Update the project with the new summary
-        await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/projects`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-            'apikey': Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
-            id: projectId,
-            summary: output
-          })
-        });
-      } catch (summaryUpdateError) {
-        console.error('Error updating project summary:', summaryUpdateError);
-      }
-    }
-
-    return new Response(JSON.stringify({
-      output,
-      finalPrompt,
-      promptRunId,
-      actionRecordId,
-      reminderSet,
-      nextCheckDateInfo,
-      usedMCP,
-      humanReviewRequestId,
-      knowledgeResults
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error in test-workflow-prompt function:', error);
     
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Unknown error occurred',
-      output: `Error occurred: ${error.message}`
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        output: result,
+        finalPrompt,
+        projectId,
+        promptType,
+        aiProvider,
+        aiModel,
+        promptRunId,
+        actionRecordId,
+        reminderSet,
+        nextCheckDateInfo,
+        usedMCP: useMCP,
+        humanReviewRequestId,
+        knowledgeResults: knowledgeResults.length
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        status: 200,
+      }
+    );
+  } catch (error) {
+    console.error("Error in test-workflow-prompt function:", error);
+    
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+        status: 500,
+      }
+    );
   }
 });
-
-// Helper function to extract JSON from a string
-function extractJsonFromString(inputString) {
-  try {
-    // First, check if the entire string is valid JSON
-    try {
-      return JSON.parse(inputString);
-    } catch (e) {
-      // Not valid JSON, continue with extraction
-    }
-    
-    // Look for JSON objects wrapped in curly braces
-    const jsonRegex = /{[\s\S]*?}/gm;
-    const matches = inputString.match(jsonRegex);
-    
-    if (matches && matches.length > 0) {
-      // Try each match to find valid JSON
-      for (const match of matches) {
-        try {
-          const parsedJson = JSON.parse(match);
-          if (parsedJson && typeof parsedJson === 'object') {
-            return parsedJson;
-          }
-        } catch (e) {
-          // Not valid JSON, try the next match
-          continue;
-        }
-      }
-    }
-    
-    // If no valid JSON found, check for JSON delimiters
-    const jsonStartIndex = inputString.indexOf('{');
-    const jsonEndIndex = inputString.lastIndexOf('}');
-    
-    if (jsonStartIndex !== -1 && jsonEndIndex !== -1 && jsonEndIndex > jsonStartIndex) {
-      const jsonSubstring = inputString.substring(jsonStartIndex, jsonEndIndex + 1);
-      try {
-        return JSON.parse(jsonSubstring);
-      } catch (e) {
-        // Not valid JSON
-      }
-    }
-    
-    // No valid JSON found
-    return null;
-  } catch (error) {
-    console.error('Error extracting JSON from string:', error);
-    return null;
-  }
-}
-
-// Helper function to handle knowledge queries with MCP
-async function handleKnowledgeQueryWithMCP(promptText, contextData, aiProvider, aiModel) {
-  console.log('Setting up MCP for knowledge query');
-  
-  // Create a system prompt for knowledge querying
-  const systemPrompt = "You are a knowledge assistant that helps find and synthesize information from the knowledge base.";
-  
-  // Create the initial MCP context with the query
-  const mcpContext = createMCPContext(
-    systemPrompt,
-    `Question: ${contextData.query}`,
-    getDefaultTools()
-  );
-  
-  try {
-    // First, search the knowledge base
-    console.log('Searching knowledge base with MCP...');
-    const searchResults = await searchKnowledgeBase(contextData.query, contextData.company_id);
-    
-    if (!searchResults || searchResults.length === 0) {
-      console.log('No knowledge base results found');
-      return "I couldn't find any relevant information in the knowledge base for your query.";
-    }
-    
-    // Format knowledge results and add them to the context
-    const formattedResults = {
-      results: searchResults.map(r => ({
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        url: r.url,
-        similarity: r.similarity
-      }))
-    };
-    
-    // Add the search results to the MCP context
-    const contextWithResults = addToolResult(
-      mcpContext,
-      'knowledge_base_lookup',
-      formattedResults
-    );
-    
-    // Add instruction for the AI to process the results
-    const finalContext = addAssistantMessage(
-      contextWithResults,
-      "I've found some potentially relevant information in the knowledge base. Let me use this to answer your question."
-    );
-    
-    // Call the AI provider with the complete context
-    console.log('Calling AI provider with knowledge context using MCP');
-    const result = await callAIProviderWithMCP(aiProvider, aiModel, finalContext);
-    
-    if (!result) {
-      throw new Error('No response received from AI provider');
-    }
-    
-    // Extract the content from the response
-    return result.choices?.[0]?.message?.content || 
-           (Array.isArray(result.content) ? result.content[0]?.text : result.content) || 
-           "Error: Unable to process knowledge base results";
-  } catch (error) {
-    console.error('Error in MCP knowledge query:', error);
-    return `Error processing knowledge query: ${error.message}`;
-  }
-}

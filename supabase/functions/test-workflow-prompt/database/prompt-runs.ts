@@ -1,77 +1,87 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-type PromptRunData = {
-  projectId: string;
-  promptInput: string;
-  aiProvider: string;
-  aiModel: string;
-  initiatedBy: string;
-};
-
-/**
- * Log a new prompt run in the database
- */
-export async function logPromptRun(data: PromptRunData): Promise<string | null> {
+export async function logPromptRun(
+  supabase: SupabaseClient,
+  projectId: string | null, 
+  workflowPromptId: string | null, 
+  promptInput: string,
+  aiProvider: string,
+  aiModel: string
+) {
   try {
-    // Map the input data to match the database column names
-    const { data: promptRun, error } = await supabase
+    console.log("Logging prompt run with data:", {
+      project_id: projectId,
+      workflow_prompt_id: workflowPromptId,
+      prompt_input: promptInput.substring(0, 100) + "...", // Log just the beginning for brevity
+      ai_provider: aiProvider,
+      ai_model: aiModel,
+    });
+
+    // Create base insert object
+    const insertData: any = {
+      project_id: projectId,
+      workflow_prompt_id: workflowPromptId,
+      prompt_input: promptInput,
+      status: 'PENDING',
+      ai_provider: aiProvider,
+      ai_model: aiModel,
+    };
+
+    // Insert the prompt run record
+    const { data, error } = await supabase
       .from('prompt_runs')
-      .insert({
-        project_id: data.projectId,
-        prompt_input: data.promptInput,
-        ai_provider: data.aiProvider,
-        ai_model: data.aiModel,
-        // Removed initiated_by as it doesn't exist in the schema
-        status: 'PROCESSING'
-      })
-      .select('id')
+      .insert(insertData)
+      .select()
       .single();
-
+      
     if (error) {
-      console.error('Error in logPromptRun:', error);
-      throw error;
+      console.error("Error logging prompt run:", error);
+      throw new Error(`Failed to log prompt run: ${error.message}`);
     }
-
-    return promptRun?.id || null;
+    
+    return data.id;
   } catch (error) {
-    console.error('Error logging prompt run:', error);
+    console.error("Error logging prompt run:", error);
     return null;
   }
 }
 
-/**
- * Create a new action record
- */
-export async function createActionRecord(data: any): Promise<string | null> {
+export async function updatePromptRunWithResult(
+  supabase: SupabaseClient,
+  promptRunId: string,
+  result: string,
+  isError: boolean = false
+) {
   try {
-    // Ensure we're using action_payload instead of actionPayload
-    // Map the data to match the column name in the database
-    const { data: actionRecord, error } = await supabase
-      .from('action_records')
-      .insert({
-        ...data,
-        // If data contains actionPayload, rename it to action_payload
-        action_payload: data.actionPayload || data.action_payload,
-        // Delete the actionPayload property if it exists to avoid conflicts
-        ...(data.actionPayload && { actionPayload: undefined })
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error in createActionRecord:', error);
-      throw error;
+    if (!promptRunId) {
+      throw new Error("Cannot update prompt run: promptRunId is required");
     }
-
-    return actionRecord?.id || null;
+    
+    console.log(`Updating prompt run ${promptRunId} with ${isError ? 'error' : 'result'}`);
+    
+    const updateData: any = {
+      status: isError ? 'ERROR' : 'COMPLETED',
+      completed_at: new Date().toISOString()
+    };
+    
+    if (isError) {
+      updateData.error_message = result;
+    } else {
+      updateData.prompt_output = result;
+    }
+    
+    const { error } = await supabase
+      .from('prompt_runs')
+      .update(updateData)
+      .eq('id', promptRunId);
+    
+    if (error) {
+      console.error("Error updating prompt run:", error);
+      throw new Error(`Failed to update prompt run: ${error.message}`);
+    }
+    
+    return true;
   } catch (error) {
-    console.error('Error creating action record:', error);
-    return null;
+    console.error("Error updating prompt run with result:", error);
+    return false;
   }
 }

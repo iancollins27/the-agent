@@ -1,162 +1,182 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { PromptRun } from '@/components/admin/types';
+import { toast } from "@/components/ui/use-toast";
 
+// Formats data from the database into the PromptRun format
+export const formatPromptRunData = (data: any[]): PromptRun[] => {
+  return data.map(run => {
+    const baseUrl = run.projects?.companies?.company_project_base_URL || null;
+    const crmId = run.projects?.crm_id || null;
+    const crmUrl = baseUrl && crmId ? `${baseUrl}${crmId}` : null;
+    
+    return {
+      ...run,
+      project_name: run.projects?.crm_id || 'Unknown Project',
+      project_address: run.projects?.Address || null,
+      project_crm_url: crmUrl,
+      project_next_step: run.projects?.next_step || null,
+      project_roofer_contact: run.roofer_contact || null, // Including the roofer contact
+      workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
+      workflow_type: run.workflow_prompts?.type,
+      prompt_text: run.prompt_input,
+      result: run.prompt_output
+    } as unknown as PromptRun;
+  });
+};
+
+// Function to debug and log project-related information
 export const debugProjectData = async (companyId: string) => {
   try {
-    // Check if the company has projects
-    const { count, error } = await supabase
+    console.log("Fetching prompt runs with company ID:", companyId);
+    
+    const { data: allProjects, error: allProjectsError } = await supabase
       .from('projects')
-      .select('*', { count: 'exact', head: true })
+      .select('id, crm_id, Address, project_manager')
       .eq('company_id', companyId);
-
-    console.log(`Company ${companyId} has ${count} projects`);
     
-    if (error) {
-      console.error(`Error checking company projects: ${error.message}`);
+    if (allProjectsError) {
+      console.error("Error fetching all projects:", allProjectsError);
+    } else {
+      console.log("All projects for company:", allProjects);
     }
+
+    const { data: allPromptRuns, error: allPromptRunsError } = await supabase
+      .from('prompt_runs')
+      .select('id, project_id, status, created_at')
+      .order('created_at', { ascending: false });
     
-    return count || 0;
-  } catch (e) {
-    console.error("Error in debugProjectData:", e);
-    return 0;
+    if (allPromptRunsError) {
+      console.error("Error fetching all prompt runs:", allPromptRunsError);
+    } else {
+      console.log("All available prompt runs:", allPromptRuns);
+    }
+  } catch (error) {
+    console.error("Error in debug project data:", error);
   }
 };
 
+// Fetch projects based on filters
 export const fetchProjects = async (
   companyId: string, 
-  userId: string, 
-  onlyShowMyProjects: boolean,
+  userId: string | null, 
+  onlyMyProjects: boolean,
   projectManagerFilter: string | null
 ) => {
-  try {
-    let query = supabase
-      .from('projects')
-      .select(`
-        id, 
-        project_manager,
-        company_id,
-        Address
-      `)
-      .eq('company_id', companyId);
+  let projectQuery = supabase
+    .from('projects')
+    .select('id, crm_id, Address, project_manager, next_step') // Added next_step to the selection
+    .eq('company_id', companyId);
 
-    if (onlyShowMyProjects) {
-      query = query.eq('project_manager', userId);
-    } else if (projectManagerFilter) {
-      query = query.eq('project_manager', projectManagerFilter);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching projects:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (e) {
-    console.error("Error in fetchProjects:", e);
-    return [];
+  if (onlyMyProjects && userId) {
+    // This filter takes precedence over projectManagerFilter
+    projectQuery = projectQuery.eq('project_manager', userId);
+  } else if (projectManagerFilter) {
+    // Only apply project manager filter if we're not filtering for current user's projects
+    projectQuery = projectQuery.eq('project_manager', projectManagerFilter);
   }
+
+  const { data, error } = await projectQuery;
+  
+  if (error) {
+    throw error;
+  }
+  
+  console.log("Projects found:", data?.length || 0);
+  return data || [];
 };
 
+// Define a type for our database result with the additional roofer_contact property
+interface PromptRunWithRoofer extends Record<string, any> {
+  roofer_contact?: string | null;
+}
+
+// Fetch prompt runs with filters
 export const fetchFilteredPromptRuns = async (
-  projectIds: string[], 
+  projectIds: string[],
   statusFilter: string | null,
-  timeConstraint: string | null,
-  from: number = 0,
-  to: number = 19
+  timeConstraint: string | null
 ) => {
-  try {
-    if (projectIds.length === 0) {
-      return [];
-    }
+  if (projectIds.length === 0) {
+    return [];
+  }
 
-    let query = supabase
-      .from('prompt_runs')
-      .select(`
+  let query = supabase
+    .from('prompt_runs')
+    .select(`
+      *,
+      projects:project_id (
         id,
-        project_id,
-        created_at,
-        completed_at,
-        status,
-        ai_provider,
-        ai_model,
-        workflow_prompt_id,
-        prompt_input,
-        prompt_output,
-        error_message,
-        feedback_rating,
-        feedback_description,
-        feedback_tags,
-        reviewed,
-        workflow_prompts (
-          type
-        ),
-        projects!prompt_runs_project_id_fkey (
-          Address,
-          project_manager,
-          profiles (
-            profile_fname,
-            profile_lname
-          )
+        crm_id, 
+        Address,
+        company_id,
+        project_manager,
+        next_step,
+        companies:company_id (
+          company_project_base_URL
         )
-      `)
-      .in('project_id', projectIds)
-      .order('created_at', { ascending: false });
+      ),
+      workflow_prompts:workflow_prompt_id (type)
+    `)
+    .in('project_id', projectIds)
+    .order('created_at', { ascending: false });
 
-    if (statusFilter) {
-      query = query.eq('status', statusFilter);
-    }
-
-    if (timeConstraint) {
-      query = query.gte('created_at', timeConstraint);
-    }
-
-    // Add range for pagination
-    query = query.range(from, to);
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching filtered prompt runs:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (e) {
-    console.error("Error in fetchFilteredPromptRuns:", e);
-    return [];
+  if (statusFilter) {
+    query = query.eq('status', statusFilter);
   }
-};
 
-export const formatPromptRunData = (promptRunsData: any[]) => {
-  try {
-    return promptRunsData.map(run => ({
-      id: run.id,
-      project_id: run.project_id,
-      workflow_prompt_id: run.workflow_prompt_id,
-      prompt_input: run.prompt_input || '',
-      prompt_output: run.prompt_output,
-      error_message: run.error_message,
-      status: run.status,
-      created_at: run.created_at,
-      completed_at: run.completed_at,
-      feedback_rating: run.feedback_rating,
-      feedback_description: run.feedback_description,
-      feedback_tags: run.feedback_tags,
-      project_address: run.projects?.Address || 'Unknown Address',
-      workflow_prompt_type: run.workflow_prompts?.type || 'unknown',
-      workflow_type: run.workflow_prompts?.type,
-      reviewed: run.reviewed === true,
-      project_manager: run.projects?.project_manager || null,
-      project_roofer_contact: null,
-      pm_name: run.projects?.profiles 
-        ? `${run.projects.profiles.profile_fname || ''} ${run.projects.profiles.profile_lname || ''}`.trim() 
-        : 'Unknown',
-      pending_actions: 0
-    }));
-  } catch (e) {
-    console.error("Error in formatPromptRunData:", e);
-    return [];
+  if (timeConstraint) {
+    query = query.gte('created_at', timeConstraint);
   }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  console.log("Prompt runs found:", data?.length || 0);
+  
+  // Create an array of our extended type
+  const promptRunsWithRoofer: PromptRunWithRoofer[] = data || [];
+  
+  // Fetch roofer contact information for each project
+  if (promptRunsWithRoofer.length > 0) {
+    const projectIds = promptRunsWithRoofer.map(run => run.project_id).filter(Boolean);
+    const uniqueProjectIds = [...new Set(projectIds)];
+    
+    if (uniqueProjectIds.length > 0) {
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('project_contacts')
+        .select(`
+          project_id,
+          contacts:contact_id (
+            id, full_name, role
+          )
+        `)
+        .in('project_id', uniqueProjectIds);
+      
+      if (!contactsError && contactsData) {
+        // Create a map of project_id to roofer contact name
+        const rooferContactMap = new Map();
+        
+        contactsData.forEach(item => {
+          if (item.contacts && item.contacts.role === 'Roofer') {
+            rooferContactMap.set(item.project_id, item.contacts.full_name);
+          }
+        });
+        
+        // Add roofer contact to each prompt run
+        promptRunsWithRoofer.forEach(run => {
+          if (run.project_id && rooferContactMap.has(run.project_id)) {
+            // Add the property to each run object
+            run.roofer_contact = rooferContactMap.get(run.project_id);
+          }
+        });
+      } else {
+        console.error("Error fetching roofer contacts:", contactsError);
+      }
+    }
+  }
+  
+  return promptRunsWithRoofer;
 };

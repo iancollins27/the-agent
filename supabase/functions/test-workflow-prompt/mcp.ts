@@ -91,21 +91,20 @@ export const getDefaultTools = (): MCPTool[] => [
   },
   {
     name: 'knowledge_base_lookup',
-    description: 'Searches the knowledge base for relevant information using semantic similarity',
+    description: 'Queries the knowledge base for relevant information',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The search query to find relevant knowledge base entries'
+          description: 'The query to search for in the knowledge base'
         },
-        top_k: {
-          type: 'integer',
-          description: 'Number of results to return (default: 5)',
-          default: 5
+        project_id: {
+          type: 'string',
+          description: 'The project ID to scope the knowledge base search'
         }
       },
-      required: ['query']
+      required: ['query', 'project_id']
     },
     return_value: {
       type: 'object',
@@ -115,11 +114,9 @@ export const getDefaultTools = (): MCPTool[] => [
           items: {
             type: 'object',
             properties: {
-              id: { type: 'string' },
               title: { type: 'string' },
               content: { type: 'string' },
-              url: { type: 'string' },
-              similarity: { type: 'number' }
+              relevance: { type: 'number' }
             }
           }
         }
@@ -134,44 +131,19 @@ export function createMCPContext(
   userPrompt: string,
   tools: MCPTool[] = []
 ): MCPContext {
-  // Ensure that both prompts are non-empty strings
-  const sanitizedSystemPrompt = systemPrompt || "You are an AI assistant processing project data.";
-  const sanitizedUserPrompt = userPrompt || "Please analyze the following data.";
-  
-  console.log(`Creating MCP context with system prompt: ${sanitizedSystemPrompt.substring(0, 50)}...`);
-  console.log(`User prompt length: ${sanitizedUserPrompt.length}`);
-  
-  // Create a properly structured MCP context with messages array
-  const context: MCPContext = {
+  return {
     messages: [
       {
         role: 'system',
-        content: sanitizedSystemPrompt
+        content: systemPrompt
       },
       {
         role: 'user',
-        content: sanitizedUserPrompt
+        content: userPrompt
       }
-    ]
+    ],
+    tools: tools.length > 0 ? tools : undefined
   };
-  
-  // Add tools only if they exist
-  if (tools && tools.length > 0) {
-    context.tools = tools;
-    console.log(`Added ${tools.length} tools to MCP context`);
-  }
-  
-  // Verify that the context is properly structured
-  if (!context.messages || context.messages.length === 0) {
-    console.error("Created an invalid MCP context with no messages");
-    // Ensure we have valid messages by setting defaults if needed
-    context.messages = [
-      { role: 'system', content: 'You are an AI assistant.' },
-      { role: 'user', content: 'Please provide a response.' }
-    ];
-  }
-  
-  return context;
 }
 
 // Formats a tool call result to add to the MCP context
@@ -180,19 +152,6 @@ export function addToolResult(
   toolName: string,
   result: any
 ): MCPContext {
-  // Validate the context before proceeding
-  if (!context || !context.messages) {
-    console.error("Invalid MCP context provided to addToolResult");
-    // Return a minimal valid context as fallback
-    return {
-      messages: [
-        { role: 'system', content: 'System context was missing or invalid.' },
-        { role: 'user', content: 'Please provide a valid response.' }
-      ]
-    };
-  }
-  
-  // Create a new context with the tool result added
   return {
     ...context,
     messages: [
@@ -211,19 +170,6 @@ export function addAssistantMessage(
   context: MCPContext,
   content: string
 ): MCPContext {
-  // Validate the context before proceeding
-  if (!context || !context.messages) {
-    console.error("Invalid MCP context provided to addAssistantMessage");
-    // Return a minimal valid context as fallback
-    return {
-      messages: [
-        { role: 'system', content: 'System context was missing or invalid.' },
-        { role: 'user', content: 'Please provide a valid response.' }
-      ]
-    };
-  }
-  
-  // Create a new context with the assistant message added
   return {
     ...context,
     messages: [
@@ -238,131 +184,65 @@ export function addAssistantMessage(
 
 // Formats the MCP context for OpenAI API
 export function formatForOpenAI(context: MCPContext): any {
-  // Validate context before formatting
-  if (!context.messages || context.messages.length === 0) {
-    console.error("Invalid MCP context: missing or empty messages array");
-    // Provide a fallback minimal context
-    return {
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: "You are an AI assistant." },
-        { role: "user", content: "Please provide a helpful response." }
-      ]
-    };
-  }
-  
-  // Log the first few messages for debugging
-  const messagesToLog = context.messages.slice(0, 3);
-  console.log("First few messages:", JSON.stringify(messagesToLog, null, 2));
-  console.log(`Total messages: ${context.messages.length}`);
-  
-  // Format the context for OpenAI
-  const formatted = {
+  return {
     model: "gpt-4o",
-    messages: context.messages
-  };
-  
-  // Add tools only if they exist
-  if (context.tools && context.tools.length > 0) {
-    formatted.tools = context.tools.map(tool => ({
+    messages: context.messages,
+    tools: context.tools ? context.tools.map(tool => ({
       type: "function",
       function: {
         name: tool.name,
         description: tool.description,
         parameters: tool.parameters
       }
-    }));
-    
-    // Set tool choice if there's exactly one tool
-    formatted.tool_choice = context.tools.length === 1 ? 
-      { type: "function", function: { name: context.tools[0].name } } : "auto";
-  }
-  
-  return formatted;
+    })) : undefined,
+    tool_choice: context.tools && context.tools.length === 1 ? 
+      { type: "function", function: { name: context.tools[0].name } } : "auto"
+  };
 }
 
 // Formats the MCP context for Claude API
 export function formatForClaude(context: MCPContext): any {
-  // Validate context before formatting
-  if (!context.messages || context.messages.length === 0) {
-    console.error("Invalid MCP context: missing or empty messages array for Claude");
-    // Provide a fallback minimal context
-    return {
-      model: "claude-3-haiku-20240307",
-      messages: [
-        { role: "user", content: "Please provide a helpful response." }
-      ]
-    };
-  }
-  
-  // Log the first few messages for debugging
-  const messagesToLog = context.messages.slice(0, 3);
-  console.log("First few messages for Claude:", JSON.stringify(messagesToLog, null, 2));
-  console.log(`Total Claude messages: ${context.messages.length}`);
-  
-  // Format the context for Claude
-  const formatted = {
+  // Claude has a different format for tools, so we need to adapt
+  return {
     model: "claude-3-haiku-20240307",
-    messages: context.messages
-  };
-  
-  // Add tools only if they exist
-  if (context.tools && context.tools.length > 0) {
-    formatted.tools = context.tools.map(tool => ({
+    messages: context.messages,
+    tools: context.tools ? context.tools.map(tool => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.parameters
-    }));
-  }
-  
-  return formatted;
+    })) : undefined
+  };
 }
 
 // Extracts tool calls from OpenAI response
 export function extractToolCallsFromOpenAI(response: any): any[] {
-  if (!response || !response.choices || !response.choices[0] || !response.choices[0].message) {
-    console.error("Invalid OpenAI response format in extractToolCallsFromOpenAI");
+  if (!response.choices || !response.choices[0] || !response.choices[0].message) {
     return [];
   }
   
   const message = response.choices[0].message;
   if (!message.tool_calls || !Array.isArray(message.tool_calls)) {
-    console.log("No tool calls found in OpenAI response");
     return [];
   }
   
-  try {
-    return message.tool_calls.map(toolCall => ({
-      name: toolCall.function.name,
-      arguments: JSON.parse(toolCall.function.arguments)
-    }));
-  } catch (error) {
-    console.error("Error parsing tool call arguments:", error);
-    return [];
-  }
+  return message.tool_calls.map(toolCall => ({
+    name: toolCall.function.name,
+    arguments: JSON.parse(toolCall.function.arguments)
+  }));
 }
 
 // Extracts tool calls from Claude response
 export function extractToolCallsFromClaude(response: any): any[] {
-  if (!response || !response.content || !Array.isArray(response.content)) {
-    console.error("Invalid Claude response format in extractToolCallsFromClaude");
+  if (!response.content || !Array.isArray(response.content)) {
     return [];
   }
   
   const toolCalls = response.content
     .filter(item => item.type === 'tool_use')
-    .map(item => {
-      try {
-        return {
-          name: item.name,
-          arguments: item.input
-        };
-      } catch (error) {
-        console.error("Error processing Claude tool call:", error);
-        return null;
-      }
-    })
-    .filter(Boolean); // Remove nulls
+    .map(item => ({
+      name: item.name,
+      arguments: item.input
+    }));
   
   return toolCalls;
 }
