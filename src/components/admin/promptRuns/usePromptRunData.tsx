@@ -74,15 +74,13 @@ export const usePromptRunData = (statusFilter: string | null) => {
           const projectId = run.project_id;
           const rooferContact = projectId ? rooferContactMap.get(projectId) : null;
           
-          // Make sure to include all required properties from the PromptRun type
           return {
-            // Include the original properties first
             ...run,
-            // Add derived properties
             project_name: run.projects?.crm_id || 'Unknown Project',
             project_address: run.projects?.Address || null,
             project_roofer_contact: rooferContact || null,
             workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
+            // Make sure it matches our PromptRun type
             workflow_type: run.workflow_prompts?.type,
             prompt_text: run.prompt_input,
             result: run.prompt_output,

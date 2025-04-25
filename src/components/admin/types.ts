@@ -1,10 +1,9 @@
-
 export interface PromptRun {
   id: string;
   project_id?: string;
   project_name?: string;
   project_address?: string;
-  project_roofer_contact?: string | null;
+  project_roofer_contact?: string;
   project_crm_url?: string | null;
   prompt_text?: string;
   result?: string;
@@ -15,10 +14,6 @@ export interface PromptRun {
   created_at: string;
   project_next_step?: string;
   workflow_type?: string;
-  prompt_input?: string;
-  prompt_output?: string;
-  error_message?: string;
-  workflow_prompt_type?: string;
 }
 
 export interface ActionRecord {
@@ -39,5 +34,4 @@ export interface ActionRecord {
   sender_name?: string | null;
   project_name?: string | null;
   project_address?: string | null;
-  approver_name?: string | null;
 }
