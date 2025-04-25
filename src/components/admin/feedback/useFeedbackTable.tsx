@@ -22,7 +22,7 @@ export const useFeedbackTable = () => {
             )
           )
         `)
-        .or('feedback_rating.neq.null,feedback_description.neq.null,feedback_tags.neq.null')
+        .or('feedback_rating.is.not.null,feedback_description.is.not.null,feedback_tags.is.not.null')
         .order('created_at', { ascending: false });
 
       if (error) {

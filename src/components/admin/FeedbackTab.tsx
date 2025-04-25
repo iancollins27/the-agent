@@ -67,14 +67,16 @@ const FeedbackTab = () => {
                 <TableCell>{run.feedback_rating ? renderStars(run.feedback_rating) : 'No rating'}</TableCell>
                 <TableCell className="max-w-md">{run.feedback_description || 'No description'}</TableCell>
                 <TableCell>
-                  {run.feedback_tags?.map((tag, index) => (
-                    <span 
-                      key={index}
-                      className="inline-block bg-gray-100 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+                  {run.feedback_tags && run.feedback_tags.length > 0 ? 
+                    run.feedback_tags.map((tag, index) => (
+                      <span 
+                        key={index}
+                        className="inline-block bg-gray-100 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2"
+                      >
+                        {tag}
+                      </span>
+                    )) : 'No tags'
+                  }
                 </TableCell>
                 <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
                 <TableCell>
