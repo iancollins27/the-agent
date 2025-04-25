@@ -5,7 +5,8 @@ import { PromptRun } from '@/components/admin/types';
 export const fetchFilteredPromptRuns = async (
   projectIds: string[],
   statusFilter: string | null,
-  timeConstraint: string | null
+  timeConstraint: string | null,
+  onlyPendingActions: boolean = false
 ) => {
   try {
     let query = supabase
@@ -29,16 +30,28 @@ export const fetchFilteredPromptRuns = async (
       query = query.in('project_id', projectIds);
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      throw error;
+    let data = await query;
+    
+    if (onlyPendingActions && data.data) {
+      // Fetch all prompt runs that have pending actions
+      const { data: pendingActions } = await supabase
+        .from('action_records')
+        .select('prompt_run_id')
+        .eq('status', 'pending');
+      
+      if (pendingActions) {
+        const pendingPromptRunIds = new Set(pendingActions.map(action => action.prompt_run_id));
+        data.data = data.data.filter(run => pendingPromptRunIds.has(run.id));
+      }
     }
 
-    return data || [];
+    if (data.error) {
+      throw data.error;
+    }
+
+    return data.data || [];
   } catch (error) {
     console.error('Error in fetchFilteredPromptRuns:', error);
     return [];
   }
 };
-

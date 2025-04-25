@@ -15,6 +15,7 @@ interface UsePromptRunsProps {
   getDateFilter: () => string | null;
   onlyShowLatestRuns?: boolean;
   excludeReminderActions?: boolean;
+  onlyPendingActions?: boolean;
 }
 
 export const usePromptRuns = ({
@@ -25,7 +26,8 @@ export const usePromptRuns = ({
   timeFilter,
   getDateFilter,
   onlyShowLatestRuns = false,
-  excludeReminderActions = false
+  excludeReminderActions = false,
+  onlyPendingActions = false
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,13 @@ export const usePromptRuns = ({
       const projectIds = projectsData.map(project => project.id);
       const timeConstraint = timeFilter !== 'ALL' ? getDateFilter() : null;
       
-      const data = await fetchFilteredPromptRuns(projectIds, statusFilter, timeConstraint);
+      const data = await fetchFilteredPromptRuns(
+        projectIds, 
+        statusFilter, 
+        timeConstraint,
+        onlyPendingActions
+      );
+      
       let formattedData = formatPromptRunData(data);
 
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
@@ -118,7 +126,7 @@ export const usePromptRuns = ({
     if (userProfile) {
       fetchPromptRuns();
     }
-  }, [userProfile, statusFilter, onlyShowMyProjects, projectManagerFilter, timeFilter, projectsData]);
+  }, [userProfile, statusFilter, onlyShowMyProjects, projectManagerFilter, timeFilter, projectsData, onlyPendingActions]);
 
   return {
     promptRuns,
@@ -127,4 +135,3 @@ export const usePromptRuns = ({
     fetchPromptRuns
   };
 };
-
