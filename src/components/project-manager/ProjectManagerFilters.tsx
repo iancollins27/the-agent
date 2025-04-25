@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -26,6 +25,8 @@ interface ProjectManagerFiltersProps {
   sortRooferAlphabetically: boolean;
   setSortRooferAlphabetically: (value: boolean) => void;
   onRefresh: () => void;
+  onlyPendingActions: boolean;
+  setOnlyPendingActions: (value: boolean) => void;
 }
 
 const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
@@ -45,7 +46,9 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   setGroupByRoofer,
   sortRooferAlphabetically,
   setSortRooferAlphabetically,
-  onRefresh
+  onRefresh,
+  onlyPendingActions,
+  setOnlyPendingActions
 }) => {
   return (
     <div className="flex items-center gap-4 flex-wrap">
@@ -67,10 +70,8 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
       </div>
 
-      {/* Show text for time filter */}
       <span className="text-sm text-muted-foreground">Show:</span>
       
-      {/* Time filter select */}
       <Select 
         value={timeFilter} 
         onValueChange={setTimeFilter}
@@ -86,13 +87,11 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         </SelectContent>
       </Select>
       
-      {/* Project Manager filter */}
       <ProjectManagerSelector 
         value={projectManagerFilter} 
         onChange={setProjectManagerFilter}
       />
       
-      {/* Combined filter dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="flex items-center gap-2">
@@ -129,7 +128,15 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
       
-      {/* Refresh button */}
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="only-pending-actions"
+          checked={onlyPendingActions}
+          onCheckedChange={setOnlyPendingActions}
+        />
+        <Label htmlFor="only-pending-actions">Only Show Projects with Pending Actions</Label>
+      </div>
+
       <Button onClick={onRefresh} variant="outline" size="icon">
         <RefreshCw className="h-4 w-4" />
       </Button>

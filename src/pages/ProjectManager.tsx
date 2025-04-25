@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -11,11 +10,6 @@ import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
 import { useFilterPersistence } from "@/hooks/useFilterPersistence";
 
-// Import components
-import ProjectManagerHeader from '../components/project-manager/ProjectManagerHeader';
-import ProjectManagerFilters from '../components/project-manager/ProjectManagerFilters';
-import ProjectManagerContent from '../components/project-manager/ProjectManagerContent';
-
 const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -24,7 +18,6 @@ const ProjectManager: React.FC = () => {
   const { user } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
   
-  // Filter persistence
   const { filters, updateFilter } = useFilterPersistence({
     hideReviewed: true,
     excludeReminderActions: false,
@@ -33,10 +26,10 @@ const ProjectManager: React.FC = () => {
     onlyMyProjects: false,
     projectManagerFilter: null,
     groupByRoofer: false,
-    sortRooferAlphabetically: true
+    sortRooferAlphabetically: true,
+    onlyPendingActions: false
   });
   
-  // Use persisted filters
   const hideReviewed = filters.hideReviewed;
   const excludeReminderActions = filters.excludeReminderActions;
   const timeFilter = filters.timeFilter;
@@ -45,8 +38,8 @@ const ProjectManager: React.FC = () => {
   const projectManagerFilter = filters.projectManagerFilter;
   const groupByRoofer = filters.groupByRoofer;
   const sortRooferAlphabetically = filters.sortRooferAlphabetically;
+  const onlyPendingActions = filters.onlyPendingActions;
   
-  // Sync raw timeFilter with persisted filters
   useEffect(() => {
     rawSetTimeFilter(timeFilter);
   }, [timeFilter]);
@@ -97,13 +90,14 @@ const ProjectManager: React.FC = () => {
     setPromptRuns
   } = usePromptRuns({
     userProfile,
-    statusFilter,
-    onlyShowMyProjects: onlyMyProjects,
-    projectManagerFilter,
-    timeFilter,
+    statusFilter: filters.statusFilter,
+    onlyShowMyProjects: filters.onlyMyProjects,
+    projectManagerFilter: filters.projectManagerFilter,
+    timeFilter: filters.timeFilter,
     getDateFilter,
     onlyShowLatestRuns: true,
-    excludeReminderActions
+    excludeReminderActions: filters.excludeReminderActions,
+    onlyPendingActions: filters.onlyPendingActions
   });
 
   console.log(`ProjectManager component: Retrieved ${promptRuns.length} prompt runs`);
@@ -155,7 +149,7 @@ const ProjectManager: React.FC = () => {
 
     if (sortRooferAlphabetically) {
       runs.sort((a, b) => {
-        const rooferA = a.project_roofer_contact || 'zzz'; // Put empty values at the end
+        const rooferA = a.project_roofer_contact || 'zzz';
         const rooferB = b.project_roofer_contact || 'zzz';
         return rooferA.localeCompare(rooferB);
       });

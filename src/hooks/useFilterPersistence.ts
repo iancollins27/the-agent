@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 
 type StoredFilterValues = {
@@ -10,12 +9,12 @@ type StoredFilterValues = {
   projectManagerFilter: string | null;
   groupByRoofer: boolean;
   sortRooferAlphabetically: boolean;
+  onlyPendingActions: boolean;
 };
 
 export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
   const [values, setValues] = useState<StoredFilterValues>(defaultValues);
 
-  // Load saved filters when component mounts
   useEffect(() => {
     try {
       const savedFilters = localStorage.getItem('projectManagerFilters');
@@ -25,11 +24,9 @@ export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
       }
     } catch (error) {
       console.error('Error loading saved filters:', error);
-      // If there's an error, use the default values
     }
   }, []);
 
-  // Save filters when they change
   useEffect(() => {
     try {
       localStorage.setItem('projectManagerFilters', JSON.stringify(values));
@@ -41,7 +38,6 @@ export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
   return {
     filters: values,
     setFilters: setValues,
-    // Convenience functions for updating individual filters
     updateFilter: <K extends keyof StoredFilterValues>(
       key: K,
       value: StoredFilterValues[K]

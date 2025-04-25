@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -21,6 +20,7 @@ interface UsePromptRunsProps {
   getDateFilter: () => string | null;
   onlyShowLatestRuns?: boolean;
   excludeReminderActions?: boolean;
+  onlyPendingActions?: boolean;
 }
 
 export const usePromptRuns = ({
@@ -31,7 +31,8 @@ export const usePromptRuns = ({
   timeFilter,
   getDateFilter,
   onlyShowLatestRuns = false,
-  excludeReminderActions = false
+  excludeReminderActions = false,
+  onlyPendingActions = false
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,6 +156,35 @@ export const usePromptRuns = ({
           );
           
           console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
+        }
+      }
+
+      if (onlyPendingActions && formattedData.length > 0) {
+        const promptRunIds = formattedData.map(run => run.id);
+        
+        const { data: actionData, error: actionError } = await supabase
+          .from('action_records')
+          .select('prompt_run_id')
+          .in('prompt_run_id', promptRunIds)
+          .eq('status', 'pending');
+
+        if (actionError) {
+          console.error('Error fetching pending actions:', actionError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to filter pending actions",
+          });
+        } else {
+          // Get the set of prompt run IDs that have pending actions
+          const pendingActionRunIds = new Set(
+            actionData.map(action => action.prompt_run_id)
+          );
+          
+          // Only keep prompt runs that have pending actions
+          formattedData = formattedData.filter(
+            run => pendingActionRunIds.has(run.id)
+          );
         }
       }
 
