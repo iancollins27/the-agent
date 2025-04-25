@@ -1,3 +1,4 @@
+
 export interface PromptRun {
   id: string;
   project_id?: string;
@@ -36,6 +37,7 @@ export interface ActionRecord {
   execution_result?: any | null;
   recipient_name?: string | null;
   sender_name?: string | null;
+  approver_name?: string | null;
   project_name?: string | null;
   project_address?: string | null;
 }
