@@ -4,6 +4,7 @@ import { PromptRun } from '../components/admin/types';
 import { usePromptFeedback } from './usePromptFeedback';
 import { usePromptRunsFetcher } from './promptRuns/usePromptRunsFetcher';
 import { UsePromptRunsProps } from './promptRuns/types';
+import { supabase } from "@/integrations/supabase/client";
 
 export const usePromptRuns = ({
   userProfile,
@@ -18,7 +19,9 @@ export const usePromptRuns = ({
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
-  const { handleRatingChange, handleFeedbackChange } = usePromptFeedback();
+  const { handleRatingChange, handleFeedbackChange } = usePromptFeedback((updater) => {
+    setPromptRuns(updater);
+  });
   const { fetchPromptRuns: fetchData } = usePromptRunsFetcher();
 
   const fetchPromptRuns = async () => {
