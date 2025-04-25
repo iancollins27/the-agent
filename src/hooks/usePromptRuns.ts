@@ -50,7 +50,8 @@ export const usePromptRuns = ({
     projectManagerFilter, 
     timeFilter, 
     onlyShowLatestRuns,
-    excludeReminderActions
+    excludeReminderActions,
+    onlyPendingActions
   ]);
 
   const fetchPromptRuns = async () => {
@@ -141,7 +142,6 @@ export const usePromptRuns = ({
             description: "Failed to filter out reminder actions",
           });
         } else {
-          // Filter out both reminder actions and NO_ACTION type
           const filteredActionRunIds = new Set(
             actionData
               .filter(action => 
@@ -176,15 +176,13 @@ export const usePromptRuns = ({
             description: "Failed to filter pending actions",
           });
         } else {
-          // Get the set of prompt run IDs that have pending actions
           const pendingActionRunIds = new Set(
             actionData.map(action => action.prompt_run_id)
           );
           
-          // Only keep prompt runs that have pending actions
-          formattedData = formattedData.filter(
-            run => pendingActionRunIds.has(run.id)
-          );
+          formattedData = pendingActionRunIds.size > 0 
+            ? formattedData.filter(run => pendingActionRunIds.has(run.id))
+            : formattedData;
         }
       }
 

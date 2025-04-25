@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -50,8 +51,9 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   onlyPendingActions,
   setOnlyPendingActions
 }) => {
-  const handlePendingActionsChange = (value: boolean) => {
-    setOnlyPendingActions(value);
+  // Refresh is now called directly from all filter change handlers
+  const handleFilterChange = (setter: (value: any) => void, value: any) => {
+    setter(value);
     onRefresh();
   };
 
@@ -62,7 +64,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           <Switch
             id="hide-reviewed"
             checked={hideReviewed}
-            onCheckedChange={setHideReviewed}
+            onCheckedChange={(value) => handleFilterChange(setHideReviewed, value)}
           />
           <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
         </div>
@@ -71,7 +73,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           <Switch
             id="exclude-reminder-actions"
             checked={excludeReminderActions}
-            onCheckedChange={setExcludeReminderActions}
+            onCheckedChange={(value) => handleFilterChange(setExcludeReminderActions, value)}
           />
           <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
         </div>
@@ -80,7 +82,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         
         <Select 
           value={timeFilter} 
-          onValueChange={setTimeFilter}
+          onValueChange={(value) => handleFilterChange(setTimeFilter, value)}
         >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Select time range" />
@@ -95,7 +97,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         
         <ProjectManagerSelector 
           value={projectManagerFilter} 
-          onChange={setProjectManagerFilter}
+          onChange={(value) => handleFilterChange(setProjectManagerFilter, value)}
         />
         
         <DropdownMenu>
@@ -108,7 +110,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           <DropdownMenuContent align="end" className="w-[240px]">
             <DropdownMenuCheckboxItem
               checked={onlyMyProjects}
-              onCheckedChange={setOnlyMyProjects}
+              onCheckedChange={(value) => handleFilterChange(setOnlyMyProjects, value)}
             >
               Only My Projects
             </DropdownMenuCheckboxItem>
@@ -117,7 +119,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
             
             <DropdownMenuCheckboxItem
               checked={groupByRoofer}
-              onCheckedChange={setGroupByRoofer}
+              onCheckedChange={(value) => handleFilterChange(setGroupByRoofer, value)}
             >
               Group by Roofer
             </DropdownMenuCheckboxItem>
@@ -125,7 +127,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
             {groupByRoofer && (
               <DropdownMenuCheckboxItem
                 checked={sortRooferAlphabetically}
-                onCheckedChange={setSortRooferAlphabetically}
+                onCheckedChange={(value) => handleFilterChange(setSortRooferAlphabetically, value)}
                 className="pl-8"
               >
                 Sort Alphabetically
@@ -138,7 +140,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           <Switch
             id="only-pending-actions"
             checked={onlyPendingActions}
-            onCheckedChange={handlePendingActionsChange}
+            onCheckedChange={(value) => handleFilterChange(setOnlyPendingActions, value)}
           />
           <Label htmlFor="only-pending-actions">Only Show Projects with Pending Actions</Label>
         </div>
