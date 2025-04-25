@@ -13,7 +13,10 @@ type StoredFilterValues = {
 };
 
 export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
-  const [values, setValues] = useState<StoredFilterValues>(defaultValues);
+  const [values, setValues] = useState<StoredFilterValues>({
+    ...defaultValues,
+    onlyPendingActions: true
+  });
 
   useEffect(() => {
     try {

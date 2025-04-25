@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -51,91 +50,98 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   onlyPendingActions,
   setOnlyPendingActions
 }) => {
-  return (
-    <div className="flex items-center gap-4 flex-wrap">
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="hide-reviewed"
-          checked={hideReviewed}
-          onCheckedChange={setHideReviewed}
-        />
-        <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="exclude-reminder-actions"
-          checked={excludeReminderActions}
-          onCheckedChange={setExcludeReminderActions}
-        />
-        <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
-      </div>
+  const handlePendingActionsChange = (value: boolean) => {
+    setOnlyPendingActions(value);
+    onRefresh();
+  };
 
-      <span className="text-sm text-muted-foreground">Show:</span>
-      
-      <Select 
-        value={timeFilter} 
-        onValueChange={setTimeFilter}
-      >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Select time range" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="last_hour">Last Hour</SelectItem>
-          <SelectItem value="last_24_hours">Last 24 Hours</SelectItem>
-          <SelectItem value="last_7_days">Last 7 Days</SelectItem>
-          <SelectItem value="all">All Time</SelectItem>
-        </SelectContent>
-      </Select>
-      
-      <ProjectManagerSelector 
-        value={projectManagerFilter} 
-        onChange={setProjectManagerFilter}
-      />
-      
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filters
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-[240px]">
-          <DropdownMenuCheckboxItem
-            checked={onlyMyProjects}
-            onCheckedChange={setOnlyMyProjects}
-          >
-            Only My Projects
-          </DropdownMenuCheckboxItem>
-          
-          <DropdownMenuSeparator />
-          
-          <DropdownMenuCheckboxItem
-            checked={groupByRoofer}
-            onCheckedChange={setGroupByRoofer}
-          >
-            Group by Roofer
-          </DropdownMenuCheckboxItem>
-          
-          {groupByRoofer && (
-            <DropdownMenuCheckboxItem
-              checked={sortRooferAlphabetically}
-              onCheckedChange={setSortRooferAlphabetically}
-              className="pl-8"
-            >
-              Sort Alphabetically
-            </DropdownMenuCheckboxItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="only-pending-actions"
-          checked={onlyPendingActions}
-          onCheckedChange={setOnlyPendingActions}
+  return (
+    <div className="flex items-center gap-4 flex-wrap justify-between">
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="hide-reviewed"
+            checked={hideReviewed}
+            onCheckedChange={setHideReviewed}
+          />
+          <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="exclude-reminder-actions"
+            checked={excludeReminderActions}
+            onCheckedChange={setExcludeReminderActions}
+          />
+          <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
+        </div>
+
+        <span className="text-sm text-muted-foreground">Show:</span>
+        
+        <Select 
+          value={timeFilter} 
+          onValueChange={setTimeFilter}
+        >
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Select time range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="last_hour">Last Hour</SelectItem>
+            <SelectItem value="last_24_hours">Last 24 Hours</SelectItem>
+            <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+            <SelectItem value="all">All Time</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <ProjectManagerSelector 
+          value={projectManagerFilter} 
+          onChange={setProjectManagerFilter}
         />
-        <Label htmlFor="only-pending-actions">Only Show Projects with Pending Actions</Label>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[240px]">
+            <DropdownMenuCheckboxItem
+              checked={onlyMyProjects}
+              onCheckedChange={setOnlyMyProjects}
+            >
+              Only My Projects
+            </DropdownMenuCheckboxItem>
+            
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuCheckboxItem
+              checked={groupByRoofer}
+              onCheckedChange={setGroupByRoofer}
+            >
+              Group by Roofer
+            </DropdownMenuCheckboxItem>
+            
+            {groupByRoofer && (
+              <DropdownMenuCheckboxItem
+                checked={sortRooferAlphabetically}
+                onCheckedChange={setSortRooferAlphabetically}
+                className="pl-8"
+              >
+                Sort Alphabetically
+              </DropdownMenuCheckboxItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="only-pending-actions"
+            checked={onlyPendingActions}
+            onCheckedChange={handlePendingActionsChange}
+          />
+          <Label htmlFor="only-pending-actions">Only Show Projects with Pending Actions</Label>
+        </div>
       </div>
 
       <Button onClick={onRefresh} variant="outline" size="icon">
