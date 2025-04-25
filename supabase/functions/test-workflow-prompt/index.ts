@@ -63,7 +63,7 @@ serve(async (req) => {
       aiProvider, 
       aiModel, 
       workflowPromptId,
-      useMCP = false // New flag to determine whether to use MCP or legacy approach
+      useMCP = false 
     } = requestBody;
     
     console.log(`Testing prompt type: ${promptType} for project ${projectId}`);
@@ -101,7 +101,6 @@ serve(async (req) => {
       
       console.log("Created prompt run with ID:", promptRunId || "Failed to create prompt run");
       
-      // Update the latest_prompt_run_ID field on the project if this is an action detection prompt
       if (promptType === "action_detection_execution" && projectId && promptRunId) {
         try {
           const { error: updateError } = await supabase
@@ -131,38 +130,48 @@ serve(async (req) => {
     let knowledgeResults: any[] = [];
     
     try {
-      // Process differently based on whether we're using MCP or not
       if (useMCP && (aiProvider === "openai" || aiProvider === "claude")) {
-        // Create initial MCP context
         const systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
         let mcpContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
         
-        // Call AI with MCP format
         rawResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
         
-        // Extract tool calls based on provider
         const toolCalls = aiProvider === "openai" 
           ? extractToolCallsFromOpenAI(rawResponse)
           : extractToolCallsFromClaude(rawResponse);
         
-        // Process each tool call
         for (const toolCall of toolCalls) {
           if (toolCall.name === "detect_action") {
-            const actionData = toolCall.arguments;
-            
-            // Log the detected action
-            console.log("Detected action:", actionData);
-            
-            // Handle action based on decision
-            if (actionData.decision === "ACTION_NEEDED" && projectId) {
-              try {
-                actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
-                console.log("Created action record:", actionRecordId);
-              } catch (actionError) {
-                console.error("Error creating action record:", actionError);
+            const actionDecision = toolCall.arguments;
+            console.log("Detected action decision:", actionDecision);
+
+            if (actionDecision.decision === "ACTION_NEEDED") {
+              const actionContext = addAssistantMessage(mcpContext, 
+                "Let me generate the specific action details based on the project context."
+              );
+              
+              const actionResponse = await callAIProviderWithMCP(aiProvider, aiModel, actionContext);
+              const actionToolCalls = aiProvider === "openai" 
+                ? extractToolCallsFromOpenAI(actionResponse)
+                : extractToolCallsFromClaude(actionResponse);
+
+              for (const actionToolCall of actionToolCalls) {
+                if (actionToolCall.name === "generate_action") {
+                  const actionData = {
+                    ...actionDecision,
+                    ...actionToolCall.arguments
+                  };
+                  
+                  try {
+                    actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
+                    console.log("Created action record:", actionRecordId);
+                  } catch (actionError) {
+                    console.error("Error creating action record:", actionError);
+                  }
+                }
               }
-            } else if (actionData.decision === "SET_FUTURE_REMINDER" && projectId) {
-              const daysToAdd = actionData.days_until_check || 7;
+            } else if (actionDecision.decision === "SET_FUTURE_REMINDER") {
+              const daysToAdd = actionDecision.days_until_check || 7;
               const nextCheckDate = new Date();
               nextCheckDate.setDate(nextCheckDate.getDate() + daysToAdd);
               
@@ -171,32 +180,29 @@ serve(async (req) => {
                 reminderSet = true;
                 console.log(`Set reminder for project ${projectId} in ${daysToAdd} days: ${nextCheckDate.toISOString()}`);
                 
-                // Store the action type properly for filtering
-                const actionType = actionData.action_type === "NO_ACTION" ? 
+                const actionType = actionDecision.action_type === "NO_ACTION" ? 
                   "NO_ACTION" : "set_future_reminder";
                 
                 actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, {
-                  ...actionData,
+                  ...actionDecision,
                   action_type: actionType
                 });
               } catch (reminderError) {
                 console.error("Error setting reminder:", reminderError);
               }
-            } else if (actionData.decision === "QUERY_KNOWLEDGE_BASE" && projectId) {
+            } else if (actionDecision.decision === "QUERY_KNOWLEDGE_BASE") {
               try {
                 knowledgeResults = await queryKnowledgeBase(
                   supabase,
-                  actionData.query || contextData.summary,
+                  actionDecision.query || contextData.summary,
                   projectId
                 );
                 
-                // Add knowledge results to context
                 const formattedKnowledge = formatKnowledgeResults(knowledgeResults);
                 mcpContext = addToolResult(mcpContext, "knowledge_base_lookup", {
                   results: knowledgeResults
                 });
                 
-                // Make another call to get final action with knowledge included
                 mcpContext = addAssistantMessage(mcpContext, 
                   "I've queried the knowledge base. Let me analyze this information and determine the appropriate action."
                 );
@@ -231,17 +237,17 @@ serve(async (req) => {
               } catch (knowledgeError) {
                 console.error("Error in knowledge base query:", knowledgeError);
               }
-            } else if (actionData.decision === "REQUEST_HUMAN_REVIEW" && projectId) {
+            } else if (actionDecision.decision === "REQUEST_HUMAN_REVIEW") {
               try {
                 const humanReviewData = await createHumanReviewRequest(
                   supabase,
                   projectId,
                   promptRunId || "",
                   {
-                    reason: actionData.reason,
+                    reason: actionDecision.reason,
                     requested_by: requestBody.initiatedBy || "system",
                     context: contextData.summary,
-                    suggested_actions: actionData.suggested_actions || []
+                    suggested_actions: actionDecision.suggested_actions || []
                   }
                 );
                 
@@ -250,6 +256,14 @@ serve(async (req) => {
               } catch (reviewError) {
                 console.error("Error creating human review request:", reviewError);
               }
+            }
+          } else if (toolCall.name === "generate_action") {
+            const actionData = toolCall.arguments;
+            try {
+              actionRecordId = await createActionRecord(supabase, promptRunId || "", projectId, actionData);
+              console.log("Created action record from direct generation:", actionRecordId);
+            } catch (actionError) {
+              console.error("Error creating action record:", actionError);
             }
           } else if (toolCall.name === "knowledge_base_lookup") {
             try {
@@ -268,13 +282,11 @@ serve(async (req) => {
           }
         }
         
-        // Format a textual result from the structured response
         result = JSON.stringify({
           actionData: toolCalls.length > 0 ? toolCalls[0].arguments : { decision: "NO_ACTION" },
           knowledgeResults: knowledgeResults.length > 0 ? knowledgeResults : []
         }, null, 2);
       } else {
-        // Legacy approach
         result = await callAIProvider(aiProvider, aiModel, finalPrompt);
         console.log("Raw AI response:", result);
         
@@ -306,7 +318,6 @@ serve(async (req) => {
                 }
                 
                 try {
-                  // Store the action type properly for filtering
                   const actionType = actionData.action_type === "NO_ACTION" ? 
                     "NO_ACTION" : "set_future_reminder";
                   

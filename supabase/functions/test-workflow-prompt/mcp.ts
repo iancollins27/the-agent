@@ -51,7 +51,17 @@ export const getDefaultTools = (): MCPTool[] => [
         reason: {
           type: 'string',
           description: 'Explanation of the decision'
-        },
+        }
+      },
+      required: ['decision', 'reason']
+    }
+  },
+  {
+    name: 'generate_action',
+    description: 'Generates a specific action based on the project context',
+    parameters: {
+      type: 'object',
+      properties: {
         action_type: {
           type: 'string',
           enum: ['message', 'data_update', 'set_future_reminder', 'human_in_loop', 'knowledge_query'],
@@ -86,7 +96,7 @@ export const getDefaultTools = (): MCPTool[] => [
           description: 'The query to perform against the knowledge base'
         }
       },
-      required: ['decision', 'reason']
+      required: ['action_type']
     }
   },
   {
