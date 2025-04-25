@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      action_metrics: {
+        Row: {
+          action_record_id: string
+          approved: boolean | null
+          created_at: string | null
+          decision: string | null
+          executed: boolean | null
+        }
+        Insert: {
+          action_record_id: string
+          approved?: boolean | null
+          created_at?: string | null
+          decision?: string | null
+          executed?: boolean | null
+        }
+        Update: {
+          action_record_id?: string
+          approved?: boolean | null
+          created_at?: string | null
+          decision?: string | null
+          executed?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_metrics_action_record_id_fkey"
+            columns: ["action_record_id"]
+            isOneToOne: true
+            referencedRelation: "action_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       action_records: {
         Row: {
           action_payload: Json
@@ -745,6 +777,7 @@ export type Database = {
           ai_model: string | null
           ai_provider: string | null
           completed_at: string | null
+          completion_tokens: number | null
           created_at: string
           error_message: string | null
           feedback_description: string | null
@@ -754,14 +787,17 @@ export type Database = {
           project_id: string | null
           prompt_input: string
           prompt_output: string | null
+          prompt_tokens: number | null
           reviewed: boolean | null
           status: string
+          usd_cost: number | null
           workflow_prompt_id: string | null
         }
         Insert: {
           ai_model?: string | null
           ai_provider?: string | null
           completed_at?: string | null
+          completion_tokens?: number | null
           created_at?: string
           error_message?: string | null
           feedback_description?: string | null
@@ -771,14 +807,17 @@ export type Database = {
           project_id?: string | null
           prompt_input: string
           prompt_output?: string | null
+          prompt_tokens?: number | null
           reviewed?: boolean | null
           status?: string
+          usd_cost?: number | null
           workflow_prompt_id?: string | null
         }
         Update: {
           ai_model?: string | null
           ai_provider?: string | null
           completed_at?: string | null
+          completion_tokens?: number | null
           created_at?: string
           error_message?: string | null
           feedback_description?: string | null
@@ -788,8 +827,10 @@ export type Database = {
           project_id?: string | null
           prompt_input?: string
           prompt_output?: string | null
+          prompt_tokens?: number | null
           reviewed?: boolean | null
           status?: string
+          usd_cost?: number | null
           workflow_prompt_id?: string | null
         }
         Relationships: [
@@ -841,6 +882,47 @@ export type Database = {
           webhook_id?: string | null
         }
         Relationships: []
+      }
+      tool_logs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          id: string
+          input_hash: string | null
+          output_trim: string | null
+          prompt_run_id: string | null
+          status_code: number | null
+          tool_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          input_hash?: string | null
+          output_trim?: string | null
+          prompt_run_id?: string | null
+          status_code?: number | null
+          tool_name: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          id?: string
+          input_hash?: string | null
+          output_trim?: string | null
+          prompt_run_id?: string | null
+          status_code?: number | null
+          tool_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_logs_prompt_run_id_fkey"
+            columns: ["prompt_run_id"]
+            isOneToOne: false
+            referencedRelation: "prompt_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workflow_prompts: {
         Row: {
@@ -908,6 +990,23 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "company_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_daily_llm_costs: {
+        Row: {
+          company_id: string | null
+          day: string | null
+          total_tokens: number | null
+          total_usd: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"

@@ -5,6 +5,24 @@ const deepseekApiKey = Deno.env.get("DEEPSEEK_API_KEY") || "";
 import { MCPContext, formatForOpenAI, formatForClaude, extractToolCallsFromOpenAI, extractToolCallsFromClaude } from "./mcp.ts";
 
 /**
+ * Cost per 1k tokens for different models (in USD)
+ */
+const MODEL_COSTS = {
+  'gpt-4o': { prompt: 0.03, completion: 0.06 },
+  'gpt-4o-mini': { prompt: 0.01, completion: 0.03 },
+  'claude-3-haiku-20240307': { prompt: 0.0025, completion: 0.0025 },
+  'claude-3-5-haiku-20241022': { prompt: 0.0025, completion: 0.0025 }
+};
+
+function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
+  const costs = MODEL_COSTS[model] || { prompt: 0, completion: 0 };
+  return (
+    (promptTokens * costs.prompt) / 1000 +
+    (completionTokens * costs.completion) / 1000
+  );
+}
+
+/**
  * Calls the appropriate AI provider based on the specified provider and model
  */
 export async function callAIProvider(aiProvider: string, aiModel: string, prompt: string): Promise<string> {
@@ -43,10 +61,43 @@ export async function callAIProviderWithMCP(
   switch (aiProvider) {
     case "openai":
       if (openaiApiKey) {
-        return await callOpenAIWithMCP(mcpContext, aiModel);
-      } else {
-        throw new Error("OpenAI API key not configured");
+        const requestBody = formatForOpenAI(mcpContext);
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiApiKey}`,
+          },
+          body: JSON.stringify({
+            ...requestBody,
+            temperature: 0.2,
+            max_tokens: 1500,
+          }),
+        });
+        
+        const data = await response.json();
+        if (data.error) {
+          console.error("OpenAI API error:", data.error);
+          throw new Error(`OpenAI API error: ${data.error.message || data.error}`);
+        }
+
+        // Calculate and store usage metrics if available
+        if (data.usage) {
+          const { prompt_tokens, completion_tokens } = data.usage;
+          const cost = calculateCost(aiModel, prompt_tokens, completion_tokens);
+          console.log('OpenAI usage metrics:', { 
+            prompt_tokens, 
+            completion_tokens, 
+            cost,
+            model: aiModel 
+          });
+          // Note: metrics will be stored by the caller
+        }
+        
+        return data;
       }
+      throw new Error("OpenAI API key not configured");
+
     case "claude":
       if (claudeApiKey) {
         return await callClaudeWithMCP(mcpContext, aiModel);
