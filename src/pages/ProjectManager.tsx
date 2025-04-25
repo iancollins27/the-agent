@@ -193,6 +193,8 @@ const ProjectManager: React.FC = () => {
             sortRooferAlphabetically={sortRooferAlphabetically}
             setSortRooferAlphabetically={(value) => updateFilter('sortRooferAlphabetically', value)}
             onRefresh={fetchPromptRuns}
+            onlyPendingActions={onlyPendingActions}
+            setOnlyPendingActions={(value) => updateFilter('onlyPendingActions', value)}
           />
         </div>
 
