@@ -1,16 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
-import { PromptRun } from '../components/admin/types';
-import { TIME_FILTERS } from "./useTimeFilter";
-import { usePromptFeedback } from './usePromptFeedback';
-import { supabase } from "@/integrations/supabase/client";
-import { 
-  debugProjectData, 
-  fetchProjects, 
-  fetchFilteredPromptRuns, 
-  formatPromptRunData 
-} from '@/utils/promptRunsApi';
+import { PromptRun } from '@/components/admin/types';
+import { fetchFilteredPromptRuns } from '@/services/promptRunsService';
+import { useProjectData } from './useProjectData';
+import { usePromptRunFormatting } from './usePromptRunFormatting';
 
 interface UsePromptRunsProps {
   userProfile: any;
@@ -36,92 +30,44 @@ export const usePromptRuns = ({
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { handleRatingChange, handleFeedbackChange } = usePromptFeedback(setPromptRuns);
+  const { formatPromptRunData } = usePromptRunFormatting();
 
-  useEffect(() => {
-    if (userProfile) {
-      fetchPromptRuns();
-    }
-  }, [
-    statusFilter, 
-    userProfile, 
-    onlyShowMyProjects, 
-    projectManagerFilter, 
-    timeFilter, 
-    onlyShowLatestRuns,
-    excludeReminderActions
-  ]);
+  const projectsData = useProjectData(
+    userProfile?.profile_associated_company,
+    userProfile?.id,
+    onlyShowMyProjects,
+    projectManagerFilter
+  );
 
   const fetchPromptRuns = async () => {
     if (!userProfile?.profile_associated_company) {
       console.warn('User has no profile_associated_company in profile, cannot fetch projects');
       setPromptRuns([]);
       setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Your user profile is not associated with a company",
-      });
       return;
     }
 
     setLoading(true);
     try {
-      const companyId = userProfile.profile_associated_company;
-      
-      await debugProjectData(companyId);
-      
-      const projectsData = await fetchProjects(
-        companyId, 
-        userProfile.id, 
-        onlyShowMyProjects,
-        projectManagerFilter
-      );
-      
-      if (projectsData.length === 0) {
-        setPromptRuns([]);
-        setLoading(false);
-        return;
-      }
-
       const projectIds = projectsData.map(project => project.id);
-      
-      const timeConstraint = timeFilter !== TIME_FILTERS.ALL ? getDateFilter() : null;
+      const timeConstraint = timeFilter !== 'ALL' ? getDateFilter() : null;
       
       const data = await fetchFilteredPromptRuns(projectIds, statusFilter, timeConstraint);
-      
       let formattedData = formatPromptRunData(data);
 
-      console.log(`Total prompt runs before filtering: ${formattedData.length}`);
-      console.log(`onlyShowLatestRuns is set to: ${onlyShowLatestRuns}`);
-
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
-        console.log("Filtering to show only latest runs per project");
-        
         const latestRunsByProject = new Map<string, PromptRun>();
-        
         formattedData.forEach(run => {
-          if (!run.project_id) {
-            console.log(`Skipping run ${run.id} with no project_id`);
-            return;
-          }
-          
+          if (!run.project_id) return;
           const existingRun = latestRunsByProject.get(run.project_id);
-          
           if (!existingRun || new Date(run.created_at) > new Date(existingRun.created_at)) {
             latestRunsByProject.set(run.project_id, run);
           }
         });
-        
         formattedData = Array.from(latestRunsByProject.values());
-        
         formattedData.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-        
-        console.log(`Total prompt runs after filtering for latest only: ${formattedData.length}`);
-      } else {
-        console.log(`Skipping latest runs filter, showing all ${formattedData.length} runs`);
       }
 
       if (excludeReminderActions && formattedData.length > 0) {
@@ -140,7 +86,6 @@ export const usePromptRuns = ({
             description: "Failed to filter out reminder actions",
           });
         } else {
-          // Filter out both reminder actions and NO_ACTION type
           const filteredActionRunIds = new Set(
             actionData
               .filter(action => 
@@ -153,14 +98,12 @@ export const usePromptRuns = ({
           formattedData = formattedData.filter(
             run => !filteredActionRunIds.has(run.id)
           );
-          
-          console.log(`Total prompt runs after filtering reminders and NO_ACTION: ${formattedData.length}`);
         }
       }
 
       setPromptRuns(formattedData);
     } catch (error) {
-      console.error('Error fetching prompt runs:', error);
+      console.error('Error in fetchPromptRuns:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -171,12 +114,17 @@ export const usePromptRuns = ({
     }
   };
 
+  useEffect(() => {
+    if (userProfile) {
+      fetchPromptRuns();
+    }
+  }, [userProfile, statusFilter, onlyShowMyProjects, projectManagerFilter, timeFilter, projectsData]);
+
   return {
     promptRuns,
     setPromptRuns,
     loading,
-    handleRatingChange,
-    handleFeedbackChange,
     fetchPromptRuns
   };
 };
+
