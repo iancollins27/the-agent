@@ -10,7 +10,6 @@ type StoredFilterValues = {
   projectManagerFilter: string | null;
   groupByRoofer: boolean;
   sortRooferAlphabetically: boolean;
-  onlyPendingActions: boolean;
 };
 
 export const useFilterPersistence = (defaultValues: StoredFilterValues) => {

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -24,8 +25,6 @@ interface ProjectManagerFiltersProps {
   setGroupByRoofer: (value: boolean) => void;
   sortRooferAlphabetically: boolean;
   setSortRooferAlphabetically: (value: boolean) => void;
-  onlyPendingActions: boolean;
-  setOnlyPendingActions: (value: boolean) => void;
   onRefresh: () => void;
 }
 
@@ -46,8 +45,6 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   setGroupByRoofer,
   sortRooferAlphabetically,
   setSortRooferAlphabetically,
-  onlyPendingActions,
-  setOnlyPendingActions,
   onRefresh
 }) => {
   return (
@@ -63,15 +60,17 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
       
       <div className="flex items-center space-x-2">
         <Switch
-          id="only-pending-actions"
-          checked={onlyPendingActions}
-          onCheckedChange={setOnlyPendingActions}
+          id="exclude-reminder-actions"
+          checked={excludeReminderActions}
+          onCheckedChange={setExcludeReminderActions}
         />
-        <Label htmlFor="only-pending-actions">Only Pending Actions</Label>
+        <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
       </div>
-      
+
+      {/* Show text for time filter */}
       <span className="text-sm text-muted-foreground">Show:</span>
       
+      {/* Time filter select */}
       <Select 
         value={timeFilter} 
         onValueChange={setTimeFilter}
@@ -87,11 +86,13 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         </SelectContent>
       </Select>
       
+      {/* Project Manager filter */}
       <ProjectManagerSelector 
         value={projectManagerFilter} 
         onChange={setProjectManagerFilter}
       />
       
+      {/* Combined filter dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" className="flex items-center gap-2">
@@ -128,6 +129,7 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
       
+      {/* Refresh button */}
       <Button onClick={onRefresh} variant="outline" size="icon">
         <RefreshCw className="h-4 w-4" />
       </Button>

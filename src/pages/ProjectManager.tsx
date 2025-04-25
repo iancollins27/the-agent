@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,9 +10,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
 import { useFilterPersistence } from "@/hooks/useFilterPersistence";
-import ProjectManagerHeader from "../components/project-manager/ProjectManagerHeader";
-import ProjectManagerFilters from "../components/project-manager/ProjectManagerFilters";
-import ProjectManagerContent from "../components/project-manager/ProjectManagerContent";
+
+// Import components
+import ProjectManagerHeader from '../components/project-manager/ProjectManagerHeader';
+import ProjectManagerFilters from '../components/project-manager/ProjectManagerFilters';
+import ProjectManagerContent from '../components/project-manager/ProjectManagerContent';
 
 const ProjectManager: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
@@ -21,6 +24,7 @@ const ProjectManager: React.FC = () => {
   const { user } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
   
+  // Filter persistence
   const { filters, updateFilter } = useFilterPersistence({
     hideReviewed: true,
     excludeReminderActions: false,
@@ -29,10 +33,10 @@ const ProjectManager: React.FC = () => {
     onlyMyProjects: false,
     projectManagerFilter: null,
     groupByRoofer: false,
-    sortRooferAlphabetically: true,
-    onlyPendingActions: false
+    sortRooferAlphabetically: true
   });
   
+  // Use persisted filters
   const hideReviewed = filters.hideReviewed;
   const excludeReminderActions = filters.excludeReminderActions;
   const timeFilter = filters.timeFilter;
@@ -41,8 +45,8 @@ const ProjectManager: React.FC = () => {
   const projectManagerFilter = filters.projectManagerFilter;
   const groupByRoofer = filters.groupByRoofer;
   const sortRooferAlphabetically = filters.sortRooferAlphabetically;
-  const onlyPendingActions = filters.onlyPendingActions;
   
+  // Sync raw timeFilter with persisted filters
   useEffect(() => {
     rawSetTimeFilter(timeFilter);
   }, [timeFilter]);
@@ -87,18 +91,19 @@ const ProjectManager: React.FC = () => {
   const { 
     promptRuns, 
     loading, 
+    handleRatingChange, 
+    handleFeedbackChange, 
     fetchPromptRuns,
     setPromptRuns
   } = usePromptRuns({
     userProfile,
-    statusFilter: filters.statusFilter,
-    onlyShowMyProjects: filters.onlyMyProjects,
-    projectManagerFilter: filters.projectManagerFilter,
-    timeFilter: filters.timeFilter,
+    statusFilter,
+    onlyShowMyProjects: onlyMyProjects,
+    projectManagerFilter,
+    timeFilter,
     getDateFilter,
     onlyShowLatestRuns: true,
-    excludeReminderActions: filters.excludeReminderActions,
-    onlyPendingActions: filters.onlyPendingActions
+    excludeReminderActions
   });
 
   console.log(`ProjectManager component: Retrieved ${promptRuns.length} prompt runs`);
@@ -114,32 +119,6 @@ const ProjectManager: React.FC = () => {
       prev.map(run => 
         run.id === promptRunId ? { ...run, reviewed: true } : run
       )
-    );
-  };
-
-  const handleRatingChange = (promptRunId: string, rating: number | null) => {
-    setPromptRuns(prev =>
-      prev.map(run =>
-        run.id === promptRunId ? { ...run, feedback_rating: rating } : run
-      )
-    );
-  };
-
-  const handleFeedbackChange = (promptRunId: string, feedback: { 
-    description?: string; 
-    tags?: string[] 
-  }) => {
-    setPromptRuns(prev =>
-      prev.map(run => {
-        if (run.id === promptRunId) {
-          return { 
-            ...run, 
-            feedback_description: feedback.description || run.feedback_description,
-            feedback_tags: feedback.tags || run.feedback_tags
-          };
-        }
-        return run;
-      })
     );
   };
 
@@ -176,7 +155,7 @@ const ProjectManager: React.FC = () => {
 
     if (sortRooferAlphabetically) {
       runs.sort((a, b) => {
-        const rooferA = a.project_roofer_contact || 'zzz';
+        const rooferA = a.project_roofer_contact || 'zzz'; // Put empty values at the end
         const rooferB = b.project_roofer_contact || 'zzz';
         return rooferA.localeCompare(rooferB);
       });
@@ -200,50 +179,42 @@ const ProjectManager: React.FC = () => {
         <div className="flex justify-between items-center flex-wrap gap-4">
           <ProjectManagerHeader title="Project Manager Dashboard" />
           <ProjectManagerFilters 
-            hideReviewed={filters.hideReviewed}
+            hideReviewed={hideReviewed}
             setHideReviewed={(value) => updateFilter('hideReviewed', value)}
-            excludeReminderActions={filters.excludeReminderActions}
+            excludeReminderActions={excludeReminderActions}
             setExcludeReminderActions={(value) => updateFilter('excludeReminderActions', value)}
-            timeFilter={filters.timeFilter}
+            timeFilter={timeFilter}
             setTimeFilter={(value) => updateFilter('timeFilter', value)}
-            statusFilter={filters.statusFilter}
+            statusFilter={statusFilter}
             setStatusFilter={(value) => updateFilter('statusFilter', value)}
-            onlyMyProjects={filters.onlyMyProjects}
+            onlyMyProjects={onlyMyProjects}
             setOnlyMyProjects={(value) => updateFilter('onlyMyProjects', value)}
-            projectManagerFilter={filters.projectManagerFilter}
+            projectManagerFilter={projectManagerFilter}
             setProjectManagerFilter={(value) => updateFilter('projectManagerFilter', value)}
-            groupByRoofer={filters.groupByRoofer}
+            groupByRoofer={groupByRoofer}
             setGroupByRoofer={(value) => updateFilter('groupByRoofer', value)}
-            sortRooferAlphabetically={filters.sortRooferAlphabetically}
+            sortRooferAlphabetically={sortRooferAlphabetically}
             setSortRooferAlphabetically={(value) => updateFilter('sortRooferAlphabetically', value)}
-            onlyPendingActions={filters.onlyPendingActions}
-            setOnlyPendingActions={(value) => updateFilter('onlyPendingActions', value)}
             onRefresh={fetchPromptRuns}
           />
         </div>
 
         <ProjectManagerContent 
           loading={loading}
-          promptRuns={promptRuns}
-          hideReviewed={filters.hideReviewed}
+          promptRuns={processedPromptRuns}
+          hideReviewed={hideReviewed}
           getEmptyStateMessage={getEmptyStateMessage}
-          groupByRoofer={filters.groupByRoofer}
+          groupByRoofer={groupByRoofer}
           debugInfo={{
             userId: user?.id,
             companyId: userProfile?.profile_associated_company,
-            statusFilter: filters.statusFilter,
-            onlyMyProjects: filters.onlyMyProjects,
-            projectManagerFilter: filters.projectManagerFilter,
-            timeFilter: filters.timeFilter
+            statusFilter,
+            onlyMyProjects,
+            projectManagerFilter,
+            timeFilter
           }}
           onViewDetails={viewPromptRunDetails}
-          onRatingChange={(promptRunId, rating) => {
-            setPromptRuns(prev =>
-              prev.map(run =>
-                run.id === promptRunId ? { ...run, feedback_rating: rating } : run
-              )
-            );
-          }}
+          onRatingChange={handleRatingChange}
           onRunReviewed={handleRunReviewed}
         />
 
