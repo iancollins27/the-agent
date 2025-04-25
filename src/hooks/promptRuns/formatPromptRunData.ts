@@ -18,7 +18,8 @@ export const formatPromptRunData = (
       workflow_type: run.workflow_prompts?.type,
       prompt_text: run.prompt_input,
       result: run.prompt_output,
-      reviewed: run.reviewed === true
+      reviewed: run.reviewed === true,
+      project_crm_url: null // This will be populated in usePromptRuns.ts
     } as PromptRun;
   });
 };

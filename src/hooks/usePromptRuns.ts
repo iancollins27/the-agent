@@ -34,7 +34,59 @@ export const usePromptRuns = ({
 
     setLoading(true);
     try {
+      // First, fetch prompt runs
       let formattedData = await fetchData(statusFilter);
+      
+      // Filter by project manager if selected
+      if (projectManagerFilter && formattedData.length > 0) {
+        const { data: projectsWithManager, error: projectsError } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('project_manager', projectManagerFilter);
+        
+        if (!projectsError && projectsWithManager) {
+          const projectIds = new Set(projectsWithManager.map(p => p.id));
+          formattedData = formattedData.filter(run => 
+            run.project_id && projectIds.has(run.project_id)
+          );
+        }
+      }
+
+      // Apply the "only show my projects" filter if enabled
+      if (onlyShowMyProjects && userProfile?.id && formattedData.length > 0) {
+        const { data: myProjects, error: myProjectsError } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('project_manager', userProfile.id);
+        
+        if (!myProjectsError && myProjects) {
+          const myProjectIds = new Set(myProjects.map(p => p.id));
+          formattedData = formattedData.filter(run => 
+            run.project_id && myProjectIds.has(run.project_id)
+          );
+        }
+      }
+
+      // Fetch company base URL for CRM links
+      if (formattedData.length > 0) {
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .select('company_project_base_URL')
+          .eq('id', userProfile.profile_associated_company)
+          .single();
+        
+        if (!companyError && company && company.company_project_base_URL) {
+          formattedData = formattedData.map(run => {
+            if (run.project_name) {
+              return {
+                ...run,
+                project_crm_url: `${company.company_project_base_URL}${run.project_name}`
+              };
+            }
+            return run;
+          });
+        }
+      }
 
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
         const latestRunsByProject = new Map<string, PromptRun>();
