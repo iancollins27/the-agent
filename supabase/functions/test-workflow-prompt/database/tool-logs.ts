@@ -1,5 +1,6 @@
 
-import { SupabaseClient } from '@supabase/supabase-js';
+// Import SupabaseClient from the ESM URL instead of the npm package name
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 export async function logToolCall(
   supabase: SupabaseClient,
