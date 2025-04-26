@@ -14,6 +14,7 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
   const [loading, setLoading] = useState(actionId ? true : false);
   const [error, setError] = useState<string | null>(null);
   const [expandedPrompts, setExpandedPrompts] = useState<Record<string, boolean>>({});
+  const [showOriginalPrompt, setShowOriginalPrompt] = useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     // Only fetch action data if actionId is provided
@@ -50,6 +51,13 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
       [resultIndex]: !prev[resultIndex]
     }));
   };
+  
+  const toggleOriginalPrompt = (resultIndex: string) => {
+    setShowOriginalPrompt(prev => ({
+      ...prev,
+      [resultIndex]: !prev[resultIndex]
+    }));
+  };
 
   if (loading) {
     return <div>Loading...</div>;
@@ -71,6 +79,8 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
               {projectResult.results.map((result: any, resultIndex: number) => {
                 const resultKey = `${index}-${resultIndex}`;
                 const isPromptExpanded = expandedPrompts[resultKey] || false;
+                const showOriginal = showOriginalPrompt[resultKey] || false;
+                const isMCP = result.finalPrompt?.includes("Using Model Context Protocol");
                 
                 return (
                   <div key={resultIndex} className="border-t pt-3">
@@ -88,12 +98,42 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
                         </button>
                       </div>
                       
-                      {isPromptExpanded && result.finalPrompt && (
+                      {isPromptExpanded && (
                         <div className="mt-2">
-                          <PromptDisplay 
-                            promptText={result.finalPrompt} 
-                            onEdit={() => {}} 
-                          />
+                          {isMCP && (
+                            <div className="mb-2 bg-blue-50 p-2 rounded text-sm">
+                              <p className="font-medium text-blue-700">
+                                Using Model Context Protocol - Tool-based AI interaction
+                              </p>
+                              <p className="text-blue-600 text-xs">
+                                MCP provides a more structured interaction with the AI model using tools instead
+                                of direct prompting.
+                              </p>
+                              {result.originalPrompt && (
+                                <button
+                                  onClick={() => toggleOriginalPrompt(resultKey)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 mt-1 underline"
+                                >
+                                  {showOriginal ? 'Hide original prompt' : 'Show original prompt'}
+                                </button>
+                              )}
+                              {showOriginal && result.originalPrompt && (
+                                <div className="mt-2 border-t border-blue-200 pt-2">
+                                  <p className="text-xs text-blue-700 mb-1">Original prompt for reference:</p>
+                                  <PromptDisplay 
+                                    promptText={result.originalPrompt} 
+                                    onEdit={() => {}} 
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {(!isMCP || (isMCP && showOriginal)) && (
+                            <PromptDisplay 
+                              promptText={isMCP ? result.originalPrompt : result.finalPrompt} 
+                              onEdit={() => {}} 
+                            />
+                          )}
                         </div>
                       )}
                     </div>

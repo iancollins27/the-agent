@@ -28,6 +28,7 @@ export async function handleRequest(supabase: any, requestBody: any) {
     throw new Error("Prompt text is required");
   }
   
+  // We'll still perform the variable replacement for logging purposes
   let finalPrompt = replaceVariables(promptText, contextData);
   console.log("Final prompt after variable replacement:", finalPrompt);
   
@@ -65,7 +66,8 @@ export async function handleRequest(supabase: any, requestBody: any) {
   return new Response(
     JSON.stringify({
       output: response.result,
-      finalPrompt,
+      // If using MCP, we'll mark the prompt text differently
+      finalPrompt: useMCP ? "[Using Model Context Protocol - see results for details]" : finalPrompt,
       projectId,
       promptType,
       aiProvider,
@@ -76,7 +78,9 @@ export async function handleRequest(supabase: any, requestBody: any) {
       nextCheckDateInfo: response.nextCheckDateInfo,
       usedMCP: useMCP,
       humanReviewRequestId: response.humanReviewRequestId,
-      knowledgeResults: response.knowledgeResults?.length || 0
+      knowledgeResults: response.knowledgeResults?.length || 0,
+      // We'll include the original prompt for reference but not for display
+      originalPrompt: useMCP ? finalPrompt : null
     }),
     {
       headers: {
