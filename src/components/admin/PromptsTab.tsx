@@ -9,9 +9,7 @@ import PromptEditor from "./PromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
-type DbWorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
-                      'action_execution' | 'action_detection_execution' | 'multi_project_analysis' |
-                      'multi_project_message_generation';
+type DbWorkflowType = WorkflowType;
 
 const PromptsTab = () => {
   const queryClient = useQueryClient();
@@ -44,7 +42,6 @@ const PromptsTab = () => {
         allowedPromptTypes.includes(prompt.type as WorkflowType)
       ) || [];
       
-      // Log which prompt types we found and which are missing
       const foundTypes = filteredPrompts.map(p => p.type);
       console.log('Found prompt types:', foundTypes);
       
@@ -86,8 +83,6 @@ const PromptsTab = () => {
 
   const createPromptMutation = useMutation({
     mutationFn: async (promptType: WorkflowType) => {
-      const dbType = promptType as DbWorkflowType;
-
       let defaultPromptText = `This is a placeholder prompt for ${promptType}. Please update it with appropriate content.`;
       
       if (promptType === 'multi_project_message_generation') {
@@ -115,7 +110,7 @@ Return ONLY the final message text, with no additional explanations.`;
       const { data, error } = await supabase
         .from('workflow_prompts')
         .insert({ 
-          type: dbType,
+          type: promptType,
           prompt_text: defaultPromptText
         })
         .select();

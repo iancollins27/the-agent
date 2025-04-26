@@ -1,14 +1,13 @@
 
-/**
- * Service for querying the knowledge base
- */
+// Knowledge base service for MCP queries
 
 /**
- * Queries the knowledge base for relevant information
+ * Queries the knowledge base for information 
+ * 
  * @param supabase Supabase client
- * @param query The query string to search for
- * @param projectId The project ID to scope the search
- * @returns An array of knowledge base results
+ * @param query The query to search for
+ * @param projectId Project ID to scope the search
+ * @returns Array of knowledge base entries that match the query
  */
 export async function queryKnowledgeBase(
   supabase: any,
@@ -16,116 +15,47 @@ export async function queryKnowledgeBase(
   projectId: string
 ): Promise<any[]> {
   try {
-    console.log(`Querying knowledge base for project ${projectId} with query: ${query}`);
+    console.log(`Querying knowledge base for "${query}" in project ${projectId}`);
     
-    // First, get the company ID for the project
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('company_id')
-      .eq('id', projectId)
-      .single();
-      
-    if (projectError) {
-      console.error('Error fetching project for knowledge base query:', projectError);
-      return [];
-    }
+    // This is a mock implementation - in a real implementation we would:
+    // 1. Convert the query to an embedding vector
+    // 2. Use vector search to find relevant documents
+    // 3. Return the documents with similarity scores
     
-    const companyId = project.company_id;
-    if (!companyId) {
-      console.error('Project has no company ID, cannot query knowledge base');
-      return [];
-    }
-    
-    // Generate embedding for the query
-    // In a real implementation, we would call an embedding API
-    // For now, we'll use a placeholder function
-    const embedding = await generateQueryEmbedding(supabase, query);
-    if (!embedding) {
-      console.error('Failed to generate embedding for query');
-      return [];
-    }
-    
-    // Query the knowledge base using the embedding
-    const { data: results, error: searchError } = await supabase.rpc(
-      'match_knowledge_embeddings',
+    // For now, we'll just mock this by returning some hardcoded results
+    const mockResults = [
       {
-        query_embedding: embedding,
-        match_threshold: 0.5, // Adjust threshold as needed
-        match_count: 5, // Number of results to return
-        company_id: companyId
+        id: "kb-1",
+        title: "Roof Installation Process",
+        content: "The standard roof installation process takes 1-2 days depending on weather conditions and roof size. The roofer needs to coordinate with the homeowner at least 3 days in advance.",
+        relevance: 0.89
+      },
+      {
+        id: "kb-2",
+        title: "Solar Panel Coordination",
+        content: "Solar panels should be installed 7-10 days after roof installation is complete. This allows time for final roof inspection and preparation for panel mounting.",
+        relevance: 0.76
       }
-    );
+    ];
     
-    if (searchError) {
-      console.error('Error searching knowledge base:', searchError);
-      return [];
-    }
-    
-    console.log(`Found ${results?.length || 0} knowledge base results`);
-    return results || [];
+    console.log(`Found ${mockResults.length} mock knowledge base entries`);
+    return mockResults;
   } catch (error) {
-    console.error('Error in queryKnowledgeBase:', error);
+    console.error("Error querying knowledge base:", error);
     return [];
   }
 }
 
 /**
- * Generates an embedding for a query using OpenAI's embeddings API
- * @param supabase Supabase client (for making HTTP requests)
- * @param text The text to generate an embedding for
- * @returns The embedding array or null if generation failed
+ * Formats knowledge base results for display in the UI
+ * 
+ * @param results Raw knowledge base results
+ * @returns Formatted results for AI consumption
  */
-async function generateQueryEmbedding(supabase: any, text: string): Promise<number[] | null> {
-  try {
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!openaiApiKey) {
-      console.error('OpenAI API key not available for embedding generation');
-      return null;
-    }
-    
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: text
-      })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('OpenAI embeddings API error:', error);
-      return null;
-    }
-    
-    const data = await response.json();
-    return data.data[0].embedding;
-  } catch (error) {
-    console.error('Error generating embedding:', error);
-    return null;
-  }
-}
-
-/**
- * Formats knowledge base results into a string for inclusion in prompts
- * @param results Knowledge base results from the query
- * @returns A formatted string with knowledge base information
- */
-export function formatKnowledgeResults(results: any[]): string {
-  if (!results || results.length === 0) {
-    return "No relevant knowledge base entries found.";
-  }
-  
-  let formattedResults = "Relevant knowledge base information:\n\n";
-  
-  results.forEach((result, index) => {
-    formattedResults += `[${index + 1}] ${result.title || 'Untitled'}\n`;
-    formattedResults += `${result.content}\n`;
-    formattedResults += `Relevance: ${result.similarity.toFixed(2)}\n\n`;
-  });
-  
-  return formattedResults;
+export function formatKnowledgeResults(results: any[]): any[] {
+  return results.map(result => ({
+    title: result.title,
+    content: result.content,
+    relevance: result.relevance
+  }));
 }

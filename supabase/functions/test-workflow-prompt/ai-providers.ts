@@ -21,6 +21,8 @@ export function calculateCost(model: string, promptTokens: number, completionTok
 }
 
 export async function callAIProvider(aiProvider: string, aiModel: string, prompt: string): Promise<string> {
+  console.log(`Calling ${aiProvider} with model ${aiModel}`);
+  
   switch (aiProvider) {
     case "openai":
       return await callOpenAI(prompt, aiModel);
@@ -36,6 +38,8 @@ export async function callAIProviderWithMCP(
   aiModel: string, 
   mcpContext: any
 ): Promise<any> {
+  console.log(`Calling ${aiProvider} with MCP, using model ${aiModel}`);
+  
   switch (aiProvider) {
     case "openai":
       return await callOpenAIWithMCP(mcpContext, aiModel);

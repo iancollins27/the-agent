@@ -3,13 +3,13 @@
  * Model Context Protocol (MCP) implementation for structured AI interactions
  */
 
-type MCPMessage = {
+export type MCPMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   name?: string;
 };
 
-type MCPTool = {
+export type MCPTool = {
   name: string;
   description: string;
   parameters: {
@@ -210,49 +210,90 @@ export function formatForOpenAI(context: MCPContext): any {
   };
 }
 
-// Formats the MCP context for Claude API
+// Formats the MCP context for Claude API - Updated for Claude 3.5
 export function formatForClaude(context: MCPContext): any {
-  // Claude has a different format for tools, so we need to adapt
-  return {
-    model: "claude-3-5-haiku-20241022", // Use Claude 3.5 by default
+  // Claude 3.5 API format for tools
+  console.log("Formatting for Claude with messages:", context.messages.length);
+  
+  const formattedRequest: any = {
+    model: "claude-3-5-haiku-20241022", 
     messages: context.messages,
-    tools: context.tools ? context.tools.map(tool => ({
+  };
+  
+  // Add tools if specified - format correctly for Claude API
+  if (context.tools && context.tools.length > 0) {
+    console.log("Adding tools to Claude request:", context.tools.length);
+    
+    // Claude expects tools in this format
+    formattedRequest.tools = context.tools.map(tool => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.parameters
-    })) : undefined
-  };
+    }));
+    
+    console.log("Formatted tools:", JSON.stringify(formattedRequest.tools, null, 2));
+  }
+  
+  return formattedRequest;
 }
 
 // Extracts tool calls from OpenAI response
 export function extractToolCallsFromOpenAI(response: any): any[] {
+  console.log("Extracting tool calls from OpenAI response");
+  
   if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+    console.log("No valid choices in OpenAI response");
     return [];
   }
   
   const message = response.choices[0].message;
   if (!message.tool_calls || !Array.isArray(message.tool_calls)) {
+    console.log("No tool_calls in OpenAI message");
     return [];
   }
   
-  return message.tool_calls.map(toolCall => ({
-    name: toolCall.function.name,
-    arguments: JSON.parse(toolCall.function.arguments)
-  }));
+  console.log(`Found ${message.tool_calls.length} tool calls in OpenAI response`);
+  
+  return message.tool_calls.map(toolCall => {
+    console.log(`Tool call: ${toolCall.function.name}`);
+    
+    try {
+      const args = JSON.parse(toolCall.function.arguments);
+      return {
+        name: toolCall.function.name,
+        arguments: args
+      };
+    } catch (error) {
+      console.error("Error parsing tool call arguments:", error);
+      return {
+        name: toolCall.function.name,
+        arguments: {}
+      };
+    }
+  });
 }
 
-// Extracts tool calls from Claude response
+// Extracts tool calls from Claude response - Updated for Claude 3.5
 export function extractToolCallsFromClaude(response: any): any[] {
+  console.log("Extracting tool calls from Claude response");
+  console.log("Response structure:", Object.keys(response));
+  
   if (!response.content || !Array.isArray(response.content)) {
+    console.log("No content array in Claude response");
     return [];
   }
   
+  // Claude 3.5's tool_use blocks
   const toolCalls = response.content
     .filter(item => item.type === 'tool_use')
-    .map(item => ({
-      name: item.name,
-      arguments: item.input
-    }));
+    .map(item => {
+      console.log(`Found tool use: ${item.name}`);
+      return {
+        name: item.name,
+        arguments: item.input || {} // Tool inputs are in the input field
+      };
+    });
   
+  console.log(`Extracted ${toolCalls.length} tool calls from Claude response`);
   return toolCalls;
 }

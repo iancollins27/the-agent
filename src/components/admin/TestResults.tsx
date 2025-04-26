@@ -82,9 +82,36 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
                 const showOriginal = showOriginalPrompt[resultKey] || false;
                 const isMCP = result.usedMCP || result.finalPrompt?.includes("Using Model Context Protocol");
                 
+                // Calculate metrics display
+                const hasMetrics = result.promptTokens > 0 || result.completionTokens > 0;
+                
                 return (
                   <div key={resultIndex} className="border-t pt-3">
-                    <h4 className="font-medium">Prompt Type: {result.type}</h4>
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-medium">Prompt Type: {result.type}</h4>
+                      {isMCP && (
+                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                          MCP Enabled
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Metrics display if available */}
+                    {hasMetrics && (
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+                        <span className="inline-flex items-center">
+                          Prompt tokens: {result.promptTokens || 0}
+                        </span>
+                        <span className="inline-flex items-center">
+                          Completion tokens: {result.completionTokens || 0}
+                        </span>
+                        {result.costUSD > 0 && (
+                          <span className="inline-flex items-center font-medium text-emerald-700">
+                            Cost: ${result.costUSD?.toFixed(4) || "0.0000"}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Prompt Input Section */}
                     <div className="mt-3">
@@ -144,11 +171,34 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
                       <div className="bg-muted p-3 rounded text-sm">
                         <pre className="whitespace-pre-wrap mt-1 text-xs">{result.output}</pre>
                       </div>
-                      {result.actionRecordId && (
-                        <div className="text-sm">
-                          <p>Action Record ID: {result.actionRecordId}</p>
-                        </div>
-                      )}
+                      
+                      {/* Additional result information */}
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                        {result.actionRecordId && (
+                          <div className="bg-green-50 text-green-700 p-2 rounded">
+                            <p className="font-medium">Action Record Created</p>
+                            <p className="text-xs overflow-hidden text-ellipsis">{result.actionRecordId}</p>
+                          </div>
+                        )}
+                        
+                        {result.reminderSet && result.nextCheckDateInfo && (
+                          <div className="bg-amber-50 text-amber-700 p-2 rounded">
+                            <p className="font-medium">Reminder Set</p>
+                            <p className="text-xs">
+                              Next check date: {result.nextCheckDateInfo.newValue}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {result.knowledgeResults && result.knowledgeResults.length > 0 && (
+                          <div className="bg-indigo-50 text-indigo-700 p-2 rounded">
+                            <p className="font-medium">Knowledge Results</p>
+                            <p className="text-xs">
+                              {result.knowledgeResults.length} entries found
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

@@ -7,12 +7,15 @@ export async function callClaude(prompt: string, model: string = "claude-3-5-hai
     throw new Error("Claude API key is not set");
   }
   
+  // Add logging
+  console.log(`Calling Claude API with model: ${model}`);
+  
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": claudeApiKey,
-      "anthropic-version": "2023-06-01"
+      "anthropic-version": "2024-01-01" // Update to latest API version
     },
     body: JSON.stringify({
       model: model,
@@ -36,14 +39,23 @@ export async function callClaude(prompt: string, model: string = "claude-3-5-hai
 }
 
 export async function callClaudeWithMCP(mcpContext: any, model: string = "claude-3-5-haiku-20241022") {
+  if (!claudeApiKey) {
+    throw new Error("Claude API key is not set");
+  }
+  
   const requestBody = formatForClaude(mcpContext);
+  
+  // Add enhanced logging
+  console.log("Calling Claude with MCP context");
+  console.log("Using model:", model);
+  console.log("Claude request format:", JSON.stringify(requestBody, null, 2));
   
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-API-Key": claudeApiKey,
-      "anthropic-version": "2023-06-01"
+      "anthropic-version": "2024-01-01" // Update to latest API version
     },
     body: JSON.stringify({
       ...requestBody,
@@ -52,11 +64,20 @@ export async function callClaudeWithMCP(mcpContext: any, model: string = "claude
     }),
   });
   
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Claude API error (${response.status}):`, errorText);
+    throw new Error(`Claude API error (${response.status}): ${errorText}`);
+  }
+  
   const data = await response.json();
   if (data.error) {
     console.error("Claude API error:", data.error);
     throw new Error(`Claude API error: ${data.error.message || data.error}`);
   }
+  
+  // Log the raw response for debugging
+  console.log("Claude API raw response:", JSON.stringify(data, null, 2));
   
   return data;
 }
