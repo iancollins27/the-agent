@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -9,6 +8,10 @@ import { WorkflowPrompt, WorkflowType } from "@/types/workflow";
 import PromptEditor from "./PromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+
+type DbWorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
+                      'action_execution' | 'action_detection_execution' | 'multi_project_analysis' |
+                      'multi_project_message_generation';
 
 const PromptsTab = () => {
   const queryClient = useQueryClient();
@@ -46,7 +49,7 @@ const PromptsTab = () => {
       console.log('Found prompt types:', foundTypes);
       
       const missingTypes = allowedPromptTypes.filter(
-        type => !foundTypes.includes(type)
+        type => !foundTypes.includes(type as any)
       ) as WorkflowType[];
       console.log('Missing prompt types:', missingTypes);
       setMissingPrompts(missingTypes);
@@ -83,12 +86,12 @@ const PromptsTab = () => {
 
   const createPromptMutation = useMutation({
     mutationFn: async (promptType: WorkflowType) => {
-      const { data, error } = await supabase
-        .from('workflow_prompts')
-        .insert({ 
-          type: promptType,
-          prompt_text: promptType === 'multi_project_message_generation' 
-            ? `You need to create a consolidated message to send to a roofer named {{rooferName}} regarding multiple projects that require their attention.
+      const dbType = promptType as DbWorkflowType;
+
+      let defaultPromptText = `This is a placeholder prompt for ${promptType}. Please update it with appropriate content.`;
+      
+      if (promptType === 'multi_project_message_generation') {
+        defaultPromptText = `You need to create a consolidated message to send to a roofer named {{rooferName}} regarding multiple projects that require their attention.
 
 These are the projects and their details:
 {{projectData}}
@@ -106,8 +109,14 @@ Your task:
    - Keeps the message under 500 words
    - ONLY includes actionable items that require the roofer's attention
 
-Return ONLY the final message text, with no additional explanations.`
-            : `This is a placeholder prompt for ${promptType}. Please update it with appropriate content.`
+Return ONLY the final message text, with no additional explanations.`;
+      }
+
+      const { data, error } = await supabase
+        .from('workflow_prompts')
+        .insert({ 
+          type: dbType,
+          prompt_text: defaultPromptText
         })
         .select();
       

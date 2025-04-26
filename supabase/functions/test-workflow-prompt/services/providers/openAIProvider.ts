@@ -1,5 +1,6 @@
 
 const openAIApiKey = Deno.env.get("OPENAI_API_KEY") || "";
+import { formatForOpenAI } from "../../mcp.ts";
 
 export async function callOpenAI(prompt: string, model: string = "gpt-4o-mini") {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {

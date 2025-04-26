@@ -80,7 +80,7 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
                 const resultKey = `${index}-${resultIndex}`;
                 const isPromptExpanded = expandedPrompts[resultKey] || false;
                 const showOriginal = showOriginalPrompt[resultKey] || false;
-                const isMCP = result.finalPrompt?.includes("Using Model Context Protocol");
+                const isMCP = result.usedMCP || result.finalPrompt?.includes("Using Model Context Protocol");
                 
                 return (
                   <div key={resultIndex} className="border-t pt-3">
@@ -179,9 +179,9 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
   return (
     <div>
       <h2 className="text-xl font-bold">Action Record Details</h2>
-      {actionRecord ? (
+      {actionData ? (
         <pre className="mt-4 p-4 bg-muted rounded-md overflow-auto text-xs">
-          {JSON.stringify(actionRecord, null, 2)}
+          {JSON.stringify(actionData, null, 2)}
         </pre>
       ) : (
         <div>No action data found.</div>

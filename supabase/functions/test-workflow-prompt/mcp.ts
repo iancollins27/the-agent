@@ -1,3 +1,4 @@
+
 /**
  * Model Context Protocol (MCP) implementation for structured AI interactions
  */
@@ -213,7 +214,7 @@ export function formatForOpenAI(context: MCPContext): any {
 export function formatForClaude(context: MCPContext): any {
   // Claude has a different format for tools, so we need to adapt
   return {
-    model: "claude-3-haiku-20240307",
+    model: "claude-3-5-haiku-20241022", // Use Claude 3.5 by default
     messages: context.messages,
     tools: context.tools ? context.tools.map(tool => ({
       name: tool.name,

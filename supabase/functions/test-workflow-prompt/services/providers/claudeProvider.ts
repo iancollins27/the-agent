@@ -1,5 +1,6 @@
 
 const claudeApiKey = Deno.env.get("CLAUDE_API_KEY") || "";
+import { formatForClaude } from "../../mcp.ts";
 
 export async function callClaude(prompt: string, model: string = "claude-3-5-haiku-20241022") {
   if (!claudeApiKey) {

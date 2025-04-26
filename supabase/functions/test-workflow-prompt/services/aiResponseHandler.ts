@@ -1,4 +1,3 @@
-
 import { extractJsonFromResponse, generateMockResult } from "../utils.ts";
 import { createActionRecord, updatePromptRunWithResult } from "../database/index.ts";
 import { callAIProvider, callAIProviderWithMCP } from "../ai-providers.ts";
@@ -77,16 +76,18 @@ async function handleMCPResponse(
   projectId: string | null,
   contextData: any
 ) {
+  const modelToUse = aiProvider === "claude" ? "claude-3-5-haiku-20241022" : aiModel;
+  
   const systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
   let mcpContext: MCPContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
   
-  const rawResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
+  const rawResponse = await callAIProviderWithMCP(aiProvider, modelToUse, mcpContext);
   
   const toolCalls = aiProvider === "openai" 
     ? extractToolCallsFromOpenAI(rawResponse)
     : extractToolCallsFromClaude(rawResponse);
   
-  return await processToolCalls(supabase, toolCalls, mcpContext, aiProvider, aiModel, promptRunId, projectId, contextData);
+  return await processToolCalls(supabase, toolCalls, mcpContext, aiProvider, modelToUse, promptRunId, projectId, contextData);
 }
 
 async function handleStandardResponse(
@@ -108,7 +109,6 @@ async function handleStandardResponse(
   return { result };
 }
 
-// Process the tool calls from MCP and extract results
 async function processToolCalls(
   supabase: any,
   toolCalls: any[],
@@ -127,7 +127,6 @@ async function processToolCalls(
   let knowledgeResults = [];
   
   if (toolCalls.length === 0) {
-    // No tool calls, get the assistant's message
     const assistantMessage = mcpContext.messages.find(msg => msg.role === 'assistant');
     result = assistantMessage?.content || 'No action determined by the AI.';
   } else {
@@ -136,17 +135,14 @@ async function processToolCalls(
         const decision = toolCall.arguments.decision;
         const reason = toolCall.arguments.reason;
         
-        // Update context with tool result
         mcpContext = addToolResult(mcpContext, 'detect_action', { success: true, result: 'Action detected' });
         
-        // Format result as JSON
         result = JSON.stringify({
           decision,
           reason,
           ...toolCall.arguments
         }, null, 2);
         
-        // If action needed, create an action record
         if (decision === 'ACTION_NEEDED' && projectId && promptRunId) {
           try {
             actionRecordId = await createActionRecord(supabase, promptRunId, projectId, toolCall.arguments);
@@ -154,7 +150,6 @@ async function processToolCalls(
             console.error('Error creating action record:', error);
           }
         } 
-        // If future reminder, set it
         else if (decision === 'SET_FUTURE_REMINDER' && projectId) {
           reminderSet = true;
           const daysToAdd = toolCall.arguments.days_until_check || 7;
@@ -168,7 +163,6 @@ async function processToolCalls(
               
             const currentValue = project?.next_check_date;
             
-            // Calculate and set next check date
             const today = new Date();
             const nextDate = new Date(today);
             nextDate.setDate(today.getDate() + daysToAdd);
@@ -189,10 +183,8 @@ async function processToolCalls(
         }
       } 
       else if (toolCall.name === 'generate_action') {
-        // Similar handling for generate_action tool
         const actionType = toolCall.arguments.action_type;
         
-        // Add to result
         const actionResult = {
           action_type: actionType,
           ...toolCall.arguments
@@ -200,7 +192,6 @@ async function processToolCalls(
         
         result = JSON.stringify(actionResult, null, 2);
         
-        // Create action record if needed
         if (projectId && promptRunId) {
           try {
             actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionResult);
@@ -218,15 +209,12 @@ async function processToolCalls(
             const results = await queryKnowledgeBase(supabase, query, lookupProjectId);
             knowledgeResults = results;
             
-            // Format the results for the AI
             const formattedResults = formatKnowledgeResults(results);
             
-            // Add results to the MCP context
             mcpContext = addToolResult(mcpContext, 'knowledge_base_lookup', {
               results: formattedResults
             });
             
-            // If we need to make a follow-up call with the new context
             if (results.length > 0) {
               const followUpResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
               const followUpMessage = aiProvider === 'openai'
@@ -255,4 +243,3 @@ async function processToolCalls(
     rawResponse: mcpContext
   };
 }
-
