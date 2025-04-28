@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PromptRun } from '../admin/types';
 import PromptRunsTable from '../admin/PromptRunsTable';
 import RooferPromptRunsCard from './RooferPromptRunsCard';
@@ -36,11 +36,19 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   onRunReviewed,
   onPromptRerun
 }) => {
+  // Filter prompt runs based on hideReviewed prop
+  const filteredPromptRuns = useMemo(() => {
+    if (hideReviewed) {
+      return promptRuns.filter(run => !run.reviewed);
+    }
+    return promptRuns;
+  }, [promptRuns, hideReviewed]);
+  
   // Function to group prompt runs by roofer contact
   const groupPromptRunsByRoofer = () => {
     const groups: { [key: string]: PromptRun[] } = {};
     
-    promptRuns.forEach(run => {
+    filteredPromptRuns.forEach(run => {
       const rooferKey = run.project_roofer_contact || 'Unassigned';
       
       if (!groups[rooferKey]) {
@@ -67,7 +75,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
   
-  if (promptRuns.length === 0) {
+  if (filteredPromptRuns.length === 0) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <h3 className="text-lg font-medium mb-2">No Prompt Runs Found</h3>
@@ -101,12 +109,12 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-slate-200">
           <PromptRunsTable 
-            promptRuns={promptRuns}
+            promptRuns={filteredPromptRuns}
             onRatingChange={onRatingChange}
             onViewDetails={onViewDetails}
-            hideReviewed={hideReviewed}
             onRunReviewed={onRunReviewed}
             onPromptRerun={onPromptRerun}
+            reviewFilter="all" // Set to "all" since we're already pre-filtering
           />
         </div>
       )}

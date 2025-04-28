@@ -33,6 +33,7 @@ const RooferPromptRunsCard: React.FC<RooferPromptRunsCardProps> = ({
           onViewDetails={onViewDetails}
           onRunReviewed={onRunReviewed}
           onPromptRerun={onPromptRerun}
+          reviewFilter="all" // Set to "all" since we're already pre-filtering
         />
       </CardContent>
     </Card>

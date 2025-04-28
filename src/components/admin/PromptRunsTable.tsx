@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { 
   Table, 
@@ -22,8 +23,8 @@ interface PromptRunsTableProps {
   onViewDetails: (promptRun: PromptRun) => void;
   onRunReviewed?: (promptRunId: string) => void;
   reviewFilter?: string;
-  hideReviewed?: boolean; // Kept for backward compatibility
-  onPromptRerun?: () => void; // New callback to refresh data after rerun
+  hideReviewed?: boolean; // Kept for backward compatibility but will be ignored
+  onPromptRerun?: () => void; // Callback to refresh data after rerun
 }
 
 const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
@@ -32,7 +33,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   onViewDetails,
   onRunReviewed,
   reviewFilter = "all", // Default to showing all
-  hideReviewed = false, // Deprecated, kept for backward compatibility
+  hideReviewed = false, // Deprecated, kept for backward compatibility but ignored
   onPromptRerun
 }) => {
   const [rerunningPrompts, setRerunningPrompts] = useState<Record<string, boolean>>({});
@@ -118,15 +119,12 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     }
   };
 
-  // Filter runs based on the reviewFilter prop
+  // Filter runs based only on the reviewFilter prop, ignore hideReviewed
+  // The parent component should now handle filtering by reviewed status
   const filteredPromptRuns = promptRuns.filter(run => {
     if (reviewFilter === "all") return true;
     if (reviewFilter === "reviewed") return run.reviewed === true;
     if (reviewFilter === "not-reviewed") return run.reviewed !== true;
-    
-    // For backward compatibility
-    if (hideReviewed) return !run.reviewed;
-    
     return true;
   });
 
