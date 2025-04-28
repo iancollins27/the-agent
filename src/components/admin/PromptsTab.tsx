@@ -9,8 +9,6 @@ import PromptEditor from "./PromptEditor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
-type DbWorkflowType = WorkflowType;
-
 const PromptsTab = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
