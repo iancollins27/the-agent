@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import PromptRunsTable from '../PromptRunsTable';
 import PromptRunDetails from '../PromptRunDetails';
@@ -8,6 +7,7 @@ import PromptRunLoader from './PromptRunLoader';
 import EmptyPromptRunsState from './EmptyPromptRunsState';
 import { usePromptRunData } from './usePromptRunData';
 import { usePromptRunActions } from './usePromptRunActions';
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import TablePagination from '../tables/TablePagination';
@@ -39,23 +39,19 @@ const PromptRunsTab: React.FC = () => {
   };
 
   const handlePromptRerun = () => {
-    // Reset to first page when refreshing data
     setCurrentPage(1);
     fetchPromptRuns();
   };
 
-  // Filter runs based on review status and address search
   const filteredPromptRuns = useMemo(() => {
     let filtered = [...promptRuns];
     
-    // Apply review filter
     if (reviewFilter === "reviewed") {
       filtered = filtered.filter(run => run.reviewed === true);
     } else if (reviewFilter === "not-reviewed") {
       filtered = filtered.filter(run => run.reviewed !== true);
     }
     
-    // Apply address search filter
     if (searchAddress.trim()) {
       const searchTerm = searchAddress.toLowerCase().trim();
       filtered = filtered.filter(run => 
@@ -66,7 +62,6 @@ const PromptRunsTab: React.FC = () => {
     return filtered;
   }, [promptRuns, reviewFilter, searchAddress]);
 
-  // Reset to first page when filters change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [reviewFilter, searchAddress]);
