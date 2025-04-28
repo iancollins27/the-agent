@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RerunPromptResult } from './types';
 
 /**
- * Re-runs a specific prompt run with the same configuration but using the latest AI model
+ * Re-runs a specific prompt run with the same configuration but using the latest AI model and prompt template
  * 
  * @param promptRunId - The ID of the prompt run to re-execute
  * @returns An object with the new promptRunId if successful or an error message
@@ -32,7 +32,24 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       };
     }
 
-    // Step 2: Get the latest AI configuration from company settings
+    // Step 2: Get the latest prompt template for the same type
+    const { data: latestPrompt, error: promptError } = await supabase
+      .from('workflow_prompts')
+      .select('id, prompt_text')
+      .eq('type', originalRun.workflow_prompts?.type)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (promptError || !latestPrompt) {
+      console.error("Could not fetch the latest prompt template:", promptError);
+      return {
+        success: false,
+        error: `Could not fetch the latest prompt template: ${promptError?.message || "Not found"}`
+      };
+    }
+
+    // Step 3: Get the latest AI configuration from company settings
     const { data: aiConfig, error: configError } = await supabase
       .from('ai_config')
       .select('provider, model')
@@ -44,9 +61,42 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       console.warn("Could not fetch AI configuration, using default values:", configError);
     }
 
-    // Step 3: Call the test-workflow-prompt edge function with the original parameters
+    // Step 4: Call the test-workflow-prompt edge function with the original parameters
     const promptType = originalRun.workflow_prompts?.type || 'unknown';
     
+    // Fetch project details to get the most current data
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select(`
+        id, 
+        summary, 
+        next_step, 
+        project_track,
+        project_tracks:project_track (name, "track base prompt", Roles),
+        companies (name),
+        property_address
+      `)
+      .eq('id', originalRun.project_id)
+      .single();
+
+    if (projectError) {
+      console.warn("Could not fetch project details:", projectError);
+    }
+
+    // Create context data for the prompt
+    const contextData = {
+      summary: projectData?.summary || '',
+      next_step: projectData?.next_step || '',
+      company_name: projectData?.companies?.name || 'Unknown Company',
+      track_name: projectData?.project_tracks?.name || 'Default Track',
+      track_base_prompt: projectData?.project_tracks?.["track base prompt"] || '',
+      track_roles: projectData?.project_tracks?.Roles || '',
+      current_date: new Date().toISOString().split('T')[0],
+      milestone_instructions: '',
+      action_description: 'Re-run from dashboard',
+      property_address: projectData?.property_address || ''
+    };
+
     // Use the full URL with the project ID from the environment
     const response = await fetch(`https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/test-workflow-prompt`, {
       method: 'POST',
@@ -56,9 +106,10 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       },
       body: JSON.stringify({
         promptType: promptType,
-        promptText: originalRun.prompt_input,
+        promptText: latestPrompt.prompt_text,  // Using the latest prompt text from the template
         projectId: originalRun.project_id,
-        workflowPromptId: originalRun.workflow_prompt_id,
+        workflowPromptId: latestPrompt.id,     // Using the latest prompt ID
+        contextData: contextData,              // Passing the context data
         aiProvider: aiConfig?.provider || 'openai',
         aiModel: aiConfig?.model || 'gpt-4o',
         useMCP: false,

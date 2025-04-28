@@ -64,6 +64,7 @@ const TestRunner = ({
             next_step,
             company_id,
             project_track,
+            property_address,
             companies(name),
             project_tracks(name, "track base prompt", Roles)
           `)
@@ -83,7 +84,8 @@ const TestRunner = ({
           current_date: new Date().toISOString().split('T')[0],
           milestone_instructions: '',
           action_description: 'Sample action for testing',
-          isMultiProjectTest: isMultiProjectTest // Add this flag to the context data
+          isMultiProjectTest: isMultiProjectTest, // Add this flag to the context data
+          property_address: projectData.property_address || ''  // Include the property address
         };
         
         // Get milestone instructions if this is a next step
