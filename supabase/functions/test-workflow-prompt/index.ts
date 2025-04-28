@@ -15,6 +15,7 @@ export const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -29,7 +30,20 @@ serve(async (req) => {
       throw new Error("Invalid JSON in request body");
     }
     
-    return await handleRequest(supabase, requestBody);
+    const response = await handleRequest(supabase, requestBody);
+    
+    // Make sure CORS headers are added to the response
+    const headers = response.headers || new Headers();
+    
+    // Add CORS headers to the response
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      headers.set(key, value);
+    });
+    
+    return new Response(response.body, {
+      status: response.status,
+      headers: headers
+    });
   } catch (error) {
     console.error("Error in test-workflow-prompt function:", error);
     

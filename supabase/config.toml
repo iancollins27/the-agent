@@ -102,3 +102,5 @@ gcp_jwt_path = "supabase/gcloud.json"
 verify_jwt = true
 [functions.send-multi-project-message]
 verify_jwt = true
+[functions.test-workflow-prompt]
+verify_jwt = true
