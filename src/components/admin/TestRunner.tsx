@@ -64,14 +64,22 @@ const TestRunner = ({
             next_step,
             company_id,
             project_track,
-            property_address,
+            Address,
             companies(name),
             project_tracks(name, "track base prompt", Roles)
           `)
           .eq('id', projectId)
           .single();
         
-        if (projectError) throw projectError;
+        if (projectError) {
+          console.error("Error fetching project:", projectError);
+          throw projectError;
+        }
+        
+        if (!projectData) {
+          console.error("No project data found for ID:", projectId);
+          throw new Error("Project not found");
+        }
         
         // Prepare context data
         const contextData = {
@@ -84,8 +92,8 @@ const TestRunner = ({
           current_date: new Date().toISOString().split('T')[0],
           milestone_instructions: '',
           action_description: 'Sample action for testing',
-          isMultiProjectTest: isMultiProjectTest, // Add this flag to the context data
-          property_address: projectData.property_address || ''  // Include the property address
+          isMultiProjectTest: isMultiProjectTest,
+          property_address: projectData.Address || ''  // Use the Address field
         };
         
         // Get milestone instructions if this is a next step

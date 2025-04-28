@@ -74,27 +74,38 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
         project_track,
         project_tracks:project_track (name, "track base prompt", Roles),
         companies (name),
-        property_address
+        Address
       `)
       .eq('id', originalRun.project_id)
       .single();
 
     if (projectError) {
       console.warn("Could not fetch project details:", projectError);
+      return {
+        success: false,
+        error: `Could not fetch project details: ${projectError.message}`
+      };
+    }
+
+    if (!projectData) {
+      return {
+        success: false,
+        error: "Project not found"
+      };
     }
 
     // Create context data for the prompt
     const contextData = {
-      summary: projectData?.summary || '',
-      next_step: projectData?.next_step || '',
-      company_name: projectData?.companies?.name || 'Unknown Company',
-      track_name: projectData?.project_tracks?.name || 'Default Track',
-      track_base_prompt: projectData?.project_tracks?.["track base prompt"] || '',
-      track_roles: projectData?.project_tracks?.Roles || '',
+      summary: projectData.summary || '',
+      next_step: projectData.next_step || '',
+      company_name: projectData.companies?.name || 'Unknown Company',
+      track_name: projectData.project_tracks?.name || 'Default Track',
+      track_base_prompt: projectData.project_tracks?.["track base prompt"] || '',
+      track_roles: projectData.project_tracks?.Roles || '',
       current_date: new Date().toISOString().split('T')[0],
       milestone_instructions: '',
       action_description: 'Re-run from dashboard',
-      property_address: projectData?.property_address || ''
+      property_address: projectData.Address || ''  // Use the Address field
     };
 
     // Use the full URL with the project ID from the environment
