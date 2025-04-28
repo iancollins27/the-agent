@@ -99,7 +99,6 @@ const FeedbackTab = () => {
                       <PromptRunRating 
                         rating={selectedRun.feedback_rating}
                         onRatingChange={() => {}}
-                        readOnly={true}
                         size="sm"
                       />
                     </div>
