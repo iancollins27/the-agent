@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import PromptRunsTable from '../PromptRunsTable';
 import PromptRunDetails from '../PromptRunDetails';
@@ -34,6 +35,12 @@ const PromptRunsTab: React.FC = () => {
         run.id === promptRunId ? { ...run, reviewed: true } : run
       )
     );
+  };
+
+  const handlePromptRerun = () => {
+    // Reset to first page when refreshing data
+    setCurrentPage(1);
+    fetchPromptRuns();
   };
 
   const paginatedPromptRuns = promptRuns.slice(
@@ -86,6 +93,7 @@ const PromptRunsTab: React.FC = () => {
             onViewDetails={viewPromptRunDetails} 
             onRunReviewed={handleRunReviewed}
             reviewFilter={reviewFilter}
+            onPromptRerun={handlePromptRerun}
           />
           
           <div className="flex justify-center mt-4">
@@ -104,6 +112,7 @@ const PromptRunsTab: React.FC = () => {
         onOpenChange={setDetailsOpen}
         onRatingChange={handleRatingChange}
         onFeedbackChange={handleFeedbackChange}
+        onPromptRerun={handlePromptRerun}
       />
     </div>
   );

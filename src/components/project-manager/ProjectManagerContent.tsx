@@ -1,20 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2 } from "lucide-react";
-import { PromptRun } from '../admin/types';
-import EmptyPromptRuns from '../admin/EmptyPromptRuns';
-import PromptRunsTable from '../admin/PromptRunsTable';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import MultiProjectMessage from './MultiProjectMessage';
-import TablePagination from '../admin/tables/TablePagination';
 
-const ITEMS_PER_PAGE = 10;
+import React from 'react';
+import { PromptRun } from '../admin/types';
+import PromptRunsTable from '../admin/PromptRunsTable';
+import RooferPromptRunsCard from './RooferPromptRunsCard';
 
 interface ProjectManagerContentProps {
   loading: boolean;
   promptRuns: PromptRun[];
   hideReviewed: boolean;
-  groupByRoofer?: boolean;
   getEmptyStateMessage: () => string;
+  groupByRoofer: boolean;
   debugInfo: {
     userId?: string;
     companyId?: string;
@@ -26,126 +21,95 @@ interface ProjectManagerContentProps {
   onViewDetails: (run: PromptRun) => void;
   onRatingChange: (promptRunId: string, rating: number | null) => void;
   onRunReviewed: (promptRunId: string) => void;
+  onPromptRerun?: () => void;
 }
 
 const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   loading,
   promptRuns,
   hideReviewed,
-  groupByRoofer = false,
   getEmptyStateMessage,
+  groupByRoofer,
   debugInfo,
   onViewDetails,
   onRatingChange,
-  onRunReviewed
+  onRunReviewed,
+  onPromptRerun
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [hideReviewed, groupByRoofer]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  const displayedRuns = hideReviewed 
-    ? promptRuns.filter(run => !run.reviewed)
-    : promptRuns;
-
-  const paginatedRuns = displayedRuns.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-  
-  const totalPages = Math.ceil(displayedRuns.length / ITEMS_PER_PAGE);
-
-  // Calculate the displayed projects count (after filtering for hideReviewed)
-  
-  // Get unique project IDs to show actual project count
-  const uniqueProjectIds = new Set(displayedRuns.map(run => run.project_id).filter(Boolean));
-  const projectCount = uniqueProjectIds.size;
-
-  if (promptRuns.length === 0) {
-    return (
-      <EmptyPromptRuns
-        message={getEmptyStateMessage()}
-        debugInfo={debugInfo}
-      />
-    );
-  }
-
-  if (groupByRoofer) {
-    const rooferGroups: Record<string, PromptRun[]> = {};
+  // Function to group prompt runs by roofer contact
+  const groupPromptRunsByRoofer = () => {
+    const groups: { [key: string]: PromptRun[] } = {};
     
-    displayedRuns.forEach(run => {
-      const rooferName = run.project_roofer_contact || 'Unassigned';
-      if (!rooferGroups[rooferName]) {
-        rooferGroups[rooferName] = [];
+    promptRuns.forEach(run => {
+      const rooferKey = run.project_roofer_contact || 'Unassigned';
+      
+      if (!groups[rooferKey]) {
+        groups[rooferKey] = [];
       }
-      rooferGroups[rooferName].push(run);
+      
+      groups[rooferKey].push(run);
     });
     
+    return Object.entries(groups).map(([roofer, runs]) => ({
+      roofer,
+      runs
+    }));
+  };
+  
+  const rooferGroups = groupByRoofer ? groupPromptRunsByRoofer() : [];
+  
+  if (loading) {
     return (
-      <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <p className="text-sm text-muted-foreground">
-            Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({displayedRuns.length} {displayedRuns.length === 1 ? 'prompt run' : 'prompt runs'})
-          </p>
-        </div>
-        
-        {Object.entries(rooferGroups).map(([rooferName, runs]) => (
-          <Card key={rooferName} className="overflow-hidden">
-            <CardHeader className="bg-muted/50 flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">{rooferName}</CardTitle>
-              <MultiProjectMessage 
-                rooferName={rooferName} 
-                projects={runs} 
-              />
-            </CardHeader>
-            <CardContent className="p-0">
-              <PromptRunsTable 
-                promptRuns={runs} 
-                onRatingChange={onRatingChange} 
-                onViewDetails={onViewDetails}
-                onRunReviewed={onRunReviewed}
-                hideReviewed={hideReviewed}
-              />
-            </CardContent>
-          </Card>
-        ))}
+      <div className="animate-pulse space-y-4">
+        <div className="h-12 bg-slate-200 rounded"></div>
+        <div className="h-64 bg-slate-200 rounded"></div>
       </div>
     );
   }
-
+  
+  if (promptRuns.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+        <h3 className="text-lg font-medium mb-2">No Prompt Runs Found</h3>
+        <p className="text-gray-600 whitespace-pre-line">{getEmptyStateMessage()}</p>
+        
+        {/* Debug info */}
+        <div className="mt-6 p-4 bg-slate-50 rounded text-xs text-slate-500">
+          <p>Debug info:</p>
+          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          Showing {projectCount} {projectCount === 1 ? 'project' : 'projects'} ({displayedRuns.length} {displayedRuns.length === 1 ? 'prompt run' : 'prompt runs'})
-        </p>
-      </div>
-      
-      <PromptRunsTable 
-        promptRuns={paginatedRuns} 
-        onRatingChange={onRatingChange} 
-        onViewDetails={onViewDetails}
-        onRunReviewed={onRunReviewed}
-        hideReviewed={hideReviewed}
-      />
-      
-      <div className="flex justify-center mt-4">
-        <TablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      </div>
+    <div>
+      {groupByRoofer ? (
+        <div className="space-y-6">
+          {rooferGroups.map(({ roofer, runs }) => (
+            <RooferPromptRunsCard
+              key={roofer}
+              roofer={roofer}
+              promptRuns={runs}
+              onViewDetails={onViewDetails}
+              onRatingChange={onRatingChange}
+              onRunReviewed={onRunReviewed}
+              onPromptRerun={onPromptRerun}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+          <PromptRunsTable 
+            promptRuns={promptRuns}
+            onRatingChange={onRatingChange}
+            onViewDetails={onViewDetails}
+            hideReviewed={hideReviewed}
+            onRunReviewed={onRunReviewed}
+            onPromptRerun={onPromptRerun}
+          />
+        </div>
+      )}
     </div>
   );
 };

@@ -11,7 +11,9 @@ import PromptRunRating from './PromptRunRating';
 import { PromptRun } from './types';
 import PromptRunActions from './PromptRunActions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, RefreshCw } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import { rerunPrompt } from "@/utils/promptRunsApi";
 
 type PromptRunDetailsProps = {
   promptRun: PromptRun | null;
@@ -22,6 +24,7 @@ type PromptRunDetailsProps = {
     description?: string; 
     tags?: string[] 
   }) => void;
+  onPromptRerun?: () => void; // New prop to handle refresh after a re-run
 };
 
 const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({ 
@@ -29,11 +32,13 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
   open,
   onOpenChange,
   onRatingChange,
-  onFeedbackChange
+  onFeedbackChange,
+  onPromptRerun
 }) => {
   const [feedbackDescription, setFeedbackDescription] = useState<string>('');
   const [feedbackTags, setFeedbackTags] = useState<string>('');
   const [activeTab, setActiveTab] = useState('details');
+  const [isRerunning, setIsRerunning] = useState(false);
 
   // Initialize state when promptRun changes
   React.useEffect(() => {
@@ -59,29 +64,82 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
     }
   };
 
+  const handleRerunPrompt = async () => {
+    if (!promptRun) return;
+    
+    setIsRerunning(true);
+    try {
+      const result = await rerunPrompt(promptRun.id);
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Prompt has been re-run. New prompt run created.`,
+        });
+        
+        // Close the dialog and refresh data
+        onOpenChange(false);
+        
+        if (onPromptRerun) {
+          onPromptRerun();
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to re-run prompt: ${result.error}`,
+        });
+      }
+    } catch (error) {
+      console.error("Error re-running prompt:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred while re-running the prompt",
+      });
+    } finally {
+      setIsRerunning(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Prompt Run Details</DialogTitle>
-          <DialogDescription>
-            Created at {new Date(promptRun.created_at).toLocaleString()}
-          </DialogDescription>
-          {/* Add project address display */}
-          <div className="mt-2 text-sm flex items-center justify-between">
-            {promptRun.project_address && (
-              <Badge variant="outline" className="font-normal">
-                {promptRun.project_address}
-              </Badge>
-            )}
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle>Prompt Run Details</DialogTitle>
+            <DialogDescription>
+              Created at {new Date(promptRun.created_at).toLocaleString()}
+            </DialogDescription>
+            {/* Add project address display */}
+            <div className="mt-2 text-sm flex items-center">
+              {promptRun.project_address && (
+                <Badge variant="outline" className="font-normal">
+                  {promptRun.project_address}
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            {/* Re-run button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRerunPrompt}
+              disabled={isRerunning}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${isRerunning ? 'animate-spin' : ''}`} />
+              {isRerunning ? "Running..." : "Re-run"}
+            </Button>
             
-            {/* Add CRM link button */}
+            {/* CRM link button */}
             {promptRun.project_crm_url && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.open(promptRun.project_crm_url, '_blank')}
-                className="ml-2"
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 CRM Record

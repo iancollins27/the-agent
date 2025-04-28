@@ -119,6 +119,10 @@ const ProjectManager: React.FC = () => {
     );
   };
 
+  const handlePromptRerun = () => {
+    fetchPromptRuns();
+  };
+
   const getEmptyStateMessage = () => {
     if (!user) {
       return "Please log in to view your project data";
@@ -215,6 +219,7 @@ const ProjectManager: React.FC = () => {
           onViewDetails={viewPromptRunDetails}
           onRatingChange={handleRatingChange}
           onRunReviewed={handleRunReviewed}
+          onPromptRerun={handlePromptRerun}
         />
 
         <PromptRunDetails 
@@ -223,6 +228,7 @@ const ProjectManager: React.FC = () => {
           onOpenChange={setDetailsOpen}
           onRatingChange={handleRatingChange}
           onFeedbackChange={handleFeedbackChange}
+          onPromptRerun={handlePromptRerun}
         />
       </div>
     </div>

@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Table, 
   TableBody, 
@@ -10,11 +9,12 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Star, ExternalLink, Eye, CheckSquare } from "lucide-react";
+import { Star, ExternalLink, Eye, CheckSquare, RefreshCw } from "lucide-react";
 import { PromptRun } from './types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { rerunPrompt } from "@/utils/promptRunsApi";
 
 interface PromptRunsTableProps {
   promptRuns: PromptRun[];
@@ -23,6 +23,7 @@ interface PromptRunsTableProps {
   onRunReviewed?: (promptRunId: string) => void;
   reviewFilter?: string;
   hideReviewed?: boolean; // Kept for backward compatibility
+  onPromptRerun?: () => void; // New callback to refresh data after rerun
 }
 
 const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
@@ -31,8 +32,11 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   onViewDetails,
   onRunReviewed,
   reviewFilter = "all", // Default to showing all
-  hideReviewed = false // Deprecated, kept for backward compatibility
+  hideReviewed = false, // Deprecated, kept for backward compatibility
+  onPromptRerun
 }) => {
+  const [rerunningPrompts, setRerunningPrompts] = useState<Record<string, boolean>>({});
+  
   // Function to render stars for rating
   const renderStars = (promptRun: PromptRun) => {
     const rating = promptRun.feedback_rating || 0;
@@ -53,7 +57,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
 
   const handleMarkAsReviewed = async (promptRun: PromptRun) => {
     try {
-      // Update the database to mark the prompt run as reviewed
       const { error } = await supabase
         .from('prompt_runs')
         .update({ reviewed: true })
@@ -78,6 +81,40 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
         title: "Error",
         description: "Failed to mark prompt run as reviewed",
       });
+    }
+  };
+
+  const handleRerunPrompt = async (promptRun: PromptRun) => {
+    try {
+      setRerunningPrompts((prev) => ({ ...prev, [promptRun.id]: true }));
+      
+      const result = await rerunPrompt(promptRun.id);
+      
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Prompt has been re-run. New prompt run created with ID: ${result.newPromptRunId}`,
+        });
+        
+        if (onPromptRerun) {
+          onPromptRerun();
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to re-run prompt: ${result.error}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error re-running prompt:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred while re-running the prompt",
+      });
+    } finally {
+      setRerunningPrompts((prev) => ({ ...prev, [promptRun.id]: false }));
     }
   };
 
@@ -155,6 +192,17 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 >
                   <CheckSquare className="h-4 w-4 mr-1" />
                   {run.reviewed ? "Reviewed" : "Mark Reviewed"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                  onClick={() => handleRerunPrompt(run)}
+                  disabled={rerunningPrompts[run.id]}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${rerunningPrompts[run.id] ? 'animate-spin' : ''}`} />
+                  {rerunningPrompts[run.id] ? "Running..." : "Re-run"}
                 </Button>
               </TableCell>
             </TableRow>
