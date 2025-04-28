@@ -112,14 +112,6 @@ const TestRunner = ({
           
           if (promptError) throw promptError;
           
-          // Ensure we have prompt text
-          if (!promptData.prompt_text) {
-            throw new Error(`No prompt text available for workflow prompt ID: ${promptId}`);
-          }
-          
-          // Log the prompt text for debugging
-          console.log(`Running test with prompt type: ${promptData.type}, text begins with: ${promptData.prompt_text.substring(0, 50)}...`);
-          
           // Call the edge function to test the prompt
           const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
             body: {

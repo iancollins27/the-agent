@@ -32,15 +32,6 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       };
     }
 
-    // Validate that we have prompt text
-    if (!originalRun.prompt_input) {
-      console.error("Original prompt run has no prompt text");
-      return {
-        success: false,
-        error: "The original prompt had no text content to re-run"
-      };
-    }
-
     // Step 2: Get the latest AI configuration from company settings
     const { data: aiConfig, error: configError } = await supabase
       .from('ai_config')
@@ -55,8 +46,6 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
 
     // Step 3: Call the test-workflow-prompt edge function with the original parameters
     const promptType = originalRun.workflow_prompts?.type || 'unknown';
-    
-    console.log("Re-running prompt with text:", originalRun.prompt_input.substring(0, 100) + "...");
     
     // Use the full URL with the project ID from the environment
     const response = await fetch(`https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/test-workflow-prompt`, {
