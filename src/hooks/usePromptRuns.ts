@@ -35,7 +35,7 @@ export const usePromptRuns = ({
     setLoading(true);
     try {
       // First, fetch prompt runs
-      let formattedData = await fetchData(statusFilter);
+      let formattedData: PromptRun[] = await fetchData(statusFilter);
       
       // Filter by project manager if selected
       if (projectManagerFilter && formattedData.length > 0) {

@@ -15,7 +15,7 @@ export const usePromptRunsFetcher = () => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (crm_id, Address),
+          projects:project_id (crm_id, Address, next_step),
           workflow_prompts:workflow_prompt_id (type)
         `)
         .order('created_at', { ascending: false });
@@ -36,10 +36,10 @@ export const usePromptRunsFetcher = () => {
         
         const rooferContactMap = await fetchRooferContacts(uniqueProjectIds);
         
-        // Modify this line to add the rooferContactMap to each prompt run
+        // Get formatted data first
         const formattedData = formatPromptRunData(data);
         
-        // After formatting, add the roofer contact to each prompt run manually
+        // Then add the roofer contact information to each prompt run
         return formattedData.map(run => {
           const projectId = run.project_id;
           const rooferContact = projectId ? rooferContactMap.get(projectId) : null;

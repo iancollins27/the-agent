@@ -5,7 +5,7 @@ export interface PromptRun {
   project_name?: string;
   project_address?: string;
   project_manager?: string;
-  project_roofer_contact?: string;
+  project_roofer_contact?: string | null;
   project_crm_url?: string | null;
   prompt_text?: string;
   result?: string;
