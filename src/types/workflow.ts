@@ -1,5 +1,6 @@
-
-export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 'multi_project_message_generation';
+export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
+  'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 
+  'multi_project_message_generation';
 
 export type WorkflowPrompt = {
   id: string;

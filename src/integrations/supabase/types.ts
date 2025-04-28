@@ -1181,6 +1181,7 @@ export type Database = {
         | "action_execution"
         | "action_detection_execution"
         | "multi_project_analysis"
+        | "multi_project_message_generation"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1306,6 +1307,7 @@ export const Constants = {
         "action_execution",
         "action_detection_execution",
         "multi_project_analysis",
+        "multi_project_message_generation",
       ],
     },
   },
