@@ -6,6 +6,7 @@ import { handleRequest } from "./services/requestHandler.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
+console.log("Starting test-workflow-prompt function, connecting to Supabase at:", supabaseUrl);
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const corsHeaders = {
@@ -15,8 +16,11 @@ export const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log(`Received ${req.method} request to test-workflow-prompt`);
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log("Handling OPTIONS preflight request");
     return new Response("ok", { headers: corsHeaders });
   }
   
@@ -30,6 +34,7 @@ serve(async (req) => {
       throw new Error("Invalid JSON in request body");
     }
     
+    console.log("Processing request through handleRequest");
     const response = await handleRequest(supabase, requestBody);
     
     // Make sure CORS headers are added to the response
@@ -40,6 +45,7 @@ serve(async (req) => {
       headers.set(key, value);
     });
     
+    console.log("Successfully processed request, returning response");
     return new Response(response.body, {
       status: response.status,
       headers: headers
