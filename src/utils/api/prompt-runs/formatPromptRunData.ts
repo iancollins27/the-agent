@@ -14,7 +14,6 @@ export const formatPromptRunData = (data: any[]): PromptRun[] => {
       project_address: run.projects?.Address || null,
       project_crm_url: crmUrl,
       project_next_step: run.projects?.next_step || null,
-      project_roofer_contact: run.roofer_contact || null, // Including the roofer contact
       workflow_prompt_type: run.workflow_prompts?.type || 'Unknown Type',
       workflow_type: run.workflow_prompts?.type,
       prompt_text: run.prompt_input,

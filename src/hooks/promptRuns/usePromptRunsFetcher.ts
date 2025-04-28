@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,7 +35,20 @@ export const usePromptRunsFetcher = () => {
         const uniqueProjectIds = [...new Set(projectIds)];
         
         const rooferContactMap = await fetchRooferContacts(uniqueProjectIds);
-        return formatPromptRunData(data, rooferContactMap);
+        
+        // Modify this line to add the rooferContactMap to each prompt run
+        const formattedData = formatPromptRunData(data);
+        
+        // After formatting, add the roofer contact to each prompt run manually
+        return formattedData.map(run => {
+          const projectId = run.project_id;
+          const rooferContact = projectId ? rooferContactMap.get(projectId) : null;
+          
+          return {
+            ...run,
+            project_roofer_contact: rooferContact || null
+          };
+        });
       }
       
       return [];
