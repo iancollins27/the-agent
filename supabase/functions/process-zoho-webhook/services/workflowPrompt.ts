@@ -25,6 +25,7 @@ export async function generateWorkflowPrompt(
     trackRoles?: string;
     trackBasePrompt?: string;
     isNewProject: boolean;
+    propertyAddress?: string; // Added property address
   }
 ): Promise<{
   summary: string;

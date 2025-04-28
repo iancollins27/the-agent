@@ -1,3 +1,4 @@
+
 export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
   'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 
   'multi_project_message_generation';
@@ -108,7 +109,8 @@ export const availableVariables = {
     { name: "current_date", description: "Today's date" },
     { name: "next_step", description: "The current next step in the project" },
     { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" },
-    { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" }
+    { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" },
+    { name: "property_address", description: "The property address for the project" }
   ],
   multi_project_analysis: [
     { name: "communication_type", description: "Type of communication (SMS, CALL, etc.)" },

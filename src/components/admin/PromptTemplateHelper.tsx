@@ -47,6 +47,8 @@ Project Track: {{track_name}}
 
 Next Step: {{next_step}}
 
+Property Address: {{property_address}}
+
 Today's Date: {{current_date}}
 
 Milestone Instructions:

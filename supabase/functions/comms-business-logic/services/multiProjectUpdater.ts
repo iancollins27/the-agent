@@ -28,7 +28,8 @@ export async function updateProjectWithSpecificInfo(
         id, 
         summary, 
         next_step, 
-        project_track, 
+        project_track,
+        Address,
         project_tracks(name, Roles, "track base prompt")
       `)
       .eq('id', projectId)
@@ -115,7 +116,8 @@ export async function updateProjectWithSpecificInfo(
         id, 
         summary, 
         next_step, 
-        project_track, 
+        project_track,
+        Address,
         project_tracks(name, Roles, "track base prompt")
       `)
       .eq('id', projectId)
@@ -136,7 +138,8 @@ export async function updateProjectWithSpecificInfo(
       current_date: new Date().toISOString().split('T')[0],
       next_step: updatedProject.next_step || '',
       new_data: formattedCommunicationData,
-      is_reminder_check: false
+      is_reminder_check: false,
+      property_address: updatedProject.Address || ''
     };
     
     const { data: actionResult, error: actionWorkflowError } = await supabase.functions.invoke(

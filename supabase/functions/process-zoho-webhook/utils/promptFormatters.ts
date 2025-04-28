@@ -6,7 +6,7 @@
 /**
  * Format the workflow prompt with project data
  * @param promptTemplate Prompt template from the database
- * @param existingSummary Existing project summary if available
+ * @param existingSummary Existing project summary
  * @param projectData Parsed project data
  * @param nextStepInstructions Instructions for the next milestone
  * @param trackRoles Track roles
@@ -50,7 +50,8 @@ export function replaceActionPromptVariables(
   trackBasePrompt: string,
   currentDate: string,
   nextStep: string,
-  milestoneInstructions: string
+  milestoneInstructions: string,
+  propertyAddress: string = ''
 ) {
   const finalPrompt = promptText
     .replace('{{summary}}', summary)
@@ -59,7 +60,8 @@ export function replaceActionPromptVariables(
     .replace('{{track_base_prompt}}', trackBasePrompt || '')
     .replace('{{current_date}}', currentDate)
     .replace('{{next_step}}', nextStep || '')
-    .replace('{{milestone_instructions}}', milestoneInstructions || '');
+    .replace('{{milestone_instructions}}', milestoneInstructions || '')
+    .replace('{{property_address}}', propertyAddress || '');
 
   // Log the final prompt string
   console.log('Final Action Detection Prompt:', finalPrompt);

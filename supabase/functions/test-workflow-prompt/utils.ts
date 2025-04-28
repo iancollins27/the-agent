@@ -1,3 +1,4 @@
+
 export function extractJsonFromResponse(response: string): any {
   try {
     // Try to parse the entire response as JSON

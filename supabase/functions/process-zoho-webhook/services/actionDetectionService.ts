@@ -17,6 +17,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
  * @param milestoneInstructions Milestone instructions
  * @param aiProvider AI provider
  * @param aiModel AI model
+ * @param propertyAddress Property address for the project
  * @returns Result of the action detection workflow
  */
 export async function runActionDetection(
@@ -30,7 +31,8 @@ export async function runActionDetection(
   projectData: any,
   milestoneInstructions: string,
   aiProvider: string,
-  aiModel: string
+  aiModel: string,
+  propertyAddress: string = ''
 ) {
   try {
     console.log('Running action detection and execution prompt...');
@@ -52,7 +54,8 @@ export async function runActionDetection(
       next_step: nextStep || '',
       new_data: JSON.stringify(projectData),
       is_reminder_check: false,
-      milestone_instructions: milestoneInstructions || '' // Include milestone instructions
+      milestone_instructions: milestoneInstructions || '', // Include milestone instructions
+      property_address: propertyAddress || '' // Include property address
     };
     
     console.log('Calling action detection workflow with context:', Object.keys(actionContext));
