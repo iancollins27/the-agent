@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +12,7 @@ import PromptRunActions from './PromptRunActions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
-import { rerunPrompt } from "@/utils/promptRunsApi";
+import { rerunPrompt } from "@/utils/api/prompt-runs";
 
 type PromptRunDetailsProps = {
   promptRun: PromptRun | null;
@@ -24,7 +23,7 @@ type PromptRunDetailsProps = {
     description?: string; 
     tags?: string[] 
   }) => void;
-  onPromptRerun?: () => void; // New prop to handle refresh after a re-run
+  onPromptRerun?: () => void;
 };
 
 const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({ 
@@ -40,7 +39,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
   const [activeTab, setActiveTab] = useState('details');
   const [isRerunning, setIsRerunning] = useState(false);
 
-  // Initialize state when promptRun changes
   React.useEffect(() => {
     if (promptRun) {
       setFeedbackDescription(promptRun.feedback_description || '');
@@ -77,7 +75,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           description: `Prompt has been re-run. New prompt run created.`,
         });
         
-        // Close the dialog and refresh data
         onOpenChange(false);
         
         if (onPromptRerun) {
@@ -111,7 +108,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
             <DialogDescription>
               Created at {new Date(promptRun.created_at).toLocaleString()}
             </DialogDescription>
-            {/* Add project address display */}
             <div className="mt-2 text-sm flex items-center">
               {promptRun.project_address && (
                 <Badge variant="outline" className="font-normal">
@@ -122,7 +118,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           </div>
           
           <div className="flex items-center space-x-2">
-            {/* Re-run button */}
             <Button
               variant="outline"
               size="sm"
@@ -134,7 +129,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
               {isRerunning ? "Running..." : "Re-run"}
             </Button>
             
-            {/* CRM link button */}
             {promptRun.project_crm_url && (
               <Button
                 variant="outline"
@@ -155,7 +149,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
-            {/* Evaluation section at the top of the modal */}
             <Card>
               <CardContent className="p-4 space-y-4">
                 <h3 className="font-medium">Evaluation</h3>
@@ -200,7 +193,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
               </CardContent>
             </Card>
 
-            {/* Prompt Details with improved formatting */}
             <div>
               <h3 className="font-medium mb-2">Prompt Input</h3>
               <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">

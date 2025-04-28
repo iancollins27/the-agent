@@ -1,10 +1,9 @@
-
 import { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { PromptRun } from '@/components/admin/types';
 import { fetchRooferContacts } from './useRooferContacts';
-import { formatPromptRunData } from './formatPromptRunData';
+import { formatPromptRunData } from '@/utils/api/prompt-runs';
 
 export const usePromptRunsFetcher = () => {
   const { toast } = useToast();

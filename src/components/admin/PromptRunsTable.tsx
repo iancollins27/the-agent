@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Table, 
@@ -15,7 +14,7 @@ import { PromptRun } from './types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { rerunPrompt } from "@/utils/promptRunsApi";
+import { rerunPrompt } from "@/utils/api/prompt-runs";
 
 interface PromptRunsTableProps {
   promptRuns: PromptRun[];
