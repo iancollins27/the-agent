@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { PromptRun } from '@/components/admin/types';
 import { toast } from "@/components/ui/use-toast";
@@ -212,9 +213,10 @@ export const rerunPrompt = async (promptRunId: string): Promise<{ success: boole
 
     // Step 2: Get the latest AI configuration from company settings
     const { data: aiConfig, error: configError } = await supabase
-      .from('company_settings')
-      .select('default_ai_provider, default_ai_model')
-      .eq('setting_type', 'ai_provider')
+      .from('ai_config')
+      .select('provider, model')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
 
     if (configError) {
@@ -235,8 +237,8 @@ export const rerunPrompt = async (promptRunId: string): Promise<{ success: boole
         promptText: originalRun.prompt_input,
         projectId: originalRun.project_id,
         workflowPromptId: originalRun.workflow_prompt_id,
-        aiProvider: aiConfig?.default_ai_provider || 'openai',
-        aiModel: aiConfig?.default_ai_model || 'gpt-4o',
+        aiProvider: aiConfig?.provider || 'openai',
+        aiModel: aiConfig?.model || 'gpt-4o',
         useMCP: false,
         initiatedBy: 're-run button',
       })
