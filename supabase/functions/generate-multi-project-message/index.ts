@@ -83,9 +83,41 @@ serve(async (req) => {
 
     console.log(`Found ${actionRecords.length} pending actions`);
 
-    // 4. Use AI to generate a consolidated message based on the collected data
-    console.log('Preparing data for AI processing');
-    
+    // 4. Fetch the workflow prompt from the database
+    const { data: workflowPrompt, error: workflowPromptError } = await supabase
+      .from('workflow_prompts')
+      .select('prompt_text')
+      .eq('type', 'multi_project_message_generation')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (workflowPromptError) {
+      console.error(`Error fetching workflow prompt: ${JSON.stringify(workflowPromptError)}`);
+      // If we can't fetch the prompt, use a default one
+      const defaultPrompt = `
+      You need to create a consolidated message to send to a roofer named {{rooferName}} regarding multiple projects that require their attention.
+      
+      These are the projects and their details:
+      {{projectData}}
+      
+      Your task:
+      1. Analyze each project's latest prompt run and pending actions
+      2. Group projects with similar required actions or status
+      3. Create a concise but comprehensive message that:
+         - Greets the roofer by name
+         - Mentions each project (using the address as identifier)
+         - Clearly states what is needed from the roofer for each project
+         - Groups similar actions when possible
+         - Maintains a professional but friendly tone
+         - Ends with an appropriate closing
+         - Keeps the message under 500 words
+         - ONLY includes actionable items that require the roofer's attention
+      
+      Return ONLY the final message text, with no additional explanations.`;
+      workflowPrompt = { prompt_text: defaultPrompt };
+    }
+
     // Get the OpenAI API key
     const apiKey = Deno.env.get('OPENAI_API_KEY');
     if (!apiKey) {
@@ -122,28 +154,11 @@ serve(async (req) => {
       );
     }
 
-    // Create a prompt for the AI to generate a consolidated message
-    const promptContent = `
-    You need to create a consolidated message to send to a roofer named ${rooferName} regarding multiple projects that require their attention.
-    
-    These are the projects and their details:
-    ${JSON.stringify(projectData, null, 2)}
-    
-    Your task:
-    1. Analyze each project's latest prompt run and pending actions
-    2. Group projects with similar required actions or status
-    3. Create a concise but comprehensive message that:
-       - Greets the roofer by name
-       - Mentions each project (using the address as identifier)
-       - Clearly states what is needed from the roofer for each project
-       - Groups similar actions when possible
-       - Maintains a professional but friendly tone
-       - Ends with an appropriate closing
-       - Keeps the message under 500 words
-       - ONLY includes actionable items that require the roofer's attention
-    
-    Return ONLY the final message text, with no additional explanations.
-    `;
+    // Replace placeholders in the prompt
+    let promptContent = workflowPrompt.prompt_text
+      .replace(/{{rooferName}}/g, rooferName)
+      .replace(/{{projectData}}/g, JSON.stringify(projectData, null, 2))
+      .replace(/{{current_date}}/g, new Date().toISOString().split('T')[0]);
 
     console.log('Sending request to OpenAI');
     
