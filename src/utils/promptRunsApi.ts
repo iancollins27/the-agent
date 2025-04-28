@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { PromptRun } from '@/components/admin/types';
 import { toast } from "@/components/ui/use-toast";
@@ -226,11 +225,12 @@ export const rerunPrompt = async (promptRunId: string): Promise<{ success: boole
     // Step 3: Call the test-workflow-prompt edge function with the original parameters
     const promptType = originalRun.workflow_prompts?.type || 'unknown';
     
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/test-workflow-prompt`, {
+    // Instead of accessing protected properties, use the full URL with the project ID from the environment
+    const response = await fetch(`https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/test-workflow-prompt`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabase.supabaseKey}`
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aWZzeHNyYmx1ZWhvcGFtcXB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4MzA0NjIsImV4cCI6MjA1NTQwNjQ2Mn0.3MYZOhz5kH71qxniwzHDzVzF3PKCulkvACDc8R1pI6I`
       },
       body: JSON.stringify({
         promptType: promptType,
