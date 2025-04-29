@@ -276,6 +276,11 @@ async function processToolCalls(
           if (decision === 'ACTION_NEEDED' && projectId && promptRunId) {
             try {
               console.log("Creating action record");
+              // Add recipient info if not present in toolCall.arguments
+              if (toolCall.arguments.action_type === 'message' && !toolCall.arguments.recipient) {
+                console.log("Adding default recipient for message action");
+                toolCall.arguments.recipient = toolCall.arguments.recipient || "Project team";
+              }
               actionRecordId = await createActionRecord(supabase, promptRunId, projectId, toolCall.arguments);
               console.log(`Action record created: ${actionRecordId}`);
             } catch (error) {
@@ -336,6 +341,12 @@ async function processToolCalls(
             action_type: actionType,
             ...toolCall.arguments
           };
+          
+          // Add recipient info if not present for message actions
+          if (actionType === 'message' && !actionResult.recipient) {
+            console.log("Adding default recipient for message action");
+            actionResult.recipient = "Project team";
+          }
           
           result = JSON.stringify(actionResult, null, 2);
           
