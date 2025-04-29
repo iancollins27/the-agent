@@ -1,3 +1,4 @@
+
 export interface ActionRecord {
   id: string;
   project_id?: string;
@@ -18,6 +19,7 @@ export interface ActionRecord {
   project_address?: string | null;
   prompt_run_id?: string | null;
   reviewed?: boolean;
+  approver_name?: string | null;
 }
 
 export interface PromptRun {
@@ -44,16 +46,13 @@ export interface PromptRun {
   project_next_step?: string;
   project_crm_url?: string;
   project_roofer_contact?: string;
+  project_manager?: string;
   
   // Derived data
   relative_time?: string;
-}
-
-export interface Project {
-  id: string;
-  created_at: string;
-  crm_id: string;
-  Address: string;
-  next_step: string;
-  project_manager: string;
+  workflow_type?: string | null;
+  
+  // Alternate field names that might be used in some components
+  prompt_text?: string;
+  result?: string;
 }

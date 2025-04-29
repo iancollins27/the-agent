@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -196,15 +197,15 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
             <div>
               <h3 className="font-medium mb-2">Prompt Input</h3>
               <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
-                {promptRun.prompt_input || promptRun.prompt_text || 'No input available'}
+                {promptRun.prompt_input || 'No input available'}
               </pre>
             </div>
             
-            {(promptRun.prompt_output || promptRun.result) && (
+            {promptRun.prompt_output && (
               <div>
                 <h3 className="font-medium mb-2">Prompt Output</h3>
                 <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
-                  {promptRun.prompt_output || promptRun.result}
+                  {promptRun.prompt_output}
                 </pre>
               </div>
             )}
