@@ -22,7 +22,7 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
   hasMorePages,
   loading = false,
   onLoadMore,
-  pageSize = 10,
+  pageSize = 5, // Reduced default page size
   totalItems
 }) => {
   // Generate page numbers to display
@@ -43,7 +43,7 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
     }
     
     // Regular pagination when we know total pages
-    if (totalPages <= 7) {
+    if (totalPages <= 5) { // Show fewer pages at once
       // If few pages, show all
       for (let i = 0; i < totalPages; i++) {
         pages.push(i);
@@ -52,19 +52,19 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
       // Always show first page
       pages.push(0);
       
-      if (currentPage > 2) {
+      if (currentPage > 1) {
         pages.push(-1); // -1 indicates ellipsis
       }
       
-      // Show current page and neighbors
+      // Show current page and neighbors (reduced window)
       const start = Math.max(1, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 2);
+      const end = Math.min(totalPages - 1, currentPage + 1);
       
-      for (let i = start; i < end; i++) {
+      for (let i = start; i <= end; i++) {
         pages.push(i);
       }
       
-      if (currentPage < totalPages - 3) {
+      if (currentPage < totalPages - 2) {
         pages.push(-1); // -1 indicates ellipsis
       }
       
@@ -79,7 +79,7 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
 
   const pageNumbers = getPageNumbers();
   
-  if (loading) {
+  if (loading && pageNumbers.length === 0) {
     return (
       <div className="flex items-center justify-center gap-2 py-2">
         <Skeleton className="h-9 w-9 rounded-md" />
@@ -147,8 +147,8 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
       
       {totalItems !== null && totalItems !== undefined && pageSize && (
         <div className="text-xs text-muted-foreground">
-          Showing page {currentPage + 1} of {Math.max(1, Math.ceil(totalItems / pageSize))}{" "}
-          ({totalItems} items)
+          Showing {Math.min((currentPage * pageSize) + 1, totalItems)} - {Math.min((currentPage + 1) * pageSize, totalItems)} of {totalItems}{" "}
+          items (page {currentPage + 1} of {Math.max(1, Math.ceil(totalItems / pageSize))})
         </div>
       )}
       

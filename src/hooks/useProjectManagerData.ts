@@ -17,8 +17,8 @@ export const useProjectManagerData = () => {
   const { user } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
   
-  // Constants
-  const PAGE_SIZE = 10;
+  // Reduced page size to prevent resource exhaustion
+  const PAGE_SIZE = 5;
   
   // Filter state management using persistence hook
   const { filters, updateFilter } = useFilterPersistence({
@@ -30,7 +30,8 @@ export const useProjectManagerData = () => {
     projectManagerFilter: null,
     groupByRoofer: false,
     sortRooferAlphabetically: true,
-    onlyPendingActions: false
+    onlyPendingActions: false,
+    reducedPageSize: false // New flag for reduced page size mode
   });
   
   // Destructure filters for easier access
@@ -43,8 +44,23 @@ export const useProjectManagerData = () => {
     projectManagerFilter,
     groupByRoofer,
     sortRooferAlphabetically,
-    onlyPendingActions
+    onlyPendingActions,
+    reducedPageSize
   } = filters;
+  
+  // Calculate effective page size based on reduced mode
+  const effectivePageSize = reducedPageSize ? 2 : PAGE_SIZE;
+  
+  // Reset reduced page size after successful load
+  useEffect(() => {
+    if (reducedPageSize) {
+      const timer = setTimeout(() => {
+        updateFilter('reducedPageSize', false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [reducedPageSize, updateFilter]);
   
   // Sync the raw time filter with our persisted time filter
   useEffect(() => {
@@ -117,7 +133,7 @@ export const useProjectManagerData = () => {
     onlyShowLatestRuns: true,
     excludeReminderActions: filters.excludeReminderActions,
     onlyPendingActions: filters.onlyPendingActions,
-    pageSize: PAGE_SIZE
+    pageSize: effectivePageSize
   });
 
   // Update fetch error from prompt runs hook
@@ -171,7 +187,7 @@ export const useProjectManagerData = () => {
     }
     
     if (fetchError) {
-      return `Error loading data: ${fetchError}. Try refreshing the page or try again later.`;
+      return `Error loading data: ${fetchError}. Try refreshing the page or try again with fewer filters.`;
     }
     
     if (filters.onlyMyProjects) {
@@ -224,6 +240,6 @@ export const useProjectManagerData = () => {
     totalCount,
     hasMorePages,
     loadMorePromptRuns,
-    pageSize: PAGE_SIZE
+    pageSize: effectivePageSize
   };
 };

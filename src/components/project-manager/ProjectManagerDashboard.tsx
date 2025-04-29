@@ -8,7 +8,7 @@ import ProjectManagerDetailsPanel from "./ProjectManagerDetailsPanel";
 import { useProjectManagerData } from '@/hooks/useProjectManagerData';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
 
 const ProjectManagerDashboard: React.FC = () => {
   const {
@@ -48,6 +48,13 @@ const ProjectManagerDashboard: React.FC = () => {
   // Estimate total pages based on totalCount and pageSize
   const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : 0;
 
+  // Handle retry with fewer items
+  const handleRetryWithFewerItems = () => {
+    // Reduce page size temporarily to load critical data
+    updateFilter('reducedPageSize', true);
+    fetchPromptRuns();
+  };
+
   return (
     <ProjectManagerLayout>
       <ProjectManagerToolbar
@@ -66,17 +73,29 @@ const ProjectManagerDashboard: React.FC = () => {
 
       {fetchError && (
         <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error Loading Data</AlertTitle>
-          <AlertDescription className="flex items-center justify-between">
-            <div>There was an error loading the prompt runs. This may be due to too many projects or database timeout.</div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-2" 
-              onClick={() => fetchPromptRuns()}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-            </Button>
+          <AlertDescription className="flex flex-col md:flex-row items-start md:items-center justify-between">
+            <div className="mb-2 md:mb-0">
+              There was an error loading the prompt runs. This may be due to too many projects or database timeout.
+              {fetchError && <div className="text-xs mt-1 opacity-80">{fetchError}</div>}
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleRetryWithFewerItems}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" /> Try with fewer items
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => fetchPromptRuns()}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" /> Retry
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       )}

@@ -7,6 +7,9 @@ import { UsePromptRunsProps } from './promptRuns/types';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/components/ui/use-toast';
 
+// Reduced page size to prevent resource exhaustion
+const DEFAULT_PAGE_SIZE = 5;
+
 export const usePaginatedPromptRuns = ({
   userProfile,
   statusFilter,
@@ -17,7 +20,7 @@ export const usePaginatedPromptRuns = ({
   onlyShowLatestRuns = false,
   excludeReminderActions = false,
   onlyPendingActions = false,
-  pageSize = 10
+  pageSize = DEFAULT_PAGE_SIZE
 }: UsePromptRunsProps & { pageSize?: number }) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,72 +86,92 @@ export const usePaginatedPromptRuns = ({
         setTotalCount(result.count);
       }
       
-      // Filter by project manager if selected
+      // Client-side filtering for project manager
       if (projectManagerFilter && formattedData.length > 0) {
-        const { data: projectsWithManager, error: projectsError } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('project_manager', projectManagerFilter);
-        
-        if (!projectsError && projectsWithManager) {
-          const projectIds = new Set(projectsWithManager.map(p => p.id));
-          formattedData = formattedData.filter(run => 
-            run.project_id && projectIds.has(run.project_id)
-          );
+        try {
+          const { data: projectsWithManager, error: projectsError } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('project_manager', projectManagerFilter)
+            .limit(100); // Limit to avoid resource issues
+          
+          if (!projectsError && projectsWithManager) {
+            const projectIds = new Set(projectsWithManager.map(p => p.id));
+            formattedData = formattedData.filter(run => 
+              run.project_id && projectIds.has(run.project_id)
+            );
+          }
+        } catch (err) {
+          console.error("Error filtering by project manager:", err);
         }
       }
 
       // Apply the "only show my projects" filter if enabled
       if (onlyShowMyProjects && userProfile?.id && formattedData.length > 0) {
-        const { data: myProjects, error: myProjectsError } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('project_manager', userProfile.id);
-        
-        if (!myProjectsError && myProjects) {
-          const myProjectIds = new Set(myProjects.map(p => p.id));
-          formattedData = formattedData.filter(run => 
-            run.project_id && myProjectIds.has(run.project_id)
-          );
+        try {
+          const { data: myProjects, error: myProjectsError } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('project_manager', userProfile.id)
+            .limit(100); // Limit to avoid resource issues
+          
+          if (!myProjectsError && myProjects) {
+            const myProjectIds = new Set(myProjects.map(p => p.id));
+            formattedData = formattedData.filter(run => 
+              run.project_id && myProjectIds.has(run.project_id)
+            );
+          }
+        } catch (err) {
+          console.error("Error filtering by user's projects:", err);
         }
       }
 
       // Only fetch roofer contacts for this page's projects
-      const projectIds = formattedData
-        .filter(run => run.project_id && !run.project_roofer_contact)
-        .map(run => run.project_id as string);
-        
-      if (projectIds.length > 0) {
-        const rooferContactMap = await fetchRooferContacts(projectIds);
-        
-        // Apply roofer contact info to prompt runs
-        formattedData = formattedData.map(run => {
-          if (run.project_id && rooferContactMap.has(run.project_id)) {
-            return {
-              ...run,
-              project_roofer_contact: rooferContactMap.get(run.project_id)
-            };
+      if (formattedData.length > 0) {
+        const projectIds = formattedData
+          .filter(run => run.project_id && !run.project_roofer_contact)
+          .map(run => run.project_id as string);
+          
+        if (projectIds.length > 0) {
+          try {
+            const rooferContactMap = await fetchRooferContacts(projectIds);
+            
+            // Apply roofer contact info to prompt runs
+            formattedData = formattedData.map(run => {
+              if (run.project_id && rooferContactMap.has(run.project_id)) {
+                return {
+                  ...run,
+                  project_roofer_contact: rooferContactMap.get(run.project_id)
+                };
+              }
+              return run;
+            });
+          } catch (err) {
+            console.error("Error fetching roofer contacts:", err);
           }
-          return run;
-        });
+        }
       }
 
-      // Apply additional filters based on actions
-      // For efficiency, these are done client-side once the page data is fetched
+      // Apply additional filters based on actions - limit batch size
       if (onlyPendingActions && formattedData.length > 0) {
-        const promptRunIds = formattedData.map(run => run.id);
-        
-        const { data: actionData, error: actionError } = await supabase
-          .from('action_records')
-          .select('prompt_run_id')
-          .in('prompt_run_id', promptRunIds)
-          .eq('status', 'pending');
+        try {
+          const promptRunIds = formattedData.map(run => run.id);
           
-        if (!actionError && actionData) {
-          const pendingActionRunIds = new Set(actionData.map(a => a.prompt_run_id));
-          if (pendingActionRunIds.size > 0) {
-            formattedData = formattedData.filter(run => pendingActionRunIds.has(run.id));
+          const { data: actionData, error: actionError } = await supabase
+            .from('action_records')
+            .select('prompt_run_id')
+            .in('prompt_run_id', promptRunIds)
+            .eq('status', 'pending')
+            .limit(100);
+            
+          if (!actionError && actionData) {
+            const pendingActionRunIds = new Set(actionData.map(a => a.prompt_run_id));
+            if (pendingActionRunIds.size > 0) {
+              formattedData = formattedData.filter(run => pendingActionRunIds.has(run.id));
+            }
           }
+        } catch (err) {
+          console.error("Error filtering by pending actions:", err);
         }
       }
 
@@ -157,6 +180,11 @@ export const usePaginatedPromptRuns = ({
     } catch (error: any) {
       console.error('Error loading page:', error);
       setError(error?.message || 'Failed to load data. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Error Loading Data",
+        description: "There was an error loading data. Try reducing your filters or the page size."
+      });
     } finally {
       setLoading(false);
     }
@@ -185,6 +213,11 @@ export const usePaginatedPromptRuns = ({
       
       if (result.error) {
         setError(result.error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Failed to load more data: ${result.error}`
+        });
         return;
       }
       
@@ -198,18 +231,22 @@ export const usePaginatedPromptRuns = ({
         .map(run => run.project_id as string);
         
       if (projectIds.length > 0) {
-        const rooferContactMap = await fetchRooferContacts(projectIds);
-        
-        // Apply roofer contact info to prompt runs
-        additionalData = additionalData.map(run => {
-          if (run.project_id && rooferContactMap.has(run.project_id)) {
-            return {
-              ...run,
-              project_roofer_contact: rooferContactMap.get(run.project_id)
-            };
-          }
-          return run;
-        });
+        try {
+          const rooferContactMap = await fetchRooferContacts(projectIds);
+          
+          // Apply roofer contact info to prompt runs
+          additionalData = additionalData.map(run => {
+            if (run.project_id && rooferContactMap.has(run.project_id)) {
+              return {
+                ...run,
+                project_roofer_contact: rooferContactMap.get(run.project_id)
+              };
+            }
+            return run;
+          });
+        } catch (err) {
+          console.error("Error fetching roofer contacts for additional data:", err);
+        }
       }
       
       // Append new data to existing data
@@ -217,6 +254,11 @@ export const usePaginatedPromptRuns = ({
     } catch (error: any) {
       console.error('Error loading more data:', error);
       setError(error?.message || 'Failed to load more data');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load more items. Try refreshing the page."
+      });
     } finally {
       setLoading(false);
     }
@@ -227,7 +269,8 @@ export const usePaginatedPromptRuns = ({
     statusFilter,
     pageSize,
     fetchPromptRunsPage,
-    fetchRooferContacts
+    fetchRooferContacts,
+    toast
   ]);
 
   // Function to refresh all data
