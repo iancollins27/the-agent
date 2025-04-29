@@ -90,48 +90,30 @@ export async function runWorkflowPrompt(
     const { generateSummary } = await import('../ai.ts');
     const apiKey = getApiKey(aiProvider);
     
-    // Import the database functions correctly
-    // This was the source of the error - we need to use the properly structured imports
-    const promptRunId = await supabase
+    // Create a prompt run record with the full prompt text
+    const { data: promptRunData, error: promptRunError } = await supabase
       .from('prompt_runs')
       .insert({
         project_id: projectId,
-        prompt_input: prompt,
+        prompt_input: prompt,  // Store the actual prompt text
         ai_provider: aiProvider,
         ai_model: aiModel,
         status: 'PENDING'
       })
       .select()
-      .single()
-      .then(({ data }) => data?.id)
-      .catch(error => {
-        console.error("Error logging prompt run:", error);
-        return null;
-      });
+      .single();
     
+    if (promptRunError) {
+      console.error("Error logging prompt run:", promptRunError);
+      throw new Error(`Failed to log prompt run: ${promptRunError.message}`);
+    }
+    
+    const promptRunId = promptRunData?.id;
     console.log(`Created prompt run with ID: ${promptRunId || "Failed to create"}`);
     
     // Generate the summary
-    const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel);
+    const summary = await generateSummary(prompt, apiKey, aiProvider, aiModel, promptRunId);
     
-    // Update the prompt run with the result
-    if (promptRunId) {
-      try {
-        await supabase
-          .from('prompt_runs')
-          .update({
-            prompt_output: summary,
-            status: 'COMPLETED',
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', promptRunId);
-        
-        console.log(`Updated prompt run ${promptRunId} with result`);
-      } catch (updateError) {
-        console.error("Error updating prompt run:", updateError);
-      }
-    }
-      
     // Update the project with the new summary
     await supabase
       .from('projects')
@@ -139,7 +121,6 @@ export async function runWorkflowPrompt(
       .eq('id', projectId);
       
     // In a full implementation, we would parse the AI response to detect actions
-    // For now, return an empty array of actions
     return {
       summary,
       detectedActions: []

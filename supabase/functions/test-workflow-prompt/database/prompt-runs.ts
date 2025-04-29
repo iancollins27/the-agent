@@ -16,6 +16,12 @@ export async function logPromptRun(
       ai_model: aiModel,
     });
 
+    // Validate that promptInput is not empty
+    if (!promptInput || promptInput.trim() === '') {
+      console.error("Warning: Empty prompt input detected, using placeholder");
+      promptInput = "Empty prompt was provided. This is a placeholder.";
+    }
+
     // Create base insert object
     const insertData: any = {
       project_id: projectId,

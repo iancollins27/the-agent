@@ -51,6 +51,7 @@ export async function handleZohoWebhook(req: Request) {
 
     // Step 4: Generate a workflow prompt
     let workflowResult;
+    let workflowPromptId;
     try {
       // Generate the workflow prompt
       const promptResult = await generateWorkflowPrompt(
@@ -59,6 +60,17 @@ export async function handleZohoWebhook(req: Request) {
         projectData,
         businessLogicResult
       );
+      
+      // Get the workflow prompt ID
+      const { data: workflowPrompt } = await supabase
+        .from('workflow_prompts')
+        .select('id')
+        .eq('type', 'summary_generation')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      workflowPromptId = workflowPrompt?.id;
       
       // Run the workflow prompt through the AI
       workflowResult = await runWorkflowPrompt(
@@ -71,6 +83,16 @@ export async function handleZohoWebhook(req: Request) {
       
       // Update the summary in our business logic result
       businessLogicResult.summary = workflowResult.summary;
+      
+      // If we have a prompt run ID, update it with the workflow prompt ID
+      if (workflowPromptId) {
+        await supabase
+          .from('prompt_runs')
+          .update({ workflow_prompt_id: workflowPromptId })
+          .eq('project_id', businessLogicResult.projectId)
+          .is('workflow_prompt_id', null);
+      }
+      
     } catch (error) {
       console.error('Error generating workflow prompt:', error);
       return createErrorResponse(`Workflow prompt error: ${error.message}`, 500);

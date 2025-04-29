@@ -1,9 +1,15 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-export async function generateSummary(prompt: string, apiKey: string, provider: string = 'openai', model: string = 'gpt-4o') {
+export async function generateSummary(
+  prompt: string, 
+  apiKey: string, 
+  provider: string = 'openai', 
+  model: string = 'gpt-4o', 
+  existingPromptRunId: string | null = null
+) {
   console.log(`Generating summary using ${provider} model: ${model}`);
-  let promptRunId: string | null = null;
+  let promptRunId: string | null = existingPromptRunId;
   
   // Create a Supabase client for this function
   const supabase = createClient(
@@ -12,20 +18,28 @@ export async function generateSummary(prompt: string, apiKey: string, provider: 
   );
   
   try {
-    // Log the prompt run
-    const { data: promptRun, error: logError } = await supabase
-      .from('prompt_runs')
-      .insert({
-        prompt_input: prompt,
-        status: 'PENDING'
-      })
-      .select()
-      .single();
-      
-    if (logError) {
-      console.error('Error logging prompt run:', logError);
+    // Only log a new prompt run if we don't have an existing one
+    if (!promptRunId) {
+      console.log("No existing promptRunId provided, creating new prompt run record");
+      const { data: promptRun, error: logError } = await supabase
+        .from('prompt_runs')
+        .insert({
+          prompt_input: prompt,
+          ai_provider: provider,
+          ai_model: model,
+          status: 'PENDING'
+        })
+        .select()
+        .single();
+        
+      if (logError) {
+        console.error('Error logging prompt run:', logError);
+      } else {
+        promptRunId = promptRun.id;
+        console.log(`Created new prompt run with ID: ${promptRunId}`);
+      }
     } else {
-      promptRunId = promptRun.id;
+      console.log(`Using existing prompt run ID: ${promptRunId}`);
     }
     
     let response;
@@ -111,6 +125,8 @@ export async function generateSummary(prompt: string, apiKey: string, provider: 
           completed_at: new Date().toISOString()
         })
         .eq('id', promptRunId);
+      
+      console.log(`Updated prompt run ${promptRunId} with result`);
     }
     
     return response;
