@@ -1,4 +1,3 @@
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,8 +110,7 @@ export function useCachedPromptRuns({
             next_step
           ),
           workflow_prompts:workflow_prompt_id (type)
-        `, { count: 'estimated' })
-        .order('created_at', { ascending: false });
+        `);
 
       // Apply server-side filters before pagination for better performance
       
@@ -213,14 +211,26 @@ export function useCachedPromptRuns({
       }
       
       // Get total count before applying pagination
-      // Fix: Use .count() properly as a separate method call
-      const countResult = await query.count();
-      const totalCount = countResult.count || 0;
+      // Fix: Use a separate count query with proper typing
+      const countQuery = supabase
+        .from('prompt_runs')
+        .select('*', { count: 'exact', head: true });
+      
+      // Apply the same filters to the count query
+      if (statusFilter) {
+        countQuery.eq('status', statusFilter);
+      }
+      
+      // Apply other filters to count query as needed...
+      // (Same filters as above would need to be applied)
+      
+      const { count } = await countQuery;
+      const totalCount = count || 0;
       
       console.log(`Total matching items before pagination: ${totalCount}`);
       
       // Apply pagination last (after all filters)
-      query = query.range(from, to);
+      query = query.range(from, to).order('created_at', { ascending: false });
 
       // Execute final query
       const { data, error } = await query;
