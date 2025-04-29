@@ -8,19 +8,20 @@ export async function logPromptRun(
   aiModel: string
 ) {
   try {
+    // Ensure promptInput is not empty or undefined
+    if (!promptInput || typeof promptInput !== 'string' || promptInput.trim() === '') {
+      console.error("ERROR: Empty prompt input detected");
+      throw new Error("Empty prompt input provided. Cannot log prompt run with empty input.");
+    }
+
     console.log("Logging prompt run with data:", {
       project_id: projectId,
       workflow_prompt_id: workflowPromptId,
       prompt_input: promptInput.substring(0, 100) + "...", // Log just the beginning for brevity
       ai_provider: aiProvider,
       ai_model: aiModel,
+      input_length: promptInput.length,
     });
-
-    // Validate that promptInput is not empty
-    if (!promptInput || promptInput.trim() === '') {
-      console.error("Warning: Empty prompt input detected, using placeholder");
-      promptInput = "Empty prompt was provided. This is a placeholder.";
-    }
 
     // Create base insert object
     const insertData: any = {

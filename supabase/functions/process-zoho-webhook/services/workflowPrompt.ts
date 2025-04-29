@@ -30,6 +30,7 @@ export async function generateWorkflowPrompt(
 ): Promise<{
   summary: string;
   actions: any[];
+  formattedPrompt?: string; // Added to return the formatted prompt
 }> {
   try {
     console.log(`Generating workflow prompt for project ${projectId}`);
@@ -42,7 +43,7 @@ export async function generateWorkflowPrompt(
     const promptTemplate = await getWorkflowPrompt(supabase, !businessLogicData.isNewProject);
     
     // Format the prompt using our existing utility
-    const prompt = formatWorkflowPrompt(
+    const formattedPrompt = formatWorkflowPrompt(
       promptTemplate, 
       businessLogicData.summary,
       projectData,
@@ -56,7 +57,8 @@ export async function generateWorkflowPrompt(
     // In a full implementation, we would parse the AI response to detect actions
     return {
       summary: '', // We'll fill this after AI processing
-      actions: []
+      actions: [],
+      formattedPrompt  // Return the formatted prompt so we can use it in runWorkflowPrompt
     };
   } catch (error) {
     console.error('Error generating workflow prompt:', error);
@@ -71,6 +73,7 @@ export async function generateWorkflowPrompt(
  * @param prompt The formatted prompt
  * @param aiProvider The AI provider to use
  * @param aiModel The AI model to use
+ * @param workflowPromptId Optional workflow prompt ID
  * @returns The generated summary and any detected actions
  */
 export async function runWorkflowPrompt(
@@ -78,7 +81,8 @@ export async function runWorkflowPrompt(
   projectId: string,
   prompt: string,
   aiProvider: string,
-  aiModel: string
+  aiModel: string,
+  workflowPromptId?: string
 ): Promise<{
   summary: string;
   detectedActions: any[];
@@ -90,11 +94,21 @@ export async function runWorkflowPrompt(
     const { generateSummary } = await import('../ai.ts');
     const apiKey = getApiKey(aiProvider);
     
+    if (!prompt || prompt.trim() === '') {
+      console.error("ERROR: Empty prompt provided to runWorkflowPrompt");
+      throw new Error("Cannot run workflow with empty prompt");
+    }
+    
+    console.log(`Creating prompt run record with workflow prompt ID: ${workflowPromptId || "Not provided"}`);
+    console.log(`Prompt length: ${prompt.length} characters`);
+    console.log(`Prompt snippet: ${prompt.substring(0, 200)}...`);
+    
     // Create a prompt run record with the full prompt text
     const { data: promptRunData, error: promptRunError } = await supabase
       .from('prompt_runs')
       .insert({
         project_id: projectId,
+        workflow_prompt_id: workflowPromptId || null,
         prompt_input: prompt,  // Store the actual prompt text
         ai_provider: aiProvider,
         ai_model: aiModel,

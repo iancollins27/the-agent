@@ -1,6 +1,4 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-
 export async function generateSummary(
   prompt: string, 
   apiKey: string, 
@@ -18,9 +16,17 @@ export async function generateSummary(
   );
   
   try {
+    // Validate prompt input
+    if (!prompt || prompt.trim() === '') {
+      throw new Error('Cannot generate summary with empty prompt');
+    }
+
     // Only log a new prompt run if we don't have an existing one
     if (!promptRunId) {
       console.log("No existing promptRunId provided, creating new prompt run record");
+      console.log(`Prompt length: ${prompt.length} characters`);
+      console.log(`Prompt snippet: ${prompt.substring(0, 200)}...`);
+      
       const { data: promptRun, error: logError } = await supabase
         .from('prompt_runs')
         .insert({

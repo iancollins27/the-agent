@@ -52,7 +52,20 @@ export async function handleZohoWebhook(req: Request) {
     // Step 4: Generate a workflow prompt
     let workflowResult;
     let workflowPromptId;
+    let formattedPrompt;
     try {
+      // Get the workflow prompt ID
+      const { data: workflowPrompt } = await supabase
+        .from('workflow_prompts')
+        .select('id')
+        .eq('type', businessLogicResult.isNewProject ? 'summary_generation' : 'summary_update')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      workflowPromptId = workflowPrompt?.id;
+      console.log(`Using workflow prompt ID: ${workflowPromptId}`);
+      
       // Generate the workflow prompt
       const promptResult = await generateWorkflowPrompt(
         supabase,
@@ -61,37 +74,26 @@ export async function handleZohoWebhook(req: Request) {
         businessLogicResult
       );
       
-      // Get the workflow prompt ID
-      const { data: workflowPrompt } = await supabase
-        .from('workflow_prompts')
-        .select('id')
-        .eq('type', 'summary_generation')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      // Store formatted prompt for use in runWorkflowPrompt
+      formattedPrompt = promptResult.formattedPrompt;
       
-      workflowPromptId = workflowPrompt?.id;
+      if (!formattedPrompt || formattedPrompt.trim() === '') {
+        console.error("ERROR: Generated empty prompt from formatWorkflowPrompt");
+        throw new Error("Failed to generate valid prompt text");
+      }
       
       // Run the workflow prompt through the AI
       workflowResult = await runWorkflowPrompt(
         supabase,
         businessLogicResult.projectId,
-        promptResult.summary || '',
+        formattedPrompt,
         businessLogicResult.aiProvider || 'openai',
-        businessLogicResult.aiModel || 'gpt-4o'
+        businessLogicResult.aiModel || 'gpt-4o',
+        workflowPromptId
       );
       
       // Update the summary in our business logic result
       businessLogicResult.summary = workflowResult.summary;
-      
-      // If we have a prompt run ID, update it with the workflow prompt ID
-      if (workflowPromptId) {
-        await supabase
-          .from('prompt_runs')
-          .update({ workflow_prompt_id: workflowPromptId })
-          .eq('project_id', businessLogicResult.projectId)
-          .is('workflow_prompt_id', null);
-      }
       
     } catch (error) {
       console.error('Error generating workflow prompt:', error);
