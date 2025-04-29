@@ -1,24 +1,19 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
-import { useFilterPersistence } from "@/hooks/useFilterPersistence";
-import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
-import { usePaginatedPromptRuns } from './usePaginatedPromptRuns';
+import { useFilterPersistence } from "@/hooks/useFilterPersistence";
+import { TIME_FILTERS } from "@/hooks/useTimeFilter";
+import { useCachedPromptRuns } from './useCachedPromptRuns';
+import { usePromptFeedbackManager } from './usePromptFeedbackManager';
+import { PromptRun } from '../components/admin/types';
 
 export const useProjectManagerData = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
-  
-  // Reduced page size to prevent resource exhaustion
-  const PAGE_SIZE = 5;
   
   // Filter state management using persistence hook
   const { filters, updateFilter } = useFilterPersistence({
@@ -31,7 +26,7 @@ export const useProjectManagerData = () => {
     groupByRoofer: false,
     sortRooferAlphabetically: true,
     onlyPendingActions: false,
-    reducedPageSize: false // Added this property with a default value
+    reducedPageSize: false
   });
   
   // Destructure filters for easier access
@@ -49,6 +44,7 @@ export const useProjectManagerData = () => {
   } = filters;
   
   // Calculate effective page size based on reduced mode
+  const PAGE_SIZE = 5;
   const effectivePageSize = reducedPageSize ? 2 : PAGE_SIZE;
   
   // Reset reduced page size after successful load
@@ -61,93 +57,86 @@ export const useProjectManagerData = () => {
       return () => clearTimeout(timer);
     }
   }, [reducedPageSize, updateFilter]);
-  
-  // Sync the raw time filter with our persisted time filter
-  useEffect(() => {
-    rawSetTimeFilter(timeFilter);
-  }, [timeFilter, rawSetTimeFilter]);
 
-  // Fetch user profile data
+  // Fetch user profile data on mount
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
       
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        const { data, error } = await fetch(`/api/user-profile?userId=${user.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }).then(res => res.json());
           
         if (error) {
           console.error('Error fetching user profile:', error);
-          setFetchError(`Failed to load user profile: ${error.message}`);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: `Failed to load user profile: ${error.message}`
+          });
         } else {
-          console.log('User profile loaded:', data);
           setUserProfile(data);
-          setFetchError(null);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        setFetchError('Failed to load user profile data');
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: 'Failed to load user profile data'
+        });
       }
     };
     
     fetchUserProfile();
-  }, [user]);
+  }, [user, toast]);
 
-  // Handle filter dependencies
-  useEffect(() => {
-    if (onlyMyProjects) {
-      updateFilter('projectManagerFilter', null);
-    }
-  }, [onlyMyProjects, updateFilter]);
-
-  useEffect(() => {
-    if (projectManagerFilter) {
-      updateFilter('onlyMyProjects', false);
-    }
-  }, [projectManagerFilter, updateFilter]);
-
-  // Use the paginated prompt runs hook to fetch and manage data
-  const { 
-    promptRuns, 
-    loading, 
-    error,
-    handleRatingChange, 
-    handleFeedbackChange, 
-    fetchPromptRuns,
-    setPromptRuns,
-    currentPage,
-    setCurrentPage,
+  // Use the cached prompt runs hook for data fetching
+  const {
+    promptRuns,
+    isLoading,
+    isFetching,
+    error: fetchError,
     totalCount,
     hasMorePages,
-    loadMore: loadMorePromptRuns
-  } = usePaginatedPromptRuns({
-    userProfile,
-    statusFilter: filters.statusFilter,
-    onlyShowMyProjects: filters.onlyMyProjects,
-    projectManagerFilter: filters.projectManagerFilter,
-    timeFilter: filters.timeFilter,
-    getDateFilter,
-    onlyShowLatestRuns: true,
-    excludeReminderActions: filters.excludeReminderActions,
-    onlyPendingActions: filters.onlyPendingActions,
-    pageSize: effectivePageSize
+    loadMore: loadMorePromptRuns,
+    currentPage,
+    setCurrentPage,
+    refetch: fetchPromptRuns,
+    resetToFirstPage,
+    handleRetryWithFewerItems
+  } = useCachedPromptRuns({
+    statusFilter, 
+    pageSize: effectivePageSize,
+    userProfileId: user?.id || null,
+    companyId: userProfile?.profile_associated_company || null,
+    onlyMyProjects,
+    projectManagerFilter,
+    onlyPendingActions,
+    timeFilter
   });
 
-  // Update fetch error from prompt runs hook
-  useEffect(() => {
-    if (error) {
-      setFetchError(error);
-    }
-  }, [error]);
+  // Use the feedback manager hook
+  const {
+    handleRatingChange,
+    handleFeedbackChange,
+    handleRunReviewed
+  } = usePromptFeedbackManager();
 
   // Process prompt runs for display
-  const processedPromptRuns = React.useMemo(() => {
+  const processedPromptRuns = useState(() => {
     let runs = [...promptRuns];
 
-    if (filters.sortRooferAlphabetically) {
+    // Apply hide reviewed filter if needed
+    if (hideReviewed) {
+      runs = runs.filter(run => !run.reviewed);
+    }
+
+    // Apply alphabetical sorting if needed
+    if (sortRooferAlphabetically) {
       runs.sort((a, b) => {
         const rooferA = a.project_roofer_contact || 'zzz';
         const rooferB = b.project_roofer_contact || 'zzz';
@@ -156,7 +145,7 @@ export const useProjectManagerData = () => {
     }
     
     return runs;
-  }, [promptRuns, filters.sortRooferAlphabetically]);
+  })[0];
 
   // Various handlers for UI interactions
   const viewPromptRunDetails = (run: PromptRun) => {
@@ -164,22 +153,7 @@ export const useProjectManagerData = () => {
     setDetailsOpen(true);
   };
 
-  const handleRunReviewed = (promptRunId: string) => {
-    setPromptRuns(prev => 
-      prev.map(run => 
-        run.id === promptRunId ? { ...run, reviewed: true } : run
-      )
-    );
-  };
-
   const handlePromptRerun = () => {
-    fetchPromptRuns();
-  };
-
-  // Handle retry with fewer items
-  const handleRetryWithFewerItems = () => {
-    // Reduce page size temporarily to load critical data
-    updateFilter('reducedPageSize', true);
     fetchPromptRuns();
   };
 
@@ -216,6 +190,12 @@ export const useProjectManagerData = () => {
     return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
   };
 
+  // Handle filter changes with automatic view reset
+  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: typeof filters[K]) => {
+    updateFilter(key, value);
+    resetToFirstPage(); // Reset to first page when filters change
+  };
+
   return {
     selectedRun,
     detailsOpen,
@@ -229,12 +209,12 @@ export const useProjectManagerData = () => {
     groupByRoofer,
     sortRooferAlphabetically,
     onlyPendingActions,
-    loading,
+    loading: isLoading || isFetching,
     fetchError,
     processedPromptRuns,
     user,
     userProfile,
-    updateFilter,
+    updateFilter: handleFilterChange,
     fetchPromptRuns,
     viewPromptRunDetails,
     handleRatingChange,
