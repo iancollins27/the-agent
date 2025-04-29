@@ -6,6 +6,9 @@ import ProjectManagerToolbar from "./ProjectManagerToolbar";
 import ProjectManagerContent from "./ProjectManagerContent";
 import ProjectManagerDetailsPanel from "./ProjectManagerDetailsPanel";
 import { useProjectManagerData } from '@/hooks/useProjectManagerData';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 const ProjectManagerDashboard: React.FC = () => {
   const {
@@ -22,6 +25,7 @@ const ProjectManagerDashboard: React.FC = () => {
     sortRooferAlphabetically,
     onlyPendingActions,
     loading,
+    fetchError,
     processedPromptRuns,
     user,
     userProfile,
@@ -50,6 +54,23 @@ const ProjectManagerDashboard: React.FC = () => {
         updateFilter={updateFilter}
         fetchPromptRuns={fetchPromptRuns}
       />
+
+      {fetchError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Error Loading Data</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <div>There was an error loading the prompt runs. This may be due to too many projects or database timeout.</div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-2" 
+              onClick={() => fetchPromptRuns()}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <ProjectManagerContent 
         loading={loading}

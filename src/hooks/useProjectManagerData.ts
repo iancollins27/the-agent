@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +12,7 @@ export const useProjectManagerData = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
@@ -60,12 +62,15 @@ export const useProjectManagerData = () => {
           
         if (error) {
           console.error('Error fetching user profile:', error);
+          setFetchError(`Failed to load user profile: ${error.message}`);
         } else {
           console.log('User profile loaded:', data);
           setUserProfile(data);
+          setFetchError(null);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
+        setFetchError('Failed to load user profile data');
       }
     };
     
@@ -89,6 +94,7 @@ export const useProjectManagerData = () => {
   const { 
     promptRuns, 
     loading, 
+    error,
     handleRatingChange, 
     handleFeedbackChange, 
     fetchPromptRuns,
@@ -104,6 +110,13 @@ export const useProjectManagerData = () => {
     excludeReminderActions: filters.excludeReminderActions,
     onlyPendingActions: filters.onlyPendingActions
   });
+
+  // Update fetch error from prompt runs hook
+  useEffect(() => {
+    if (error) {
+      setFetchError(error);
+    }
+  }, [error]);
 
   // Process prompt runs for display
   const processedPromptRuns = React.useMemo(() => {
@@ -156,6 +169,10 @@ export const useProjectManagerData = () => {
       return "Your user profile is not associated with a company. Contact your administrator.";
     }
     
+    if (fetchError) {
+      return `Error loading data: ${fetchError}. Try refreshing the page or try again later.`;
+    }
+    
     if (filters.onlyMyProjects) {
       return "No prompt runs found for your projects. Try unchecking 'Only My Projects' filter.";
     }
@@ -189,6 +206,7 @@ export const useProjectManagerData = () => {
     sortRooferAlphabetically,
     onlyPendingActions,
     loading,
+    fetchError,
     processedPromptRuns,
     user,
     userProfile,

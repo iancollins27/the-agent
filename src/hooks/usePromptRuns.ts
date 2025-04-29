@@ -19,6 +19,7 @@ export const usePromptRuns = ({
 }: UsePromptRunsProps) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { handleRatingChange, handleFeedbackChange } = usePromptFeedback((updater) => {
     setPromptRuns(updater);
   });
@@ -33,11 +34,37 @@ export const usePromptRuns = ({
     }
 
     setLoading(true);
+    setError(null);
+    
     try {
-      // First, fetch prompt runs
-      let formattedData: PromptRun[] = await fetchData(statusFilter);
+      // First, fetch prompt runs - using pagination
+      const PAGE_SIZE = 50; // Reduce number of items per page
+      let formattedData: PromptRun[] = [];
+      let page = 0;
+      let hasMore = true;
       
-      // Filter by project manager if selected
+      // First fetch with pagination to get base data
+      while (hasMore && page < 3) { // Limit to 3 pages max to avoid excessive loading
+        console.log(`Fetching prompt runs page ${page}...`);
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        
+        const result = await fetchData(statusFilter, from, to);
+        
+        if (result && result.length > 0) {
+          formattedData = [...formattedData, ...result];
+          page++;
+          
+          // Check if we've reached the last page
+          if (result.length < PAGE_SIZE) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      // Filter by project manager if selected - do this in-memory after initial fetch
       if (projectManagerFilter && formattedData.length > 0) {
         const { data: projectsWithManager, error: projectsError } = await supabase
           .from('projects')
@@ -88,6 +115,60 @@ export const usePromptRuns = ({
         }
       }
 
+      // Fetch roofer contact info in small batches if needed
+      if (formattedData.length > 0) {
+        const projectsWithoutRooferInfo = formattedData
+          .filter(run => !run.project_roofer_contact && run.project_id)
+          .map(run => run.project_id);
+          
+        if (projectsWithoutRooferInfo.length > 0) {
+          // Split into batches of 20 to avoid URI too long errors
+          const BATCH_SIZE = 20;
+          const projectBatches = [];
+          
+          for (let i = 0; i < projectsWithoutRooferInfo.length; i += BATCH_SIZE) {
+            projectBatches.push(projectsWithoutRooferInfo.slice(i, i + BATCH_SIZE));
+          }
+          
+          const rooferContactMap = new Map();
+          
+          for (const batchProjects of projectBatches) {
+            try {
+              const { data: contactsData, error: contactsError } = await supabase
+                .from('project_contacts')
+                .select(`
+                  project_id,
+                  contacts:contact_id (
+                    id, full_name, role
+                  )
+                `)
+                .in('project_id', batchProjects);
+                
+              if (!contactsError && contactsData) {
+                contactsData.forEach(item => {
+                  if (item.contacts && item.contacts.role === 'Roofer') {
+                    rooferContactMap.set(item.project_id, item.contacts.full_name);
+                  }
+                });
+              }
+            } catch (error) {
+              console.error("Error fetching batch of roofer contacts:", error);
+            }
+          }
+          
+          // Apply roofer contact info to prompt runs
+          formattedData = formattedData.map(run => {
+            if (run.project_id && rooferContactMap.has(run.project_id)) {
+              return {
+                ...run,
+                project_roofer_contact: rooferContactMap.get(run.project_id)
+              };
+            }
+            return run;
+          });
+        }
+      }
+
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
         const latestRunsByProject = new Map<string, PromptRun>();
         
@@ -108,50 +189,79 @@ export const usePromptRuns = ({
       }
 
       if (excludeReminderActions && formattedData.length > 0) {
+        // Process in batches to avoid large queries
+        const BATCH_SIZE = 50;
+        const promptRunBatches = [];
         const promptRunIds = formattedData.map(run => run.id);
         
-        const { data: actionData, error: actionError } = await supabase
-          .from('action_records')
-          .select('prompt_run_id, action_type')
-          .in('prompt_run_id', promptRunIds);
-
-        if (!actionError && actionData) {
-          const filteredActionRunIds = new Set(
-            actionData
-              .filter(action => 
-                action.action_type === 'set_future_reminder' || 
-                action.action_type === 'NO_ACTION'
-              )
-              .map(action => action.prompt_run_id)
-          );
-
-          formattedData = formattedData.filter(
-            run => !filteredActionRunIds.has(run.id)
-          );
+        for (let i = 0; i < promptRunIds.length; i += BATCH_SIZE) {
+          promptRunBatches.push(promptRunIds.slice(i, i + BATCH_SIZE));
         }
+        
+        const filteredActionRunIds = new Set();
+        
+        for (const batchIds of promptRunBatches) {
+          try {
+            const { data: actionData, error: actionError } = await supabase
+              .from('action_records')
+              .select('prompt_run_id, action_type')
+              .in('prompt_run_id', batchIds);
+              
+            if (!actionError && actionData) {
+              actionData
+                .filter(action => 
+                  action.action_type === 'set_future_reminder' || 
+                  action.action_type === 'NO_ACTION'
+                )
+                .forEach(action => filteredActionRunIds.add(action.prompt_run_id));
+            }
+          } catch (error) {
+            console.error("Error fetching batch of action records:", error);
+          }
+        }
+
+        formattedData = formattedData.filter(
+          run => !filteredActionRunIds.has(run.id)
+        );
       }
 
       if (onlyPendingActions && formattedData.length > 0) {
+        // Process in batches for pending actions too
+        const BATCH_SIZE = 50;
+        const promptRunBatches = [];
         const promptRunIds = formattedData.map(run => run.id);
         
-        const { data: actionData, error: actionError } = await supabase
-          .from('action_records')
-          .select('prompt_run_id')
-          .in('prompt_run_id', promptRunIds)
-          .eq('status', 'pending');
-
-        if (!actionError && actionData) {
-          const pendingActionRunIds = new Set(
-            actionData.map(action => action.prompt_run_id)
-          );
-          
-          formattedData = pendingActionRunIds.size > 0 
-            ? formattedData.filter(run => pendingActionRunIds.has(run.id))
-            : formattedData;
+        for (let i = 0; i < promptRunIds.length; i += BATCH_SIZE) {
+          promptRunBatches.push(promptRunIds.slice(i, i + BATCH_SIZE));
         }
+        
+        const pendingActionRunIds = new Set();
+        
+        for (const batchIds of promptRunBatches) {
+          try {
+            const { data: actionData, error: actionError } = await supabase
+              .from('action_records')
+              .select('prompt_run_id')
+              .in('prompt_run_id', batchIds)
+              .eq('status', 'pending');
+              
+            if (!actionError && actionData) {
+              actionData.forEach(action => pendingActionRunIds.add(action.prompt_run_id));
+            }
+          } catch (error) {
+            console.error("Error fetching batch of pending action records:", error);
+          }
+        }
+
+        formattedData = pendingActionRunIds.size > 0 
+          ? formattedData.filter(run => pendingActionRunIds.has(run.id))
+          : formattedData;
       }
 
       setPromptRuns(formattedData);
+    } catch (error) {
+      console.error('Error fetching prompt runs:', error);
+      setError('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -177,6 +287,7 @@ export const usePromptRuns = ({
     promptRuns,
     setPromptRuns,
     loading,
+    error,
     handleRatingChange,
     handleFeedbackChange,
     fetchPromptRuns
