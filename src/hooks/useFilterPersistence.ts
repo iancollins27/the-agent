@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 
-type StoredFilterValues = {
+export type StoredFilterValues = {
   hideReviewed: boolean;
   excludeReminderActions: boolean;
   timeFilter: string;
@@ -39,14 +39,21 @@ export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
     }
   }, [values]);
 
+  // Updated the updateFilter function to have a more generic type signature
+  // This will allow it to be compatible with the expected type in ProjectManagerDashboard.tsx
+  const updateFilter = <K extends string>(
+    key: K, 
+    value: any
+  ): void => {
+    setValues(prev => ({ 
+      ...prev, 
+      [key]: value 
+    }));
+  };
+
   return {
     filters: values,
     setFilters: setValues,
-    updateFilter: <K extends keyof StoredFilterValues>(
-      key: K,
-      value: StoredFilterValues[K]
-    ) => {
-      setValues(prev => ({ ...prev, [key]: value }));
-    }
+    updateFilter
   };
 };
