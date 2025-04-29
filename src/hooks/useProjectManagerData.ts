@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,6 +6,7 @@ import { TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { useCachedPromptRuns } from './useCachedPromptRuns';
 import { usePromptFeedbackManager } from './usePromptFeedbackManager';
 import { PromptRun } from '../components/admin/types';
+import { fetchUserProfile } from '@/api/user-profile';
 
 export const useProjectManagerData = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
@@ -60,16 +60,12 @@ export const useProjectManagerData = () => {
 
   // Fetch user profile data on mount
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    const getUserProfile = async () => {
       if (!user) return;
       
       try {
-        const { data, error } = await fetch(`/api/user-profile?userId=${user.id}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }).then(res => res.json());
+        // Use the direct Supabase query instead of the API route
+        const { data, error } = await fetchUserProfile(user.id);
           
         if (error) {
           console.error('Error fetching user profile:', error);
@@ -81,7 +77,7 @@ export const useProjectManagerData = () => {
         } else {
           setUserProfile(data);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching user profile:', error);
         toast({
           variant: "destructive",
@@ -91,7 +87,7 @@ export const useProjectManagerData = () => {
       }
     };
     
-    fetchUserProfile();
+    getUserProfile();
   }, [user, toast]);
 
   // Use the cached prompt runs hook for data fetching
@@ -191,7 +187,7 @@ export const useProjectManagerData = () => {
   };
 
   // Handle filter changes with automatic view reset
-  const handleFilterChange = <K extends keyof typeof filters>(key: K, value: typeof filters[K]) => {
+  const handleFilterChange = <K extends string>(key: K, value: any) => {
     updateFilter(key, value);
     resetToFirstPage(); // Reset to first page when filters change
   };

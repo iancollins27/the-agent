@@ -11,7 +11,8 @@ export type StoredFilterValues = {
   groupByRoofer: boolean;
   sortRooferAlphabetically: boolean;
   onlyPendingActions: boolean;
-  reducedPageSize?: boolean; // Added reducedPageSize property
+  reducedPageSize?: boolean;
+  [key: string]: any; // Added to make the type more flexible
 };
 
 export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
@@ -40,8 +41,6 @@ export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
     }
   }, [values]);
 
-  // Updated the updateFilter function to have a more generic type signature
-  // This will allow it to be compatible with the expected type in ProjectManagerDashboard.tsx
   const updateFilter = <K extends string>(
     key: K, 
     value: any
