@@ -1,19 +1,29 @@
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
-import { useAuth } from "@/hooks/useAuth";
 import { useFilterPersistence } from "@/hooks/useFilterPersistence";
 import { TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { useCachedPromptRuns } from './useCachedPromptRuns';
 import { usePromptFeedbackManager } from './usePromptFeedbackManager';
-import { PromptRun } from '../components/admin/types';
-import { fetchUserProfile } from '@/api/user-profile';
+import { usePromptRunSelection } from './project-manager/usePromptRunSelection';
+import { useUserProfileData } from './project-manager/useUserProfileData';
+import { usePromptRunProcessor } from './project-manager/usePromptRunProcessor';
+import { useEmptyStateMessage } from './project-manager/useEmptyStateMessage';
+import { usePageSizeHandler } from './project-manager/usePageSizeHandler';
 
 export const useProjectManagerData = () => {
-  const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
+  
+  // Use the user profile data hook
+  const { user, userProfile } = useUserProfileData();
+  
+  // Use the prompt run selection hook
+  const { 
+    selectedRun, 
+    detailsOpen, 
+    setDetailsOpen, 
+    viewPromptRunDetails 
+  } = usePromptRunSelection();
   
   // Filter state management using persistence hook
   const { filters, updateFilter } = useFilterPersistence({
@@ -43,52 +53,11 @@ export const useProjectManagerData = () => {
     reducedPageSize
   } = filters;
   
-  // Calculate effective page size based on reduced mode
-  const PAGE_SIZE = 5;
-  const effectivePageSize = reducedPageSize ? 2 : PAGE_SIZE;
-  
-  // Reset reduced page size after successful load
-  useEffect(() => {
-    if (reducedPageSize) {
-      const timer = setTimeout(() => {
-        updateFilter('reducedPageSize', false);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [reducedPageSize, updateFilter]);
-
-  // Fetch user profile data on mount
-  useEffect(() => {
-    const getUserProfile = async () => {
-      if (!user) return;
-      
-      try {
-        // Use the direct Supabase query instead of the API route
-        const { data, error } = await fetchUserProfile(user.id);
-          
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: `Failed to load user profile: ${error.message}`
-          });
-        } else {
-          setUserProfile(data);
-        }
-      } catch (error: any) {
-        console.error('Error fetching user profile:', error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: 'Failed to load user profile data'
-        });
-      }
-    };
-    
-    getUserProfile();
-  }, [user, toast]);
+  // Use the page size handler hook
+  const { effectivePageSize } = usePageSizeHandler(
+    reducedPageSize, 
+    updateFilter
+  );
 
   // Use the cached prompt runs hook for data fetching
   const {
@@ -115,6 +84,20 @@ export const useProjectManagerData = () => {
     timeFilter
   });
 
+  // Use the prompt run processor hook
+  const { processedPromptRuns } = usePromptRunProcessor(
+    promptRuns,
+    hideReviewed,
+    sortRooferAlphabetically
+  );
+
+  // Use the empty state message hook
+  const { getEmptyStateMessage } = useEmptyStateMessage(
+    userProfile, 
+    { onlyMyProjects, projectManagerFilter, statusFilter, timeFilter },
+    fetchError
+  );
+
   // Use the feedback manager hook
   const {
     handleRatingChange,
@@ -122,74 +105,15 @@ export const useProjectManagerData = () => {
     handleRunReviewed
   } = usePromptFeedbackManager();
 
-  // Process prompt runs for display
-  const processedPromptRuns = useState(() => {
-    let runs = [...promptRuns];
-
-    // Apply hide reviewed filter if needed
-    if (hideReviewed) {
-      runs = runs.filter(run => !run.reviewed);
-    }
-
-    // Apply alphabetical sorting if needed
-    if (sortRooferAlphabetically) {
-      runs.sort((a, b) => {
-        const rooferA = a.project_roofer_contact || 'zzz';
-        const rooferB = b.project_roofer_contact || 'zzz';
-        return rooferA.localeCompare(rooferB);
-      });
-    }
-    
-    return runs;
-  })[0];
-
-  // Various handlers for UI interactions
-  const viewPromptRunDetails = (run: PromptRun) => {
-    setSelectedRun(run);
-    setDetailsOpen(true);
-  };
-
-  const handlePromptRerun = () => {
-    fetchPromptRuns();
-  };
-
-  // Generate appropriate empty state message
-  const getEmptyStateMessage = () => {
-    if (!user) {
-      return "Please log in to view your project data";
-    }
-    
-    if (!userProfile?.profile_associated_company) {
-      return "Your user profile is not associated with a company. Contact your administrator.";
-    }
-    
-    if (fetchError) {
-      return `Error loading data: ${fetchError}. Try refreshing the page or try again with fewer filters.`;
-    }
-    
-    if (filters.onlyMyProjects) {
-      return "No prompt runs found for your projects. Try unchecking 'Only My Projects' filter.";
-    }
-    
-    if (filters.projectManagerFilter) {
-      return "No prompt runs found for the selected project manager's projects.";
-    }
-    
-    if (filters.statusFilter) {
-      return `No prompt runs found with the '${filters.statusFilter}' status. Try selecting a different status.`;
-    }
-    
-    if (filters.timeFilter !== TIME_FILTERS.ALL) {
-      return `No prompt runs found within the selected time range. Try selecting a different time range.`;
-    }
-    
-    return "No prompt runs found for your company's projects. This could be because:\n1. No prompt runs have been created yet\n2. You don't have access to the projects with prompt runs";
-  };
-
   // Handle filter changes with automatic view reset
   const handleFilterChange = <K extends string>(key: K, value: any) => {
     updateFilter(key, value);
     resetToFirstPage(); // Reset to first page when filters change
+  };
+
+  // Handle prompt rerun
+  const handlePromptRerun = () => {
+    fetchPromptRuns();
   };
 
   return {
