@@ -247,7 +247,7 @@ async function handleMessageAction(
     console.log("Final message content:", messageContent);
   }
   
-  // Extract recipient info - ensure we have a default even if none is provided
+  // Extract recipient info
   const recipient = actionData.recipient || 
     (actionData.action_payload && actionData.action_payload.recipient) || 
     "Project team";
