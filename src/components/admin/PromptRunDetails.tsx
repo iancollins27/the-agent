@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,13 +10,14 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Star, RefreshCw } from "lucide-react";
 import { PromptRun } from './types';
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { rerunPrompt } from "@/utils/api/prompt-runs";
+import PromptRunActions from './PromptRunActions';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface PromptRunDetailsProps {
   promptRun: PromptRun | null;
@@ -34,8 +36,15 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
   onFeedbackChange,
   onPromptRerun
 }) => {
-  const [feedback, setFeedback] = useState<string>(promptRun?.feedback_description || '');
+  const [feedback, setFeedback] = useState<string>('');
   const [rerunning, setRerunning] = useState(false);
+  const [activeTab, setActiveTab] = useState("details");
+
+  useEffect(() => {
+    if (promptRun) {
+      setFeedback(promptRun.feedback_description || '');
+    }
+  }, [promptRun]);
 
   const handleClose = () => {
     onOpenChange(false);
@@ -127,7 +136,7 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
   };
 
   if (!promptRun) {
-    return null; // Or a loading state or error message
+    return null;
   }
 
   return (
@@ -140,59 +149,72 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Project Details */}
-        <div className="my-4">
-          <h3 className="text-lg font-semibold mb-2">Project Details</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <strong>Project Name:</strong> {promptRun.project_name || 'N/A'}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="actions">Actions</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="details" className="space-y-4 pt-4">
+            {/* Project Details */}
+            <div className="my-4">
+              <h3 className="text-lg font-semibold mb-2">Project Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <strong>Project Name:</strong> {promptRun.project_name || 'N/A'}
+                </div>
+                <div>
+                  <strong>Project Address:</strong> {promptRun.project_address || 'N/A'}
+                </div>
+                <div>
+                  <strong>Next Step:</strong> {promptRun.project_next_step || 'N/A'}
+                </div>
+              </div>
             </div>
-            <div>
-              <strong>Project Address:</strong> {promptRun.project_address || 'N/A'}
+
+            {/* Prompt Input */}
+            <div className="my-4">
+              <h3 className="text-lg font-semibold mb-2">Prompt Input</h3>
+              <div className="bg-gray-50 p-4 rounded border whitespace-pre-wrap">
+                {promptRun.prompt_input || "No prompt input available"}
+              </div>
             </div>
-            <div>
-              <strong>Next Step:</strong> {promptRun.project_next_step || 'N/A'}
+
+            {/* Prompt Output */}
+            <div className="my-4">
+              <h3 className="text-lg font-semibold mb-2">AI Response</h3>
+              <div className="bg-gray-50 p-4 rounded border whitespace-pre-wrap">
+                {promptRun.prompt_output || "No response available"}
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Prompt Input */}
-        <div className="my-4">
-          <h3 className="text-lg font-semibold mb-2">Prompt Input</h3>
-          <div className="bg-gray-50 p-4 rounded border whitespace-pre-wrap">
-            {promptRun.prompt_input || "No prompt input available"}
-          </div>
-        </div>
+            {/* Error Message (if any) */}
+            {promptRun.error_message && (
+              <div className="my-4">
+                <h3 className="text-lg font-semibold mb-2 text-red-500">Error</h3>
+                <div className="bg-red-50 p-4 rounded border border-red-200 text-red-700 whitespace-pre-wrap">
+                  {promptRun.error_message}
+                </div>
+              </div>
+            )}
 
-        {/* Prompt Output */}
-        <div className="my-4">
-          <h3 className="text-lg font-semibold mb-2">AI Response</h3>
-          <div className="bg-gray-50 p-4 rounded border whitespace-pre-wrap">
-            {promptRun.prompt_output || "No response available"}
-          </div>
-        </div>
-
-        {/* Error Message (if any) */}
-        {promptRun.error_message && (
-          <div className="my-4">
-            <h3 className="text-lg font-semibold mb-2 text-red-500">Error</h3>
-            <div className="bg-red-50 p-4 rounded border border-red-200 text-red-700 whitespace-pre-wrap">
-              {promptRun.error_message}
+            {/* Feedback and Rating */}
+            <div className="my-4">
+              <h3 className="text-lg font-semibold mb-2">Feedback and Rating</h3>
+              {renderStars()}
+              <Textarea 
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Add your feedback here..."
+                className="mt-2"
+              />
             </div>
-          </div>
-        )}
-
-        {/* Feedback and Rating */}
-        <div className="my-4">
-          <h3 className="text-lg font-semibold mb-2">Feedback and Rating</h3>
-          {renderStars()}
-          <Textarea 
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Add your feedback here..."
-            className="mt-2"
-          />
-        </div>
+          </TabsContent>
+          
+          <TabsContent value="actions" className="pt-4">
+            <PromptRunActions promptRunId={promptRun.id} />
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button type="button" variant="secondary" onClick={handleClose}>
