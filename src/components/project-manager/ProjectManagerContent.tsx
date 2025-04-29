@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { PromptRun } from '../admin/types';
 import PromptRunsTable from '../admin/PromptRunsTable';
 import RooferPromptRunsCard from './RooferPromptRunsCard';
+import { DataPagination } from '../ui/data-pagination';
 
 interface ProjectManagerContentProps {
   loading: boolean;
@@ -10,6 +11,13 @@ interface ProjectManagerContentProps {
   hideReviewed: boolean;
   getEmptyStateMessage: () => string;
   groupByRoofer: boolean;
+  onPageChange?: (page: number) => void;
+  currentPage?: number;
+  totalPages?: number;
+  totalCount?: number | null;
+  hasMorePages?: boolean;
+  onLoadMore?: () => void;
+  pageSize?: number;
   debugInfo: {
     userId?: string;
     companyId?: string;
@@ -30,6 +38,13 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   hideReviewed,
   getEmptyStateMessage,
   groupByRoofer,
+  onPageChange,
+  currentPage = 0,
+  totalPages = 0,
+  totalCount = null,
+  hasMorePages = false,
+  onLoadMore,
+  pageSize = 10,
   debugInfo,
   onViewDetails,
   onRatingChange,
@@ -66,7 +81,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   
   const rooferGroups = groupByRoofer ? groupPromptRunsByRoofer() : [];
   
-  if (loading) {
+  if (loading && promptRuns.length === 0) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-12 bg-slate-200 rounded"></div>
@@ -75,7 +90,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
     );
   }
   
-  if (filteredPromptRuns.length === 0) {
+  if (filteredPromptRuns.length === 0 && !loading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
         <h3 className="text-lg font-medium mb-2">No Prompt Runs Found</h3>
@@ -115,7 +130,23 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
             onRunReviewed={onRunReviewed}
             onPromptRerun={onPromptRerun}
             reviewFilter="all" // Set to "all" since we're already pre-filtering
+            loading={loading}
           />
+          
+          {onPageChange && (
+            <div className="flex justify-center my-4">
+              <DataPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={onPageChange}
+                hasMorePages={hasMorePages}
+                loading={loading}
+                onLoadMore={onLoadMore}
+                pageSize={pageSize}
+                totalItems={totalCount}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

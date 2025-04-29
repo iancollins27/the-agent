@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/use-toast";
 import ProjectManagerLayout from "./ProjectManagerLayout";
 import ProjectManagerToolbar from "./ProjectManagerToolbar";
 import ProjectManagerContent from "./ProjectManagerContent";
@@ -36,8 +36,17 @@ const ProjectManagerDashboard: React.FC = () => {
     handleFeedbackChange,
     handleRunReviewed,
     handlePromptRerun,
-    getEmptyStateMessage
+    getEmptyStateMessage,
+    currentPage,
+    setCurrentPage,
+    totalCount,
+    hasMorePages,
+    loadMorePromptRuns,
+    pageSize
   } = useProjectManagerData();
+
+  // Estimate total pages based on totalCount and pageSize
+  const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : 0;
 
   return (
     <ProjectManagerLayout>
@@ -78,6 +87,13 @@ const ProjectManagerDashboard: React.FC = () => {
         hideReviewed={hideReviewed}
         getEmptyStateMessage={getEmptyStateMessage}
         groupByRoofer={groupByRoofer}
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        hasMorePages={hasMorePages}
+        onLoadMore={loadMorePromptRuns}
+        pageSize={pageSize}
         debugInfo={{
           userId: user?.id,
           companyId: userProfile?.profile_associated_company,

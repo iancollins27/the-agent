@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
-import { usePromptRuns } from '@/hooks/usePromptRuns';
 import { useFilterPersistence } from "@/hooks/useFilterPersistence";
 import { PromptRun } from '../components/admin/types';
 import { useAuth } from "@/hooks/useAuth";
+import { usePaginatedPromptRuns } from './usePaginatedPromptRuns';
 
 export const useProjectManagerData = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
@@ -16,6 +16,9 @@ export const useProjectManagerData = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
+  
+  // Constants
+  const PAGE_SIZE = 10;
   
   // Filter state management using persistence hook
   const { filters, updateFilter } = useFilterPersistence({
@@ -90,7 +93,7 @@ export const useProjectManagerData = () => {
     }
   }, [projectManagerFilter, updateFilter]);
 
-  // Use the prompt runs hook to fetch and manage data
+  // Use the paginated prompt runs hook to fetch and manage data
   const { 
     promptRuns, 
     loading, 
@@ -98,8 +101,13 @@ export const useProjectManagerData = () => {
     handleRatingChange, 
     handleFeedbackChange, 
     fetchPromptRuns,
-    setPromptRuns
-  } = usePromptRuns({
+    setPromptRuns,
+    currentPage,
+    setCurrentPage,
+    totalCount,
+    hasMorePages,
+    loadMore: loadMorePromptRuns
+  } = usePaginatedPromptRuns({
     userProfile,
     statusFilter: filters.statusFilter,
     onlyShowMyProjects: filters.onlyMyProjects,
@@ -108,7 +116,8 @@ export const useProjectManagerData = () => {
     getDateFilter,
     onlyShowLatestRuns: true,
     excludeReminderActions: filters.excludeReminderActions,
-    onlyPendingActions: filters.onlyPendingActions
+    onlyPendingActions: filters.onlyPendingActions,
+    pageSize: PAGE_SIZE
   });
 
   // Update fetch error from prompt runs hook
@@ -132,14 +141,6 @@ export const useProjectManagerData = () => {
     
     return runs;
   }, [promptRuns, filters.sortRooferAlphabetically]);
-
-  // Refresh data when user profile is loaded
-  useEffect(() => {
-    if (userProfile) {
-      console.log("Forcing a data refresh on component mount");
-      fetchPromptRuns();
-    }
-  }, [userProfile, fetchPromptRuns]);
 
   // Various handlers for UI interactions
   const viewPromptRunDetails = (run: PromptRun) => {
@@ -217,6 +218,12 @@ export const useProjectManagerData = () => {
     handleFeedbackChange,
     handleRunReviewed,
     handlePromptRerun,
-    getEmptyStateMessage
+    getEmptyStateMessage,
+    currentPage,
+    setCurrentPage,
+    totalCount,
+    hasMorePages,
+    loadMorePromptRuns,
+    pageSize: PAGE_SIZE
   };
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import PromptRunsTable from '../PromptRunsTable';
 import PromptRunDetails from '../PromptRunDetails';
@@ -10,7 +11,7 @@ import { usePromptRunActions } from './usePromptRunActions';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import TablePagination from '../tables/TablePagination';
+import { DataPagination } from '../../ui/data-pagination';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -19,10 +20,17 @@ const PromptRunsTab: React.FC = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState("not-reviewed");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0); // Changed to 0-indexed
   const [searchAddress, setSearchAddress] = useState("");
   
-  const { promptRuns, setPromptRuns, loading, fetchPromptRuns } = usePromptRunData(statusFilter);
+  const { 
+    promptRuns, 
+    setPromptRuns, 
+    loading, 
+    fetchPromptRuns,
+    totalCount
+  } = usePromptRunData(statusFilter);
+  
   const { handleRatingChange, handleFeedbackChange } = usePromptRunActions(setPromptRuns, setSelectedRun);
 
   const viewPromptRunDetails = (run: PromptRun) => {
@@ -39,7 +47,7 @@ const PromptRunsTab: React.FC = () => {
   };
 
   const handlePromptRerun = () => {
-    setCurrentPage(1);
+    setCurrentPage(0);
     fetchPromptRuns();
   };
 
@@ -63,19 +71,24 @@ const PromptRunsTab: React.FC = () => {
   }, [promptRuns, reviewFilter, searchAddress]);
 
   React.useEffect(() => {
-    setCurrentPage(1);
+    setCurrentPage(0);
   }, [reviewFilter, searchAddress]);
 
+  // Calculate pagination details
+  const totalFilteredItems = filteredPromptRuns.length;
+  const totalPages = Math.ceil(totalFilteredItems / ITEMS_PER_PAGE);
+  
+  // Get the current page's items
   const paginatedPromptRuns = filteredPromptRuns.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * ITEMS_PER_PAGE,
+    (currentPage + 1) * ITEMS_PER_PAGE
   );
   
-  const totalPages = Math.ceil(filteredPromptRuns.length / ITEMS_PER_PAGE);
+  const hasMorePages = currentPage < totalPages - 1;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <PromptRunHeader 
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
@@ -106,7 +119,7 @@ const PromptRunsTab: React.FC = () => {
         </div>
       </div>
 
-      {loading ? (
+      {loading && promptRuns.length === 0 ? (
         <PromptRunLoader />
       ) : filteredPromptRuns.length === 0 ? (
         <div className="text-center py-10">
@@ -135,15 +148,25 @@ const PromptRunsTab: React.FC = () => {
             onRunReviewed={handleRunReviewed}
             reviewFilter={reviewFilter}
             onPromptRerun={handlePromptRerun}
+            loading={loading}
           />
           
           <div className="flex justify-center mt-4">
-            <TablePagination
+            <DataPagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              hasMorePages={hasMorePages}
+              totalItems={totalFilteredItems}
+              pageSize={ITEMS_PER_PAGE}
             />
           </div>
+          
+          {totalCount !== null && (
+            <div className="text-sm text-center text-muted-foreground">
+              Total database items: {totalCount} (Filtered: {totalFilteredItems})
+            </div>
+          )}
         </div>
       )}
 

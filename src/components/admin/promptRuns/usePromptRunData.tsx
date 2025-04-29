@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../types';
@@ -7,11 +7,42 @@ import { PromptRun } from '../types';
 export const usePromptRunData = (statusFilter: string | null) => {
   const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const { toast } = useToast();
 
-  const fetchPromptRuns = async () => {
-    setLoading(true);
+  const fetchPromptRunsCount = useCallback(async () => {
     try {
+      let query = supabase
+        .from('prompt_runs')
+        .select('id', { count: 'exact', head: true });
+
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { count, error } = await query;
+
+      if (error) {
+        console.error("Error counting prompt runs:", error);
+        return null;
+      }
+
+      return count;
+    } catch (error) {
+      console.error('Error counting prompt runs:', error);
+      return null;
+    }
+  }, [statusFilter]);
+
+  const fetchPromptRuns = useCallback(async () => {
+    setLoading(true);
+    
+    try {
+      // First get the total count
+      const count = await fetchPromptRunsCount();
+      setTotalCount(count);
+      
+      // Now fetch the actual data
       let query = supabase
         .from('prompt_runs')
         .select(`
@@ -27,7 +58,8 @@ export const usePromptRunData = (statusFilter: string | null) => {
           ),
           workflow_prompts:workflow_prompt_id (type)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(0, 49);  // Get first 50 items initially
 
       if (statusFilter) {
         query = query.eq('status', statusFilter);
@@ -40,6 +72,7 @@ export const usePromptRunData = (statusFilter: string | null) => {
       }
 
       if (data) {
+        // Format the data
         const formattedData = data.map(run => ({
           ...run,
           id: run.id,
@@ -59,26 +92,27 @@ export const usePromptRunData = (statusFilter: string | null) => {
       } else {
         setPromptRuns([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching prompt runs:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to load prompt runs data",
+        description: `Failed to load prompt runs data: ${error.message}`,
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, toast, fetchPromptRunsCount]);
 
   useEffect(() => {
     fetchPromptRuns();
-  }, [statusFilter]);
+  }, [fetchPromptRuns]);
 
   return {
     promptRuns,
     setPromptRuns,
     loading,
-    fetchPromptRuns
+    fetchPromptRuns,
+    totalCount
   };
 };
