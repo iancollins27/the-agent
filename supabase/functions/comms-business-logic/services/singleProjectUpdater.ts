@@ -134,7 +134,7 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
       next_step: updatedProject.next_step || '',
       new_data: formattedCommunicationData,
       is_reminder_check: false,
-      property_address: updatedProject.Address || ''
+      property_address: updatedProject.Address || '' // Use Address field from the database
     };
     
     const { data: actionResult, error: actionWorkflowError } = await supabase.functions.invoke(

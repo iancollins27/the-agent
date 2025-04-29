@@ -41,7 +41,7 @@ export interface PromptRun {
   
   // Project related data
   project_name?: string;
-  project_address?: string;
+  project_address?: string; // This matches the field name used in interfaces
   project_next_step?: string;
   project_crm_url?: string;
   project_roofer_contact?: string;
@@ -54,7 +54,7 @@ export interface Project {
   id: string;
   created_at: string;
   crm_id: string;
-  Address: string;
+  Address: string; // Note the capital A to match the database schema
   next_step: string;
   project_manager: string;
 }
