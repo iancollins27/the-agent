@@ -1,4 +1,3 @@
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 2000;
 const REQUEST_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_PAGE_SIZE = 20; // Increased from original value
 
 // Debounce function to prevent rapid successive calls
 function debounce<T extends (...args: any[]) => any>(
@@ -26,7 +26,7 @@ function debounce<T extends (...args: any[]) => any>(
 // Main hook for fetching prompt runs with caching
 export function useCachedPromptRuns({
   statusFilter,
-  pageSize,
+  pageSize = DEFAULT_PAGE_SIZE, // Use default if not provided
   userProfileId,
   companyId,
   onlyMyProjects,
@@ -72,13 +72,22 @@ export function useCachedPromptRuns({
     }
 
     try {
+      console.log("Filter settings:", { 
+        statusFilter, 
+        pageSize, 
+        currentPage, 
+        projectManagerFilter, 
+        timeFilter, 
+        onlyMyProjects 
+      });
+      
       // Calculate range for pagination
       const from = currentPage * pageSize;
       const to = from + pageSize - 1;
       
-      console.log(`Fetching prompt runs page ${currentPage} (range ${from}-${to})`);
+      console.log(`Fetching prompt runs page ${currentPage} (range ${from}-${to}) with pageSize ${pageSize}`);
       
-      // Base query with optimized select fields 
+      // Base query with optimized select fields - DO NOT add pagination yet
       let query = supabase
         .from('prompt_runs')
         .select(`
@@ -104,7 +113,9 @@ export function useCachedPromptRuns({
         `, { count: 'estimated' })
         .order('created_at', { ascending: false });
 
-      // Apply server-side filters when possible
+      // Apply server-side filters before pagination for better performance
+      
+      // Status filter
       if (statusFilter) {
         query = query.eq('status', statusFilter);
       }
@@ -133,61 +144,90 @@ export function useCachedPromptRuns({
         }
       }
 
-      // Filter by project manager if specified
+      // Filter by project manager if specified - this is more efficient as server-side filtering
       if (projectManagerFilter) {
-        // We need to get all projects first with the given project manager
-        const { data: projectsData } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('project_manager', projectManagerFilter);
-          
-        if (projectsData && projectsData.length > 0) {
-          const projectIds = projectsData.map(p => p.id);
-          query = query.in('project_id', projectIds);
+        // Cache project ids for the current project manager to prevent repeated queries
+        const cacheKey = ["projectsByManager", projectManagerFilter];
+        const cachedProjects = queryClient.getQueryData<string[]>(cacheKey);
+        
+        if (cachedProjects) {
+          // Use cached project IDs if available
+          console.log(`Using ${cachedProjects.length} cached project IDs for manager ${projectManagerFilter}`);
+          query = query.in('project_id', cachedProjects);
         } else {
-          // If no projects found for this manager, return empty result
-          return { data: [], totalCount: 0, hasMore: false };
+          // Otherwise fetch and cache project IDs
+          console.log(`Fetching project IDs for manager ${projectManagerFilter}`);
+          const { data: projectsData } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('project_manager', projectManagerFilter);
+            
+          if (projectsData && projectsData.length > 0) {
+            const projectIds = projectsData.map(p => p.id);
+            console.log(`Found ${projectIds.length} projects for manager ${projectManagerFilter}`);
+            
+            // Cache project IDs for reuse
+            queryClient.setQueryData(cacheKey, projectIds);
+            
+            query = query.in('project_id', projectIds);
+          } else {
+            // If no projects found for this manager, return empty result
+            console.log(`No projects found for manager ${projectManagerFilter}`);
+            return { data: [], totalCount: 0, hasMore: false };
+          }
+        }
+      }
+
+      // Apply "My Projects" filter if enabled (server-side if possible)
+      if (onlyMyProjects && userProfileId) {
+        const cacheKey = ["myProjects", userProfileId];
+        const cachedProjects = queryClient.getQueryData<string[]>(cacheKey);
+        
+        if (cachedProjects) {
+          // Use cached project IDs if available
+          console.log(`Using ${cachedProjects.length} cached project IDs for user ${userProfileId}`);
+          query = query.in('project_id', cachedProjects);
+        } else {
+          // Otherwise fetch and cache project IDs
+          console.log(`Fetching project IDs for user ${userProfileId}`);
+          const { data: myProjects } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('project_manager', userProfileId);
+            
+          if (myProjects && myProjects.length > 0) {
+            const myProjectIds = myProjects.map(p => p.id);
+            console.log(`Found ${myProjectIds.length} projects for user ${userProfileId}`);
+            
+            // Cache project IDs for reuse
+            queryClient.setQueryData(cacheKey, myProjectIds);
+            
+            query = query.in('project_id', myProjectIds);
+          } else {
+            // If user has no projects, return empty result
+            console.log(`No projects found for user ${userProfileId}`);
+            return { data: [], totalCount: 0, hasMore: false };
+          }
         }
       }
       
-      // Apply pagination after filters
+      // Get total count before applying pagination
+      const { count: totalCount } = await query.count();
+      console.log(`Total matching items before pagination: ${totalCount}`);
+      
+      // Apply pagination last (after all filters)
       query = query.range(from, to);
 
-      const { data, error, count } = await query;
+      // Execute final query
+      const { data, error } = await query;
 
       if (error) {
         throw error;
       }
 
-      // Process results serverside when possible
-      let results = data || [];
-      let totalCount = count || 0;
-
-      // Handle client-side filtering for specific filters
-      if (onlyMyProjects && userProfileId) {
-        // Get project IDs for this user (with cache)
-        const cachedProjects = queryClient.getQueryData(["myProjects", userProfileId]);
-        
-        if (cachedProjects) {
-          const myProjectIds = new Set(cachedProjects as string[]);
-          results = results.filter(run => run.project_id && myProjectIds.has(run.project_id));
-        } else {
-          const { data: myProjects } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('project_manager', userProfileId)
-            .limit(100);
-            
-          if (myProjects) {
-            const myProjectIds = new Set(myProjects.map(p => p.id));
-            // Cache for reuse
-            queryClient.setQueryData(["myProjects", userProfileId], 
-              myProjects.map(p => p.id));
-            results = results.filter(run => run.project_id && myProjectIds.has(run.project_id));
-          }
-        }
-      }
-
+      // Process results
+      const results = data || [];
+      
       // Format the data for display
       const formattedData = results.map(run => {
         return {
@@ -217,6 +257,10 @@ export function useCachedPromptRuns({
           
         if (projectIds.length > 0) {
           try {
+            // Use unique project IDs to avoid duplicate requests
+            const uniqueProjectIds = [...new Set(projectIds)];
+            console.log(`Fetching roofer contacts for ${uniqueProjectIds.length} unique projects`);
+            
             const { data: contactsData } = await supabase
               .from('project_contacts')
               .select(`
@@ -225,7 +269,7 @@ export function useCachedPromptRuns({
                   id, full_name, role
                 )
               `)
-              .in('project_id', projectIds.slice(0, 10)) // Limit to first 10 to prevent URL too long
+              .in('project_id', uniqueProjectIds.slice(0, Math.min(50, uniqueProjectIds.length))) // Limit to prevent URI too long
               .filter('contacts.role', 'eq', 'Roofer');
               
             if (contactsData) {
@@ -251,9 +295,9 @@ export function useCachedPromptRuns({
       
       // Handle pending actions filter if needed
       if (onlyPendingActions && formattedData.length > 0) {
-        const promptRunIds = formattedData.map(run => run.id).slice(0, 10);
-        
         try {
+          const promptRunIds = formattedData.map(run => run.id);
+          
           const { data: actionData } = await supabase
             .from('action_records')
             .select('prompt_run_id')
@@ -265,7 +309,7 @@ export function useCachedPromptRuns({
             return { 
               data: formattedData.filter(run => pendingActionRunIds.has(run.id)),
               totalCount: pendingActionRunIds.size, 
-              hasMore: false  // Simplified - we won't know exact count with client filtering
+              hasMore: results.length === pageSize  
             };
           } else {
             return { data: [], totalCount: 0, hasMore: false };
@@ -278,7 +322,7 @@ export function useCachedPromptRuns({
       return {
         data: formattedData,
         totalCount,
-        hasMore: results.length === pageSize
+        hasMore: results.length === pageSize && from + results.length < (totalCount || 0)
       };
     } catch (error) {
       console.error("Error fetching prompt runs:", error);

@@ -13,14 +13,14 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { DataPagination } from '../../ui/data-pagination';
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 20; // Increased from 10
 
 const PromptRunsTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState("not-reviewed");
-  const [currentPage, setCurrentPage] = useState(0); // Changed to 0-indexed
+  const [currentPage, setCurrentPage] = useState(0); // 0-indexed
   const [searchAddress, setSearchAddress] = useState("");
   
   const { 

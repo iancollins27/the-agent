@@ -44,7 +44,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   totalCount = null,
   hasMorePages = false,
   onLoadMore,
-  pageSize = 10,
+  pageSize = 20, // Increased default page size
   debugInfo,
   onViewDetails,
   onRatingChange,

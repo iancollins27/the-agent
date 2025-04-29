@@ -22,7 +22,7 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
   hasMorePages,
   loading = false,
   onLoadMore,
-  pageSize = 5, // Reduced default page size
+  pageSize = 20, // Increased default page size
   totalItems
 }) => {
   // Generate page numbers to display
@@ -43,7 +43,7 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
     }
     
     // Regular pagination when we know total pages
-    if (totalPages <= 5) { // Show fewer pages at once
+    if (totalPages <= 7) { 
       // If few pages, show all
       for (let i = 0; i < totalPages; i++) {
         pages.push(i);
@@ -52,11 +52,11 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
       // Always show first page
       pages.push(0);
       
-      if (currentPage > 1) {
+      if (currentPage > 2) {
         pages.push(-1); // -1 indicates ellipsis
       }
       
-      // Show current page and neighbors (reduced window)
+      // Show current page and neighbors
       const start = Math.max(1, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
       
@@ -64,7 +64,7 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
         pages.push(i);
       }
       
-      if (currentPage < totalPages - 2) {
+      if (currentPage < totalPages - 3) {
         pages.push(-1); // -1 indicates ellipsis
       }
       
@@ -93,6 +93,11 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
   if (currentPage === 0 && pageNumbers.length === 0) {
     return null;
   }
+  
+  // Calculate display information
+  const firstItemOnPage = totalItems ? Math.min((currentPage * pageSize) + 1, totalItems) : 0;
+  const lastItemOnPage = totalItems ? Math.min((currentPage + 1) * pageSize, totalItems) : 0;
+  const totalPagesCount = Math.max(1, totalItems && pageSize ? Math.ceil(totalItems / pageSize) : totalPages);
 
   return (
     <div className="flex flex-col items-center gap-2 py-2">
@@ -147,8 +152,14 @@ export const DataPagination: React.FC<DataPaginationProps> = ({
       
       {totalItems !== null && totalItems !== undefined && pageSize && (
         <div className="text-xs text-muted-foreground">
-          Showing {Math.min((currentPage * pageSize) + 1, totalItems)} - {Math.min((currentPage + 1) * pageSize, totalItems)} of {totalItems}{" "}
-          items (page {currentPage + 1} of {Math.max(1, Math.ceil(totalItems / pageSize))})
+          {totalItems > 0 ? (
+            <>
+              Showing {firstItemOnPage} - {lastItemOnPage} of {totalItems}{" "}
+              items (page {currentPage + 1} of {totalPagesCount})
+            </>
+          ) : (
+            <>No items to display</>
+          )}
         </div>
       )}
       
