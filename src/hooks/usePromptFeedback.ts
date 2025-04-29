@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { PromptRun } from '../components/admin/types';
@@ -41,13 +40,14 @@ export const usePromptFeedback = (
     }
   };
 
-  const handleFeedbackChange = async (promptRunId: string, feedback: { description?: string; tags?: string[] }) => {
+  // Update the feedback parameter to be a string
+  const handleFeedbackChange = async (promptRunId: string, feedback: string) => {
     try {
       const { error } = await supabase
         .from('prompt_runs')
         .update({
-          feedback_description: feedback.description,
-          feedback_tags: feedback.tags
+          feedback_description: feedback
+          // No longer updating feedback_tags
         })
         .eq('id', promptRunId);
 
@@ -60,8 +60,9 @@ export const usePromptFeedback = (
           run.id === promptRunId 
             ? { 
                 ...run, 
-                feedback_description: feedback.description || null, 
-                feedback_tags: feedback.tags || null 
+                feedback_description: feedback,
+                // Keep existing tags 
+                feedback_tags: run.feedback_tags
               } 
             : run
         )
