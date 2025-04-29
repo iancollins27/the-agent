@@ -16,7 +16,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { rerunPrompt } from "@/utils/api/prompt-runs";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface PromptRunsTableProps {
   promptRuns: PromptRun[];
@@ -26,7 +25,6 @@ interface PromptRunsTableProps {
   reviewFilter?: string;
   hideReviewed?: boolean; // Kept for backward compatibility but will be ignored
   onPromptRerun?: () => void; // Callback to refresh data after rerun
-  loading?: boolean;
 }
 
 const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
@@ -36,8 +34,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   onRunReviewed,
   reviewFilter = "all", // Default to showing all
   hideReviewed = false, // Deprecated, kept for backward compatibility but ignored
-  onPromptRerun,
-  loading = false
+  onPromptRerun
 }) => {
   const [rerunningPrompts, setRerunningPrompts] = useState<Record<string, boolean>>({});
   
@@ -130,41 +127,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     if (reviewFilter === "not-reviewed") return run.reviewed !== true;
     return true;
   });
-
-  // Loading skeleton
-  if (loading && promptRuns.length === 0) {
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Address</TableHead>
-            <TableHead>Next Step</TableHead>
-            <TableHead>Roofer</TableHead>
-            <TableHead>Time</TableHead>
-            <TableHead>Rating</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {[1, 2, 3, 4, 5].map(i => (
-            <TableRow key={`skeleton-${i}`}>
-              <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-              <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-              <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-              <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-              <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  <Skeleton className="h-8 w-16" />
-                  <Skeleton className="h-8 w-16" />
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    );
-  }
 
   return (
     <Table>
