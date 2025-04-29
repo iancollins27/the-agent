@@ -31,7 +31,7 @@ export const useProjectManagerData = () => {
     groupByRoofer: false,
     sortRooferAlphabetically: true,
     onlyPendingActions: false,
-    reducedPageSize: false // New flag for reduced page size mode
+    reducedPageSize: false // Added this property with a default value
   });
   
   // Destructure filters for easier access
@@ -176,6 +176,13 @@ export const useProjectManagerData = () => {
     fetchPromptRuns();
   };
 
+  // Handle retry with fewer items
+  const handleRetryWithFewerItems = () => {
+    // Reduce page size temporarily to load critical data
+    updateFilter('reducedPageSize', true);
+    fetchPromptRuns();
+  };
+
   // Generate appropriate empty state message
   const getEmptyStateMessage = () => {
     if (!user) {
@@ -240,6 +247,7 @@ export const useProjectManagerData = () => {
     totalCount,
     hasMorePages,
     loadMorePromptRuns,
-    pageSize: effectivePageSize
+    pageSize: effectivePageSize,
+    handleRetryWithFewerItems
   };
 };

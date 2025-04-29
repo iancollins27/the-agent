@@ -11,6 +11,7 @@ export type StoredFilterValues = {
   groupByRoofer: boolean;
   sortRooferAlphabetically: boolean;
   onlyPendingActions: boolean;
+  reducedPageSize?: boolean; // Added reducedPageSize property
 };
 
 export const useFilterPersistence = (defaultValues: StoredFilterValues) => {

@@ -42,18 +42,12 @@ const ProjectManagerDashboard: React.FC = () => {
     totalCount,
     hasMorePages,
     loadMorePromptRuns,
-    pageSize
+    pageSize,
+    handleRetryWithFewerItems
   } = useProjectManagerData();
 
   // Estimate total pages based on totalCount and pageSize
   const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : 0;
-
-  // Handle retry with fewer items
-  const handleRetryWithFewerItems = () => {
-    // Reduce page size temporarily to load critical data
-    updateFilter('reducedPageSize', true);
-    fetchPromptRuns();
-  };
 
   return (
     <ProjectManagerLayout>
