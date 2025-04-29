@@ -102,13 +102,56 @@ export function useCachedPromptRuns({
           ),
           workflow_prompts:workflow_prompt_id (type)
         `, { count: 'estimated' })
-        .order('created_at', { ascending: false })
-        .range(from, to);
+        .order('created_at', { ascending: false });
 
       // Apply server-side filters when possible
       if (statusFilter) {
         query = query.eq('status', statusFilter);
       }
+
+      // Apply time filter if specified
+      if (timeFilter && timeFilter !== 'all') {
+        let timeConstraint;
+        const now = new Date();
+        
+        switch(timeFilter) {
+          case 'last_hour':
+            timeConstraint = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+            break;
+          case 'last_24_hours':
+            timeConstraint = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case 'last_7_days':
+            timeConstraint = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+          default:
+            timeConstraint = null;
+        }
+        
+        if (timeConstraint) {
+          query = query.gte('created_at', timeConstraint);
+        }
+      }
+
+      // Filter by project manager if specified
+      if (projectManagerFilter) {
+        // We need to get all projects first with the given project manager
+        const { data: projectsData } = await supabase
+          .from('projects')
+          .select('id')
+          .eq('project_manager', projectManagerFilter);
+          
+        if (projectsData && projectsData.length > 0) {
+          const projectIds = projectsData.map(p => p.id);
+          query = query.in('project_id', projectIds);
+        } else {
+          // If no projects found for this manager, return empty result
+          return { data: [], totalCount: 0, hasMore: false };
+        }
+      }
+      
+      // Apply pagination after filters
+      query = query.range(from, to);
 
       const { data, error, count } = await query;
 
