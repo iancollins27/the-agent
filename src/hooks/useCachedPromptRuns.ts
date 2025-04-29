@@ -1,3 +1,4 @@
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -212,7 +213,10 @@ export function useCachedPromptRuns({
       }
       
       // Get total count before applying pagination
-      const { count: totalCount } = await query.count();
+      // Fix: Use .count() properly as a separate method call
+      const countResult = await query.count();
+      const totalCount = countResult.count || 0;
+      
       console.log(`Total matching items before pagination: ${totalCount}`);
       
       // Apply pagination last (after all filters)
@@ -322,7 +326,7 @@ export function useCachedPromptRuns({
       return {
         data: formattedData,
         totalCount,
-        hasMore: results.length === pageSize && from + results.length < (totalCount || 0)
+        hasMore: results.length === pageSize && from + results.length < totalCount
       };
     } catch (error) {
       console.error("Error fetching prompt runs:", error);
