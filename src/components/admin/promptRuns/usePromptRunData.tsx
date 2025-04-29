@@ -25,7 +25,7 @@ export const usePromptRunData = (statusFilter: string | null) => {
               profile_lname
             )
           ),
-          workflow_prompts:workflow_prompt_id (type)
+          workflow_prompts:workflow_prompt_id (id, type)
         `)
         .order('created_at', { ascending: false });
 
@@ -49,7 +49,8 @@ export const usePromptRunData = (statusFilter: string | null) => {
           project_manager: run.projects?.project_manager ? 
             `${run.projects.project_manager.profile_fname || ''} ${run.projects.project_manager.profile_lname || ''}`.trim() || 'Unnamed Manager' 
             : null,
-          workflow_type: run.workflow_prompts?.type,
+          workflow_type: run.workflow_prompts?.type || null,
+          workflow_prompt_type: run.workflow_prompts?.type || null,
           prompt_text: run.prompt_input,
           result: run.prompt_output,
           reviewed: run.reviewed === true
