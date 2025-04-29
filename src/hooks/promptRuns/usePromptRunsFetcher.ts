@@ -16,7 +16,7 @@ export const usePromptRunsFetcher = () => {
         .select(`
           *,
           projects:project_id (crm_id, Address, next_step),
-          workflow_prompts:workflow_prompt_id (type)
+          workflow_prompts:workflow_prompt_id (id, type)
         `)
         .order('created_at', { ascending: false });
 

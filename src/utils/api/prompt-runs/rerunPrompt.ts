@@ -19,7 +19,7 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
         prompt_input,
         project_id,
         workflow_prompt_id,
-        workflow_prompts:workflow_prompt_id (type)
+        workflow_prompts:workflow_prompt_id (id, type)
       `)
       .eq('id', promptRunId)
       .single();
@@ -32,11 +32,21 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       };
     }
 
+    const workflowType = originalRun.workflow_prompts?.type;
+    
+    if (!workflowType) {
+      console.error("Original prompt run is missing workflow type");
+      return {
+        success: false,
+        error: "Could not determine the workflow type for this prompt run. It might be missing required data."
+      };
+    }
+
     // Step 2: Get the latest prompt template for the same type
     const { data: latestPrompt, error: promptError } = await supabase
       .from('workflow_prompts')
       .select('id, prompt_text')
-      .eq('type', originalRun.workflow_prompts?.type)
+      .eq('type', workflowType)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
@@ -62,7 +72,7 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
     }
 
     // Step 4: Call the test-workflow-prompt edge function with the original parameters
-    const promptType = originalRun.workflow_prompts?.type || 'unknown';
+    const promptType = workflowType;
     
     // Fetch project details to get the most current data
     const { data: projectData, error: projectError } = await supabase
