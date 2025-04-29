@@ -1,4 +1,6 @@
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+
 export async function generateSummary(
   prompt: string, 
   apiKey: string, 
