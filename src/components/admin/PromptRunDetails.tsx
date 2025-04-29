@@ -1,121 +1,85 @@
-
-import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Star, RefreshCw } from "lucide-react";
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import PromptRunRating from './PromptRunRating';
 import { PromptRun } from './types';
-import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { rerunPrompt } from "@/utils/api/prompt-runs";
 import PromptRunActions from './PromptRunActions';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ExternalLink, RefreshCw } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
+import { rerunPrompt } from "@/utils/api/prompt-runs";
 
-interface PromptRunDetailsProps {
+type PromptRunDetailsProps = {
   promptRun: PromptRun | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRatingChange: (promptRunId: string, rating: number | null) => void;
-  onFeedbackChange: (promptRunId: string, feedback: string) => void;
+  onFeedbackChange?: (promptRunId: string, feedback: { 
+    description?: string; 
+    tags?: string[] 
+  }) => void;
   onPromptRerun?: () => void;
-}
+};
 
 const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({ 
   promptRun, 
-  open, 
-  onOpenChange, 
+  open,
+  onOpenChange,
   onRatingChange,
   onFeedbackChange,
   onPromptRerun
 }) => {
-  const [feedback, setFeedback] = useState<string>('');
-  const [rerunning, setRerunning] = useState(false);
-  const [activeTab, setActiveTab] = useState("details");
+  const [feedbackDescription, setFeedbackDescription] = useState<string>('');
+  const [feedbackTags, setFeedbackTags] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('details');
+  const [isRerunning, setIsRerunning] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (promptRun) {
-      setFeedback(promptRun.feedback_description || '');
+      setFeedbackDescription(promptRun.feedback_description || '');
+      setFeedbackTags((promptRun.feedback_tags || []).join(', '));
     }
   }, [promptRun]);
 
-  const handleClose = () => {
-    onOpenChange(false);
-  };
+  if (!promptRun) return null;
 
-  const handleFeedbackUpdate = async () => {
-    if (!promptRun) return;
-
-    try {
-      const { error } = await supabase
-        .from('prompt_runs')
-        .update({ feedback_description: feedback })
-        .eq('id', promptRun.id);
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: "Success",
-        description: "Feedback updated successfully",
-      });
-
-      onFeedbackChange(promptRun.id, feedback);
-    } catch (error) {
-      console.error('Error updating feedback:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update feedback",
+  const handleSaveFeedback = () => {
+    if (onFeedbackChange && promptRun) {
+      const tags = feedbackTags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+      
+      onFeedbackChange(promptRun.id, {
+        description: feedbackDescription || null,
+        tags: tags.length > 0 ? tags : null
       });
     }
-  };
-
-  const renderStars = () => {
-    if (!promptRun) return null;
-
-    const rating = promptRun.feedback_rating || 0;
-    return (
-      <div className="flex items-center">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-5 w-5 cursor-pointer ${
-              star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-            }`}
-            onClick={() => onRatingChange(promptRun.id, star === rating ? null : star)}
-          />
-        ))}
-      </div>
-    );
   };
 
   const handleRerunPrompt = async () => {
     if (!promptRun) return;
     
+    setIsRerunning(true);
     try {
-      setRerunning(true);
-      
       const result = await rerunPrompt(promptRun.id);
       
       if (result.success) {
         toast({
           title: "Success",
-          description: `Prompt has been re-run. New prompt run created with ID: ${result.newPromptRunId}`,
+          description: `Prompt has been re-run. New prompt run created.`,
         });
+        
+        onOpenChange(false);
         
         if (onPromptRerun) {
           onPromptRerun();
         }
-        handleClose();
       } else {
         toast({
           variant: "destructive",
@@ -124,110 +88,141 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
         });
       }
     } catch (error) {
-      console.error('Error re-running prompt:', error);
+      console.error("Error re-running prompt:", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: "An unexpected error occurred while re-running the prompt",
       });
     } finally {
-      setRerunning(false);
+      setIsRerunning(false);
     }
   };
 
-  if (!promptRun) {
-    return null;
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[80%] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Prompt Run Details</DialogTitle>
-          <DialogDescription>
-            Details for prompt run ID: {promptRun.id}
-          </DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle>Prompt Run Details</DialogTitle>
+            <DialogDescription>
+              Created at {new Date(promptRun.created_at).toLocaleString()}
+            </DialogDescription>
+            <div className="mt-2 text-sm flex items-center">
+              {promptRun.project_address && (
+                <Badge variant="outline" className="font-normal">
+                  {promptRun.project_address}
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRerunPrompt}
+              disabled={isRerunning}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${isRerunning ? 'animate-spin' : ''}`} />
+              {isRerunning ? "Running..." : "Re-run"}
+            </Button>
+            
+            {promptRun.project_crm_url && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(promptRun.project_crm_url, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                CRM Record
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="actions">Actions</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="details" className="space-y-4 pt-4">
-            {/* Project Details */}
-            <div className="my-4">
-              <h3 className="text-lg font-semibold mb-2">Project Details</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <strong>Project Name:</strong> {promptRun.project_name || 'N/A'}
-                </div>
-                <div>
-                  <strong>Project Address:</strong> {promptRun.project_address || 'N/A'}
-                </div>
-                <div>
-                  <strong>Next Step:</strong> {promptRun.project_next_step || 'N/A'}
-                </div>
-              </div>
-            </div>
 
-            {/* Prompt Input */}
-            <div className="my-4">
-              <h3 className="text-lg font-semibold mb-2">Prompt Input</h3>
-              <div className="bg-gray-50 p-4 rounded border whitespace-pre-wrap">
-                {promptRun.prompt_input || "No prompt input available"}
-              </div>
-            </div>
+          <TabsContent value="details" className="space-y-4">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <h3 className="font-medium">Evaluation</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Rating</Label>
+                    <PromptRunRating 
+                      rating={promptRun.feedback_rating}
+                      onRatingChange={(rating) => onRatingChange(promptRun.id, rating)}
+                      size="md"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="tags">Tags (comma separated)</Label>
+                    <Input
+                      id="tags"
+                      value={feedbackTags}
+                      onChange={(e) => setFeedbackTags(e.target.value)}
+                      placeholder="accuracy, clarity, etc."
+                    />
+                  </div>
+                  
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="feedback">Feedback</Label>
+                    <Textarea
+                      id="feedback"
+                      value={feedbackDescription}
+                      onChange={(e) => setFeedbackDescription(e.target.value)}
+                      placeholder="Provide your feedback about this prompt run..."
+                      rows={3}
+                    />
+                  </div>
 
-            {/* Prompt Output */}
-            <div className="my-4">
-              <h3 className="text-lg font-semibold mb-2">AI Response</h3>
-              <div className="bg-gray-50 p-4 rounded border whitespace-pre-wrap">
-                {promptRun.prompt_output || "No response available"}
-              </div>
-            </div>
-
-            {/* Error Message (if any) */}
-            {promptRun.error_message && (
-              <div className="my-4">
-                <h3 className="text-lg font-semibold mb-2 text-red-500">Error</h3>
-                <div className="bg-red-50 p-4 rounded border border-red-200 text-red-700 whitespace-pre-wrap">
-                  {promptRun.error_message}
+                  <div className="md:col-span-2">
+                    <Button onClick={handleSaveFeedback} className="mt-2">
+                      Save Feedback
+                    </Button>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            <div>
+              <h3 className="font-medium mb-2">Prompt Input</h3>
+              <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
+                {promptRun.prompt_input || promptRun.prompt_text || 'No input available'}
+              </pre>
+            </div>
+            
+            {(promptRun.prompt_output || promptRun.result) && (
+              <div>
+                <h3 className="font-medium mb-2">Prompt Output</h3>
+                <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
+                  {promptRun.prompt_output || promptRun.result}
+                </pre>
               </div>
             )}
-
-            {/* Feedback and Rating */}
-            <div className="my-4">
-              <h3 className="text-lg font-semibold mb-2">Feedback and Rating</h3>
-              {renderStars()}
-              <Textarea 
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Add your feedback here..."
-                className="mt-2"
-              />
-            </div>
+            
+            {promptRun.error_message && (
+              <div>
+                <h3 className="font-medium mb-2 text-red-500">Error</h3>
+                <pre className="bg-red-50 p-4 rounded overflow-auto max-h-60 text-sm text-red-500 whitespace-pre-wrap break-words">
+                  {promptRun.error_message}
+                </pre>
+              </div>
+            )}
           </TabsContent>
           
-          <TabsContent value="actions" className="pt-4">
+          <TabsContent value="actions">
             <PromptRunActions promptRunId={promptRun.id} />
           </TabsContent>
         </Tabs>
-
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={handleClose}>
-            Close
-          </Button>
-          <Button type="button" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800" onClick={handleRerunPrompt} disabled={rerunning}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${rerunning ? 'animate-spin' : ''}`} />
-              {rerunning ? "Running..." : "Re-run"}
-          </Button>
-          <Button type="button" onClick={handleFeedbackUpdate}>
-            Update Feedback
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -43,7 +43,7 @@ export async function updateProject(
     company_id: string;
     project_track?: string | null;
     next_check_date?: string | null;
-    Address?: string; // Using Address with capital A to match database schema
+    Address?: string;
     project_manager?: string | null; // Added project_manager field
   }
 ) {
@@ -73,7 +73,7 @@ export async function createProject(
     crm_id: string;
     project_track?: string | null;
     next_check_date?: string | null;
-    Address?: string; // Using Address with capital A to match database schema
+    Address?: string;
     project_manager?: string | null; // Added project_manager field
   }
 ) {

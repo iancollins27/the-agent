@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -46,15 +47,13 @@ export const usePromptRunActions = (
     }
   };
 
-  // Update the type of the feedback parameter to match the expected interface
-  const handleFeedbackChange = async (promptRunId: string, feedback: string) => {
+  const handleFeedbackChange = async (promptRunId: string, feedback: { description?: string; tags?: string[] }) => {
     try {
-      // Update feedback as a string in the database
       const { error } = await supabase
         .from('prompt_runs')
         .update({
-          feedback_description: feedback,
-          // We're no longer updating tags since feedback is now a string
+          feedback_description: feedback.description,
+          feedback_tags: feedback.tags
         })
         .eq('id', promptRunId);
 
@@ -68,9 +67,8 @@ export const usePromptRunActions = (
           run.id === promptRunId 
             ? { 
                 ...run, 
-                feedback_description: feedback,
-                // Keep existing tags
-                feedback_tags: run.feedback_tags 
+                feedback_description: feedback.description || null, 
+                feedback_tags: feedback.tags || null 
               } 
             : run
         )
@@ -81,9 +79,8 @@ export const usePromptRunActions = (
         prev && prev.id === promptRunId 
           ? { 
               ...prev, 
-              feedback_description: feedback,
-              // Keep existing tags
-              feedback_tags: prev.feedback_tags
+              feedback_description: feedback.description || null, 
+              feedback_tags: feedback.tags || null 
             } 
           : prev
       );

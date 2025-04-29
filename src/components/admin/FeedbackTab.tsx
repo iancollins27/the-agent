@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { usePromptRunData } from './promptRuns/usePromptRunData';
@@ -61,7 +62,7 @@ const FeedbackTab = () => {
                 onClick={() => handleRowClick(run)}
               >
                 <TableCell>{run.project_address || 'N/A'}</TableCell>
-                <TableCell><p><strong>Project:</strong> {run.project_name || 'Unknown Project'}</p></TableCell>
+                <TableCell>{run.project_manager || 'No manager assigned'}</TableCell>
                 <TableCell>{run.feedback_description}</TableCell>
                 <TableCell>
                   {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}

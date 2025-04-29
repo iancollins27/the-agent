@@ -1,46 +1,113 @@
+
 import React from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { format, isValid, parseISO } from 'date-fns';
 import { ActionRecord } from './types';
-import { formatDistanceToNow } from 'date-fns';
 
 interface ActionDetailsProps {
   action: ActionRecord;
-  onClose: () => void;
 }
 
-const ActionDetails: React.FC<ActionDetailsProps> = ({ action, onClose }) => {
+const ActionDetails: React.FC<ActionDetailsProps> = ({ action }) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "Unknown";
+    try {
+      const date = parseISO(dateString);
+      if (!isValid(date)) return 'Unknown';
+      return format(date, 'MMM d, yyyy h:mm a');
+    } catch (error) {
+      return 'Unknown';
+    }
+  };
+
+  const timestamp = formatDate(action.created_at);
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "executed":
+        return "default";
+      case "approved":
+        return "default";
+      case "rejected":
+        return "destructive";
+      case "failed":
+        return "destructive";
+      default:
+        return "secondary";
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3 text-center">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
-            Action Details
-          </h3>
-          <div className="mt-2 px-7 py-3">
-            <p className="text-sm text-gray-500">
-              <strong>Action Type:</strong> {action.action_type}
-            </p>
-            <p><strong>Status:</strong> {action.status}</p>
-            <p><strong>Message:</strong> {action.message || 'No message'}</p>
-            <p><strong>Requires Approval:</strong> {action.requires_approval ? 'Yes' : 'No'}</p>
-            <p><strong>Created At:</strong> {formatDistanceToNow(new Date(action.created_at), { addSuffix: true })}</p>
-            <p><strong>Executed At:</strong> {action.executed_at ? formatDistanceToNow(new Date(action.executed_at), { addSuffix: true }) : 'Not yet executed'}</p>
-            <p><strong>Recipient:</strong> {action.recipient_name || 'No recipient'}</p>
-            <p><strong>Sender:</strong> {action.sender_name || 'No sender'}</p>
-            <p><strong>Project:</strong> {action.project_name || 'No project'}</p>
-            <p><strong>Approver:</strong> {action.approver_id || 'No approver assigned'}</p>
-          </div>
-          <div className="items-center px-4 py-3">
-            <button
-              className="px-4 py-2 bg-gray-500 text-white text-base font-medium rounded-md width-full shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
-              onClick={onClose}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <InfoCard title="Basic Information">
+          <InfoItem label="Type" value={<Badge variant="outline" className="capitalize">{action.action_type?.replace(/_/g, ' ') || 'Unknown'}</Badge>} />
+          <InfoItem label="Status" value={
+            <Badge 
+              variant={getStatusBadgeVariant(action.status) as any}
+              className="capitalize"
             >
-              Close
-            </button>
-          </div>
-        </div>
+              {action.status}
+            </Badge>
+          } />
+          <InfoItem label="Created" value={timestamp} />
+          <InfoItem label="Project" value={action.project_name || 'N/A'} />
+        </InfoCard>
+
+        <InfoCard title="People">
+          <InfoItem label="Recipient" value={action.recipient_name || 'N/A'} />
+          <InfoItem label="Sender" value={action.sender_name || 'System'} />
+          {action.approver_id && (
+            <InfoItem label="Approved by" value={action.approver_name || action.approver_id} />
+          )}
+        </InfoCard>
       </div>
+
+      <InfoCard title="Message Content">
+        <div className="whitespace-pre-wrap p-3 border rounded-md bg-muted/50">
+          {action.message || 'No message content'}
+        </div>
+      </InfoCard>
+
+      {action.action_payload && typeof action.action_payload === 'object' && (
+        <InfoCard title="Action Payload">
+          <pre className="text-xs overflow-auto p-3 border rounded-md bg-muted/50">
+            {JSON.stringify(action.action_payload, null, 2)}
+          </pre>
+        </InfoCard>
+      )}
+
+      {action.execution_result && (
+        <InfoCard title="Execution Result">
+          <pre className="text-xs overflow-auto p-3 border rounded-md bg-muted/50">
+            {JSON.stringify(action.execution_result, null, 2)}
+          </pre>
+        </InfoCard>
+      )}
     </div>
   );
 };
+
+// Helper components
+const InfoCard: React.FC<{title: string, children: React.ReactNode}> = ({ title, children }) => (
+  <Card>
+    <CardContent className="p-4">
+      <h3 className="font-medium mb-3">{title}</h3>
+      <div className="space-y-2">
+        {children}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const InfoItem: React.FC<{label: string, value: React.ReactNode}> = ({ label, value }) => (
+  <div>
+    <div className="text-sm text-muted-foreground">{label}</div>
+    <div className="font-medium">{value}</div>
+    <Separator className="mt-2" />
+  </div>
+);
 
 export default ActionDetails;

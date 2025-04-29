@@ -93,7 +93,7 @@ const TestRunner = ({
           milestone_instructions: '',
           action_description: 'Sample action for testing',
           isMultiProjectTest: isMultiProjectTest,
-          property_address: projectData.Address || ''  // Use the Address field from the database
+          property_address: projectData.Address || ''  // Use the Address field
         };
         
         // Get milestone instructions if this is a next step
