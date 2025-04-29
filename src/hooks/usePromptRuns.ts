@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { PromptRun } from '../components/admin/types';
 import { usePromptFeedback } from './usePromptFeedback';
@@ -23,7 +22,7 @@ export const usePromptRuns = ({
   const { handleRatingChange, handleFeedbackChange } = usePromptFeedback((updater) => {
     setPromptRuns(updater);
   });
-  const { fetchPromptRuns: fetchData } = usePromptRunsFetcher();
+  const { fetchPromptRunsPage } = usePromptRunsFetcher();
 
   const fetchPromptRuns = async () => {
     if (!userProfile?.profile_associated_company) {
@@ -49,14 +48,14 @@ export const usePromptRuns = ({
         const from = page * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
         
-        const result = await fetchData(statusFilter, from, to);
+        const result = await fetchPromptRunsPage(statusFilter, page, PAGE_SIZE);
         
-        if (result && result.length > 0) {
-          formattedData = [...formattedData, ...result];
+        if (result && result.data.length > 0) {
+          formattedData = [...formattedData, ...result.data];
           page++;
           
           // Check if we've reached the last page
-          if (result.length < PAGE_SIZE) {
+          if (result.data.length < PAGE_SIZE) {
             hasMore = false;
           }
         } else {

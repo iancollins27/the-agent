@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Toaster } from "@/components/ui/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 import ProjectManagerLayout from "./ProjectManagerLayout";
 import ProjectManagerToolbar from "./ProjectManagerToolbar";
 import ProjectManagerContent from "./ProjectManagerContent";
