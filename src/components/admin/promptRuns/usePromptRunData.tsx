@@ -49,9 +49,9 @@ export const usePromptRunData = (statusFilter: string | null) => {
           project_manager: run.projects?.project_manager ? 
             `${run.projects.project_manager.profile_fname || ''} ${run.projects.project_manager.profile_lname || ''}`.trim() || 'Unnamed Manager' 
             : null,
-          workflow_type: run.workflow_prompts?.type,
-          prompt_text: run.prompt_input,
-          result: run.prompt_output,
+          workflow_prompt_type: run.workflow_prompts?.type,
+          prompt_input: run.prompt_input,
+          prompt_output: run.prompt_output,
           reviewed: run.reviewed === true
         })) as PromptRun[];
 
