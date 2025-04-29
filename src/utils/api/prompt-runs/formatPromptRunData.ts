@@ -1,33 +1,41 @@
 
-import { PromptRun } from '@/components/admin/types';
-import { WorkflowType, workflowTitles } from '@/types/workflow';
+import { PromptRun } from "@/components/admin/types";
+import { formatDistanceToNow } from 'date-fns';
 
-// Formats data from the database into the PromptRun format
 export const formatPromptRunData = (data: any[]): PromptRun[] => {
-  return data.map(run => {
-    const baseUrl = run.projects?.companies?.company_project_base_URL || null;
-    const crmId = run.projects?.crm_id || null;
-    const crmUrl = baseUrl && crmId ? `${baseUrl}${crmId}` : null;
+  return data.map((item) => {
+    // Extract project details if available
+    const projectData = item.projects || {};
+    const workflowPromptData = item.workflow_prompts || {};
     
-    // Ensure workflow_type is a valid value
-    let workflowType = null;
-    if (run.workflow_prompts?.type) {
-      // Make sure it's a valid enum value
-      if (Object.keys(workflowTitles).includes(run.workflow_prompts.type)) {
-        workflowType = run.workflow_prompts.type;
-      }
-    }
+    // Format the data into our PromptRun shape
+    const formattedData: PromptRun = {
+      id: item.id,
+      created_at: item.created_at,
+      status: item.status,
+      ai_provider: item.ai_provider,
+      ai_model: item.ai_model,
+      prompt_input: item.prompt_input,
+      prompt_output: item.prompt_output,
+      error_message: item.error_message,
+      feedback_rating: item.feedback_rating,
+      feedback_description: item.feedback_description,
+      feedback_tags: item.feedback_tags,
+      completed_at: item.completed_at,
+      reviewed: item.reviewed || false,
+      project_id: item.project_id,
+      workflow_prompt_id: item.workflow_prompt_id,
+      workflow_prompt_type: workflowPromptData?.type || null,
+      
+      // Project related data
+      project_name: projectData.crm_id || null,
+      project_address: projectData.Address || null,
+      project_next_step: projectData.next_step || null,
+      
+      // Calculate relative time for display
+      relative_time: item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : 'Unknown',
+    };
     
-    return {
-      ...run,
-      project_name: run.projects?.crm_id || 'Unknown Project',
-      project_address: run.projects?.Address || null,
-      project_crm_url: crmUrl,
-      project_next_step: run.projects?.next_step || null,
-      workflow_prompt_type: workflowType || 'Unknown Type',
-      workflow_type: workflowType,
-      prompt_text: run.prompt_input,
-      result: run.prompt_output
-    } as unknown as PromptRun;
+    return formattedData;
   });
 };

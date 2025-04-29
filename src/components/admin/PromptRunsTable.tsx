@@ -10,7 +10,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Star, ExternalLink, Eye, CheckSquare, RefreshCw } from "lucide-react";
+import { Star, ExternalLink, Eye, CheckSquare, RefreshCw, FileText } from "lucide-react";
 import { PromptRun } from './types';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
@@ -135,6 +135,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
         <TableRow>
           <TableHead>Address</TableHead>
           <TableHead>Next Step</TableHead>
+          <TableHead>Workflow Type</TableHead>
           <TableHead>Roofer</TableHead>
           <TableHead>Time</TableHead>
           <TableHead>Rating</TableHead>
@@ -144,7 +145,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableBody>
         {filteredPromptRuns.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-center py-6">
+            <TableCell colSpan={7} className="text-center py-6">
               {reviewFilter === "reviewed" 
                 ? "No reviewed prompt runs found." 
                 : reviewFilter === "not-reviewed"
@@ -157,6 +158,16 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
             <TableRow key={run.id}>
               <TableCell>{run.project_address || 'N/A'}</TableCell>
               <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
+              <TableCell>
+                {run.workflow_prompt_type ? (
+                  <div className="flex items-center">
+                    <FileText className="h-4 w-4 mr-1 text-blue-500" />
+                    <span>{run.workflow_prompt_type}</span>
+                  </div>
+                ) : (
+                  'N/A'
+                )}
+              </TableCell>
               <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
               <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
               <TableCell>{renderStars(run)}</TableCell>
