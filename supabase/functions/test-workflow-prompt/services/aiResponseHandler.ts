@@ -1,3 +1,4 @@
+
 import { extractJsonFromResponse, generateMockResult } from "../utils.ts";
 import { createActionRecord, updatePromptRunWithResult } from "../database/index.ts";
 import { callAIProvider, callAIProviderWithMCP, calculateCost } from "../ai-providers.ts";
@@ -12,7 +13,7 @@ import {
 } from "../mcp.ts";
 import { queryKnowledgeBase, formatKnowledgeResults } from "../knowledge-service.ts";
 import { createHumanReviewRequest } from "../human-service.ts";
-import { logToolCall, updatePromptRunMetrics } from "../database/tool-logs.ts";
+import { logToolCall, updatePromptRunMetrics, logActionMetrics } from "../database/tool-logs.ts";
 
 const startTimer = () => {
   return Date.now();
@@ -232,6 +233,7 @@ async function processToolCalls(
   let nextCheckDateInfo = null;
   let humanReviewRequestId = null;
   let knowledgeResults = [];
+  let detectActionResult = null;
   
   if (toolCalls.length === 0) {
     console.log("No tool calls found in the response");
@@ -243,6 +245,7 @@ async function processToolCalls(
   } else {
     console.log(`Processing ${toolCalls.length} tool calls`);
     
+    // Process tool calls sequentially to maintain dependencies between calls
     for (const toolCall of toolCalls) {
       console.log(`Processing tool call: ${toolCall.name}`);
       const toolCallStartTime = startTimer();
@@ -255,6 +258,9 @@ async function processToolCalls(
           console.log(`Action detection decision: ${decision}`);
           console.log(`Reason: ${reason}`);
           
+          // Save detection result for later use by create_action_record
+          detectActionResult = toolCall.arguments;
+          
           // Log tool call for metrics
           await logToolCall(supabase, {
             promptRunId: promptRunId || "",
@@ -265,24 +271,18 @@ async function processToolCalls(
             output: JSON.stringify({ success: true, decision, reason })
           });
           
-          mcpContext = addToolResult(mcpContext, 'detect_action', { success: true, result: 'Action detected' });
+          // Add tool result to context for potential follow-up calls
+          mcpContext = addToolResult(mcpContext, 'detect_action', { success: true, decision, reason });
           
+          // Include in final result
           result = JSON.stringify({
             decision,
             reason,
             ...toolCall.arguments
           }, null, 2);
           
-          if (decision === 'ACTION_NEEDED' && projectId && promptRunId) {
-            try {
-              console.log("Creating action record");
-              actionRecordId = await createActionRecord(supabase, promptRunId, projectId, toolCall.arguments);
-              console.log(`Action record created: ${actionRecordId}`);
-            } catch (error) {
-              console.error('Error creating action record:', error);
-            }
-          } 
-          else if (decision === 'SET_FUTURE_REMINDER' && projectId) {
+          // Handle SET_FUTURE_REMINDER directly from detect_action
+          if (decision === 'SET_FUTURE_REMINDER' && projectId) {
             reminderSet = true;
             const daysToAdd = toolCall.arguments.days_until_check || 7;
             
@@ -317,10 +317,20 @@ async function processToolCalls(
               console.error('Error setting next check date:', error);
             }
           }
+          
+          // If decision requires additional tools, make another AI call to process them
+          if (decision === 'ACTION_NEEDED') {
+            console.log("Action needed detected, expect follow-up create_action_record call");
+            // We'll wait for explicit create_action_record call now
+          }
         } 
-        else if (toolCall.name === 'generate_action') {
+        else if (toolCall.name === 'create_action_record') {
+          if (!detectActionResult || detectActionResult.decision !== 'ACTION_NEEDED') {
+            console.warn("create_action_record called without proper detect_action first");
+          }
+          
           const actionType = toolCall.arguments.action_type;
-          console.log(`Generating action of type: ${actionType}`);
+          console.log(`Creating action record of type: ${actionType}`);
           
           // Log tool call for metrics
           await logToolCall(supabase, {
@@ -337,15 +347,45 @@ async function processToolCalls(
             ...toolCall.arguments
           };
           
-          result = JSON.stringify(actionResult, null, 2);
+          // Merge with detection result
+          const mergedActionData = {
+            ...detectActionResult,
+            ...actionResult
+          };
+          
+          console.log("Merged action data:", JSON.stringify(mergedActionData, null, 2));
           
           if (projectId && promptRunId) {
             try {
-              console.log("Creating action record from generate_action");
-              actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionResult);
+              console.log("Creating action record from create_action_record tool call");
+              actionRecordId = await createActionRecord(supabase, promptRunId, projectId, mergedActionData);
               console.log(`Action record created: ${actionRecordId}`);
+              
+              // Update the result to include the action record details
+              if (result) {
+                const resultObj = JSON.parse(result);
+                resultObj.action_record_id = actionRecordId;
+                resultObj.action_type = actionType;
+                result = JSON.stringify(resultObj, null, 2);
+              }
+              
+              // Add tool result
+              mcpContext = addToolResult(mcpContext, 'create_action_record', { 
+                success: true, 
+                action_record_id: actionRecordId 
+              });
             } catch (error) {
               console.error('Error creating action record:', error);
+              
+              // Log failure
+              await logToolCall(supabase, {
+                promptRunId: promptRunId || "",
+                name: toolCall.name,
+                status: 500,
+                duration: endTimer(toolCallStartTime),
+                args: toolCall.arguments,
+                output: JSON.stringify({ error: error.message })
+              });
             }
           }
         }
@@ -405,6 +445,39 @@ async function processToolCalls(
               output: JSON.stringify({ error: error.message })
             });
           }
+        } 
+        else if (toolCall.name === 'generate_action') {
+          console.warn("DEPRECATED: generate_action tool called, should use create_action_record instead");
+          // Handle for backward compatibility
+          const actionType = toolCall.arguments.action_type;
+          console.log(`Generating action of type: ${actionType} (deprecated method)`);
+          
+          // Log tool call for metrics
+          await logToolCall(supabase, {
+            promptRunId: promptRunId || "",
+            name: toolCall.name,
+            status: 200,
+            duration: endTimer(toolCallStartTime),
+            args: toolCall.arguments,
+            output: JSON.stringify({ success: true, actionType, deprecated: true })
+          });
+          
+          const actionResult = {
+            action_type: actionType,
+            ...toolCall.arguments
+          };
+          
+          result = JSON.stringify(actionResult, null, 2);
+          
+          if (projectId && promptRunId) {
+            try {
+              console.log("Creating action record from deprecated generate_action");
+              actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionResult);
+              console.log(`Action record created: ${actionRecordId}`);
+            } catch (error) {
+              console.error('Error creating action record:', error);
+            }
+          }
         }
       } catch (toolError) {
         console.error(`Error processing tool call ${toolCall.name}:`, toolError);
@@ -416,6 +489,72 @@ async function processToolCalls(
           args: toolCall.arguments || {},
           output: JSON.stringify({ error: toolError.message })
         });
+      }
+    }
+    
+    // If needed, prompt AI one more time to generate final response
+    if (detectActionResult && !actionRecordId && detectActionResult.decision === 'ACTION_NEEDED') {
+      console.log("ACTION_NEEDED detected but no action record created, making follow-up call");
+      
+      // Add assistant message to context prompting for action creation
+      mcpContext = addAssistantMessage(mcpContext, 
+        "You detected that action is needed. Please use the create_action_record tool to specify the details of the action."
+      );
+      
+      try {
+        const followUpResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
+        
+        // Extract tool calls from follow-up response
+        const followUpToolCalls = aiProvider === 'openai'
+          ? extractToolCallsFromOpenAI(followUpResponse)
+          : extractToolCallsFromClaude(followUpResponse);
+          
+        if (followUpToolCalls.length > 0) {
+          console.log(`Processing ${followUpToolCalls.length} follow-up tool calls`);
+          
+          // Process only create_action_record calls
+          for (const ftc of followUpToolCalls) {
+            if (ftc.name === 'create_action_record') {
+              const ftcStartTime = startTimer();
+              try {
+                const actionType = ftc.arguments.action_type;
+                console.log(`Creating action record of type: ${actionType} from follow-up`);
+                
+                await logToolCall(supabase, {
+                  promptRunId: promptRunId || "",
+                  name: ftc.name,
+                  status: 200,
+                  duration: endTimer(ftcStartTime),
+                  args: ftc.arguments,
+                  output: JSON.stringify({ success: true, actionType, followUp: true })
+                });
+                
+                const actionResult = {
+                  ...detectActionResult,
+                  action_type: actionType,
+                  ...ftc.arguments
+                };
+                
+                if (projectId && promptRunId) {
+                  actionRecordId = await createActionRecord(supabase, promptRunId, projectId, actionResult);
+                  console.log(`Follow-up action record created: ${actionRecordId}`);
+                  
+                  // Update result to include action details
+                  if (result) {
+                    const resultObj = JSON.parse(result);
+                    resultObj.action_record_id = actionRecordId;
+                    resultObj.action_type = actionType;
+                    result = JSON.stringify(resultObj, null, 2);
+                  }
+                }
+              } catch (error) {
+                console.error('Error handling follow-up action creation:', error);
+              }
+            }
+          }
+        }
+      } catch (followUpError) {
+        console.error('Error in follow-up AI call:', followUpError);
       }
     }
   }

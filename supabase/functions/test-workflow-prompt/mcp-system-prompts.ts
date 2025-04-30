@@ -12,18 +12,17 @@ ${formatAvailableTools(availableTools)}
 
 WORKFLOW PROCESS:
 1. First, use the detect_action tool to determine if any action is needed based on the project context
-2. If an action is needed, use the appropriate tool to generate that action:
-   - For message actions: Use generate_action with action_type="message"
-   - For data updates: Use generate_action with action_type="data_update" 
-   - For future reminders: Use generate_action with action_type="set_future_reminder"
-3. If knowledge is needed, use knowledge_base_lookup to search the knowledge base
+2. If detect_action decides that ACTION_NEEDED, you MUST then use the create_action_record tool to create that action
+3. For data queries, use knowledge_base_lookup to search the knowledge base
 4. Your job is to orchestrate a coherent sequence of operations to address the project's needs
 
 IMPORTANT GUIDELINES:
 - Always think step-by-step
 - Consider the current state of the project and next steps required
 - Be concise and specific with your reasoning
-- Focus on concrete actions that move the project forward
+- Always follow tool calls with their required subsequent actions:
+  * detect_action (ACTION_NEEDED) → create_action_record
+  * detect_action (QUERY_KNOWLEDGE_BASE) → knowledge_base_lookup
 - Don't send communications directly, instead create action records for review
 - For timestamps, use ISO format YYYY-MM-DD
 
@@ -37,10 +36,9 @@ function formatAvailableTools(tools: string[]): string {
   
   const toolDescriptions: Record<string, string> = {
     'detect_action': 'Analyzes project context and determines if any action should be taken.',
-    'generate_action': 'Generates a specific action based on the project context.',
-    'create_action_record': 'Creates a record of the action to be taken for the project.',
+    'create_action_record': 'Creates a specific action record based on the detection results.',
     'knowledge_base_lookup': 'Queries the knowledge base for relevant information.',
-    'set_reminder': 'Sets a reminder to check on the project at a later date.'
+    'generate_action': 'DEPRECATED: Use create_action_record instead.'
   };
   
   return tools.map(tool => {

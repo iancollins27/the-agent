@@ -38,6 +38,17 @@ const TestRunner = ({
     return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
   };
   
+  // Get available tools based on MCP mode
+  const getAvailableTools = (useMCPMode: boolean): string[] => {
+    if (!useMCPMode) return [];
+    
+    return [
+      'detect_action', 
+      'create_action_record', 
+      'knowledge_base_lookup'
+    ];
+  };
+  
   const runTest = async () => {
     if (selectedPromptIds.length === 0 || selectedProjectIds.length === 0) {
       toast({
@@ -77,6 +88,9 @@ const TestRunner = ({
           description: "MCP Orchestrator prompt selected, enabling MCP mode automatically."
         });
       }
+      
+      // Get the available tools based on MCP mode
+      const availableTools = getAvailableTools(useMCP || isMCPOrchestratorSelected);
       
       const allResults = [];
       
@@ -120,13 +134,8 @@ const TestRunner = ({
           milestone_instructions: '',
           action_description: 'Sample action for testing',
           isMultiProjectTest: isMultiProjectTest,
-          property_address: projectData.Address || '',  // Use the Address field
-          available_tools: useMCP ? [
-            'detect_action',
-            'generate_action',
-            'knowledge_base_lookup',
-            'create_action_record'
-          ] : []
+          property_address: projectData.Address || '',
+          available_tools: availableTools
         };
         
         // Get milestone instructions if this is a next step
@@ -172,7 +181,7 @@ const TestRunner = ({
               workflowPromptId: promptData.id,
               initiatedBy: userEmail,
               isMultiProjectTest: isMultiProjectTest,
-              useMCP: useMCP // Use Model Context Protocol if enabled
+              useMCP: useMCP || promptData.type === 'mcp_orchestrator' // Force MCP for orchestrator prompts
             }
           });
           
@@ -241,7 +250,12 @@ const TestRunner = ({
           <Info className="h-4 w-4 text-blue-500" />
           <AlertDescription className="ml-2">
             <span className="font-medium">Model Context Protocol (MCP) enabled</span>: This uses a structured approach 
-            for AI interactions with tool-calling capabilities for knowledge base integration, action record creation, and workflow orchestration.
+            for AI interactions with tool-calling capabilities including:
+            <ul className="mt-1 ml-4 list-disc space-y-1">
+              <li>detect_action - Determines if any action is needed</li>
+              <li>create_action_record - Creates specific action records</li>
+              <li>knowledge_base_lookup - Searches for relevant information</li>
+            </ul>
             Currently works with OpenAI and Claude providers only.
           </AlertDescription>
         </Alert>

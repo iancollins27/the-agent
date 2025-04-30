@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ArrowDownToLine } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ToolLogEntry {
@@ -73,6 +73,38 @@ const ToolLogs: React.FC<ToolLogsProps> = ({ toolLogs }) => {
       return `${(ms / 1000).toFixed(2)}s`;
     }
   };
+  
+  const getToolBadge = (toolName: string) => {
+    switch (toolName) {
+      case 'detect_action':
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Decision</Badge>;
+      case 'create_action_record':
+        return <Badge variant="outline" className="bg-purple-100 text-purple-800">Action</Badge>;
+      case 'knowledge_base_lookup':
+        return <Badge variant="outline" className="bg-amber-100 text-amber-800">Knowledge</Badge>;
+      case 'generate_action':
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800">Generate (Deprecated)</Badge>;
+      default:
+        return <Badge variant="outline">{toolName}</Badge>;
+    }
+  };
+  
+  // Group logs by sequence (detect_action -> create_action_record)
+  const groupedLogs = React.useMemo(() => {
+    const groups: { sequence: number; logs: ToolLogEntry[] }[] = [];
+    let currentSequence = -1;
+    
+    toolLogs.forEach((log, index) => {
+      if (log.tool_name === 'detect_action' || index === 0) {
+        currentSequence++;
+        groups.push({ sequence: currentSequence, logs: [log] });
+      } else {
+        groups[currentSequence].logs.push(log);
+      }
+    });
+    
+    return groups;
+  }, [toolLogs]);
 
   if (toolLogs.length === 0) {
     return (
@@ -85,72 +117,93 @@ const ToolLogs: React.FC<ToolLogsProps> = ({ toolLogs }) => {
   }
 
   return (
-    <div className="space-y-4">
-      {toolLogs.map((log, index) => {
-        const isExpanded = expandedLogs[log.id] || false;
-        const toolInput = parseToolInput(log.output_trim);
-        
-        return (
-          <Collapsible
-            key={log.id}
-            open={isExpanded}
-            onOpenChange={() => toggleLogExpansion(log.id)}
-            className="border rounded-lg"
-          >
-            <CollapsibleTrigger asChild className="w-full">
-              <Button 
-                variant="ghost" 
-                className="flex items-center justify-between w-full p-4 text-left"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex-none w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-800 font-bold">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="font-medium">{log.tool_name}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      {getStatusBadge(log.status_code)}
-                      <span>{formatDuration(log.duration_ms)}</span>
-                      <span>•</span>
-                      <span>{formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}</span>
+    <div className="space-y-6">
+      {groupedLogs.map((group, groupIndex) => (
+        <div key={`group-${groupIndex}`} className="border rounded-lg">
+          <div className="bg-muted/50 p-2 px-4 text-sm font-medium flex items-center">
+            <span>Sequence {groupIndex + 1}</span>
+            {group.logs.length > 1 && (
+              <Badge variant="outline" className="ml-2 bg-blue-50">
+                {group.logs.length} tool calls
+              </Badge>
+            )}
+          </div>
+          
+          <div className="divide-y">
+            {group.logs.map((log, logIndex) => {
+              const isExpanded = expandedLogs[log.id] || false;
+              const toolInput = parseToolInput(log.output_trim);
+              
+              return (
+                <Collapsible
+                  key={log.id}
+                  open={isExpanded}
+                  onOpenChange={() => toggleLogExpansion(log.id)}
+                  className="w-full"
+                >
+                  <CollapsibleTrigger asChild className="w-full">
+                    <Button 
+                      variant="ghost" 
+                      className="flex items-center justify-between w-full p-4 text-left"
+                    >
+                      <div className="flex items-center gap-4">
+                        {logIndex > 0 && <ArrowDownToLine size={12} className="text-gray-400 ml-3" />}
+                        <div className="flex-none w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-800 font-bold">
+                          {logIndex + 1}
+                        </div>
+                        <div>
+                          <div className="font-medium flex items-center">
+                            {log.tool_name}
+                            <div className="ml-2">
+                              {getToolBadge(log.tool_name)}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            {getStatusBadge(log.status_code)}
+                            <span>{formatDuration(log.duration_ms)}</span>
+                            <span>•</span>
+                            <span>{formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}</span>
+                          </div>
+                        </div>
+                      </div>
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 pb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Input Parameters</h4>
+                          <div className="font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto">
+                            {toolInput ? (
+                              JSON.stringify(toolInput, null, 2)
+                            ) : (
+                              "Unable to parse tool input parameters"
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Output</h4>
+                          <div className="font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto">
+                            {log.output_trim || "No output data available"}
+                            {log.output_trim && log.output_trim.endsWith('...') && (
+                              <div className="text-xs italic mt-1">Output truncated...</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 text-xs text-muted-foreground">
+                        <div>Tool ID: {log.id}</div>
+                        <div>Hash: {log.input_hash?.substring(0, 16)}...</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="px-4 pb-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Input Parameters</h4>
-                    <div className="font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto">
-                      {toolInput ? (
-                        JSON.stringify(toolInput, null, 2)
-                      ) : (
-                        "Unable to parse tool input parameters"
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Output</h4>
-                    <div className="font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto">
-                      {log.output_trim || "No output data available"}
-                      {log.output_trim && log.output_trim.endsWith('...') && (
-                        <div className="text-xs italic mt-1">Output truncated...</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 text-xs text-muted-foreground">
-                  <div>Tool ID: {log.id}</div>
-                  <div>Hash: {log.input_hash?.substring(0, 16)}...</div>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        );
-      })}
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 };
