@@ -1,217 +1,174 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PromptRun } from '../types';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import PromptRunFilters from '../PromptRunFilters';
-import { useTimeFilter } from '@/hooks/useTimeFilter';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ExecutionsListItem from './ExecutionsListItem';
-import ExecutionsListSkeleton from './ExecutionsListSkeleton';
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import ExecutionsEmptyState from './ExecutionsEmptyState';
-
-export const DEFAULT_PAGE_SIZE = 10;
+import { PromptRun } from '../types';
 
 const ExecutionsList: React.FC = () => {
-  // State for filters
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [onlyShowMyProjects, setOnlyShowMyProjects] = useState(false);
-  const [projectManagerFilter, setProjectManagerFilter] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const { timeFilter, setTimeFilter, getDateFilter } = useTimeFilter();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [workflowFilter, setWorkflowFilter] = useState('all');
   
-  // Fetch user profile
-  const { data: userProfile } = useQuery({
-    queryKey: ['userProfile'],
+  const { data: executions, isLoading, error } = useQuery({
+    queryKey: ['executions', workflowFilter],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      return data;
-    }
-  });
-  
-  // Query to fetch prompt runs with tool calls
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['executionsList', statusFilter, onlyShowMyProjects, projectManagerFilter, timeFilter, currentPage],
-    queryFn: async () => {
-      if (!userProfile?.profile_associated_company) {
-        return { promptRuns: [], totalCount: 0 };
-      }
-      
-      // Fetch prompt runs that have associated tool logs
+      // Build query
       let query = supabase
         .from('prompt_runs')
-        .select('*, tool_logs!inner(*)', { count: 'exact' })
-        .eq('status', 'COMPLETED');
-      
-      // Apply filters
-      if (statusFilter) {
-        query = query.eq('status', statusFilter);
-      }
-      
-      // Apply date filter
-      const dateFilter = getDateFilter();
-      if (dateFilter) {
-        query = query.gte('created_at', dateFilter);
-      }
-      
-      // Calculate pagination
-      const from = (currentPage - 1) * DEFAULT_PAGE_SIZE;
-      const to = from + DEFAULT_PAGE_SIZE - 1;
-      
-      // Apply pagination
-      query = query
+        .select(`
+          id, 
+          created_at,
+          status,
+          ai_provider,
+          ai_model,
+          prompt_input,
+          prompt_output,
+          workflow_prompts(type),
+          project_id,
+          projects(name:summary, address:Address)
+        `)
         .order('created_at', { ascending: false })
-        .range(from, to);
-        
-      const { data, error, count } = await query;
+        .limit(50);
+
+      // Apply workflow filter if not 'all'
+      if (workflowFilter !== 'all') {
+        query = query.eq('workflow_prompts.type', workflowFilter);
+      }
+
+      const { data, error } = await query;
       
       if (error) throw error;
       
-      // Process the runs to format dates and extract tool logs
-      const processedRuns: PromptRun[] = data.map((run: any) => ({
-        ...run,
-        relative_time: formatDistanceToNow(new Date(run.created_at), { addSuffix: true }),
-        tool_logs_count: run.tool_logs?.length || 0
-      }));
+      // Get tool log counts for each prompt run
+      // This helps identify MCP runs
+      const promptRunIds = data.map(run => run.id);
+      const { data: toolLogCounts, error: toolLogsError } = await supabase
+        .from('tool_logs')
+        .select('prompt_run_id, count')
+        .in('prompt_run_id', promptRunIds)
+        .select('prompt_run_id')
+        .then(res => {
+          // Create a map of prompt run ID to tool log count
+          const counts = new Map();
+          res.data?.forEach(item => {
+            counts.set(item.prompt_run_id, (counts.get(item.prompt_run_id) || 0) + 1);
+          });
+          return { data: counts, error: res.error };
+        });
       
-      // Additional filtering for project managers if needed
-      let filteredRuns = processedRuns;
-      
-      if (projectManagerFilter) {
-        // Fetch projects with the selected manager
-        const { data: projectsWithManager } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('project_manager', projectManagerFilter);
-          
-        if (projectsWithManager) {
-          const projectIds = new Set(projectsWithManager.map(p => p.id));
-          filteredRuns = filteredRuns.filter(run => 
-            run.project_id && projectIds.has(run.project_id)
-          );
-        }
+      if (toolLogsError) {
+        console.error('Error fetching tool log counts:', toolLogsError);
       }
       
-      if (onlyShowMyProjects && userProfile?.id) {
-        // Fetch projects managed by the current user
-        const { data: myProjects } = await supabase
-          .from('projects')
-          .select('id')
-          .eq('project_manager', userProfile.id);
-          
-        if (myProjects) {
-          const myProjectIds = new Set(myProjects.map(p => p.id));
-          filteredRuns = filteredRuns.filter(run => 
-            run.project_id && myProjectIds.has(run.project_id)
-          );
+      // Format the results and add relative time
+      const formattedExecutions = data.map(run => {
+        const createdAt = new Date(run.created_at);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now.getTime() - createdAt.getTime()) / 1000);
+        
+        let relativeTime;
+        if (diffInSeconds < 60) {
+          relativeTime = `${diffInSeconds} seconds ago`;
+        } else if (diffInSeconds < 3600) {
+          relativeTime = `${Math.floor(diffInSeconds / 60)} minutes ago`;
+        } else if (diffInSeconds < 86400) {
+          relativeTime = `${Math.floor(diffInSeconds / 3600)} hours ago`;
+        } else {
+          relativeTime = `${Math.floor(diffInSeconds / 86400)} days ago`;
         }
-      }
+        
+        return {
+          ...run,
+          relative_time: relativeTime,
+          workflow_type: run.workflow_prompts?.type || null,
+          project_name: run.projects?.name || null,
+          project_address: run.projects?.address || null,
+          tool_logs_count: toolLogCounts?.data?.get(run.id) || 0
+        };
+      });
       
-      return { 
-        promptRuns: filteredRuns, 
-        totalCount: count || filteredRuns.length 
-      };
+      return formattedExecutions;
     },
-    enabled: !!userProfile
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
   
-  const totalPages = data ? Math.ceil(data.totalCount / DEFAULT_PAGE_SIZE) : 0;
-  
-  const handlePageChange = (page: number) => {
-    if (page > 0 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-  
+  // Filter executions based on search query
+  const filteredExecutions = executions?.filter(execution => {
+    if (!searchQuery) return true;
+    
+    const searchLower = searchQuery.toLowerCase();
+    
+    return (
+      (execution.workflow_type?.toLowerCase().includes(searchLower)) ||
+      (execution.project_name?.toLowerCase().includes(searchLower)) ||
+      (execution.project_address?.toLowerCase().includes(searchLower)) ||
+      (execution.ai_model?.toLowerCase().includes(searchLower))
+    );
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-destructive/15 text-destructive p-4 rounded-md">
+        <h2 className="font-semibold mb-2">Error Loading Executions</h2>
+        <p>{error.message}</p>
+      </div>
+    );
+  }
+
   return (
-    <Card className="w-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold">Agent Executions</CardTitle>
-        <PromptRunFilters 
-          timeFilter={timeFilter}
-          onTimeFilterChange={setTimeFilter}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          onlyShowMyProjects={onlyShowMyProjects}
-          onMyProjectsChange={setOnlyShowMyProjects}
-          projectManagerFilter={projectManagerFilter}
-          onProjectManagerFilterChange={setProjectManagerFilter}
-          onRefresh={() => refetch()}
-          hideStatusFilter={true} // We're already filtering for COMPLETED runs
-        />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <ExecutionsListSkeleton />
-        ) : data?.promptRuns && data.promptRuns.length > 0 ? (
-          <div className="space-y-4">
-            {data.promptRuns.map((run: PromptRun) => (
-              <ExecutionsListItem key={run.id} promptRun={run} />
-            ))}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end">
+        <div className="flex-1">
+          <Label htmlFor="search" className="text-sm">Search</Label>
+          <Input
+            id="search"
+            placeholder="Search by project name, address, workflow type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="w-full md:w-64">
+          <Label htmlFor="workflow-filter" className="text-sm">Workflow Type</Label>
+          <Select value={workflowFilter} onValueChange={setWorkflowFilter}>
+            <SelectTrigger id="workflow-filter">
+              <SelectValue placeholder="Filter by workflow" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Workflows</SelectItem>
+              <SelectItem value="summary_generation">Summary Generation</SelectItem>
+              <SelectItem value="summary_update">Summary Update</SelectItem>
+              <SelectItem value="action_detection_execution">Action Detection & Execution</SelectItem>
+              <SelectItem value="multi_project_analysis">Multi-Project Analysis</SelectItem>
+              <SelectItem value="multi_project_message_generation">Message Generation</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {filteredExecutions?.length === 0 && (
+          <div className="text-center text-muted-foreground py-8">
+            No executions found matching your criteria.
           </div>
-        ) : (
-          <ExecutionsEmptyState />
         )}
-      </CardContent>
-      {data?.totalCount && data.totalCount > DEFAULT_PAGE_SIZE && (
-        <CardFooter>
-          <Pagination className="w-full">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-              
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Logic to show pages around current page
-                let pageNum: number;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <PaginationItem key={pageNum}>
-                    <PaginationLink 
-                      isActive={pageNum === currentPage}
-                      onClick={() => handlePageChange(pageNum)}
-                    >
-                      {pageNum}
-                    </PaginationLink>
-                  </PaginationItem>
-                );
-              })}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </CardFooter>
-      )}
-    </Card>
+        
+        {filteredExecutions?.map((execution) => (
+          <ExecutionsListItem key={execution.id} promptRun={execution as PromptRun} />
+        ))}
+      </div>
+    </div>
   );
 };
 

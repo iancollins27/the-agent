@@ -1,64 +1,44 @@
 
-import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ProjectManagerNav from "../components/ProjectManagerNav";
-import ActionRecordsTab from "../components/admin/ActionRecordsTab";
-import PromptsTab from "../components/admin/PromptsTab";
-import TestingTab from "../components/admin/TestingTab";
-import PromptRunsTab from "../components/admin/PromptRunsTab";
-import FeedbackTab from "../components/admin/FeedbackTab";
-import { ObservabilityTab } from "../components/admin/observability/ObservabilityTab";
-import ExecutionsTab from "../components/admin/ExecutionsTab";
+import React, { useState } from 'react';
+import ProjectManagerNav from '../components/ProjectManagerNav';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import PromptsTab from '../components/admin/PromptsTab';
+import ExecutionsTab from '../components/admin/ExecutionsTab';
+import MCPConfigTab from '../components/admin/MCPConfigTab';
 
 const AdminConsole: React.FC = () => {
-  const [activeTab, setActiveTab] = React.useState("prompt-runs");
+  const [activeTab, setActiveTab] = useState('prompts');
 
   return (
     <div className="min-h-screen bg-slate-50">
       <ProjectManagerNav />
-      
-      <div className="container mx-auto py-6">
-        <h1 className="text-3xl font-bold mb-6">Admin Console</h1>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full sm:w-[900px]" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
-            <TabsTrigger value="prompt-runs">Prompt Runs</TabsTrigger>
-            <TabsTrigger value="actions">Actions</TabsTrigger>
-            <TabsTrigger value="executions">Executions</TabsTrigger>
-            <TabsTrigger value="prompts">Prompts</TabsTrigger>
-            <TabsTrigger value="testing">Testing</TabsTrigger>
-            <TabsTrigger value="feedback">Feedback</TabsTrigger>
-            <TabsTrigger value="observability">Metrics</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="prompt-runs">
-            <PromptRunsTab />
-          </TabsContent>
-          
-          <TabsContent value="actions">
-            <ActionRecordsTab />
-          </TabsContent>
-          
-          <TabsContent value="executions">
-            <ExecutionsTab />
-          </TabsContent>
-          
-          <TabsContent value="prompts">
-            <PromptsTab />
-          </TabsContent>
-          
-          <TabsContent value="testing">
-            <TestingTab />
-          </TabsContent>
-          
-          <TabsContent value="feedback">
-            <FeedbackTab />
-          </TabsContent>
+      <div className="container py-6">
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold tracking-tight">Admin Console</h1>
+          </div>
 
-          <TabsContent value="observability">
-            <ObservabilityTab />
-          </TabsContent>
-        </Tabs>
+          <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="bg-white border">
+              <TabsTrigger value="prompts">AI Prompts</TabsTrigger>
+              <TabsTrigger value="executions">Executions</TabsTrigger>
+              <TabsTrigger value="mcp">MCP Config</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="prompts">
+              <PromptsTab />
+            </TabsContent>
+            
+            <TabsContent value="executions">
+              <ExecutionsTab />
+            </TabsContent>
+            
+            <TabsContent value="mcp">
+              <MCPConfigTab />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
