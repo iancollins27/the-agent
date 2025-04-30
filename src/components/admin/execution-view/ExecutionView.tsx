@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ExternalLink, Info, Wrench } from 'lucide-react';
+import { Loader2, ExternalLink, Info, Tool } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -36,26 +36,13 @@ const ExecutionView = () => {
           completion_tokens,
           usd_cost,
           workflow_prompt_id,
-          project_id
+          project_id,
+          workflow_prompts(type)
         `)
         .eq('id', executionId)
         .single();
 
       if (promptRunError) throw promptRunError;
-
-      // Get workflow type from workflow_prompt_id if available
-      let workflowType = 'Unknown';
-      if (promptRun.workflow_prompt_id) {
-        const { data: workflowPrompt, error: workflowError } = await supabase
-          .from('workflow_prompts')
-          .select('type')
-          .eq('id', promptRun.workflow_prompt_id)
-          .single();
-          
-        if (!workflowError && workflowPrompt) {
-          workflowType = workflowPrompt.type;
-        }
-      }
 
       // Fetch related tool logs if any
       const { data: toolLogs, error: toolLogsError } = await supabase
@@ -87,10 +74,7 @@ const ExecutionView = () => {
       }
 
       return {
-        promptRun: {
-          ...promptRun,
-          workflow_type: workflowType
-        },
+        promptRun,
         toolLogs: toolLogs || [],
         project
       } as ExecutionViewType;
@@ -137,7 +121,7 @@ const ExecutionView = () => {
   
   // Format timestamps for better readability
   const formattedCreatedAt = new Date(promptRun.created_at).toLocaleString();
-  const workflowType = promptRun.workflow_type || 'Unknown';
+  const workflowType = promptRun.workflow_prompts?.type || 'Unknown';
   const modelName = promptRun.ai_model || 'Unknown Model';
 
   return (
@@ -150,7 +134,7 @@ const ExecutionView = () => {
         
         {isMCPExecution && (
           <div className="flex items-center bg-blue-50 text-blue-800 px-3 py-1 rounded-md">
-            <Wrench className="h-4 w-4 mr-1" />
+            <Tool className="h-4 w-4 mr-1" />
             <span className="font-medium">MCP Execution</span>
             <span className="ml-2 text-blue-600 text-xs bg-blue-100 px-2 py-0.5 rounded-full">
               {toolLogs.length} Tool Calls
@@ -216,7 +200,7 @@ const ExecutionView = () => {
             </div>
             <div>
               <div className="text-muted-foreground">Cost</div>
-              <div className="font-medium">${typeof promptRun.usd_cost === 'string' ? parseFloat(promptRun.usd_cost).toFixed(4) : '0.0000'}</div>
+              <div className="font-medium">${promptRun.usd_cost ? parseFloat(promptRun.usd_cost).toFixed(4) : '0.0000'}</div>
             </div>
           </div>
         </CardContent>

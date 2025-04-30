@@ -27,7 +27,7 @@ const ExecutionsList: React.FC = () => {
           ai_model,
           prompt_input,
           prompt_output,
-          workflow_prompt_id,
+          workflow_prompts(type),
           project_id,
           projects(name:summary, address:Address)
         `)
@@ -35,17 +35,8 @@ const ExecutionsList: React.FC = () => {
         .limit(50);
 
       // Apply workflow filter if not 'all'
-      if (workflowFilter !== 'all' && workflowFilter) {
-        // First get workflow_prompt_id for the specified type
-        const { data: workflowPrompts } = await supabase
-          .from('workflow_prompts')
-          .select('id')
-          .eq('type', workflowFilter);
-          
-        if (workflowPrompts && workflowPrompts.length > 0) {
-          const workflowIds = workflowPrompts.map(wp => wp.id);
-          query = query.in('workflow_prompt_id', workflowIds);
-        }
+      if (workflowFilter !== 'all') {
+        query = query.eq('workflow_prompts.type', workflowFilter);
       }
 
       const { data, error } = await query;
@@ -55,37 +46,22 @@ const ExecutionsList: React.FC = () => {
       // Get tool log counts for each prompt run
       // This helps identify MCP runs
       const promptRunIds = data.map(run => run.id);
-      
-      let toolLogCounts = new Map();
-      if (promptRunIds.length > 0) {
-        const { data: toolLogs, error: toolLogsError } = await supabase
-          .from('tool_logs')
-          .select('prompt_run_id')
-          .in('prompt_run_id', promptRunIds);
-          
-        if (!toolLogsError && toolLogs) {
-          // Count tool logs per prompt run ID
-          toolLogs.forEach(log => {
-            toolLogCounts.set(
-              log.prompt_run_id, 
-              (toolLogCounts.get(log.prompt_run_id) || 0) + 1
-            );
+      const { data: toolLogCounts, error: toolLogsError } = await supabase
+        .from('tool_logs')
+        .select('prompt_run_id, count')
+        .in('prompt_run_id', promptRunIds)
+        .select('prompt_run_id')
+        .then(res => {
+          // Create a map of prompt run ID to tool log count
+          const counts = new Map();
+          res.data?.forEach(item => {
+            counts.set(item.prompt_run_id, (counts.get(item.prompt_run_id) || 0) + 1);
           });
-        } else if (toolLogsError) {
-          console.error('Error fetching tool log counts:', toolLogsError);
-        }
-      }
-      
-      // Get workflow types
-      const { data: workflowPrompts } = await supabase
-        .from('workflow_prompts')
-        .select('id, type');
-        
-      const workflowTypeMap = new Map();
-      if (workflowPrompts) {
-        workflowPrompts.forEach(wp => {
-          workflowTypeMap.set(wp.id, wp.type);
+          return { data: counts, error: res.error };
         });
+      
+      if (toolLogsError) {
+        console.error('Error fetching tool log counts:', toolLogsError);
       }
       
       // Format the results and add relative time
@@ -108,10 +84,10 @@ const ExecutionsList: React.FC = () => {
         return {
           ...run,
           relative_time: relativeTime,
-          workflow_type: workflowTypeMap.get(run.workflow_prompt_id) || null,
+          workflow_type: run.workflow_prompts?.type || null,
           project_name: run.projects?.name || null,
           project_address: run.projects?.address || null,
-          tool_logs_count: toolLogCounts.get(run.id) || 0
+          tool_logs_count: toolLogCounts?.data?.get(run.id) || 0
         };
       });
       
@@ -176,7 +152,6 @@ const ExecutionsList: React.FC = () => {
               <SelectItem value="action_detection_execution">Action Detection & Execution</SelectItem>
               <SelectItem value="multi_project_analysis">Multi-Project Analysis</SelectItem>
               <SelectItem value="multi_project_message_generation">Message Generation</SelectItem>
-              <SelectItem value="mcp_orchestrator">MCP Orchestrator</SelectItem>
             </SelectContent>
           </Select>
         </div>

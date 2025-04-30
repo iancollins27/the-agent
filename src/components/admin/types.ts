@@ -1,4 +1,3 @@
-
 export interface ActionRecord {
   id: string;
   project_id?: string;
@@ -51,10 +50,7 @@ export interface PromptRun {
   reviewed?: boolean;
   project_id?: string;
   workflow_prompt_id?: string;
-  workflow_type?: string;
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  usd_cost?: string;
+  workflow_prompt_type?: string | null;
   
   // Project related data
   project_name?: string;
@@ -66,6 +62,7 @@ export interface PromptRun {
   
   // Derived data
   relative_time?: string;
+  workflow_type?: string | null;
   tool_logs_count?: number;
   
   // Alternate field names that might be used in some components
@@ -82,22 +79,14 @@ export interface ToolLog {
   input_hash: string;
   output_trim: string;
   created_at: string;
-  sequence?: number;
   
   // Derived/computed fields
   input?: any; // Decoded from hash or fetched separately
   output?: any; // Full output if available
+  sequence?: number; // Order in which tools were called
 }
 
 export interface ExecutionView {
   promptRun: PromptRun;
   toolLogs: ToolLog[];
-  project: {
-    id: string;
-    summary?: string;
-    next_step?: string;
-    project_track?: string;
-    Address?: string;
-    crm_id?: string;
-  } | null;
 }
