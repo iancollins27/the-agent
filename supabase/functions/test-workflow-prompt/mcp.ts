@@ -67,12 +67,37 @@ export function addToolResult(context: MCPContext, toolCallId: string, toolName:
     tools: [...context.tools]
   };
 
-  // Add the tool response message
+  // First, add the assistant's message with the tool call if it doesn't exist yet
+  const hasAssistantMessage = updatedContext.messages.some(msg => 
+    msg.role === 'assistant' && 
+    msg.tool_calls && 
+    msg.tool_calls.some((call: any) => call.id === toolCallId)
+  );
+
+  if (!hasAssistantMessage) {
+    // We need to add a proper assistant message with the tool call before adding the tool response
+    updatedContext.messages.push({
+      role: "assistant",
+      content: null,
+      tool_calls: [
+        {
+          id: toolCallId,
+          type: "function",
+          function: {
+            name: toolName,
+            arguments: typeof result === 'string' ? result : JSON.stringify(result)
+          }
+        }
+      ]
+    });
+  }
+
+  // Now add the tool response message
   updatedContext.messages.push({
     role: "tool",
     tool_call_id: toolCallId,
     name: toolName,
-    content: JSON.stringify(result)
+    content: typeof result === 'string' ? result : JSON.stringify(result)
   });
 
   return updatedContext;

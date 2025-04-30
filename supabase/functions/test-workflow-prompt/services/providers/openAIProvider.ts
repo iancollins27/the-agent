@@ -1,3 +1,4 @@
+
 import { logPromptRun, updatePromptRunWithResult } from "../../database/prompt-runs.ts";
 import { createMCPContext, getDefaultTools, addToolResult, extractToolCallsFromOpenAI } from "../../mcp.ts";
 import { logToolCall, updatePromptRunMetrics } from "../../database/tool-logs.ts";
@@ -109,18 +110,28 @@ async function handleMCPRequest(
 
     try {
       // Make API request to OpenAI
+      const payload = {
+        model: model,
+        messages: context.messages,
+        temperature: 0.7
+      };
+      
+      if (context.tools && context.tools.length > 0) {
+        // @ts-ignore - Add tools to payload if available
+        payload.tools = context.tools;
+        // @ts-ignore - Set tool_choice to auto if tools are available
+        payload.tool_choice = "auto";
+      }
+      
+      console.log(`Sending OpenAI request for iteration ${iterationCount} with ${context.messages.length} messages`);
+      
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${openAIApiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: model,
-          messages: context.messages,
-          tools: context.tools.length > 0 ? context.tools : undefined,
-          tool_choice: context.tools.length > 0 ? "auto" : "none",
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -131,6 +142,9 @@ async function handleMCPRequest(
 
       const data = await response.json();
       const message = data.choices[0].message;
+      
+      // Add the assistant message to our context
+      context.messages.push(message);
       
       // Log completion metrics
       if (data.usage) {
@@ -159,33 +173,45 @@ async function handleMCPRequest(
           try {
             const toolResult = await processToolCall(supabase, call.name, call.arguments, promptRunId, projectId);
             
-            // Add the tool result to the MCP context
-            context = addToolResult(context, call.id, call.name, toolResult);
-            
             // Store the tool output for later processing
             toolOutputs.push({
               tool: call.name,
               args: call.arguments,
               result: toolResult
             });
+            
+            // Add the tool result as a separate message
+            context.messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              name: call.name,
+              content: JSON.stringify(toolResult)
+            });
           } 
           catch (toolError) {
             console.error(`Error executing tool ${call.name}: ${toolError}`);
             
-            // Add error result to the context
-            const errorResult = { 
-              status: "error", 
-              error: toolError.message || "Unknown tool execution error",
-              message: `Tool execution failed: ${toolError.message || "Unknown error"}`
-            };
-            
-            context = addToolResult(context, call.id, call.name, errorResult);
+            // Add error result as a tool response
+            context.messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              name: call.name,
+              content: JSON.stringify({ 
+                status: "error", 
+                error: toolError.message || "Unknown tool execution error",
+                message: `Tool execution failed: ${toolError.message || "Unknown error"}`
+              })
+            });
             
             // Store the error in tool outputs
             toolOutputs.push({
               tool: call.name,
               args: call.arguments,
-              result: errorResult
+              result: { 
+                status: "error", 
+                error: toolError.message || "Unknown tool execution error",
+                message: `Tool execution failed: ${toolError.message || "Unknown error"}`
+              }
             });
           }
         }
@@ -336,3 +362,6 @@ function calculateCost(model: string, usage: any): number {
 
   return promptCost + completionCost;
 }
+
+// Import at the end to avoid circular dependencies
+import { createActionRecord } from "../../database/index.ts";
