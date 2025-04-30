@@ -1,9 +1,8 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, ThumbsUp, ThumbsDown, Star, RotateCw } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -14,7 +13,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PromptRun, workflowTitles, WorkflowType } from './types';
-import PromptRunRating from './PromptRunRating';
 import PromptRunStatusBadge from './PromptRunStatusBadge';
 
 interface PromptRunsTableProps {
@@ -102,19 +100,9 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               {run.project_name ? (
                 <div className="flex flex-col">
                   <span className="font-medium">{run.project_name}</span>
-                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                  <span className="text-xs text-muted-foreground truncate max-w-[300px] break-words">
                     {run.project_address || 'No address'}
                   </span>
-                  {run.project_crm_url && (
-                    <Link
-                      to={run.project_crm_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Open in CRM
-                    </Link>
-                  )}
                 </div>
               ) : (
                 <span className="text-muted-foreground italic">No project</span>
@@ -125,18 +113,16 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 <Button
                   onClick={() => handleMarkReviewed(run.id)}
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                 >
-                  <Star className="h-4 w-4 mr-1" />
                   Mark as reviewed
                 </Button>
               )}
               <Button
                 onClick={() => onViewDetails(run)}
                 size="sm"
-                variant="outline"
+                variant="default"
               >
-                <Eye className="h-4 w-4 mr-1" />
                 View details
               </Button>
               <Button
@@ -148,6 +134,22 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 <RotateCw className="h-4 w-4 mr-1" />
                 Rerun
               </Button>
+              {run.project_crm_url && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  asChild
+                >
+                  <Link
+                    to={run.project_crm_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open CRM
+                  </Link>
+                </Button>
+              )}
             </TableCell>
           </TableRow>
         ))}
