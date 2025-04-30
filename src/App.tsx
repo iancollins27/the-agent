@@ -13,6 +13,7 @@ import ChatbotConfig from "./pages/ChatbotConfig";
 import CompanySettings from "./pages/CompanySettings";
 import MermaidDiagrams from "./pages/MermaidDiagrams";
 import ProjectManager from "./pages/ProjectManager";
+import ExecutionView from "./components/admin/execution-view/ExecutionView";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,16 @@ const App = () => (
             </ProtectedRoute>
           } 
         />
+        <Route 
+          path="/admin/executions/:executionId" 
+          element={
+            <ProtectedRoute>
+              <AdminConsole />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="" element={<ExecutionView />} />
+        </Route>
         <Route 
           path="/chat" 
           element={

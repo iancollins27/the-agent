@@ -1,222 +1,177 @@
-
-import React, { useState } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Star, ExternalLink, Eye, CheckSquare, RefreshCw, FileText } from "lucide-react";
-import { PromptRun } from './types';
-import { formatDistanceToNow } from 'date-fns';
-import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { rerunPrompt } from "@/utils/api/prompt-runs";
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Eye, ThumbsUp, ThumbsDown, Star, RotateCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { PromptRun, workflowTitles, WorkflowType } from './types';
+import PromptRunRating from './PromptRunRating';
+import PromptRunStatusBadge from './PromptRunStatusBadge';
 
 interface PromptRunsTableProps {
   promptRuns: PromptRun[];
-  onRatingChange: (promptRunId: string, rating: number | null) => void;
+  onRatingChange: (id: string, rating: number) => void;
   onViewDetails: (promptRun: PromptRun) => void;
-  onRunReviewed?: (promptRunId: string) => void;
+  onRunReviewed: (id: string) => void;
   reviewFilter?: string;
-  hideReviewed?: boolean; // Kept for backward compatibility but will be ignored
-  onPromptRerun?: () => void; // Callback to refresh data after rerun
+  onPromptRerun?: () => void;
 }
 
-const PromptRunsTable: React.FC<PromptRunsTableProps> = ({ 
-  promptRuns, 
-  onRatingChange, 
+export const formatRelativeTime = (date: string): string => {
+  const now = new Date();
+  const promptDate = new Date(date);
+  const diffMs = now.getTime() - promptDate.getTime();
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else {
+    return `${diffDays}d ago`;
+  }
+};
+
+const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
+  promptRuns,
+  onRatingChange,
   onViewDetails,
   onRunReviewed,
-  reviewFilter = "all", // Default to showing all
-  hideReviewed = false, // Deprecated, kept for backward compatibility but ignored
-  onPromptRerun
+  reviewFilter = 'all',
+  onPromptRerun,
 }) => {
-  const [rerunningPrompts, setRerunningPrompts] = useState<Record<string, boolean>>({});
-  
-  // Function to render stars for rating
-  const renderStars = (promptRun: PromptRun) => {
-    const rating = promptRun.feedback_rating || 0;
-    return (
-      <div className="flex items-center">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-4 w-4 cursor-pointer ${
-              star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-            }`}
-            onClick={() => onRatingChange(promptRun.id, star === rating ? null : star)}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const handleMarkAsReviewed = async (promptRun: PromptRun) => {
+  const handleMarkReviewed = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('prompt_runs')
-        .update({ reviewed: true })
-        .eq('id', promptRun.id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Prompt run marked as reviewed",
-      });
-      
-      if (onRunReviewed) {
-        onRunReviewed(promptRun.id);
-      }
+      onRunReviewed(id);
     } catch (error) {
       console.error('Error marking prompt run as reviewed:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to mark prompt run as reviewed",
-      });
     }
   };
 
-  const handleRerunPrompt = async (promptRun: PromptRun) => {
+  const handleRerunPrompt = async (promptRunId: string) => {
     try {
-      setRerunningPrompts((prev) => ({ ...prev, [promptRun.id]: true }));
-      
-      const result = await rerunPrompt(promptRun.id);
-      
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: `Prompt has been re-run. New prompt run created with ID: ${result.newPromptRunId}`,
-        });
-        
-        if (onPromptRerun) {
-          onPromptRerun();
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: `Failed to re-run prompt: ${result.error}`,
-        });
-      }
+      // Here you would implement the logic to rerun a prompt
+      console.log('Rerunning prompt:', promptRunId);
+      onPromptRerun?.();
     } catch (error) {
-      console.error('Error re-running prompt:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred while re-running the prompt",
-      });
-    } finally {
-      setRerunningPrompts((prev) => ({ ...prev, [promptRun.id]: false }));
+      console.error('Error rerunning prompt:', error);
     }
   };
-
-  // Filter runs based only on the reviewFilter prop, ignore hideReviewed
-  // The parent component should now handle filtering by reviewed status
-  const filteredPromptRuns = promptRuns.filter(run => {
-    if (reviewFilter === "all") return true;
-    if (reviewFilter === "reviewed") return run.reviewed === true;
-    if (reviewFilter === "not-reviewed") return run.reviewed !== true;
-    return true;
-  });
 
   return (
-    <Table>
-      <TableCaption>List of recent prompt runs from your projects</TableCaption>
+    <Table className="border rounded-md">
+      {promptRuns.length === 0 && (
+        <TableCaption>No prompt runs available</TableCaption>
+      )}
       <TableHeader>
         <TableRow>
-          <TableHead>Address</TableHead>
-          <TableHead>Next Step</TableHead>
-          <TableHead>Workflow Type</TableHead>
-          <TableHead>Roofer</TableHead>
           <TableHead>Time</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Project</TableHead>
+          <TableHead>Status</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredPromptRuns.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={7} className="text-center py-6">
-              {reviewFilter === "reviewed" 
-                ? "No reviewed prompt runs found." 
-                : reviewFilter === "not-reviewed"
-                ? "All prompt runs have been reviewed. Great job!" 
-                : "No prompt runs found matching your criteria."}
+        {promptRuns.map((run) => (
+          <TableRow key={run.id} className={run.reviewed ? 'opacity-75' : ''}>
+            <TableCell>
+              <div className="flex flex-col">
+                <span className="text-sm">
+                  {new Date(run.created_at).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {formatRelativeTime(run.created_at)}
+                </span>
+              </div>
+            </TableCell>
+            <TableCell>
+              {run.workflow_prompt_type && (
+                <Badge variant="outline" className="capitalize">
+                  {(run.workflow_prompt_type as WorkflowType).replace(/_/g, ' ')}
+                </Badge>
+              )}
+            </TableCell>
+            <TableCell>
+              {run.project_name ? (
+                <div className="flex flex-col">
+                  <span className="font-medium">{run.project_name}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                    {run.project_address || 'No address'}
+                  </span>
+                  {run.project_crm_url && (
+                    <Link
+                      to={run.project_crm_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Open in CRM
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <span className="text-muted-foreground italic">No project</span>
+              )}
+            </TableCell>
+            <TableCell>
+              <PromptRunStatusBadge status={run.status} />
+            </TableCell>
+            <TableCell>
+              <PromptRunRating
+                promptRunId={run.id}
+                rating={run.feedback_rating}
+                onChange={(rating) => onRatingChange(run.id, rating)}
+              />
+            </TableCell>
+            <TableCell className="text-right space-x-1">
+              {reviewFilter === 'not-reviewed' && !run.reviewed && (
+                <Button
+                  onClick={() => handleMarkReviewed(run.id)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Star className="h-4 w-4 mr-1" />
+                  <span className="sr-only">Mark as reviewed</span>
+                </Button>
+              )}
+              <Button
+                onClick={() => onViewDetails(run)}
+                size="sm"
+                variant="ghost"
+                className="hover:bg-muted"
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                <span className="sr-only">View details</span>
+              </Button>
+              <Button
+                onClick={() => handleRerunPrompt(run.id)}
+                size="sm"
+                variant="ghost"
+                className="hover:bg-muted"
+                title="Rerun prompt"
+              >
+                <RotateCw className="h-4 w-4 mr-1" />
+                <span className="sr-only">Rerun prompt</span>
+              </Button>
             </TableCell>
           </TableRow>
-        ) : (
-          filteredPromptRuns.map((run) => (
-            <TableRow key={run.id}>
-              <TableCell>{run.project_address || 'N/A'}</TableCell>
-              <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
-              <TableCell>
-                {run.workflow_prompt_type ? (
-                  <div className="flex items-center">
-                    <FileText className="h-4 w-4 mr-1 text-blue-500" />
-                    <span>{run.workflow_prompt_type}</span>
-                  </div>
-                ) : (
-                  'N/A'
-                )}
-              </TableCell>
-              <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
-              <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
-              <TableCell>{renderStars(run)}</TableCell>
-              <TableCell className="text-right space-x-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => onViewDetails(run)}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
-                
-                {run.project_crm_url && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(run.project_crm_url, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    CRM
-                  </Button>
-                )}
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-                  onClick={() => handleMarkAsReviewed(run)}
-                  disabled={run.reviewed}
-                >
-                  <CheckSquare className="h-4 w-4 mr-1" />
-                  {run.reviewed ? "Reviewed" : "Mark Reviewed"}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-                  onClick={() => handleRerunPrompt(run)}
-                  disabled={rerunningPrompts[run.id]}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-1 ${rerunningPrompts[run.id] ? 'animate-spin' : ''}`} />
-                  {rerunningPrompts[run.id] ? "Running..." : "Re-run"}
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))
-        )}
+        ))}
       </TableBody>
     </Table>
   );

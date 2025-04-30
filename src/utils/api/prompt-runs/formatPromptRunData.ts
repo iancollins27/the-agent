@@ -34,6 +34,9 @@ export const formatPromptRunData = (data: any[]): PromptRun[] => {
       
       // Calculate relative time for display
       relative_time: item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : 'Unknown',
+      
+      // Set workflow type
+      workflow_type: workflowPromptData?.type || null
     };
     
     return formattedData;

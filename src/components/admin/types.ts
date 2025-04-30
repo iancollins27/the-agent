@@ -68,4 +68,39 @@ export interface PromptRun {
   // Alternate field names that might be used in some components
   prompt_text?: string;
   result?: string;
+  
+  // Tool logs related data
+  toolLogsCount?: number;
 }
+
+export interface ToolLog {
+  id: string;
+  created_at: string;
+  prompt_run_id: string;
+  tool_name: string;
+  duration_ms: number;
+  status_code: number;
+  input_hash?: string;
+  output_trim?: string;
+}
+
+export type WorkflowType = 
+  | 'summary_generation' 
+  | 'summary_update' 
+  | 'action_detection' 
+  | 'action_execution' 
+  | 'action_detection_execution' 
+  | 'multi_project_analysis' 
+  | 'multi_project_message_generation'
+  | 'mcp_orchestrator';
+
+export const workflowTitles: Record<WorkflowType, string> = {
+  summary_generation: 'Summary Generation',
+  summary_update: 'Summary Update',
+  action_detection: 'Action Detection',
+  action_execution: 'Action Execution',
+  action_detection_execution: 'Action Detection & Execution',
+  multi_project_analysis: 'Multi-Project Analysis',
+  multi_project_message_generation: 'Multi-Project Message',
+  mcp_orchestrator: 'MCP Orchestrator'
+};
