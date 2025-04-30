@@ -24,6 +24,7 @@ const TestRunner = ({
 }: TestRunnerProps) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [useMCP, setUseMCP] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Check if MCP Orchestrator prompt is selected
@@ -60,6 +61,7 @@ const TestRunner = ({
     }
     
     setIsLoading(true);
+    setError(null);
     
     try {
       // Get current user information
@@ -169,36 +171,66 @@ const TestRunner = ({
             console.warn(`Using MCP mode with a non-orchestrator prompt type: ${promptData.type}`);
           }
           
-          // Call the edge function to test the prompt
-          const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
-            body: {
-              promptType: promptData.type,
-              promptText: promptData.prompt_text,
-              projectId: projectData.id,
-              contextData: contextData,
-              aiProvider: aiProvider,
-              aiModel: aiModel,
-              workflowPromptId: promptData.id,
-              initiatedBy: userEmail,
-              isMultiProjectTest: isMultiProjectTest,
-              useMCP: useMCP || promptData.type === 'mcp_orchestrator' // Force MCP for orchestrator prompts
+          try {
+            // Call the edge function to test the prompt with improved error handling
+            const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
+              body: {
+                promptType: promptData.type,
+                promptText: promptData.prompt_text,
+                projectId: projectData.id,
+                contextData: contextData,
+                aiProvider: aiProvider,
+                aiModel: aiModel,
+                workflowPromptId: promptData.id,
+                initiatedBy: userEmail,
+                isMultiProjectTest: isMultiProjectTest,
+                useMCP: useMCP || promptData.type === 'mcp_orchestrator' // Force MCP for orchestrator prompts
+              }
+            });
+            
+            if (error) {
+              console.error("Edge function error:", error);
+              throw new Error(`Edge function error: ${error.message || "Unknown error"}`);
             }
-          });
-          
-          if (error) throw error;
-          
-          projectResults.push({
-            type: promptData.type,
-            output: data.output,
-            finalPrompt: data.finalPrompt,
-            promptRunId: data.promptRunId,
-            actionRecordId: data.actionRecordId,
-            reminderSet: data.reminderSet || false,
-            nextCheckDateInfo: data.nextCheckDateInfo,
-            usedMCP: data.usedMCP,
-            humanReviewRequestId: data.humanReviewRequestId,
-            knowledgeResultsCount: data.knowledgeResults?.length || 0
-          });
+            
+            if (!data) {
+              throw new Error("No data returned from edge function");
+            }
+            
+            projectResults.push({
+              type: promptData.type,
+              output: data.output,
+              finalPrompt: data.finalPrompt,
+              promptRunId: data.promptRunId,
+              actionRecordId: data.actionRecordId,
+              reminderSet: data.reminderSet || false,
+              nextCheckDateInfo: data.nextCheckDateInfo,
+              usedMCP: data.usedMCP,
+              humanReviewRequestId: data.humanReviewRequestId,
+              knowledgeResultsCount: data.knowledgeResults?.length || 0
+            });
+          } catch (functionError) {
+            console.error(`Error calling test-workflow-prompt function:`, functionError);
+            
+            // Add more detailed diagnostics
+            const diagnosticInfo = {
+              promptId,
+              promptType: promptData.type,
+              projectId: projectData.id,
+              error: functionError.message || "Unknown error",
+              useMCP: useMCP || promptData.type === 'mcp_orchestrator'
+            };
+            
+            // Set a user-friendly error message
+            setError(`Failed to run test: ${functionError.message || "Unknown error"}. Please check the Edge Function logs for more details.`);
+            
+            // Add error information to the results so we can show it in the UI
+            projectResults.push({
+              type: promptData.type,
+              error: functionError.message || "Unknown error",
+              diagnostics: diagnosticInfo
+            });
+          }
         }
         
         allResults.push({
@@ -210,6 +242,7 @@ const TestRunner = ({
       onTestComplete(allResults);
     } catch (error) {
       console.error('Error testing prompt:', error);
+      setError(error.message || "Unknown error occurred");
       toast({
         variant: "destructive",
         title: "Test Failed",
@@ -245,6 +278,15 @@ const TestRunner = ({
           ) : isMultiProjectTest ? "Run Multi-Project Test" : "Run Test"}
         </Button>
       </div>
+      
+      {error && (
+        <Alert variant="destructive" className="text-sm">
+          <AlertDescription>
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {useMCP && (
         <Alert className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
           <Info className="h-4 w-4 text-blue-500" />

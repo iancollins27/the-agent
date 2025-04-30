@@ -59,3 +59,43 @@ export async function logToolCall(
     return null;
   }
 }
+
+/**
+ * Update prompt run with metrics after all tool calls are complete
+ */
+export async function updatePromptRunMetrics(
+  supabase: any,
+  promptRunId: string,
+  metrics: { 
+    total_tokens?: number; 
+    prompt_tokens?: number; 
+    completion_tokens?: number; 
+    usd_cost?: number; 
+  }
+): Promise<boolean> {
+  if (!promptRunId) {
+    console.warn("No promptRunId provided for metrics update");
+    return false;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('prompt_runs')
+      .update({
+        prompt_tokens: metrics.prompt_tokens || null,
+        completion_tokens: metrics.completion_tokens || null,
+        usd_cost: metrics.usd_cost || null
+      })
+      .eq('id', promptRunId);
+    
+    if (error) {
+      console.error('Error updating prompt run metrics:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    console.error('Exception in updatePromptRunMetrics:', e);
+    return false;
+  }
+}

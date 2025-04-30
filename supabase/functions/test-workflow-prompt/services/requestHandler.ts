@@ -1,5 +1,5 @@
 
-import { corsHeaders } from "../index.ts";
+import { corsHeaders } from "../utils/cors.ts";
 import { logPromptRun } from "../database/index.ts";
 import { replaceVariables } from "../utils.ts";
 import { handleAIResponse } from "./aiResponseHandler.ts";

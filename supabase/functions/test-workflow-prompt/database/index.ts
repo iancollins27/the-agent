@@ -2,7 +2,7 @@
 import { logPromptRun, updatePromptRunWithResult } from "./prompt-runs.ts";
 import { setProjectNextCheckDate, setNextCheckDate } from "./projects.ts";
 import { createActionRecord } from "./actions.ts";
-import { logToolCall, updatePromptRunMetrics, logActionMetrics } from "./tool-logs.ts";
+import { logToolCall, updatePromptRunMetrics } from "./tool-logs.ts";
 
 export {
   // Prompt runs related functions
@@ -18,6 +18,5 @@ export {
   
   // Observability related functions
   logToolCall,
-  updatePromptRunMetrics,
-  logActionMetrics
+  updatePromptRunMetrics
 };
