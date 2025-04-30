@@ -4,8 +4,12 @@ import { handleZohoWebhook } from "./handlers/webhookHandler.ts"
 import { corsHeaders } from "./utils/cors.ts"
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200 
+    })
   }
 
   return handleZohoWebhook(req)

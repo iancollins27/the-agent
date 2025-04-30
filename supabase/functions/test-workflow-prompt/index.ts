@@ -34,12 +34,7 @@ serve(async (req) => {
     const response = await handleRequest(supabase, requestBody);
     
     // Return the response with CORS headers
-    const headers = new Headers();
-    
-    // Add CORS headers
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      headers.set(key, value);
-    });
+    const headers = new Headers(corsHeaders);
     
     // Add Content-Type header if not already present
     if (!headers.has("Content-Type")) {
@@ -47,8 +42,8 @@ serve(async (req) => {
     }
     
     console.log("Successfully processed request, returning response");
-    return new Response(response.body, {
-      status: response.status,
+    return new Response(JSON.stringify(response), {
+      status: 200,
       headers: headers
     });
   } catch (error) {

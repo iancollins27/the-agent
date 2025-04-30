@@ -63,34 +63,25 @@ export async function handleRequest(supabase: any, requestBody: any) {
     contextData
   );
   
-  return new Response(
-    JSON.stringify({
-      output: response.result,
-      // If using MCP, we'll mark the prompt text differently
-      finalPrompt: useMCP ? "[Using Model Context Protocol - see results for details]" : finalPrompt,
-      projectId,
-      promptType,
-      aiProvider,
-      aiModel,
-      promptRunId,
-      actionRecordId: response.actionRecordId,
-      reminderSet: response.reminderSet,
-      nextCheckDateInfo: response.nextCheckDateInfo,
-      usedMCP: useMCP,
-      humanReviewRequestId: response.humanReviewRequestId,
-      knowledgeResults: response.knowledgeResults || [],
-      toolOutputs: response.toolOutputs || [],
-      // We'll include the original prompt for reference but not for display
-      originalPrompt: useMCP ? finalPrompt : null
-    }),
-    {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-      },
-      status: 200,
-    }
-  );
+  return {
+    output: response.result,
+    // If using MCP, we'll mark the prompt text differently
+    finalPrompt: useMCP ? "[Using Model Context Protocol - see results for details]" : finalPrompt,
+    projectId,
+    promptType,
+    aiProvider,
+    aiModel,
+    promptRunId,
+    actionRecordId: response.actionRecordId,
+    reminderSet: response.reminderSet,
+    nextCheckDateInfo: response.nextCheckDateInfo,
+    usedMCP: useMCP,
+    humanReviewRequestId: response.humanReviewRequestId,
+    knowledgeResults: response.knowledgeResults || [],
+    toolOutputs: response.toolOutputs || [],
+    // We'll include the original prompt for reference but not for display
+    originalPrompt: useMCP ? finalPrompt : null
+  };
 }
 
 async function updateProjectLatestPromptRun(supabase: any, projectId: string, promptRunId: string) {
