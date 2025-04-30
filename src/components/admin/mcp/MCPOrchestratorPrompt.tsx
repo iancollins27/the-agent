@@ -9,6 +9,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { mcpOrchestratorTemplate } from './MCPOrchestratorTemplate';
 
+// For TypeScript, define the expected structure
+interface WorkflowPrompt {
+  id?: string;
+  created_at?: string;
+  updated_at?: string;
+  prompt_text: string;
+  type: string;
+}
+
 const MCPOrchestratorPrompt = () => {
   const [promptText, setPromptText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -31,7 +40,7 @@ const MCPOrchestratorPrompt = () => {
         throw error;
       }
       
-      return data;
+      return data as WorkflowPrompt | null;
     }
   });
 
@@ -48,15 +57,11 @@ const MCPOrchestratorPrompt = () => {
         if (error) throw error;
         return { ...prompt, prompt_text: newPrompt.prompt_text };
       } else {
-        // Create new prompt
-        const { data, error } = await supabase
-          .from('workflow_prompts')
-          .insert({ 
-            type: 'mcp_orchestrator', 
-            prompt_text: newPrompt.prompt_text 
-          })
-          .select()
-          .single();
+        // Create new prompt with raw SQL to bypass TypeScript limitations
+        // This is a workaround for the type issue
+        const { data, error } = await supabase.rpc('create_mcp_orchestrator_prompt', {
+          p_prompt_text: newPrompt.prompt_text
+        });
           
         if (error) throw error;
         return data;
