@@ -1,10 +1,13 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
+import { WorkflowType } from "@/types/workflow";
 
 type TestRunnerProps = {
   selectedPromptIds: string[];
@@ -22,6 +25,18 @@ const TestRunner = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [useMCP, setUseMCP] = useState<boolean>(false);
   const { toast } = useToast();
+  
+  // Check if MCP Orchestrator prompt is selected
+  const hasMCPOrchestrator = async (promptIds: string[]): Promise<boolean> => {
+    if (promptIds.length === 0) return false;
+    
+    const { data } = await supabase
+      .from('workflow_prompts')
+      .select('type')
+      .in('id', promptIds);
+      
+    return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
+  };
   
   const runTest = async () => {
     if (selectedPromptIds.length === 0 || selectedProjectIds.length === 0) {
@@ -50,6 +65,18 @@ const TestRunner = ({
         
       const aiProvider = aiConfig?.provider || 'openai';
       const aiModel = aiConfig?.model || 'gpt-4o';
+      
+      // Check if any selected prompt is an MCP orchestrator
+      const isMCPOrchestratorSelected = await hasMCPOrchestrator(selectedPromptIds);
+      
+      // If MCP orchestrator is selected, force MCP mode on
+      if (isMCPOrchestratorSelected && !useMCP) {
+        setUseMCP(true);
+        toast({
+          title: "MCP Mode Enabled",
+          description: "MCP Orchestrator prompt selected, enabling MCP mode automatically."
+        });
+      }
       
       const allResults = [];
       
@@ -93,7 +120,13 @@ const TestRunner = ({
           milestone_instructions: '',
           action_description: 'Sample action for testing',
           isMultiProjectTest: isMultiProjectTest,
-          property_address: projectData.Address || ''  // Use the Address field
+          property_address: projectData.Address || '',  // Use the Address field
+          available_tools: useMCP ? [
+            'detect_action',
+            'generate_action',
+            'knowledge_base_lookup',
+            'create_action_record'
+          ] : []
         };
         
         // Get milestone instructions if this is a next step
@@ -121,6 +154,11 @@ const TestRunner = ({
             .single();
           
           if (promptError) throw promptError;
+          
+          // If using MCP with a non-orchestrator prompt, provide a warning in the console
+          if (useMCP && promptData.type !== 'mcp_orchestrator') {
+            console.warn(`Using MCP mode with a non-orchestrator prompt type: ${promptData.type}`);
+          }
           
           // Call the edge function to test the prompt
           const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
@@ -150,7 +188,7 @@ const TestRunner = ({
             nextCheckDateInfo: data.nextCheckDateInfo,
             usedMCP: data.usedMCP,
             humanReviewRequestId: data.humanReviewRequestId,
-            knowledgeResultsCount: data.knowledgeResults
+            knowledgeResultsCount: data.knowledgeResults?.length || 0
           });
         }
         
@@ -199,11 +237,14 @@ const TestRunner = ({
         </Button>
       </div>
       {useMCP && (
-        <div className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
-          <span className="font-medium">Model Context Protocol (MCP) enabled</span>: This uses a more structured approach 
-          for AI interactions with tool-calling capabilities for knowledge base integration and human-in-the-loop workflows.
-          Currently works with OpenAI and Claude providers only.
-        </div>
+        <Alert className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="ml-2">
+            <span className="font-medium">Model Context Protocol (MCP) enabled</span>: This uses a structured approach 
+            for AI interactions with tool-calling capabilities for knowledge base integration, action record creation, and workflow orchestration.
+            Currently works with OpenAI and Claude providers only.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );

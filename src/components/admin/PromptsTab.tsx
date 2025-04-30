@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -19,7 +20,8 @@ const PromptsTab = () => {
     'summary_update', 
     'action_detection_execution',
     'multi_project_analysis',
-    'multi_project_message_generation'
+    'multi_project_message_generation',
+    'mcp_orchestrator'
   ];
 
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
@@ -103,12 +105,41 @@ Your task:
    - ONLY includes actionable items that require the roofer's attention
 
 Return ONLY the final message text, with no additional explanations.`;
+      } else if (promptType === 'mcp_orchestrator') {
+        defaultPromptText = `You are an AI orchestrator using the Model Context Protocol. Your job is to analyze the project and determine what actions need to be taken.
+
+Project Summary:
+{{summary}}
+
+Project Track: {{track_name}}
+Track Roles: {{track_roles}}
+Track Base Prompt: {{track_base_prompt}}
+Current Date: {{current_date}}
+Next Step: {{next_step}}
+Property Address: {{property_address}}
+Is Reminder Check: {{is_reminder_check}}
+
+Available Tools:
+{{available_tools}}
+
+Follow these steps:
+1. Analyze the current state of the project based on the summary and context
+2. Determine if any action is needed using the detect_action tool
+3. If an action is needed, specify what type of action using the appropriate tool
+4. If knowledge is needed, use the knowledge_base_lookup tool
+5. Be specific in your reasoning and explanations
+
+Remember:
+- Think step by step
+- Be specific about what actions are needed
+- Provide clear reasoning for your decisions`;
       }
 
+      // Use the .insert() method with the explicit type cast
       const { data, error } = await supabase
         .from('workflow_prompts')
         .insert({ 
-          type: promptType,
+          type: promptType as any,  // Use type assertion here
           prompt_text: defaultPromptText
         })
         .select();

@@ -5,12 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import Tool from '@/components/icons/Tool';
 
 interface PromptInputProps {
-  promptRun: any;
+  promptRun: any; // Keep as any since it might have additional properties
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
   // Determine if this is an MCP execution
-  const isMCPExecution = (promptRun.toolLogsCount || 0) > 0;
+  const isMCPExecution = promptRun.toolLogsCount ? 
+    promptRun.toolLogsCount > 0 : // Use the property if it exists
+    Array.isArray(promptRun.toolLogs) && promptRun.toolLogs.length > 0; // Fallback to checking toolLogs array
   
   return (
     <Card className="border border-muted">

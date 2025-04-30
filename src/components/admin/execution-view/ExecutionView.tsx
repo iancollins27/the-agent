@@ -74,8 +74,14 @@ const ExecutionView: React.FC = () => {
         else console.error("Error fetching project:", projectError);
       }
 
+      // Create an enhanced promptRun object with additional data
+      const enhancedPromptRun = {
+        ...promptRun,
+        toolLogsCount: toolLogs?.length || 0
+      };
+
       return {
-        promptRun,
+        promptRun: enhancedPromptRun,
         toolLogs: toolLogs || [],
         project
       };
@@ -84,7 +90,7 @@ const ExecutionView: React.FC = () => {
     staleTime: 1000 * 60 * 5 // 5 minutes
   });
 
-  const isMCPExecution = (execution?.toolLogs?.length || 0) > 0;
+  const isMCPExecution = execution?.toolLogs?.length > 0;
 
   if (isLoading) {
     return (
@@ -125,9 +131,6 @@ const ExecutionView: React.FC = () => {
   const workflowType = promptRun.workflow_prompts?.type || 'Unknown';
   const modelName = promptRun.ai_model || 'Unknown Model';
 
-  // Add toolLogsCount to promptRun for PromptInput component
-  promptRun.toolLogsCount = toolLogs.length;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -143,12 +146,13 @@ const ExecutionView: React.FC = () => {
             <Tool className="h-4 w-4 mr-1" />
             <span className="font-medium">MCP Execution</span>
             <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-600 border-blue-200">
-              {toolLogs.length} Tool Calls
+              {toolLogs.length} Tool {toolLogs.length === 1 ? 'Call' : 'Calls'}
             </Badge>
           </div>
         )}
       </div>
 
+      {/* Project context card */}
       {project && (
         <Card>
           <CardHeader className="pb-2">
@@ -166,6 +170,7 @@ const ExecutionView: React.FC = () => {
         </Card>
       )}
       
+      {/* Tabs for displaying different aspects of the execution */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-4">
           <TabsTrigger value="prompt-input">Input</TabsTrigger>
@@ -193,6 +198,7 @@ const ExecutionView: React.FC = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Execution metadata */}
       <Card className="bg-muted/40">
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
