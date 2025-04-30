@@ -13,7 +13,6 @@ const MCPInfoAlert: React.FC = () => {
         <ul className="mt-1 ml-4 list-disc space-y-1">
           <li>detect_action - Determines if any action is needed</li>
           <li>create_action_record - Creates specific action records</li>
-          <li>knowledge_base_lookup - Searches for relevant information</li>
         </ul>
         Currently works with OpenAI and Claude providers only.
       </AlertDescription>

@@ -32,8 +32,8 @@ export const useTestRunner = (
     
     return [
       'detect_action', 
-      'create_action_record', 
-      'knowledge_base_lookup'
+      'create_action_record'
+      // Removing 'knowledge_base_lookup' from available tools
     ];
   };
   
