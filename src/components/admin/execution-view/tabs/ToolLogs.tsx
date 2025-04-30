@@ -11,16 +11,19 @@ interface ToolLogsProps {
   promptRunId: string;
 }
 
-interface ToolLog {
+export interface ToolLog {
   id: string;
   tool_name: string;
-  tool_call_id: string;
-  tool_args: string;
-  tool_result: string;
+  tool_call_id?: string;
+  tool_args?: string;
+  tool_result?: string;
   status_code: number;
   duration_ms: number;
-  error_message: string | null;
+  error_message?: string | null;
   created_at: string;
+  input_hash?: string;
+  output_trim?: string;
+  prompt_run_id?: string;
 }
 
 const ToolLogs: React.FC<ToolLogsProps> = ({ promptRunId }) => {
@@ -97,21 +100,30 @@ const ToolLogs: React.FC<ToolLogsProps> = ({ promptRunId }) => {
     let result;
     
     try {
-      args = typeof log.tool_args === 'string' ? JSON.parse(log.tool_args) : log.tool_args;
+      args = typeof log.tool_args === 'string' ? JSON.parse(log.tool_args || '{}') : log.tool_args;
     } catch (e) {
       args = log.tool_args;
     }
     
     try {
-      result = typeof log.tool_result === 'string' ? JSON.parse(log.tool_result) : log.tool_result;
+      result = typeof log.tool_result === 'string' ? JSON.parse(log.tool_result || '{}') : log.tool_result;
     } catch (e) {
       result = log.tool_result;
+    }
+
+    // Handle output_trim as an alternative to tool_result
+    if (!result && log.output_trim) {
+      try {
+        result = JSON.parse(log.output_trim);
+      } catch (e) {
+        result = log.output_trim;
+      }
     }
     
     return {
       ...log,
-      parsedArgs: args,
-      parsedResult: result
+      parsedArgs: args || {},
+      parsedResult: result || {}
     };
   });
 
@@ -128,7 +140,9 @@ const ToolLogs: React.FC<ToolLogsProps> = ({ promptRunId }) => {
                 <Badge variant={log.status_code >= 200 && log.status_code < 300 ? "default" : "destructive"}>
                   {log.tool_name}
                 </Badge>
-                <span className="text-xs text-muted-foreground">ID: {log.tool_call_id}</span>
+                <span className="text-xs text-muted-foreground">
+                  ID: {log.tool_call_id || 'N/A'}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center text-xs text-muted-foreground">
@@ -144,21 +158,25 @@ const ToolLogs: React.FC<ToolLogsProps> = ({ promptRunId }) => {
             </div>
             
             <div className="p-3">
-              <div className="mb-2">
-                <h4 className="font-medium text-sm mb-1">Arguments:</h4>
-                <pre className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
-                  {JSON.stringify(log.parsedArgs, null, 2)}
-                </pre>
-              </div>
+              {(log.parsedArgs && Object.keys(log.parsedArgs).length > 0) && (
+                <div className="mb-2">
+                  <h4 className="font-medium text-sm mb-1">Arguments:</h4>
+                  <pre className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
+                    {JSON.stringify(log.parsedArgs, null, 2)}
+                  </pre>
+                </div>
+              )}
               
               <Separator className="my-2" />
               
-              <div>
-                <h4 className="font-medium text-sm mb-1">Result:</h4>
-                <pre className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
-                  {JSON.stringify(log.parsedResult, null, 2)}
-                </pre>
-              </div>
+              {(log.parsedResult && Object.keys(log.parsedResult).length > 0) && (
+                <div>
+                  <h4 className="font-medium text-sm mb-1">Result:</h4>
+                  <pre className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
+                    {JSON.stringify(log.parsedResult, null, 2)}
+                  </pre>
+                </div>
+              )}
               
               {log.error_message && (
                 <div className="mt-2 text-sm text-red-500 bg-red-50 p-2 rounded border border-red-200">

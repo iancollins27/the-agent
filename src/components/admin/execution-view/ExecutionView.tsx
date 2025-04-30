@@ -190,7 +190,7 @@ const ExecutionView: React.FC = () => {
         </TabsContent>
         
         <TabsContent value="tool-logs" className="mt-4">
-          <ToolLogs toolLogs={toolLogs} />
+          <ToolLogs promptRunId={promptRun.id} />
         </TabsContent>
         
         <TabsContent value="project-context" className="mt-4">
