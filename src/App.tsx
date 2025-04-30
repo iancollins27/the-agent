@@ -1,24 +1,95 @@
 
-import React from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import ProjectManager from './pages/ProjectManager';
-import AdminConsole from './pages/AdminConsole';
-import ExecutionViewer from './pages/ExecutionViewer';
-import { useAuth } from './hooks/useAuth';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import Auth from "./pages/Auth";
+import NotFound from "./pages/NotFound";
+import AdminConsole from "./pages/AdminConsole";
+import AgentChat from "./pages/AgentChat";
+import ChatbotConfig from "./pages/ChatbotConfig";
+import CompanySettings from "./pages/CompanySettings";
+import MermaidDiagrams from "./pages/MermaidDiagrams";
+import ProjectManager from "./pages/ProjectManager";
 
-function App() {
-  const { user } = useAuth();
+const queryClient = new QueryClient();
 
-  return (
-    <Router>
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
       <Routes>
-        {/* Main Routes */}
-        <Route path="/" element={<ProjectManager />} />
-        <Route path="/admin" element={<AdminConsole />} />
-        <Route path="/admin/executions/:executionId" element={<ExecutionViewer />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AdminConsole />
+            </ProtectedRoute>
+          }
+        />
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute>
+              <AdminConsole />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/chat" 
+          element={
+            <ProtectedRoute>
+              <AgentChat />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/chatbot-config" 
+          element={
+            <ProtectedRoute>
+              <ChatbotConfig />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="/company-settings" element={<CompanySettings />} />
+        <Route
+          path="/system-diagrams"
+          element={
+            <ProtectedRoute>
+              <MermaidDiagrams />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project-manager"
+          element={
+            <ProtectedRoute>
+              <ProjectManager />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFound />} />
       </Routes>
-    </Router>
-  );
-}
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
