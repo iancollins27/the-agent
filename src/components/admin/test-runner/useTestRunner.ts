@@ -1,32 +1,19 @@
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Loader2, Info } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
-import { WorkflowType } from "@/types/workflow"; // Import from the shared type definition
+import { useToast } from "@/components/ui/use-toast";
 
-type TestRunnerProps = {
-  selectedPromptIds: string[];
-  selectedProjectIds: string[];
-  onTestComplete: (results: any) => void;
-  isMultiProjectTest?: boolean;
-};
-
-const TestRunner = ({ 
-  selectedPromptIds, 
-  selectedProjectIds, 
-  onTestComplete, 
-  isMultiProjectTest = false 
-}: TestRunnerProps) => {
+export const useTestRunner = (
+  selectedPromptIds: string[],
+  selectedProjectIds: string[],
+  onTestComplete: (results: any) => void,
+  isMultiProjectTest: boolean = false
+) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [useMCP, setUseMCP] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  
+
   // Check if MCP Orchestrator prompt is selected
   const hasMCPOrchestrator = async (promptIds: string[]): Promise<boolean> => {
     if (promptIds.length === 0) return false;
@@ -172,6 +159,12 @@ const TestRunner = ({
           }
           
           try {
+            console.log("Calling test-workflow-prompt function with:", {
+              promptType: promptData.type,
+              projectId: projectData.id,
+              useMCP: useMCP || promptData.type === 'mcp_orchestrator'
+            });
+            
             // Call the edge function to test the prompt with improved error handling
             const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
               body: {
@@ -252,58 +245,12 @@ const TestRunner = ({
       setIsLoading(false);
     }
   };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Switch 
-            id="mcp-toggle" 
-            checked={useMCP} 
-            onCheckedChange={setUseMCP} 
-          />
-          <label htmlFor="mcp-toggle" className="text-sm font-medium">
-            Use Model Context Protocol (MCP)
-          </label>
-        </div>
-        <Button 
-          onClick={runTest} 
-          disabled={isLoading || selectedPromptIds.length === 0 || selectedProjectIds.length === 0}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Testing...
-            </>
-          ) : isMultiProjectTest ? "Run Multi-Project Test" : "Run Test"}
-        </Button>
-      </div>
-      
-      {error && (
-        <Alert variant="destructive" className="text-sm">
-          <AlertDescription>
-            {error}
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {useMCP && (
-        <Alert className="text-sm text-muted-foreground bg-muted p-2 rounded-md">
-          <Info className="h-4 w-4 text-blue-500" />
-          <AlertDescription className="ml-2">
-            <span className="font-medium">Model Context Protocol (MCP) enabled</span>: This uses a structured approach 
-            for AI interactions with tool-calling capabilities including:
-            <ul className="mt-1 ml-4 list-disc space-y-1">
-              <li>detect_action - Determines if any action is needed</li>
-              <li>create_action_record - Creates specific action records</li>
-              <li>knowledge_base_lookup - Searches for relevant information</li>
-            </ul>
-            Currently works with OpenAI and Claude providers only.
-          </AlertDescription>
-        </Alert>
-      )}
-    </div>
-  );
+  
+  return {
+    isLoading,
+    useMCP,
+    error,
+    setUseMCP,
+    runTest
+  };
 };
-
-export default TestRunner;

@@ -1,7 +1,8 @@
+
 import { useState } from "react";
 import TestResults from "@/components/admin/TestResults";
 import TestSelection from "@/components/admin/TestSelection";
-import TestRunner from "@/components/admin/TestRunner";
+import TestRunner from "@/components/admin/test-runner";
 import TablePagination from './tables/TablePagination';
 
 const ITEMS_PER_PAGE = 10;
