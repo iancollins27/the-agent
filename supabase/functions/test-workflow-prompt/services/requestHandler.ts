@@ -78,7 +78,7 @@ export async function handleRequest(supabase: any, requestBody: any) {
       nextCheckDateInfo: response.nextCheckDateInfo,
       usedMCP: useMCP,
       humanReviewRequestId: response.humanReviewRequestId,
-      knowledgeResults: response.knowledgeResults?.length || 0,
+      knowledgeResults: response.knowledgeResults || [],
       // We'll include the original prompt for reference but not for display
       originalPrompt: useMCP ? finalPrompt : null
     }),

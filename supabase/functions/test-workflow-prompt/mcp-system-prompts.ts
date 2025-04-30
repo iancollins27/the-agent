@@ -26,6 +26,12 @@ IMPORTANT GUIDELINES:
 - Don't send communications directly, instead create action records for review
 - For timestamps, use ISO format YYYY-MM-DD
 
+TOOL CALL RULES:
+- Each tool call MUST be made separately, not as a batch
+- If detect_action returns ACTION_NEEDED, you MUST call create_action_record in your next step
+- Include all required parameters for each tool call
+- Wait for the response from each tool call before proceeding to the next action
+
 When in doubt, focus on: What specific action will most effectively move this project forward?`;
 };
 

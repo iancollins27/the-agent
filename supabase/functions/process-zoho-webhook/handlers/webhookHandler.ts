@@ -13,6 +13,14 @@ import { detectAndProcessActions } from '../services/actionDetection.ts'
  * @returns Response object
  */
 export async function handleZohoWebhook(req: Request) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200 // Explicitly set status code to 200
+    });
+  }
+  
   try {
     // Initialize Supabase client
     const supabase = createClient(

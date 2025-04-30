@@ -16,12 +16,13 @@ export const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log(`Received ${req.method} request to test-workflow-prompt`);
-  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     console.log("Handling OPTIONS preflight request");
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200 // Explicitly set status code to 200 for OPTIONS
+    });
   }
   
   try {
@@ -38,7 +39,7 @@ serve(async (req) => {
     const response = await handleRequest(supabase, requestBody);
     
     // Make sure CORS headers are added to the response
-    const headers = response.headers || new Headers();
+    const headers = new Headers(response.headers);
     
     // Add CORS headers to the response
     Object.entries(corsHeaders).forEach(([key, value]) => {
