@@ -1,6 +1,7 @@
+
 export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
   'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 
-  'multi_project_message_generation' | 'mcp_orchestrator';
+  'multi_project_message_generation';
 
 export type WorkflowPrompt = {
   id: string;
@@ -62,8 +63,7 @@ export const workflowTitles: Record<WorkflowType, string> = {
   action_execution: "Action Execution",
   action_detection_execution: "Action Detection & Execution",
   multi_project_analysis: "Multi-Project Analysis",
-  multi_project_message_generation: "Multi-Project Message Generation",
-  mcp_orchestrator: "MCP Orchestrator"
+  multi_project_message_generation: "Multi-Project Message Generation"
 };
 
 export const availableVariables = {

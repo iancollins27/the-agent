@@ -1,69 +1,41 @@
-import { PromptRun, WorkflowType } from "@/types/workflow";
 
-/**
- * Formats the prompt run data to match the PromptRun type
- * @param promptRun The prompt run data from the database
- * @returns The formatted prompt run data
- */
-export function formatPromptRunData(promptRun: any): PromptRun {
-  const {
-    id,
-    created_at,
-    status,
-    ai_provider,
-    ai_model,
-    prompt_input,
-    prompt_output,
-    error_message,
-    feedback_rating,
-    feedback_description,
-    feedback_tags,
-    completed_at,
-    reviewed,
-    project_id,
-    workflow_prompt_id,
-    project_name,
-    project_address,
-    project_next_step,
-    project_crm_url,
-    project_roofer_contact,
-    project_manager,
-    prompt_tokens,
-    completion_tokens,
-    usd_cost
-  } = promptRun;
+import { PromptRun } from "@/components/admin/types";
+import { formatDistanceToNow } from 'date-fns';
 
-  let workflow_type = promptRun.workflow_type || null;
-  
-  if (promptRun.workflow_prompts?.type) {
-    workflow_type = promptRun.workflow_prompts.type;
-  }
-
-  return {
-    id,
-    created_at,
-    status,
-    ai_provider,
-    ai_model,
-    prompt_input,
-    prompt_output,
-    error_message,
-    feedback_rating,
-    feedback_description,
-    feedback_tags,
-    completed_at,
-    reviewed,
-    project_id,
-    workflow_prompt_id,
-    project_name,
-    project_address,
-    project_next_step,
-    project_crm_url,
-    project_roofer_contact,
-    project_manager,
-    prompt_tokens,
-    completion_tokens,
-    usd_cost,
-    workflow_type
-  };
-}
+export const formatPromptRunData = (data: any[]): PromptRun[] => {
+  return data.map((item) => {
+    // Extract project details if available
+    const projectData = item.projects || {};
+    const workflowPromptData = item.workflow_prompts || {};
+    
+    // Format the data into our PromptRun shape
+    const formattedData: PromptRun = {
+      id: item.id,
+      created_at: item.created_at,
+      status: item.status,
+      ai_provider: item.ai_provider,
+      ai_model: item.ai_model,
+      prompt_input: item.prompt_input,
+      prompt_output: item.prompt_output,
+      error_message: item.error_message,
+      feedback_rating: item.feedback_rating,
+      feedback_description: item.feedback_description,
+      feedback_tags: item.feedback_tags,
+      completed_at: item.completed_at,
+      reviewed: item.reviewed || false,
+      project_id: item.project_id,
+      workflow_prompt_id: item.workflow_prompt_id,
+      workflow_prompt_type: workflowPromptData?.type || null,
+      
+      // Project related data
+      project_name: projectData.crm_id || null,
+      project_address: projectData.Address || null,
+      project_next_step: projectData.next_step || null,
+      
+      // Calculate relative time for display
+      relative_time: item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : 'Unknown',
+    };
+    
+    return formattedData;
+  });
+};

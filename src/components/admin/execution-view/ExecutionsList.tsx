@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PromptRun, WorkflowType } from '@/types/workflow';
+import { PromptRun } from '../types';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw } from 'lucide-react';
@@ -79,18 +80,11 @@ const ExecutionsList: React.FC = () => {
       if (error) throw error;
       
       // Process the runs to format dates and extract tool logs
-      const processedRuns: PromptRun[] = data.map((run: any) => {
-        // Get workflow type from the joined workflow_prompts table or from the run directly
-        const workflowType = run.workflow_type || 
-          (run.workflow_prompts ? run.workflow_prompts.type : null);
-          
-        return {
-          ...run,
-          relative_time: formatDistanceToNow(new Date(run.created_at), { addSuffix: true }),
-          tool_logs_count: run.tool_logs?.length || 0,
-          workflow_type: workflowType
-        };
-      });
+      const processedRuns: PromptRun[] = data.map((run: any) => ({
+        ...run,
+        relative_time: formatDistanceToNow(new Date(run.created_at), { addSuffix: true }),
+        tool_logs_count: run.tool_logs?.length || 0
+      }));
       
       // Additional filtering for project managers if needed
       let filteredRuns = processedRuns;

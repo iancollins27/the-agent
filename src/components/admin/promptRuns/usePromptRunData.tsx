@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -39,35 +40,23 @@ export const usePromptRunData = (statusFilter: string | null) => {
       }
 
       if (data) {
-        const formattedRuns = data?.map(run => {
-          // Get workflow type from the joined workflow_prompts table or from the run directly
-          const workflowType = run.workflow_type || 
-            (run.workflow_prompts ? run.workflow_prompts.type : null);
-          
-          // Format numeric values to ensure they're consistent
-          let usdCost = run.usd_cost;
-          if (typeof usdCost === 'string') {
-            usdCost = parseFloat(usdCost);
-          }
-          
-          return {
-            ...run,
-            id: run.id,
-            created_at: run.created_at,
-            project_name: run.projects?.crm_id || 'Unknown Project',
-            project_address: run.projects?.Address || null,
-            project_manager: run.projects?.project_manager ? 
-              `${run.projects.project_manager.profile_fname || ''} ${run.projects.project_manager.profile_lname || ''}`.trim() || 'Unnamed Manager' 
-              : null,
-            workflow_type: workflowType,
-            usd_cost: usdCost,
-            prompt_text: run.prompt_input,
-            result: run.prompt_output,
-            reviewed: run.reviewed === true
-          } as PromptRun;
-        }) || [];
+        const formattedData = data.map(run => ({
+          ...run,
+          id: run.id,
+          created_at: run.created_at,
+          project_name: run.projects?.crm_id || 'Unknown Project',
+          project_address: run.projects?.Address || null,
+          project_manager: run.projects?.project_manager ? 
+            `${run.projects.project_manager.profile_fname || ''} ${run.projects.project_manager.profile_lname || ''}`.trim() || 'Unnamed Manager' 
+            : null,
+          workflow_type: run.workflow_prompts?.type || null,
+          workflow_prompt_type: run.workflow_prompts?.type || null,
+          prompt_text: run.prompt_input,
+          result: run.prompt_output,
+          reviewed: run.reviewed === true
+        })) as PromptRun[];
 
-        setPromptRuns(formattedRuns);
+        setPromptRuns(formattedData);
       } else {
         setPromptRuns([]);
       }
