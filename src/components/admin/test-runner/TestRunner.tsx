@@ -2,7 +2,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useTestRunner } from "./useTestRunner";
+import { useTestRunner } from "./hooks/useTestRunner";
 import MCPInfoAlert from "./MCPInfoAlert";
 import MCPToggle from "./MCPToggle";
 import ErrorAlert from "./ErrorAlert";
