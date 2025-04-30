@@ -49,7 +49,7 @@ export async function handleAIResponse(
     
     if (useMCP && (aiProvider === "openai" || aiProvider === "claude")) {
       ({ result, actionRecordId, reminderSet, nextCheckDateInfo, humanReviewRequestId, knowledgeResults, rawResponse, promptTokens, completionTokens, costUSD } = 
-        await handleMCPResponse(supabase, aiProvider, aiModel, finalPrompt, promptRunId, projectId, promptType, contextData));
+        await handleMCPResponse(supabase, aiProvider, aiModel, finalPrompt, promptRunId, projectId, contextData));
     } else {
       ({ result, actionRecordId, reminderSet, nextCheckDateInfo, promptTokens, completionTokens, costUSD } = 
         await handleStandardResponse(supabase, aiProvider, aiModel, finalPrompt, promptRunId, projectId, promptType, contextData));
@@ -95,53 +95,17 @@ async function handleMCPResponse(
   finalPrompt: string,
   promptRunId: string | null,
   projectId: string | null,
-  promptType: string,
   contextData: any
 ) {
   console.log("Using Model Context Protocol for structured interaction");
   
   const modelToUse = aiProvider === "claude" ? "claude-3-5-haiku-20241022" : aiModel;
   
-  // Fetch the MCP orchestrator prompt
-  const { data: orchestratorPrompt, error: promptError } = await supabase
-    .from('workflow_prompts')
-    .select('*')
-    .eq('type', 'mcp_orchestrator')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  const systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
   
-  let systemPrompt;
-  if (promptError) {
-    console.log("No MCP orchestrator prompt found. Using default orchestrator prompt.");
-    systemPrompt = `You are an AI orchestrator that processes project information and helps determine appropriate actions. Use the available tools to analyze the project context and suggest actions when needed. For this workflow type: ${promptType}`;
-  } else {
-    console.log(`Using MCP orchestrator prompt ID: ${orchestratorPrompt.id}`);
-    
-    // Replace variables in the orchestrator prompt
-    const orchestratorContext = {
-      ...contextData,
-      workflow_type: promptType,
-      project_id: projectId
-    };
-    
-    // Import and use the replaceVariables function
-    const { replaceVariables } = await import("../utils.ts");
-    systemPrompt = replaceVariables(orchestratorPrompt.prompt_text, orchestratorContext);
-    console.log("Orchestrator prompt after variable replacement:", systemPrompt.substring(0, 200) + "...");
-  }
-  
-  // Create MCP context with tools and memory
+  // Create MCP context with tools
   console.log("Creating MCP context with tools");
-  let mcpContext: MCPContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools(), {
-    conversationHistory: [],
-    toolCallHistory: [],
-    projectContext: {
-      projectId,
-      promptType,
-      ...contextData
-    }
-  });
+  let mcpContext: MCPContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
   
   // Keep track of original prompt for display in UI
   const originalPrompt = finalPrompt;
@@ -196,8 +160,7 @@ async function handleMCPResponse(
     originalPrompt,
     promptTokens,
     completionTokens,
-    costUSD,
-    promptType
+    costUSD
   );
 }
 
@@ -261,8 +224,7 @@ async function processToolCalls(
   originalPrompt: string,
   promptTokens: number,
   completionTokens: number,
-  costUSD: number,
-  promptType: string
+  costUSD: number
 ) {
   let result = '';
   let actionRecordId = null;
@@ -286,17 +248,12 @@ async function processToolCalls(
       const toolCallStartTime = startTimer();
       
       try {
-        // Log tool call in memory
-        mcpContext = logToolCall(mcpContext, toolCall.name, toolCall.arguments);
-        
         if (toolCall.name === 'detect_action') {
           const decision = toolCall.arguments.decision;
           const reason = toolCall.arguments.reason;
-          const confidence = toolCall.arguments.confidence || 0.0;
           
           console.log(`Action detection decision: ${decision}`);
           console.log(`Reason: ${reason}`);
-          console.log(`Confidence: ${confidence}`);
           
           // Log tool call for metrics
           await logToolCall(supabase, {
@@ -305,7 +262,7 @@ async function processToolCalls(
             status: 200,
             duration: endTimer(toolCallStartTime),
             args: toolCall.arguments,
-            output: JSON.stringify({ success: true, decision, reason, confidence })
+            output: JSON.stringify({ success: true, decision, reason })
           });
           
           mcpContext = addToolResult(mcpContext, 'detect_action', { success: true, result: 'Action detected' });
@@ -313,7 +270,6 @@ async function processToolCalls(
           result = JSON.stringify({
             decision,
             reason,
-            confidence,
             ...toolCall.arguments
           }, null, 2);
           
@@ -360,22 +316,11 @@ async function processToolCalls(
             } catch (error) {
               console.error('Error setting next check date:', error);
             }
-          } else if (decision === 'REQUEST_HUMAN_REVIEW' && projectId) {
-            try {
-              console.log("Creating human review request");
-              // Implement human review request logic here
-              const { createHumanReviewRequest } = await import("../human-service.ts");
-              humanReviewRequestId = await createHumanReviewRequest(supabase, promptRunId, projectId, toolCall.arguments);
-              console.log(`Human review request created: ${humanReviewRequestId}`);
-            } catch (error) {
-              console.error('Error creating human review request:', error);
-            }
           }
         } 
         else if (toolCall.name === 'generate_action') {
           const actionType = toolCall.arguments.action_type;
-          const priority = toolCall.arguments.priority || 'medium';
-          console.log(`Generating action of type: ${actionType} with priority ${priority}`);
+          console.log(`Generating action of type: ${actionType}`);
           
           // Log tool call for metrics
           await logToolCall(supabase, {
@@ -389,7 +334,6 @@ async function processToolCalls(
           
           const actionResult = {
             action_type: actionType,
-            priority,
             ...toolCall.arguments
           };
           
@@ -404,26 +348,18 @@ async function processToolCalls(
               console.error('Error creating action record:', error);
             }
           }
-          
-          mcpContext = addToolResult(mcpContext, 'generate_action', { 
-            success: true, 
-            result: `Generated ${actionType} action`, 
-            action_id: actionRecordId 
-          });
         }
         else if (toolCall.name === 'knowledge_base_lookup') {
           try {
             console.log("Processing knowledge base lookup");
             const query = toolCall.arguments.query;
             const lookupProjectId = toolCall.arguments.project_id || projectId;
-            const maxResults = toolCall.arguments.max_results || 5;
             
             console.log(`Query: "${query}" for project: ${lookupProjectId}`);
             
             if (lookupProjectId) {
               const queryStartTime = startTimer();
-              const { queryKnowledgeBase, formatKnowledgeResults } = await import("../knowledge-service.ts");
-              const results = await queryKnowledgeBase(supabase, query, lookupProjectId, maxResults);
+              const results = await queryKnowledgeBase(supabase, query, lookupProjectId);
               const queryDuration = endTimer(queryStartTime);
               
               // Log tool call for metrics
@@ -460,68 +396,6 @@ async function processToolCalls(
             }
           } catch (error) {
             console.error('Error processing knowledge base lookup:', error);
-            await logToolCall(supabase, {
-              promptRunId: promptRunId || "",
-              name: toolCall.name,
-              status: 500,
-              duration: endTimer(toolCallStartTime),
-              args: toolCall.arguments,
-              output: JSON.stringify({ error: error.message })
-            });
-          }
-        }
-        else if (toolCall.name === 'analyze_timeline') {
-          try {
-            console.log("Processing timeline analysis");
-            const analyzeProjectId = toolCall.arguments.project_id || projectId;
-            const milestoneFocus = toolCall.arguments.milestone_focus;
-            
-            console.log(`Analyzing timeline for project: ${analyzeProjectId}, focus: ${milestoneFocus || 'all milestones'}`);
-            
-            // This is a mock implementation - in production, you would implement real timeline analysis
-            const timelineAnalysis = {
-              current_phase: "Roof Installation",
-              days_in_current_phase: 7,
-              upcoming_milestones: [
-                {
-                  name: "Final Inspection", 
-                  expected_date: new Date(new Date().getTime() + 7*24*60*60*1000).toISOString().split('T')[0],
-                  status: "pending"
-                }
-              ],
-              delays: []
-            };
-            
-            // Log tool call for metrics
-            await logToolCall(supabase, {
-              promptRunId: promptRunId || "",
-              name: toolCall.name,
-              status: 200,
-              duration: endTimer(toolCallStartTime),
-              args: toolCall.arguments,
-              output: JSON.stringify({ success: true })
-            });
-            
-            mcpContext = addToolResult(mcpContext, 'analyze_timeline', timelineAnalysis);
-            
-            // If this was the only tool called, use it for the result
-            if (toolCalls.length === 1) {
-              result = JSON.stringify(timelineAnalysis, null, 2);
-            }
-            
-            // Request a follow-up decision based on the timeline
-            console.log("Calling AI again with timeline analysis results");
-            const followUpResponse = await callAIProviderWithMCP(aiProvider, aiModel, mcpContext);
-            const followUpMessage = aiProvider === 'openai'
-              ? followUpResponse.choices[0]?.message?.content
-              : followUpResponse.content[0]?.text;
-              
-            if (followUpMessage) {
-              result = followUpMessage;
-              console.log("Updated result with timeline-enhanced response");
-            }
-          } catch (error) {
-            console.error('Error processing timeline analysis:', error);
             await logToolCall(supabase, {
               promptRunId: promptRunId || "",
               name: toolCall.name,
