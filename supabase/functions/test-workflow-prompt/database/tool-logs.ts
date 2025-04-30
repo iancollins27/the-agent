@@ -5,6 +5,7 @@
 
 /**
  * Log a tool call to the database
+ * Updated to match the actual database schema
  */
 export async function logToolCall(
   supabase: any,
@@ -24,12 +25,18 @@ export async function logToolCall(
   
   // Truncate long inputs/outputs to avoid database issues
   const maxLength = 10000;
-  const truncatedArgs = toolArgs && toolArgs.length > maxLength 
-    ? toolArgs.slice(0, maxLength) + "... [truncated]" 
-    : toolArgs;
   
-  const truncatedResult = toolResult && toolResult.length > maxLength 
-    ? toolResult.slice(0, maxLength) + "... [truncated]" 
+  // Create a hash of the tool arguments to store in input_hash
+  let inputHash;
+  try {
+    inputHash = toolArgs ? String(toolArgs).substring(0, 100) : null;
+  } catch (e) {
+    inputHash = "Error creating input hash";
+  }
+  
+  // Truncate tool result to store in output_trim
+  const outputTrim = toolResult && toolResult.length > maxLength 
+    ? toolResult.substring(0, maxLength) + "... [truncated]" 
     : toolResult;
 
   try {
@@ -38,12 +45,13 @@ export async function logToolCall(
       .insert({
         prompt_run_id: promptRunId,
         tool_name: toolName,
-        tool_call_id: toolCallId,
-        tool_args: truncatedArgs,
-        tool_result: truncatedResult,
+        // Use input_hash instead of tool_args
+        input_hash: inputHash,
+        // Use output_trim instead of tool_result
+        output_trim: outputTrim,
         status_code: statusCode,
-        duration_ms: durationMs,
-        error_message: errorMessage
+        duration_ms: durationMs
+        // error_message column doesn't exist, so we don't include it
       })
       .select()
       .single();

@@ -1,9 +1,9 @@
-
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { setProjectNextCheckDate } from "./projects.ts";
 
 /**
  * Creates an action record from action detection+execution results
+ * Improved error handling to ensure a consistent return format
  */
 export async function createActionRecord(
   supabase: SupabaseClient,
@@ -13,6 +13,21 @@ export async function createActionRecord(
 ) {
   try {
     console.log("Creating action record with data:", JSON.stringify(actionData, null, 2));
+    
+    if (!projectId) {
+      console.error("Error: Missing projectId for action record");
+      return { status: "error", error: "Missing projectId" };
+    }
+    
+    if (!promptRunId) {
+      console.error("Error: Missing promptRunId for action record");
+      return { status: "error", error: "Missing promptRunId" };
+    }
+    
+    if (!actionData) {
+      console.error("Error: Missing actionData for action record");
+      return { status: "error", error: "Missing actionData" };
+    }
     
     // Parse the decision and other data from the AI response
     const decision = actionData.decision;
@@ -26,11 +41,16 @@ export async function createActionRecord(
       return await handleFutureReminder(supabase, promptRunId, projectId, actionData);
     } else {
       console.log("No action needed based on AI decision:", decision);
-      return null;
+      // Return a valid object even when no action is taken
+      return { status: "no_action", message: `No action needed: ${decision || "unknown decision"}` };
     }
   } catch (error) {
     console.error("Error creating action record:", error);
-    return null;
+    // Return structured error object with status field
+    return { 
+      status: "error", 
+      error: error.message || "Unknown error in createActionRecord" 
+    };
   }
 }
 
@@ -336,7 +356,7 @@ async function handleMessageAction(
 }
 
 /**
- * Handle other action types
+ * Handle other action types with improved error handling
  */
 async function handleOtherActionTypes(
   supabase: SupabaseClient,
@@ -415,19 +435,29 @@ async function handleOtherActionTypes(
       
     if (error) {
       console.error("Error creating action record:", error);
-      throw new Error(`Failed to create action record: ${error.message}`);
+      return { 
+        status: "error", 
+        error: `Failed to create action record: ${error.message}`
+      };
     }
     
     console.log("Action record created successfully:", data);
-    return data.id;
+    return { 
+      status: "success", 
+      action_record_id: data.id,
+      message: "Action record created successfully"
+    };
   } catch (insertError) {
     console.error("Exception during action record insert:", insertError);
-    return null;
+    return { 
+      status: "error", 
+      error: insertError.message || "Unknown error during action creation"
+    };
   }
 }
 
 /**
- * Handle SET_FUTURE_REMINDER decision type
+ * Handle SET_FUTURE_REMINDER decision type with improved error handling
  */
 async function handleFutureReminder(
   supabase: SupabaseClient,
@@ -435,17 +465,20 @@ async function handleFutureReminder(
   projectId: string,
   actionData: any
 ) {
-  // Calculate the next check date
-  const daysToAdd = actionData.days_until_check || 7; // Default to 7 days if not specified
-  const nextCheckDate = await setProjectNextCheckDate(supabase, projectId, daysToAdd);
-  
-  if (!nextCheckDate) {
-    console.error("Failed to set next check date for project", projectId);
-    return null;
-  }
-  
-  // Create an action record to document the reminder setting
   try {
+    // Calculate the next check date
+    const daysToAdd = actionData.days_until_check || 7; // Default to 7 days if not specified
+    const nextCheckDate = await setProjectNextCheckDate(supabase, projectId, daysToAdd);
+    
+    if (!nextCheckDate) {
+      console.error("Failed to set next check date for project", projectId);
+      return { 
+        status: "error", 
+        error: "Failed to set next check date" 
+      };
+    }
+    
+    // Create an action record to document the reminder setting
     const { data, error } = await supabase
       .from('action_records')
       .insert({
@@ -466,13 +499,26 @@ async function handleFutureReminder(
       
     if (error) {
       console.error("Error creating reminder action record:", error);
-      throw new Error(`Failed to create reminder action record: ${error.message}`);
+      return { 
+        status: "error", 
+        error: `Failed to create reminder action record: ${error.message}` 
+      };
     }
     
     console.log("Reminder action record created successfully:", data);
-    return data.id;
+    return { 
+      status: "success", 
+      action_record_id: data.id,
+      reminderSet: true,
+      reminderDays: daysToAdd,
+      nextCheckDate: nextCheckDate,
+      message: "Reminder set successfully"
+    };
   } catch (error) {
     console.error("Error creating reminder action record:", error);
-    return null;
+    return { 
+      status: "error", 
+      error: error.message || "Unknown error setting reminder" 
+    };
   }
 }

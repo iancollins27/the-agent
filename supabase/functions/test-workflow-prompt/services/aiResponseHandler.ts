@@ -1,4 +1,3 @@
-
 import { searchKnowledgeBase } from "../knowledge-service.ts";
 import { requestHumanReview } from "../human-service.ts";
 import { createActionRecord, createReminder } from "../database/actions.ts";
@@ -40,7 +39,7 @@ export async function handleAIResponse(
       );
       
       if (useMCP && response.toolOutputs) {
-        return processToolOutputs(supabase, response.toolOutputs, projectId, response.result);
+        return processToolOutputs(supabase, response.toolOutputs, projectId, response.result, promptRunId);
       }
       
       return { result: response.result };
@@ -59,7 +58,7 @@ export async function handleAIResponse(
       );
       
       if (useMCP && response.toolOutputs) {
-        const processedResponse = await processToolOutputs(supabase, response.toolOutputs, projectId, response.result);
+        const processedResponse = await processToolOutputs(supabase, response.toolOutputs, projectId, response.result, promptRunId);
         return {
           ...processedResponse,
           toolOutputs: response.toolOutputs
@@ -80,7 +79,8 @@ async function processToolOutputs(
   supabase: any,
   toolOutputs: any[],
   projectId: string,
-  finalResult: string
+  finalResult: string,
+  promptRunId: string
 ): Promise<{
   result: string;
   actionRecordId?: string;
@@ -100,11 +100,28 @@ async function processToolOutputs(
     knowledgeResults: []
   };
   
+  let errorFound = false;
+  let errorMessage = "";
+  
   for (const toolOutput of toolOutputs) {
     const { tool, args, result: toolResult } = toolOutput;
     
+    // Handle potential null or undefined toolResult
+    if (!toolResult) {
+      console.error(`Null or undefined result for tool ${tool}`);
+      errorFound = true;
+      errorMessage += `Failed to get result from ${tool}. `;
+      continue;
+    }
+    
     if (tool === "detect_action") {
       console.log(`Detected action decision: ${toolResult.decision}`);
+      
+      if (toolResult.status === "error") {
+        errorFound = true;
+        errorMessage += `Error in detect_action: ${toolResult.error}. `;
+        continue;
+      }
       
       if (toolResult.reminderSet) {
         result.reminderSet = true;
@@ -116,11 +133,38 @@ async function processToolOutputs(
     }
     else if (tool === "create_action_record" || tool === "generate_action") {
       console.log(`Action record created: ${JSON.stringify(toolResult)}`);
+      
+      if (toolResult.status === "error") {
+        errorFound = true;
+        errorMessage += `Error in create_action_record: ${toolResult.error}. `;
+        continue;
+      }
+      
       result.actionRecordId = toolResult.action_record_id;
     }
     else if (tool === "knowledge_base_lookup") {
-      console.log(`Knowledge base results: ${toolResult.results?.length || 0} items`);
-      result.knowledgeResults = toolResult.results || [];
+      // We're not using this anymore, but keeping the handling just in case
+      console.log(`Knowledge base lookup no longer available`);
+    }
+  }
+  
+  // If we encountered errors in tool processing, request human review
+  if (errorFound && projectId && promptRunId) {
+    try {
+      const humanReviewResult = await requestHumanReview(
+        supabase,
+        projectId, 
+        promptRunId,
+        "Tool execution errors during MCP conversation",
+        errorMessage
+      );
+      
+      if (humanReviewResult && humanReviewResult.id) {
+        result.humanReviewRequestId = humanReviewResult.id;
+        result.result = `A request for human review has been initiated to address the errors encountered while processing the tools: ${errorMessage} Please wait for further updates from the human team managing this project.`;
+      }
+    } catch (e) {
+      console.error("Error requesting human review:", e);
     }
   }
   
