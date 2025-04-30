@@ -1,95 +1,43 @@
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import ProjectManager from './pages/ProjectManager';
+import ProjectDetails from './pages/ProjectDetails';
+import ActionApprovals from './pages/ActionApprovals';
+import AdminConsole from './pages/AdminConsole';
+import Settings from './pages/Settings';
+import { useAuth } from './contexts/AuthContext';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import UpdateProfile from './pages/UpdateProfile';
+import PrivateRoute from './components/PrivateRoute';
+import PublicRoute from './components/PublicRoute';
+import ExecutionViewer from './pages/ExecutionViewer';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import AdminConsole from "./pages/AdminConsole";
-import AgentChat from "./pages/AgentChat";
-import ChatbotConfig from "./pages/ChatbotConfig";
-import CompanySettings from "./pages/CompanySettings";
-import MermaidDiagrams from "./pages/MermaidDiagrams";
-import ProjectManager from "./pages/ProjectManager";
+function App() {
+  const { currentUser } = useAuth();
 
-const queryClient = new QueryClient();
-
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return <>{children}</>;
-};
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+  return (
+    <Router>
       <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <AdminConsole />
-            </ProtectedRoute>
-          }
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute>
-              <AdminConsole />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/chat" 
-          element={
-            <ProtectedRoute>
-              <AgentChat />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/chatbot-config" 
-          element={
-            <ProtectedRoute>
-              <ChatbotConfig />
-            </ProtectedRoute>
-          } 
-        />
-        <Route path="/company-settings" element={<CompanySettings />} />
-        <Route
-          path="/system-diagrams"
-          element={
-            <ProtectedRoute>
-              <MermaidDiagrams />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project-manager"
-          element={
-            <ProtectedRoute>
-              <ProjectManager />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<NotFound />} />
+        {/* Public Routes */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+
+        {/* Private Routes */}
+        <Route path="/" element={<PrivateRoute><ProjectManager /></PrivateRoute>} />
+        <Route path="/project/:id" element={<PrivateRoute><ProjectDetails /></PrivateRoute>} />
+        <Route path="/action-approvals" element={<PrivateRoute><ActionApprovals /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute><AdminConsole /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+        <Route path="/update-profile" element={<PrivateRoute><UpdateProfile /></PrivateRoute>} />
+        
+        {/* Add the new route for execution viewer */}
+        <Route path="/admin/executions/:executionId" element={<ExecutionViewer />} />
       </Routes>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </Router>
+  );
+}
 
 export default App;

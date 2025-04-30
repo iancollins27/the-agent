@@ -69,3 +69,24 @@ export interface PromptRun {
   prompt_text?: string;
   result?: string;
 }
+
+export interface ToolLog {
+  id: string;
+  prompt_run_id: string;
+  tool_name: string;
+  status_code: number;
+  duration_ms: number;
+  input_hash: string;
+  output_trim: string;
+  created_at: string;
+  
+  // Derived/computed fields
+  input?: any; // Decoded from hash or fetched separately
+  output?: any; // Full output if available
+  sequence?: number; // Order in which tools were called
+}
+
+export interface ExecutionView {
+  promptRun: PromptRun;
+  toolLogs: ToolLog[];
+}

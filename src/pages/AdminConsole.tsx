@@ -8,6 +8,7 @@ import TestingTab from "../components/admin/TestingTab";
 import PromptRunsTab from "../components/admin/PromptRunsTab";
 import FeedbackTab from "../components/admin/FeedbackTab";
 import { ObservabilityTab } from "../components/admin/observability/ObservabilityTab";
+import ExecutionsTab from "../components/admin/ExecutionsTab";
 
 const AdminConsole: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState("prompt-runs");
@@ -20,9 +21,10 @@ const AdminConsole: React.FC = () => {
         <h1 className="text-3xl font-bold mb-6">Admin Console</h1>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+          <TabsList className="grid w-full sm:w-[900px]" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
             <TabsTrigger value="prompt-runs">Prompt Runs</TabsTrigger>
             <TabsTrigger value="actions">Actions</TabsTrigger>
+            <TabsTrigger value="executions">Executions</TabsTrigger>
             <TabsTrigger value="prompts">Prompts</TabsTrigger>
             <TabsTrigger value="testing">Testing</TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
@@ -35,6 +37,10 @@ const AdminConsole: React.FC = () => {
           
           <TabsContent value="actions">
             <ActionRecordsTab />
+          </TabsContent>
+          
+          <TabsContent value="executions">
+            <ExecutionsTab />
           </TabsContent>
           
           <TabsContent value="prompts">
