@@ -15,7 +15,7 @@ const ExecutionsListItem: React.FC<ExecutionsListItemProps> = ({ promptRun }) =>
   const navigate = useNavigate();
   
   // Count tool logs if available
-  const toolLogsCount = 'tool_logs_count' in promptRun ? promptRun.tool_logs_count : 0;
+  const toolLogsCount = typeof promptRun.tool_logs_count === 'number' ? promptRun.tool_logs_count : 0;
   
   const handleViewExecution = () => {
     navigate(`/admin/executions/${promptRun.id}`);

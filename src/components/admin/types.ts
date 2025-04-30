@@ -1,4 +1,3 @@
-
 export interface ActionRecord {
   id: string;
   project_id?: string;
@@ -64,6 +63,7 @@ export interface PromptRun {
   // Derived data
   relative_time?: string;
   workflow_type?: string | null;
+  tool_logs_count?: number;
   
   // Alternate field names that might be used in some components
   prompt_text?: string;
