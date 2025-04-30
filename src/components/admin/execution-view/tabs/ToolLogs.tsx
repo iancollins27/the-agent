@@ -1,210 +1,177 @@
 
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, ArrowDownToLine } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-
-interface ToolLogEntry {
-  id: string;
-  created_at: string;
-  tool_name: string;
-  input_hash: string;
-  output_trim: string;
-  status_code: number;
-  duration_ms: number;
-}
+import { Separator } from '@/components/ui/separator';
+import { AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface ToolLogsProps {
-  toolLogs: ToolLogEntry[];
+  promptRunId: string;
 }
 
-const ToolLogs: React.FC<ToolLogsProps> = ({ toolLogs }) => {
-  const [expandedLogs, setExpandedLogs] = React.useState<{ [key: string]: boolean }>({});
+interface ToolLog {
+  id: string;
+  tool_name: string;
+  tool_call_id: string;
+  tool_args: string;
+  tool_result: string;
+  status_code: number;
+  duration_ms: number;
+  error_message: string | null;
+  created_at: string;
+}
 
-  const toggleLogExpansion = (logId: string) => {
-    setExpandedLogs(prev => ({
-      ...prev,
-      [logId]: !prev[logId]
-    }));
-  };
-
-  // Try to parse tool args from output
-  const parseToolInput = (outputTrim: string): Record<string, any> | null => {
-    try {
-      // Try to parse the full output as JSON first
-      const parsedOutput = JSON.parse(outputTrim);
+const ToolLogs: React.FC<ToolLogsProps> = ({ promptRunId }) => {
+  const { data: toolLogs, isLoading, error } = useQuery({
+    queryKey: ['tool-logs', promptRunId],
+    queryFn: async () => {
+      if (!promptRunId) return [];
       
-      // If the output has an 'args' property, that's likely our tool args
-      if (parsedOutput.args) {
-        return parsedOutput.args;
+      const { data, error } = await supabase
+        .from('tool_logs')
+        .select('*')
+        .eq('prompt_run_id', promptRunId)
+        .order('created_at', { ascending: true });
+        
+      if (error) {
+        console.error('Error fetching tool logs:', error);
+        throw error;
       }
       
-      return parsedOutput;
-    } catch (e) {
-      // If it's not valid JSON, try to extract JSON from the string
-      try {
-        const jsonMatch = outputTrim.match(/\{.*\}/s);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-      } catch (innerError) {
-        // Ignore inner parsing errors
-      }
-      
-      return null;
-    }
-  };
+      return data as ToolLog[];
+    },
+    enabled: !!promptRunId
+  });
 
-  const getStatusBadge = (status: number) => {
-    if (status >= 200 && status < 300) {
-      return <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">Success</Badge>;
-    } else {
-      return <Badge variant="destructive">Error {status}</Badge>;
-    }
-  };
-
-  const formatDuration = (ms: number) => {
-    if (ms < 1000) {
-      return `${ms}ms`;
-    } else {
-      return `${(ms / 1000).toFixed(2)}s`;
-    }
-  };
-  
-  const getToolBadge = (toolName: string) => {
-    switch (toolName) {
-      case 'detect_action':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Decision</Badge>;
-      case 'create_action_record':
-        return <Badge variant="outline" className="bg-purple-100 text-purple-800">Action</Badge>;
-      case 'knowledge_base_lookup':
-        return <Badge variant="outline" className="bg-amber-100 text-amber-800">Knowledge</Badge>;
-      case 'generate_action':
-        return <Badge variant="outline" className="bg-orange-100 text-orange-800">Generate (Deprecated)</Badge>;
-      default:
-        return <Badge variant="outline">{toolName}</Badge>;
-    }
-  };
-  
-  // Group logs by sequence (detect_action -> create_action_record)
-  const groupedLogs = React.useMemo(() => {
-    const groups: { sequence: number; logs: ToolLogEntry[] }[] = [];
-    let currentSequence = -1;
-    
-    toolLogs.forEach((log, index) => {
-      if (log.tool_name === 'detect_action' || index === 0) {
-        currentSequence++;
-        groups.push({ sequence: currentSequence, logs: [log] });
-      } else {
-        groups[currentSequence].logs.push(log);
-      }
-    });
-    
-    return groups;
-  }, [toolLogs]);
-
-  if (toolLogs.length === 0) {
+  if (isLoading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center p-8 text-muted-foreground">
-          No tool logs available for this execution
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Tool Logs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center p-4 text-sm text-muted-foreground">
+            Loading tool logs...
+          </div>
         </CardContent>
       </Card>
     );
   }
 
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Tool Logs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-red-50 p-4 rounded-md text-sm text-red-500 border border-red-200 flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            Error loading tool logs
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!toolLogs || toolLogs.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Tool Logs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center p-4 text-sm text-muted-foreground">
+            No tool logs available for this execution
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Parse the JSON arguments and results
+  const parsedLogs = toolLogs.map(log => {
+    let args;
+    let result;
+    
+    try {
+      args = typeof log.tool_args === 'string' ? JSON.parse(log.tool_args) : log.tool_args;
+    } catch (e) {
+      args = log.tool_args;
+    }
+    
+    try {
+      result = typeof log.tool_result === 'string' ? JSON.parse(log.tool_result) : log.tool_result;
+    } catch (e) {
+      result = log.tool_result;
+    }
+    
+    return {
+      ...log,
+      parsedArgs: args,
+      parsedResult: result
+    };
+  });
+
   return (
-    <div className="space-y-6">
-      {groupedLogs.map((group, groupIndex) => (
-        <div key={`group-${groupIndex}`} className="border rounded-lg">
-          <div className="bg-muted/50 p-2 px-4 text-sm font-medium flex items-center">
-            <span>Sequence {groupIndex + 1}</span>
-            {group.logs.length > 1 && (
-              <Badge variant="outline" className="ml-2 bg-blue-50">
-                {group.logs.length} tool calls
-              </Badge>
-            )}
-          </div>
-          
-          <div className="divide-y">
-            {group.logs.map((log, logIndex) => {
-              const isExpanded = expandedLogs[log.id] || false;
-              const toolInput = parseToolInput(log.output_trim);
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-medium">Tool Logs ({toolLogs.length})</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {parsedLogs.map((log, index) => (
+          <div key={log.id} className="border rounded-md">
+            <div className="p-3 flex justify-between items-center bg-slate-50 rounded-t-md">
+              <div className="flex items-center gap-2">
+                <Badge variant={log.status_code >= 200 && log.status_code < 300 ? "default" : "destructive"}>
+                  {log.tool_name}
+                </Badge>
+                <span className="text-xs text-muted-foreground">ID: {log.tool_call_id}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {log.duration_ms}ms
+                </div>
+                {log.status_code >= 200 && log.status_code < 300 ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                )}
+              </div>
+            </div>
+            
+            <div className="p-3">
+              <div className="mb-2">
+                <h4 className="font-medium text-sm mb-1">Arguments:</h4>
+                <pre className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
+                  {JSON.stringify(log.parsedArgs, null, 2)}
+                </pre>
+              </div>
               
-              return (
-                <Collapsible
-                  key={log.id}
-                  open={isExpanded}
-                  onOpenChange={() => toggleLogExpansion(log.id)}
-                  className="w-full"
-                >
-                  <CollapsibleTrigger asChild className="w-full">
-                    <Button 
-                      variant="ghost" 
-                      className="flex items-center justify-between w-full p-4 text-left"
-                    >
-                      <div className="flex items-center gap-4">
-                        {logIndex > 0 && <ArrowDownToLine size={12} className="text-gray-400 ml-3" />}
-                        <div className="flex-none w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-800 font-bold">
-                          {logIndex + 1}
-                        </div>
-                        <div>
-                          <div className="font-medium flex items-center">
-                            {log.tool_name}
-                            <div className="ml-2">
-                              {getToolBadge(log.tool_name)}
-                            </div>
-                          </div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                            {getStatusBadge(log.status_code)}
-                            <span>{formatDuration(log.duration_ms)}</span>
-                            <span>•</span>
-                            <span>{formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}</span>
-                          </div>
-                        </div>
-                      </div>
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="px-4 pb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Input Parameters</h4>
-                          <div className="font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto">
-                            {toolInput ? (
-                              JSON.stringify(toolInput, null, 2)
-                            ) : (
-                              "Unable to parse tool input parameters"
-                            )}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Output</h4>
-                          <div className="font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto">
-                            {log.output_trim || "No output data available"}
-                            {log.output_trim && log.output_trim.endsWith('...') && (
-                              <div className="text-xs italic mt-1">Output truncated...</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 text-xs text-muted-foreground">
-                        <div>Tool ID: {log.id}</div>
-                        <div>Hash: {log.input_hash?.substring(0, 16)}...</div>
-                      </div>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
+              <Separator className="my-2" />
+              
+              <div>
+                <h4 className="font-medium text-sm mb-1">Result:</h4>
+                <pre className="bg-slate-50 p-2 rounded text-xs overflow-auto max-h-32">
+                  {JSON.stringify(log.parsedResult, null, 2)}
+                </pre>
+              </div>
+              
+              {log.error_message && (
+                <div className="mt-2 text-sm text-red-500 bg-red-50 p-2 rounded border border-red-200">
+                  Error: {log.error_message}
+                </div>
+              )}
+            </div>
+            
+            {index < parsedLogs.length - 1 && <Separator />}
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 };
 

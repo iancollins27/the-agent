@@ -38,13 +38,18 @@ serve(async (req) => {
     console.log("Processing request through handleRequest");
     const response = await handleRequest(supabase, requestBody);
     
-    // Make sure CORS headers are added to the response
-    const headers = new Headers(response.headers);
+    // Return the response with CORS headers
+    const headers = new Headers();
     
-    // Add CORS headers to the response
+    // Add CORS headers
     Object.entries(corsHeaders).forEach(([key, value]) => {
       headers.set(key, value);
     });
+    
+    // Add Content-Type header if not already present
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
     
     console.log("Successfully processed request, returning response");
     return new Response(response.body, {

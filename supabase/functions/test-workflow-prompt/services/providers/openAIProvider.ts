@@ -105,6 +105,7 @@ async function handleMCPRequest(
   // Start the conversation loop
   while (!isComplete && iterations < maxIterations) {
     iterations++;
+    console.log(`Starting MCP iteration ${iterations}`);
     
     // Call OpenAI API with the current context
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -133,31 +134,43 @@ async function handleMCPRequest(
     const message = data.choices[0].message;
     mcpContext.messages.push(message);
     
+    console.log(`Message content type: ${typeof message.content}, content: ${message.content || "null"}`);
+    console.log(`Tool calls: ${message.tool_calls ? message.tool_calls.length : 0}`);
+    
     // Check if the message contains tool calls
     if (message.tool_calls && message.tool_calls.length > 0) {
-      const toolCalls = extractToolCallsFromOpenAI(data);
+      const toolCalls = extractToolCallsFromOpenAI(message);
       
       // Process each tool call
       for (const toolCall of toolCalls) {
-        console.log(`Processing tool call: ${toolCall.name}`);
+        console.log(`Processing tool call: ${toolCall.name}, id: ${toolCall.id}`);
         
-        // Log the tool call
-        const toolResult = await processToolCall(
-          toolCall,
-          supabase,
-          promptRunId,
-          projectId
-        );
-        
-        // Add the tool result to the context
-        mcpContext = addToolResult(mcpContext, toolCall.name, toolResult);
-        
-        // Add to our collection of tool outputs
-        toolOutputs.push({
-          tool: toolCall.name,
-          args: toolCall.arguments,
-          result: toolResult
-        });
+        try {
+          // Log the tool call
+          const toolResult = await processToolCall(
+            toolCall,
+            supabase,
+            promptRunId,
+            projectId
+          );
+          
+          // Add the tool result to the context
+          mcpContext = addToolResult(mcpContext, toolCall.id, toolCall.name, toolResult);
+          
+          // Add to our collection of tool outputs
+          toolOutputs.push({
+            tool: toolCall.name,
+            args: toolCall.arguments,
+            result: toolResult
+          });
+        } catch (error) {
+          console.error(`Error processing tool call ${toolCall.name}:`, error);
+          // Add error result to context to prevent API errors
+          mcpContext = addToolResult(mcpContext, toolCall.id, toolCall.name, { 
+            status: "error", 
+            error: error.message 
+          });
+        }
       }
     } else {
       // If no tool calls, the conversation is complete
@@ -169,6 +182,8 @@ async function handleMCPRequest(
   if (iterations >= maxIterations) {
     finalResponse = "Maximum number of iterations reached. The conversation was terminated for safety reasons.";
   }
+  
+  console.log(`MCP conversation complete after ${iterations} iterations`);
   
   return { 
     result: finalResponse,
@@ -185,7 +200,7 @@ async function processToolCall(
   promptRunId: string,
   projectId: string
 ): Promise<any> {
-  const { name: toolName, arguments: toolArgs } = toolCall;
+  const { name: toolName, arguments: toolArgs, id: toolCallId } = toolCall;
   
   // Start timestamp for duration calculation
   const startTime = performance.now();
@@ -194,6 +209,9 @@ async function processToolCall(
   let error = null;
   
   try {
+    // Parse tool arguments if needed
+    const parsedArgs = typeof toolArgs === "string" ? JSON.parse(toolArgs) : toolArgs;
+    
     // Import the services we need for tool execution
     const { 
       createActionRecord, 
@@ -209,21 +227,21 @@ async function processToolCall(
         // Just return the arguments for now, as this is a detection step
         result = {
           status: "success",
-          decision: toolArgs.decision,
-          reason: toolArgs.reason,
-          priority: toolArgs.priority || "medium"
+          decision: parsedArgs.decision,
+          reason: parsedArgs.reason,
+          priority: parsedArgs.priority || "medium"
         };
         
-        if (toolArgs.decision === "SET_FUTURE_REMINDER" && toolArgs.days_until_check) {
+        if (parsedArgs.decision === "SET_FUTURE_REMINDER" && parsedArgs.days_until_check) {
           const reminderResult = await createReminder(
             supabase,
             projectId,
-            toolArgs.days_until_check,
-            toolArgs.check_reason || toolArgs.reason
+            parsedArgs.days_until_check,
+            parsedArgs.check_reason || parsedArgs.reason
           );
           
           result.reminderSet = true;
-          result.reminderDays = toolArgs.days_until_check;
+          result.reminderDays = parsedArgs.days_until_check;
           result.reminderResult = reminderResult;
         }
         
@@ -234,23 +252,23 @@ async function processToolCall(
         const actionRecord = await createActionRecord(
           supabase,
           projectId,
-          toolArgs.action_type,
-          toolArgs.description,
-          toolArgs.recipient,
-          toolArgs.sender,
-          toolArgs.message_text
+          parsedArgs.action_type,
+          parsedArgs.description,
+          parsedArgs.recipient,
+          parsedArgs.sender,
+          parsedArgs.message_text || ""
         );
         
         result = {
           status: "success",
           action_record_id: actionRecord.id,
-          action_type: toolArgs.action_type
+          action_type: parsedArgs.action_type
         };
         break;
       }
       
       case "knowledge_base_lookup": {
-        const searchResults = await searchKnowledgeBase(supabase, toolArgs.query, toolArgs.project_id || projectId);
+        const searchResults = await searchKnowledgeBase(supabase, parsedArgs.query, parsedArgs.project_id || projectId);
         result = {
           status: "success",
           results: searchResults
@@ -265,17 +283,17 @@ async function processToolCall(
         const actionRecord = await createActionRecord(
           supabase,
           projectId,
-          toolArgs.action_type,
-          toolArgs.description,
-          toolArgs.recipient_role,
+          parsedArgs.action_type,
+          parsedArgs.description,
+          parsedArgs.recipient_role,
           "AI Assistant",
-          toolArgs.message_text || toolArgs.description
+          parsedArgs.message_text || parsedArgs.description
         );
         
         result = {
           status: "success",
           action_record_id: actionRecord.id,
-          action_type: toolArgs.action_type,
+          action_type: parsedArgs.action_type,
           deprecated: "generate_action is deprecated, please use create_action_record instead"
         };
         break;
@@ -304,13 +322,14 @@ async function processToolCall(
       supabase,
       promptRunId,
       toolName,
-      toolCall.id,
+      toolCallId,
       JSON.stringify(toolArgs),
       JSON.stringify(result),
       statusCode,
       durationMs,
       error
     );
+    console.log(`Logged tool call ${toolName} with ID ${toolCallId}`);
   } catch (logError) {
     console.error("Failed to log tool call:", logError);
   }

@@ -12,7 +12,7 @@ ${formatAvailableTools(availableTools)}
 
 WORKFLOW PROCESS:
 1. First, use the detect_action tool to determine if any action is needed based on the project context
-2. If detect_action decides that ACTION_NEEDED, you MUST then use the create_action_record tool to create that action
+2. If detect_action decides that ACTION_NEEDED, you MUST then use the create_action_record tool as a separate tool call to create that action
 3. For data queries, use knowledge_base_lookup to search the knowledge base
 4. Your job is to orchestrate a coherent sequence of operations to address the project's needs
 
@@ -20,17 +20,17 @@ IMPORTANT GUIDELINES:
 - Always think step-by-step
 - Consider the current state of the project and next steps required
 - Be concise and specific with your reasoning
-- Always follow tool calls with their required subsequent actions:
-  * detect_action (ACTION_NEEDED) → create_action_record
-  * detect_action (QUERY_KNOWLEDGE_BASE) → knowledge_base_lookup
+- Each tool must be called separately as an individual tool call
+- Tool calls must be made sequentially, waiting for each tool's response before making the next call
 - Don't send communications directly, instead create action records for review
 - For timestamps, use ISO format YYYY-MM-DD
 
 TOOL CALL RULES:
-- Each tool call MUST be made separately, not as a batch
-- If detect_action returns ACTION_NEEDED, you MUST call create_action_record in your next step
+- ALWAYS make each tool call separately, not as a batch
+- If detect_action returns ACTION_NEEDED, you MUST call create_action_record in your next step as a separate tool call
 - Include all required parameters for each tool call
 - Wait for the response from each tool call before proceeding to the next action
+- Never attempt to execute two tool calls at once
 
 When in doubt, focus on: What specific action will most effectively move this project forward?`;
 };
@@ -41,8 +41,8 @@ function formatAvailableTools(tools: string[]): string {
   }
   
   const toolDescriptions: Record<string, string> = {
-    'detect_action': 'Analyzes project context and determines if any action should be taken.',
-    'create_action_record': 'Creates a specific action record based on the detection results.',
+    'detect_action': 'Analyzes project context and determines if any action should be taken. Returns decision: ACTION_NEEDED, NO_ACTION, SET_FUTURE_REMINDER, REQUEST_HUMAN_REVIEW, or QUERY_KNOWLEDGE_BASE.',
+    'create_action_record': 'Creates a specific action record based on the detection results. This should be called as a separate tool call after detect_action returns ACTION_NEEDED.',
     'knowledge_base_lookup': 'Queries the knowledge base for relevant information.',
     'generate_action': 'DEPRECATED: Use create_action_record instead.'
   };

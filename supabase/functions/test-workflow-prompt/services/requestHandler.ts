@@ -79,6 +79,7 @@ export async function handleRequest(supabase: any, requestBody: any) {
       usedMCP: useMCP,
       humanReviewRequestId: response.humanReviewRequestId,
       knowledgeResults: response.knowledgeResults || [],
+      toolOutputs: response.toolOutputs || [],
       // We'll include the original prompt for reference but not for display
       originalPrompt: useMCP ? finalPrompt : null
     }),

@@ -1,110 +1,61 @@
 
-// Import SupabaseClient from the ESM URL instead of the npm package name
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+/**
+ * Functions for logging tool calls
+ */
 
+/**
+ * Log a tool call to the database
+ */
 export async function logToolCall(
-  supabase: SupabaseClient,
-  {
-    promptRunId,
-    name,
-    status,
-    duration,
-    args,
-    output,
-  }: {
-    promptRunId: string;
-    name: string;
-    status: number;
-    duration: number;
-    args: any;
-    output: string;
+  supabase: any,
+  promptRunId: string,
+  toolName: string,
+  toolCallId: string,
+  toolArgs: string,
+  toolResult: string,
+  statusCode: number,
+  durationMs: number,
+  errorMessage?: string | null
+): Promise<any> {
+  if (!promptRunId) {
+    console.warn("No promptRunId provided for tool call logging");
+    return null;
   }
-) {
-  try {
-    // Create SHA-256 hash of the input args
-    const inputHash = await crypto.subtle.digest(
-      "SHA-256", 
-      new TextEncoder().encode(JSON.stringify(args))
-    );
-    const hashHex = Array.from(new Uint8Array(inputHash))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+  
+  // Truncate long inputs/outputs to avoid database issues
+  const maxLength = 10000;
+  const truncatedArgs = toolArgs && toolArgs.length > maxLength 
+    ? toolArgs.slice(0, maxLength) + "... [truncated]" 
+    : toolArgs;
+  
+  const truncatedResult = toolResult && toolResult.length > maxLength 
+    ? toolResult.slice(0, maxLength) + "... [truncated]" 
+    : toolResult;
 
-    // Log the tool call
-    const { error } = await supabase
-      .from("tool_logs")
+  try {
+    const { data, error } = await supabase
+      .from('tool_logs')
       .insert({
         prompt_run_id: promptRunId,
-        tool_name: name,
-        status_code: status,
-        duration_ms: duration,
-        input_hash: hashHex,
-        output_trim: output.slice(0, 300)
-      });
-
-    if (error) {
-      console.error("Error logging tool call:", error);
-    }
-  } catch (err) {
-    console.error("Error in logToolCall:", err);
-  }
-}
-
-export async function updatePromptRunMetrics(
-  supabase: SupabaseClient,
-  promptRunId: string,
-  metrics: {
-    promptTokens?: number;
-    completionTokens?: number;
-    usdCost?: number;
-  }
-) {
-  try {
-    const { error } = await supabase
-      .from("prompt_runs")
-      .update({
-        prompt_tokens: metrics.promptTokens,
-        completion_tokens: metrics.completionTokens,
-        usd_cost: metrics.usdCost
+        tool_name: toolName,
+        tool_call_id: toolCallId,
+        tool_args: truncatedArgs,
+        tool_result: truncatedResult,
+        status_code: statusCode,
+        duration_ms: durationMs,
+        error_message: errorMessage
       })
-      .eq("id", promptRunId);
-
+      .select()
+      .single();
+    
     if (error) {
-      console.error("Error updating prompt run metrics:", error);
+      console.error('Error logging tool call:', error);
+      return null;
     }
-  } catch (err) {
-    console.error("Error in updatePromptRunMetrics:", err);
-  }
-}
-
-export async function logActionMetrics(
-  supabase: SupabaseClient,
-  {
-    actionRecordId,
-    decision,
-    approved,
-    executed
-  }: {
-    actionRecordId: string;
-    decision: string;
-    approved?: boolean;
-    executed?: boolean;
-  }
-) {
-  try {
-    const { error } = await supabase
-      .from("action_metrics")
-      .insert({
-        action_record_id: actionRecordId,
-        decision,
-        approved,
-        executed
-      });
-
-    if (error) {
-      console.error("Error logging action metrics:", error);
-    }
-  } catch (err) {
-    console.error("Error in logActionMetrics:", err);
+    
+    return data;
+  } catch (e) {
+    console.error('Exception in logToolCall:', e);
+    return null;
   }
 }

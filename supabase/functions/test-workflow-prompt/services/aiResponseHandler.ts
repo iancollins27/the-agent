@@ -20,6 +20,7 @@ export async function handleAIResponse(
   nextCheckDateInfo?: any;
   humanReviewRequestId?: string;
   knowledgeResults?: any[];
+  toolOutputs?: any[];
 }> {
   console.log(`Handling ${useMCP ? 'MCP' : 'standard'} AI response for ${aiProvider}/${aiModel}`);
   
@@ -58,7 +59,11 @@ export async function handleAIResponse(
       );
       
       if (useMCP && response.toolOutputs) {
-        return processToolOutputs(supabase, response.toolOutputs, projectId, response.result);
+        const processedResponse = await processToolOutputs(supabase, response.toolOutputs, projectId, response.result);
+        return {
+          ...processedResponse,
+          toolOutputs: response.toolOutputs
+        };
       }
       
       return { result: response.result };

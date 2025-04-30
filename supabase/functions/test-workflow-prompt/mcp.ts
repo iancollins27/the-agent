@@ -1,28 +1,16 @@
 
-import { getMCPOrchestratorPrompt } from "./mcp-system-prompts.ts";
+/**
+ * Model Context Protocol (MCP) implementation
+ */
 
-export type Message = {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  name?: string;
-  tool_call_id?: string;
+// Define types for MCP context and tool calls
+export type MCPContext = {
+  messages: any[];
+  tools: any[];
 };
 
-export interface MCPContext {
-  messages: Message[];
-  tools: Tool[];
-}
-
-export interface Tool {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: any;
-  };
-}
-
-export function createMCPContext(systemPrompt: string, userPrompt: string, tools: Tool[]): MCPContext {
+// Create the initial MCP context with system prompt and user message
+export function createMCPContext(systemPrompt: string, userPrompt: string, tools: any[]): MCPContext {
   return {
     messages: [
       {
@@ -34,111 +22,94 @@ export function createMCPContext(systemPrompt: string, userPrompt: string, tools
         content: userPrompt
       }
     ],
-    tools
+    tools: tools
   };
 }
 
-export function addToolResult(context: MCPContext, toolName: string, result: any): MCPContext {
-  // Find the last assistant message with a tool call for this tool
-  const assistantMessages = context.messages.filter(m => m.role === "assistant");
-  const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
-  
-  if (!lastAssistantMessage || !lastAssistantMessage.tool_call_id) {
-    console.warn("No assistant message with tool call found");
-    return context;
+// Extract tool calls from the OpenAI assistant message
+export function extractToolCallsFromOpenAI(message: any): Array<{id: string, name: string, arguments: any}> {
+  if (!message.tool_calls || message.tool_calls.length === 0) {
+    console.error("No tool calls found in message");
+    return [];
   }
-  
-  // Add the tool result
-  const newMessages = [...context.messages, {
-    role: "tool",
-    content: typeof result === "string" ? result : JSON.stringify(result),
-    name: toolName,
-    tool_call_id: lastAssistantMessage.tool_call_id
-  }];
-  
-  return {
-    ...context,
-    messages: newMessages
-  };
-}
 
-export function addAssistantMessage(context: MCPContext, message: string): MCPContext {
-  return {
-    ...context,
-    messages: [...context.messages, {
-      role: "assistant",
-      content: message
-    }]
-  };
-}
-
-export function extractToolCallsFromOpenAI(response: any): any[] {
-  const toolCalls = response?.choices?.[0]?.message?.tool_calls || [];
-  return toolCalls.map((toolCall: any) => ({
-    id: toolCall.id,
-    name: toolCall.function.name,
-    arguments: JSON.parse(toolCall.function.arguments)
-  }));
-}
-
-export function extractToolCallsFromClaude(response: any): any[] {
-  const toolCalls = [];
-  
-  try {
-    const content = response?.content || [];
-    for (const item of content) {
-      if (item.type === 'tool_use') {
-        toolCalls.push({
-          id: item.id,
-          name: item.tool_use.name,
-          arguments: item.tool_use.parameters
-        });
+  return message.tool_calls.map((toolCall: any) => {
+    try {
+      // Extract and parse the arguments
+      let args;
+      try {
+        args = JSON.parse(toolCall.function.arguments);
+      } catch (e) {
+        args = toolCall.function.arguments;
       }
+
+      return {
+        id: toolCall.id,
+        name: toolCall.function.name,
+        arguments: args
+      };
+    } catch (e) {
+      console.error("Error extracting tool call:", e);
+      return {
+        id: toolCall.id || "unknown",
+        name: "error",
+        arguments: { error: "Failed to parse arguments" }
+      };
     }
-  } catch (err) {
-    console.error("Error extracting tool calls from Claude response:", err);
-  }
-  
-  return toolCalls;
+  });
 }
 
-export function getDefaultTools(): Tool[] {
+// Add a tool result back to the MCP context
+export function addToolResult(context: MCPContext, toolCallId: string, toolName: string, result: any): MCPContext {
+  // Create a copy of the context
+  const updatedContext = {
+    messages: [...context.messages],
+    tools: [...context.tools]
+  };
+
+  // Add the tool response message
+  updatedContext.messages.push({
+    role: "tool",
+    tool_call_id: toolCallId,
+    name: toolName,
+    content: JSON.stringify(result)
+  });
+
+  return updatedContext;
+}
+
+// Get the default tools definition
+export function getDefaultTools(): any[] {
   return [
     {
       type: "function",
       function: {
         name: "detect_action",
-        description: "Analyzes project context to determine if action is needed, postponed, or unnecessary. This should always be your first tool.",
+        description: "Analyzes project context to determine if any action is needed, postponed, or unnecessary",
         parameters: {
           type: "object",
           properties: {
             decision: {
               type: "string",
-              enum: [
-                "ACTION_NEEDED",
-                "NO_ACTION",
-                "SET_FUTURE_REMINDER",
-                "REQUEST_HUMAN_REVIEW",
-                "QUERY_KNOWLEDGE_BASE"
-              ],
-              description: "The decision about what course of action to take"
+              enum: ["ACTION_NEEDED", "NO_ACTION", "SET_FUTURE_REMINDER", "REQUEST_HUMAN_REVIEW", "QUERY_KNOWLEDGE_BASE"],
+              description: "Decision on what to do next"
             },
             reason: {
               type: "string",
-              description: "Detailed explanation of your decision-making process and reasoning"
+              description: "Explanation for the decision"
             },
             priority: {
-              type: "string",
+              type: "string", 
               enum: ["high", "medium", "low"],
-              description: "The priority level of the action or reminder"
+              description: "Priority of the action or task"
             },
             days_until_check: {
-              type: "integer",
-              description: "If decision is SET_FUTURE_REMINDER, number of days until the reminder"
+              type: "number",
+              description: "If SET_FUTURE_REMINDER, days until we should check again"
             },
             check_reason: {
               type: "string",
-              description: "If decision is SET_FUTURE_REMINDER, reason for the reminder"
+              description: "Reason to check in the future"
             }
           },
           required: ["decision", "reason"]
@@ -149,33 +120,32 @@ export function getDefaultTools(): Tool[] {
       type: "function",
       function: {
         name: "create_action_record",
-        description: "Creates a specific action record for team members to execute based on the project's needs. Only use after detect_action confirms ACTION_NEEDED.",
+        description: "Creates a record of an action that needs to be taken",
         parameters: {
           type: "object",
           properties: {
             action_type: {
               type: "string",
-              enum: ["message", "data_update", "reminder", "human_review"],
-              description: "The type of action to be taken"
+              description: "Type of action to create"
             },
             description: {
               type: "string",
-              description: "Detailed description of what needs to be done"
+              description: "Description of the action"
             },
             recipient: {
               type: "string",
-              description: "Who should receive this action (name, role, or contact ID)"
+              description: "Role or person who should receive this action"
             },
             sender: {
               type: "string",
-              description: "Who is sending this action (name, role, or contact ID)"
+              description: "Role or person who is sending this action"
             },
             message_text: {
               type: "string",
-              description: "For message actions, the content of the message to send"
+              description: "Text content of message if this is a communication action"
             }
           },
-          required: ["action_type", "description"]
+          required: ["action_type", "description", "recipient", "sender"]
         }
       }
     },
@@ -183,17 +153,17 @@ export function getDefaultTools(): Tool[] {
       type: "function",
       function: {
         name: "knowledge_base_lookup",
-        description: "Searches the knowledge base for relevant information about the project",
+        description: "Searches the knowledge base for relevant information",
         parameters: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "The search query to find relevant information"
+              description: "Search query"
             },
             project_id: {
               type: "string",
-              description: "Optional project ID to limit the search scope"
+              description: "Optional project ID to limit scope"
             }
           },
           required: ["query"]
