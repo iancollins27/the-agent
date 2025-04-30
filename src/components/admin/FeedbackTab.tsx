@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge";
 import { PromptRun } from './types';
 import PromptRunRating from './PromptRunRating';
+import PromptSection from './prompt-details/PromptSection';
 
 const FeedbackTab = () => {
   const { promptRuns, loading } = usePromptRunData('COMPLETED');
@@ -123,30 +124,22 @@ const FeedbackTab = () => {
                   </div>
                 </div>
 
-                {/* Prompt Input */}
-                <div className="space-y-2">
-                  <h3 className="text-lg font-medium">Prompt Input</h3>
-                  <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
-                    {selectedRun.prompt_input || 'No input available'}
-                  </pre>
-                </div>
+                <PromptSection 
+                  title="Prompt Input"
+                  content={selectedRun.prompt_input || 'No input available'}
+                />
                 
-                {/* Prompt Output */}
-                <div className="space-y-2">
-                  <h3 className="text-lg font-medium">Prompt Output</h3>
-                  <pre className="bg-slate-100 p-4 rounded overflow-auto max-h-60 text-sm whitespace-pre-wrap break-words">
-                    {selectedRun.prompt_output || 'No output available'}
-                  </pre>
-                </div>
+                <PromptSection 
+                  title="Prompt Output"
+                  content={selectedRun.prompt_output || 'No output available'}
+                />
                 
-                {/* Error Message (if any) */}
                 {selectedRun.error_message && (
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-medium text-red-500">Error</h3>
-                    <pre className="bg-red-50 p-4 rounded overflow-auto max-h-60 text-sm text-red-500 whitespace-pre-wrap break-words">
-                      {selectedRun.error_message}
-                    </pre>
-                  </div>
+                  <PromptSection 
+                    title="Error"
+                    content={selectedRun.error_message}
+                    isError={true}
+                  />
                 )}
               </div>
             </>

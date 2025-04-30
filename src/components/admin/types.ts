@@ -20,6 +20,19 @@ export interface ActionRecord {
   prompt_run_id?: string | null;
   reviewed?: boolean;
   approver_name?: string | null;
+  // Include recipient and sender for nested objects from database joins
+  recipient?: {
+    id: string;
+    full_name: string;
+    phone_number: string;
+    email: string;
+  } | null;
+  sender?: {
+    id: string;
+    full_name: string;
+    phone_number: string;
+    email: string;
+  } | null;
 }
 
 export interface PromptRun {
