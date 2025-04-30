@@ -1,3 +1,4 @@
+
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
 import { createMCPContext, getDefaultTools, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
@@ -102,6 +103,10 @@ export async function processMCPRequest(
         // Process each tool call
         const extractedToolCalls = extractToolCallsFromOpenAI(message);
         
+        // Remove the assistant message we just added since we'll re-add it properly 
+        // with the tool responses in the correct sequence
+        context.messages.pop();
+        
         for (const call of extractedToolCalls) {
           console.log(`Processing tool call: ${call.name}, id: ${call.id}`);
         
@@ -113,7 +118,7 @@ export async function processMCPRequest(
             }
             
             // If this is a create_action_record call, add the decision if it's missing
-            if (call.name === "create_action_record" && lastToolDecision) {
+            if ((call.name === "create_action_record" || call.name === "generate_action") && lastToolDecision) {
               // Make sure we have the arguments as an object
               if (typeof call.arguments === "string") {
                 try {
@@ -138,7 +143,8 @@ export async function processMCPRequest(
               result: toolResult
             });
             
-            // Add the tool result to the context
+            // Add the tool result to the context properly 
+            // This will add both the assistant tool call and the tool response
             context = addToolResult(context, call.id, call.name, toolResult);
           } 
           catch (toolError) {
@@ -171,6 +177,22 @@ export async function processMCPRequest(
       console.error("Error in MCP iteration:", error);
       finalAnswer = `Error during MCP processing: ${error.message}`;
       break;
+    }
+    
+    // Validate context structure to ensure it's valid
+    for (let i = 0; i < context.messages.length; i++) {
+      const message = context.messages[i];
+      if (message.role === "assistant" && message.tool_calls) {
+        // Check if each tool call has a corresponding tool response
+        for (const toolCall of message.tool_calls) {
+          const hasResponse = context.messages.some(
+            m => m.role === "tool" && m.tool_call_id === toolCall.id
+          );
+          if (!hasResponse) {
+            console.error(`Missing tool response for tool_call_id: ${toolCall.id}`);
+          }
+        }
+      }
     }
     
     // Safety mechanism to prevent infinite loops

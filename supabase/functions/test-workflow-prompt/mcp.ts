@@ -21,26 +21,43 @@ export function addToolResult(context: any, toolId: string, toolName: string, re
   // Format result to string if needed
   const resultString = typeof result === 'string' ? result : JSON.stringify(result);
   
-  // Add the tool result as a new message to the context
-  context.messages.push({
-    role: 'assistant',
-    tool_calls: [
-      {
-        id: toolId,
-        type: 'function',
-        function: {
-          name: toolName,
-          arguments: JSON.stringify({}),  // This is ignored, but needed for the format
+  // Find if this assistant message already exists in the context
+  let assistantMessageIndex = context.messages.findIndex(m => 
+    m.role === 'assistant' && 
+    m.tool_calls && 
+    m.tool_calls.some(tc => tc.id === toolId)
+  );
+
+  if (assistantMessageIndex !== -1) {
+    // The assistant message already exists, so we should just add the tool response
+    context.messages.push({
+      role: 'tool',
+      tool_call_id: toolId,
+      content: resultString
+    });
+  } else {
+    // Add the tool call as a new message to the context
+    context.messages.push({
+      role: 'assistant',
+      tool_calls: [
+        {
+          id: toolId,
+          type: 'function',
+          function: {
+            name: toolName,
+            arguments: JSON.stringify({}),  // This is ignored, but needed for the format
+          }
         }
-      }
-    ]
-  });
-  
-  context.messages.push({
-    role: 'tool',
-    tool_call_id: toolId,
-    content: resultString
-  });
+      ]
+    });
+    
+    // Add the corresponding tool response message immediately after
+    context.messages.push({
+      role: 'tool',
+      tool_call_id: toolId,
+      content: resultString
+    });
+  }
   
   return context;
 }
@@ -133,6 +150,36 @@ export function getDefaultTools() {
             }
           },
           required: ["action_type", "description"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "generate_action",
+        description: "Creates a specific action for team members to execute based on the project's needs. Only use after detect_action confirms ACTION_NEEDED.",
+        parameters: {
+          type: "object",
+          properties: {
+            action_type: {
+              type: "string",
+              enum: ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query"],
+              description: "The type of action to be taken"
+            },
+            description: {
+              type: "string",
+              description: "Detailed description of what needs to be done"
+            },
+            recipient_role: {
+              type: "string",
+              description: "Who should receive this action"
+            },
+            message_text: {
+              type: "string",
+              description: "For message actions, the content of the message"
+            }
+          },
+          required: ["action_type", "description", "recipient_role"]
         }
       }
     }
