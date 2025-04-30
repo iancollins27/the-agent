@@ -13,6 +13,7 @@ import {
 import { queryKnowledgeBase, formatKnowledgeResults } from "../knowledge-service.ts";
 import { createHumanReviewRequest } from "../human-service.ts";
 import { logToolCall, updatePromptRunMetrics } from "../database/tool-logs.ts";
+import { getLatestWorkflowPrompt } from "../services/workflowPromptService.ts";
 
 const startTimer = () => {
   return Date.now();
@@ -101,14 +102,41 @@ async function handleMCPResponse(
   
   const modelToUse = aiProvider === "claude" ? "claude-3-5-haiku-20241022" : aiModel;
   
-  const systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
+  // Get the MCP orchestrator prompt from the database
+  let systemPrompt = "You are an AI assistant that processes project information and helps determine appropriate actions. Use the available tools to analyze the context and suggest actions.";
   
-  // Create MCP context with tools
-  console.log("Creating MCP context with tools");
+  try {
+    // Fetch the latest MCP orchestrator prompt
+    const { getLatestWorkflowPrompt } = await import("../../comms-business-logic/services/workflowPromptService.ts");
+    const orchestratorPrompt = await getLatestWorkflowPrompt(supabase, "mcp_orchestrator");
+    
+    if (orchestratorPrompt && orchestratorPrompt.prompt_text) {
+      console.log("Found MCP orchestrator prompt in the database");
+      systemPrompt = orchestratorPrompt.prompt_text;
+    } else {
+      console.log("No MCP orchestrator prompt found, using default");
+    }
+  } catch (error) {
+    console.error("Error fetching MCP orchestrator prompt:", error);
+    // Continue with default prompt
+  }
+  
+  // Create MCP context with enhanced system prompt and tools
+  console.log("Creating MCP context with tools and orchestrator prompt");
   let mcpContext: MCPContext = createMCPContext(systemPrompt, finalPrompt, getDefaultTools());
   
   // Keep track of original prompt for display in UI
   const originalPrompt = finalPrompt;
+  
+  // Add workflow context to the MCP context if available
+  if (contextData) {
+    // Add additional context as a system message for better orchestration
+    const contextMessage = {
+      role: 'system' as const,
+      content: `Current project context:\n${JSON.stringify(contextData, null, 2)}`
+    };
+    mcpContext.messages.splice(1, 0, contextMessage); // Insert after system prompt, before user message
+  }
   
   // Start the timer for performance measurement
   const callStartTime = startTimer();

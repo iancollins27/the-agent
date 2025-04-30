@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -12,22 +12,52 @@ import { formatDistanceToNow, format } from 'date-fns';
 import ExecutionViewSkeleton from './ExecutionViewSkeleton';
 import ExecutionToolCall from './ExecutionToolCall';
 import PromptSection from '../prompt-details/PromptSection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, Info, Tool } from 'lucide-react';
+
+// Tab components
+import PromptInput from './tabs/PromptInput';
+import PromptOutput from './tabs/PromptOutput';
+import ToolLogs from './tabs/ToolLogs';
+import ProjectContext from './tabs/ProjectContext';
+
+interface ExecutionViewProps {
+  promptRun: PromptRun;
+  toolLogs: ToolLog[];
+  project: any;
+}
 
 const ExecutionView: React.FC = () => {
   const { executionId } = useParams();
   const navigate = useNavigate();
-  const [expandedToolId, setExpandedToolId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('prompt-input');
   
   // Fetch the prompt run and its tool logs
   const { data, isLoading, error } = useQuery({
-    queryKey: ['executionDetail', executionId],
+    queryKey: ['execution', executionId],
     queryFn: async () => {
       if (!executionId) return null;
       
       // Fetch the prompt run
       const { data: promptRun, error: promptRunError } = await supabase
         .from('prompt_runs')
-        .select('*')
+        .select(`
+          id,
+          created_at,
+          status,
+          ai_provider,
+          ai_model,
+          prompt_input,
+          prompt_output,
+          error_message,
+          prompt_tokens,
+          completion_tokens,
+          usd_cost,
+          workflow_prompt_id,
+          project_id,
+          workflow_prompts(type)
+        `)
         .eq('id', executionId)
         .single();
         
@@ -40,147 +70,176 @@ const ExecutionView: React.FC = () => {
         .eq('prompt_run_id', executionId)
         .order('created_at', { ascending: true });
         
-      if (toolLogsError) throw toolLogsError;
+      if (toolLogsError) console.error("Error fetching tool logs:", toolLogsError);
       
-      // Format the data
-      const formattedRun: PromptRun = {
-        ...promptRun,
-        relative_time: formatDistanceToNow(new Date(promptRun.created_at), { addSuffix: true })
-      };
-      
-      // Add sequence numbers to tool logs
-      const formattedToolLogs: ToolLog[] = toolLogs.map((log, index) => ({
-        ...log,
-        sequence: index + 1,
-        // Attempt to parse the output trim (which is often JSON)
-        output: (() => {
-          try {
-            return JSON.parse(log.output_trim);
-          } catch (e) {
-            return log.output_trim;
-          }
-        })()
-      }));
+      // Get project details if available
+      let project = null;
+      if (promptRun.project_id) {
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select(`
+            id,
+            summary,
+            next_step,
+            project_track,
+            Address,
+            crm_id
+          `)
+          .eq('id', promptRun.project_id)
+          .single();
+          
+        if (!projectError) project = projectData;
+        else console.error("Error fetching project:", projectError);
+      }
       
       return {
-        promptRun: formattedRun,
-        toolLogs: formattedToolLogs
+        promptRun,
+        toolLogs: toolLogs || [],
+        project
       };
-    }
+    },
+    enabled: !!executionId,
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
   
-  // Handle back navigation
-  const handleBack = () => {
-    navigate('/admin/executions');
-  };
+  const isMCPExecution = (data?.toolLogs?.length || 0) > 0;
   
-  // Toggle tool call expansion
-  const toggleToolExpand = (toolId: string) => {
-    if (expandedToolId === toolId) {
-      setExpandedToolId(null);
-    } else {
-      setExpandedToolId(toolId);
-    }
-  };
-  
-  if (isLoading) return <ExecutionViewSkeleton />;
-  
-  if (error || !data) {
+  if (isLoading) {
     return (
-      <Card className="max-w-4xl mx-auto my-6">
-        <CardContent className="pt-6">
-          <div className="text-center py-8">
-            <h3 className="text-lg font-medium text-gray-900">Error Loading Execution</h3>
-            <p className="mt-2 text-sm text-gray-500">
-              There was an error loading the execution details.
-            </p>
-            <Button onClick={handleBack} className="mt-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Executions
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-center items-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading execution data...</span>
+      </div>
     );
   }
   
-  const { promptRun, toolLogs } = data;
+  if (error) {
+    return (
+      <Alert variant="destructive" className="mx-auto max-w-3xl mt-8">
+        <AlertTitle>Error Loading Execution</AlertTitle>
+        <AlertDescription>
+          There was a problem loading the execution data: {error.message}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (!data) {
+    return (
+      <Alert className="mx-auto max-w-3xl mt-8">
+        <Info className="h-5 w-5" />
+        <AlertTitle>No Data Found</AlertTitle>
+        <AlertDescription>
+          No execution found with the ID: {executionId}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  const { promptRun, toolLogs, project } = data;
+  
+  // Format timestamps for better readability
+  const formattedCreatedAt = new Date(promptRun.created_at).toLocaleString();
+  const workflowType = promptRun.workflow_prompts?.type || 'Unknown';
+  const modelName = promptRun.ai_model || 'Unknown Model';
   
   return (
-    <div className="max-w-4xl mx-auto my-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={handleBack}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Executions
-        </Button>
-        
-        <div className="flex items-center space-x-2">
-          <Clock className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-500">
-            {format(new Date(promptRun.created_at), 'PPpp')}
-          </span>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Execution Details</h1>
+          <p className="text-muted-foreground">
+            {formattedCreatedAt} • {workflowType} • {modelName}
+          </p>
         </div>
+        
+        {isMCPExecution && (
+          <div className="flex items-center bg-blue-50 text-blue-800 px-3 py-1 rounded-md">
+            <Tool className="h-4 w-4 mr-1" />
+            <span className="font-medium">MCP Execution</span>
+            <span className="ml-2 text-blue-600 text-xs bg-blue-100 px-2 py-0.5 rounded-full">
+              {toolLogs.length} Tool Calls
+            </span>
+          </div>
+        )}
       </div>
       
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+      {project && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center">
+              Project Context
+              <span className="text-xs text-gray-500 ml-2 font-normal">
+                (ID: {project.id})
+              </span>
+            </CardTitle>
+            <CardDescription>
+              {project.Address || 'No address available'}
+              {project.crm_id && ` • CRM ID: ${project.crm_id}`}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-4">
+          <TabsTrigger value="prompt-input">Input</TabsTrigger>
+          <TabsTrigger value="prompt-output">Output</TabsTrigger>
+          <TabsTrigger value="tool-logs" disabled={!isMCPExecution}>
+            Tool Logs ({toolLogs.length})
+          </TabsTrigger>
+          <TabsTrigger value="project-context">Context</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="prompt-input" className="mt-4">
+          <PromptInput promptRun={promptRun} />
+        </TabsContent>
+        
+        <TabsContent value="prompt-output" className="mt-4">
+          <PromptOutput promptRun={promptRun} />
+        </TabsContent>
+        
+        <TabsContent value="tool-logs" className="mt-4">
+          <ToolLogs toolLogs={toolLogs} />
+        </TabsContent>
+        
+        <TabsContent value="project-context" className="mt-4">
+          <ProjectContext project={project} />
+        </TabsContent>
+      </Tabs>
+      
+      <Card className="bg-muted/40">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <CardTitle>{promptRun.project_name || 'Unnamed Project'}</CardTitle>
-              <CardDescription>
-                {promptRun.project_address && (
-                  <span className="block">{promptRun.project_address}</span>
-                )}
-                <span>{promptRun.ai_provider} • {promptRun.ai_model}</span>
-              </CardDescription>
+              <div className="text-muted-foreground">Provider</div>
+              <div className="font-medium">{promptRun.ai_provider || 'Unknown'}</div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {promptRun.workflow_type && (
-                <Badge variant="outline">{promptRun.workflow_type}</Badge>
-              )}
-              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                {toolLogs.length} Tool Calls
-              </Badge>
+            <div>
+              <div className="text-muted-foreground">Model</div>
+              <div className="font-medium">{promptRun.ai_model || 'Unknown'}</div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {/* Initial Prompt */}
-            <div className="border rounded-md p-4 bg-slate-50">
-              <h3 className="text-sm font-medium mb-2 flex items-center">
-                <Badge variant="secondary" className="mr-2">PROMPT</Badge>
-                Initial Input
-              </h3>
-              <pre className="text-sm whitespace-pre-wrap text-gray-700">{promptRun.prompt_input}</pre>
+            <div>
+              <div className="text-muted-foreground">Status</div>
+              <div className="font-medium capitalize">{promptRun.status.toLowerCase()}</div>
             </div>
-            
-            {/* Tool Calls Timeline */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Execution Steps</h3>
-              
-              <div className="space-y-3">
-                {toolLogs.map((toolLog) => (
-                  <ExecutionToolCall 
-                    key={toolLog.id}
-                    toolLog={toolLog}
-                    isExpanded={expandedToolId === toolLog.id}
-                    onToggle={() => toggleToolExpand(toolLog.id)}
-                  />
-                ))}
+            <div>
+              <div className="text-muted-foreground">Cost</div>
+              <div className="font-medium">
+                ${typeof promptRun.usd_cost === 'number' 
+                  ? promptRun.usd_cost.toFixed(4) 
+                  : parseFloat(promptRun.usd_cost || '0').toFixed(4)}
               </div>
-            </div>
-            
-            {/* Final Result */}
-            <div className="border-t pt-4 mt-6">
-              <h3 className="text-lg font-medium mb-4">Final Result</h3>
-              <PromptSection 
-                title="Response"
-                content={promptRun.prompt_output || 'No response data available'}
-              />
             </div>
           </div>
         </CardContent>
+        <div className="border-t bg-muted/20 px-6 py-3">
+          <div className="flex justify-between w-full text-xs text-muted-foreground">
+            <div>Prompt Tokens: {promptRun.prompt_tokens || 'Unknown'}</div>
+            <div>Completion Tokens: {promptRun.completion_tokens || 'Unknown'}</div>
+            <div>Execution ID: {promptRun.id?.slice(0, 8)}</div>
+          </div>
+        </div>
       </Card>
     </div>
   );

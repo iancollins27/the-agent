@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Table, 
@@ -119,6 +118,30 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
     }
   };
 
+  // Find where workflow_prompt_type is referenced and replace with workflow_type
+  // Update the getBadgeVariant function if it exists to handle the new type
+  const getBadgeVariant = (type?: string) => {
+    switch (type) {
+      case 'summary_generation':
+        return 'default';
+      case 'summary_update':
+        return 'secondary';
+      case 'action_detection':
+      case 'action_detection_execution':
+        return 'outline';
+      case 'action_execution':
+        return 'destructive';
+      case 'multi_project_analysis':
+        return 'warning';
+      case 'multi_project_message_generation':
+        return 'success';
+      case 'mcp_orchestrator':
+        return 'blue';
+      default:
+        return 'outline';
+    }
+  };
+
   // Filter runs based only on the reviewFilter prop, ignore hideReviewed
   // The parent component should now handle filtering by reviewed status
   const filteredPromptRuns = promptRuns.filter(run => {
@@ -154,68 +177,71 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
             </TableCell>
           </TableRow>
         ) : (
-          filteredPromptRuns.map((run) => (
-            <TableRow key={run.id}>
-              <TableCell>{run.project_address || 'N/A'}</TableCell>
-              <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
-              <TableCell>
-                {run.workflow_prompt_type ? (
-                  <div className="flex items-center">
-                    <FileText className="h-4 w-4 mr-1 text-blue-500" />
-                    <span>{run.workflow_prompt_type}</span>
-                  </div>
-                ) : (
-                  'N/A'
-                )}
-              </TableCell>
-              <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
-              <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
-              <TableCell>{renderStars(run)}</TableCell>
-              <TableCell className="text-right space-x-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => onViewDetails(run)}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
-                
-                {run.project_crm_url && (
+          filteredPromptRuns.map((run) => {
+            const workflowType = run.workflow_type || workflowTitles[(run.workflow_prompts?.type as WorkflowType) || 'action_detection_execution'];
+            return (
+              <TableRow key={run.id}>
+                <TableCell>{run.project_address || 'N/A'}</TableCell>
+                <TableCell className="max-w-[300px] truncate">{run.project_next_step || 'No next step defined'}</TableCell>
+                <TableCell>
+                  {workflowType ? (
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-1 text-blue-500" />
+                      <span>{workflowType}</span>
+                    </div>
+                  ) : (
+                    'N/A'
+                  )}
+                </TableCell>
+                <TableCell>{run.project_roofer_contact || 'No roofer assigned'}</TableCell>
+                <TableCell>{formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</TableCell>
+                <TableCell>{renderStars(run)}</TableCell>
+                <TableCell className="text-right space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => onViewDetails(run)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                  
+                  {run.project_crm_url && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(run.project_crm_url, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      CRM
+                    </Button>
+                  )}
+                  
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(run.project_crm_url, '_blank')}
+                    className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
+                    onClick={() => handleMarkAsReviewed(run)}
+                    disabled={run.reviewed}
                   >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    CRM
+                    <CheckSquare className="h-4 w-4 mr-1" />
+                    {run.reviewed ? "Reviewed" : "Mark Reviewed"}
                   </Button>
-                )}
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-                  onClick={() => handleMarkAsReviewed(run)}
-                  disabled={run.reviewed}
-                >
-                  <CheckSquare className="h-4 w-4 mr-1" />
-                  {run.reviewed ? "Reviewed" : "Mark Reviewed"}
-                </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-                  onClick={() => handleRerunPrompt(run)}
-                  disabled={rerunningPrompts[run.id]}
-                >
-                  <RefreshCw className={`h-4 w-4 mr-1 ${rerunningPrompts[run.id] ? 'animate-spin' : ''}`} />
-                  {rerunningPrompts[run.id] ? "Running..." : "Re-run"}
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                    onClick={() => handleRerunPrompt(run)}
+                    disabled={rerunningPrompts[run.id]}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${rerunningPrompts[run.id] ? 'animate-spin' : ''}`} />
+                    {rerunningPrompts[run.id] ? "Running..." : "Re-run"}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })
         )}
       </TableBody>
     </Table>

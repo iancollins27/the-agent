@@ -50,7 +50,6 @@ export interface PromptRun {
   reviewed?: boolean;
   project_id?: string;
   workflow_prompt_id?: string;
-  workflow_prompt_type?: string | null;
   
   // Project related data
   project_name?: string;
@@ -64,6 +63,11 @@ export interface PromptRun {
   relative_time?: string;
   workflow_type?: string | null;
   tool_logs_count?: number;
+  
+  // Tokens and cost
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  usd_cost?: number | string;
   
   // Alternate field names that might be used in some components
   prompt_text?: string;
@@ -89,4 +93,5 @@ export interface ToolLog {
 export interface ExecutionView {
   promptRun: PromptRun;
   toolLogs: ToolLog[];
+  project?: any;
 }
