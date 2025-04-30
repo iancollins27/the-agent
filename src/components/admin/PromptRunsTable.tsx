@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, ThumbsUp, ThumbsDown, Star, RotateCw } from 'lucide-react';
@@ -134,9 +135,8 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
             </TableCell>
             <TableCell>
               <PromptRunRating
-                promptRunId={run.id}
                 rating={run.feedback_rating}
-                onChange={(rating) => onRatingChange(run.id, rating)}
+                onRatingChange={(rating) => onRatingChange(run.id, rating)}
               />
             </TableCell>
             <TableCell className="text-right space-x-1">
