@@ -47,3 +47,26 @@ export async function createHumanReviewRequest(
     return null;
   }
 }
+
+/**
+ * Alias for createHumanReviewRequest to maintain compatibility with code expecting requestHumanReview
+ */
+export async function requestHumanReview(
+  supabase: any,
+  projectId: string,
+  promptRunId: string,
+  reason: string,
+  context: string
+): Promise<{id: string | null}> {
+  const id = await createHumanReviewRequest(
+    supabase,
+    projectId,
+    promptRunId,
+    {
+      reason,
+      context
+    }
+  );
+  
+  return { id };
+}
