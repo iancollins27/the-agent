@@ -1,3 +1,4 @@
+
 import { searchKnowledgeBase } from "../knowledge-service.ts";
 import { requestHumanReview } from "../human-service.ts";
 import { createActionRecord, createReminder } from "../database/actions.ts";
@@ -69,6 +70,29 @@ export async function handleAIResponse(
     }
   } catch (error) {
     console.error("Error handling AI response:", error);
+    
+    // Try to request human review if there was an error
+    try {
+      if (projectId && promptRunId) {
+        const humanReviewResult = await requestHumanReview(
+          supabase,
+          projectId, 
+          promptRunId,
+          "Error during AI processing",
+          error.message || "Unknown error occurred during AI processing"
+        );
+        
+        if (humanReviewResult && humanReviewResult.id) {
+          return { 
+            result: `An error occurred: ${error.message || "Unknown error"}. A human review has been requested.`,
+            humanReviewRequestId: humanReviewResult.id
+          };
+        }
+      }
+    } catch (reviewError) {
+      console.error("Error requesting human review:", reviewError);
+    }
+    
     return { 
       result: `Error: ${error.message || "Unknown error occurred"}` 
     };
@@ -102,6 +126,7 @@ async function processToolOutputs(
   
   let errorFound = false;
   let errorMessage = "";
+  let detectedDecision = null;
   
   for (const toolOutput of toolOutputs) {
     const { tool, args, result: toolResult } = toolOutput;
@@ -116,6 +141,7 @@ async function processToolOutputs(
     
     if (tool === "detect_action") {
       console.log(`Detected action decision: ${toolResult.decision}`);
+      detectedDecision = toolResult.decision;
       
       if (toolResult.status === "error") {
         errorFound = true;
@@ -133,6 +159,13 @@ async function processToolOutputs(
     }
     else if (tool === "create_action_record" || tool === "generate_action") {
       console.log(`Action record created: ${JSON.stringify(toolResult)}`);
+      
+      // Make sure create_action_record has the decision from detect_action
+      if (!args.decision && detectedDecision) {
+        console.log(`Adding missing decision to action: ${detectedDecision}`);
+        // Update the args with the detected decision
+        toolOutput.args.decision = detectedDecision;
+      }
       
       if (toolResult.status === "error") {
         errorFound = true;

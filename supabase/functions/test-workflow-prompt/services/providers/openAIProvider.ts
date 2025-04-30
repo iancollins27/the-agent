@@ -1,7 +1,7 @@
-
 import { logPromptRun, updatePromptRunWithResult } from "../../database/prompt-runs.ts";
 import { createMCPContext, getDefaultTools, addToolResult, extractToolCallsFromOpenAI } from "../../mcp.ts";
 import { logToolCall, updatePromptRunMetrics } from "../../database/tool-logs.ts";
+import { requestHumanReview } from "../../human-service.ts";
 
 export async function processOpenAIRequest(
   prompt: string,
@@ -103,6 +103,7 @@ async function handleMCPRequest(
   let toolOutputs: any[] = [];
   const MAX_ITERATIONS = 5; // Prevent infinite loops
   let iterationCount = 0;
+  let lastToolDecision = null; // Track the last decision from detect_action tool
   
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
@@ -171,6 +172,29 @@ async function handleMCPRequest(
           console.log(`Processing tool call: ${call.name}, id: ${call.id}`);
         
           try {
+            // If this is a detect_action call, store the decision
+            if (call.name === "detect_action" && call.arguments && call.arguments.decision) {
+              lastToolDecision = call.arguments.decision;
+              console.log(`Detected action decision: ${lastToolDecision}`);
+            }
+            
+            // If this is a create_action_record call, add the decision if it's missing
+            if (call.name === "create_action_record" && lastToolDecision) {
+              // Make sure we have the arguments as an object
+              if (typeof call.arguments === "string") {
+                try {
+                  call.arguments = JSON.parse(call.arguments);
+                } catch (e) {
+                  // If parsing fails, keep it as is
+                }
+              }
+              
+              // Add the decision if it's an object and missing the decision
+              if (typeof call.arguments === "object" && !call.arguments.decision) {
+                call.arguments.decision = lastToolDecision;
+              }
+            }
+            
             const toolResult = await processToolCall(supabase, call.name, call.arguments, promptRunId, projectId);
             
             // Store the tool output for later processing
@@ -180,38 +204,26 @@ async function handleMCPRequest(
               result: toolResult
             });
             
-            // Add the tool result as a separate message
-            context.messages.push({
-              role: "tool",
-              tool_call_id: call.id,
-              name: call.name,
-              content: JSON.stringify(toolResult)
-            });
+            // Add the tool result to the context
+            context = addToolResult(context, call.id, call.name, toolResult);
           } 
           catch (toolError) {
             console.error(`Error executing tool ${call.name}: ${toolError}`);
             
-            // Add error result as a tool response
-            context.messages.push({
-              role: "tool",
-              tool_call_id: call.id,
-              name: call.name,
-              content: JSON.stringify({ 
-                status: "error", 
-                error: toolError.message || "Unknown tool execution error",
-                message: `Tool execution failed: ${toolError.message || "Unknown error"}`
-              })
-            });
+            // Add error result using the addToolResult function to maintain proper context
+            const errorResult = { 
+              status: "error", 
+              error: toolError.message || "Unknown tool execution error",
+              message: `Tool execution failed: ${toolError.message || "Unknown error"}`
+            };
+            
+            context = addToolResult(context, call.id, call.name, errorResult);
             
             // Store the error in tool outputs
             toolOutputs.push({
               tool: call.name,
               args: call.arguments,
-              result: { 
-                status: "error", 
-                error: toolError.message || "Unknown tool execution error",
-                message: `Tool execution failed: ${toolError.message || "Unknown error"}`
-              }
+              result: errorResult
             });
           }
         }
@@ -268,7 +280,7 @@ async function processToolCall(supabase: any, toolName: string, args: any, promp
         result = { 
           decision: args.decision,
           reason: args.reason,
-          priority: args.priority,
+          priority: args.priority || "medium",
           reminderSet: args.decision === "SET_FUTURE_REMINDER",
           reminderDays: args.days_until_check, 
           status: "success"
@@ -277,8 +289,15 @@ async function processToolCall(supabase: any, toolName: string, args: any, promp
         
       case "create_action_record":
       case "generate_action":
-        // Create an action record
-        result = await createActionRecord(supabase, promptRunId, projectId, args);
+        // Make sure decision is included from detect_action call
+        if (args.decision) {
+          // Create an action record with the decision
+          result = await createActionRecord(supabase, promptRunId, projectId, args);
+        } else {
+          console.warn("Missing decision in create_action_record call");
+          // Attempt to call createActionRecord anyway, the function should handle missing decision
+          result = await createActionRecord(supabase, promptRunId, projectId, args);
+        }
         break;
         
       case "knowledge_base_lookup":

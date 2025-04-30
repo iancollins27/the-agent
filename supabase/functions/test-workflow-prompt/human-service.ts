@@ -1,72 +1,81 @@
 
-// Human-in-the-loop service for MCP handling
-
 /**
- * Creates a human review request
- * 
- * @param supabase Supabase client
- * @param projectId Project ID
- * @param promptRunId Prompt run ID that triggered the review
- * @param data Review request data
- * @returns ID of created human review request
+ * Human-in-the-loop service
+ * Handles requesting human reviews and escalations
  */
-export async function createHumanReviewRequest(
-  supabase: any,
-  projectId: string,
-  promptRunId: string,
-  data: {
-    reason: string;
-    context: string;
-    question?: string;
-  }
-): Promise<string | null> {
-  try {
-    console.log(`Creating human review request for project ${projectId}`);
-    
-    const { data: result, error } = await supabase
-      .from('human_review_requests')
-      .insert({
-        project_id: projectId,
-        prompt_run_id: promptRunId,
-        review_reason: data.reason,
-        context_data: data.context,
-        question: data.question,
-        status: 'pending'
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      console.error("Error creating human review request:", error);
-      return null;
-    }
-    
-    return result.id;
-  } catch (error) {
-    console.error("Error in createHumanReviewRequest:", error);
-    return null;
-  }
-}
 
-/**
- * Alias for createHumanReviewRequest to maintain compatibility with code expecting requestHumanReview
- */
 export async function requestHumanReview(
   supabase: any,
   projectId: string,
   promptRunId: string,
   reason: string,
-  context: string
-): Promise<{id: string | null}> {
-  const id = await createHumanReviewRequest(
-    supabase,
-    projectId,
-    promptRunId,
-    {
-      reason,
-      context
+  details: string
+): Promise<{ id: string } | null> {
+  try {
+    console.log(`Requesting human review for project ${projectId}`);
+    
+    // Create an action record for the human review
+    const { data, error } = await supabase
+      .from('action_records')
+      .insert({
+        project_id: projectId,
+        prompt_run_id: promptRunId,
+        action_type: 'human_in_loop',
+        status: 'pending',
+        requires_approval: true,
+        message: details,
+        action_payload: {
+          reason: reason,
+          details: details,
+          requested_at: new Date().toISOString(),
+          prompt_run_id: promptRunId
+        }
+      })
+      .select('id')
+      .single();
+    
+    if (error) {
+      console.error("Error creating human review action:", error);
+      throw error;
     }
-  );
-  
-  return { id };
+    
+    console.log(`Created human review request with ID: ${data.id}`);
+    return data;
+  } catch (error) {
+    console.error("Error requesting human review:", error);
+    return null;
+  }
+}
+
+export async function resolveHumanReview(
+  supabase: any,
+  actionId: string,
+  resolution: string,
+  comments: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('action_records')
+      .update({
+        status: 'executed',
+        executed_at: new Date().toISOString(),
+        message: comments,
+        action_payload: {
+          resolution: resolution,
+          resolution_comments: comments,
+          resolved_at: new Date().toISOString()
+        }
+      })
+      .eq('id', actionId);
+    
+    if (error) {
+      console.error("Error resolving human review:", error);
+      throw error;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error resolving human review:", error);
+    return false;
+  }
 }

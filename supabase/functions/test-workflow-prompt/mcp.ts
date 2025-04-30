@@ -59,6 +59,34 @@ export function extractToolCallsFromOpenAI(message: any): Array<{id: string, nam
   });
 }
 
+// Extract tool calls from Claude API responses
+export function extractToolCallsFromClaude(data: any): Array<{id: string, name: string, arguments: any}> {
+  if (!data || !data.content || !Array.isArray(data.content)) {
+    console.error("Invalid Claude API response format");
+    return [];
+  }
+  
+  // Find any tool_use blocks in the content
+  const toolUse = data.content.find((item: any) => 
+    item.type === 'tool_use'
+  );
+  
+  if (!toolUse) {
+    return [];
+  }
+  
+  try {
+    return [{
+      id: toolUse.id || `claude-tool-${Date.now()}`,
+      name: toolUse.name,
+      arguments: toolUse.input
+    }];
+  } catch (e) {
+    console.error("Error extracting Claude tool call:", e);
+    return [];
+  }
+}
+
 // Add a tool result back to the MCP context
 export function addToolResult(context: MCPContext, toolCallId: string, toolName: string, result: any): MCPContext {
   // Create a copy of the context
@@ -67,14 +95,17 @@ export function addToolResult(context: MCPContext, toolCallId: string, toolName:
     tools: [...context.tools]
   };
 
-  // First, add the assistant's message with the tool call if it doesn't exist yet
-  const hasAssistantMessage = updatedContext.messages.some(msg => 
-    msg.role === 'assistant' && 
-    msg.tool_calls && 
-    msg.tool_calls.some((call: any) => call.id === toolCallId)
+  // Find the last assistant message to see if it contains the tool call
+  const lastAssistantMessageIndex = updatedContext.messages.findLastIndex(msg => 
+    msg.role === 'assistant'
   );
 
-  if (!hasAssistantMessage) {
+  // Check if we need to add an assistant message with the tool call
+  const hasToolCall = lastAssistantMessageIndex >= 0 && 
+    updatedContext.messages[lastAssistantMessageIndex].tool_calls && 
+    updatedContext.messages[lastAssistantMessageIndex].tool_calls.some((call: any) => call.id === toolCallId);
+  
+  if (!hasToolCall) {
     // We need to add a proper assistant message with the tool call before adding the tool response
     updatedContext.messages.push({
       role: "assistant",
@@ -168,6 +199,10 @@ export function getDefaultTools(): any[] {
             message_text: {
               type: "string",
               description: "Text content of message if this is a communication action"
+            },
+            decision: {
+              type: "string",
+              description: "The decision that led to this action (ACTION_NEEDED, etc)"
             }
           },
           required: ["action_type", "description", "recipient", "sender"]

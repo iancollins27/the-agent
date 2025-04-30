@@ -31,12 +31,19 @@ export async function createActionRecord(
       return { status: "error", error: "Missing actionData" };
     }
     
-    // Parse the decision and other data from the AI response
-    const decision = actionData.decision;
+    // Parse the decision from the AI response
+    // If decision wasn't explicitly provided, default to ACTION_NEEDED since this is the create_action_record tool
+    const decision = actionData.decision || "ACTION_NEEDED";
     
     // Only create an action record if the decision is ACTION_NEEDED
-    if (decision === "ACTION_NEEDED") {
-      return await handleActionNeeded(supabase, promptRunId, projectId, actionData);
+    if (decision === "ACTION_NEEDED" || !decision) {
+      // Prepare data for action creation
+      const actionRequest = {
+        ...actionData,
+        decision: "ACTION_NEEDED" // Ensure decision is properly set
+      };
+      
+      return await handleActionNeeded(supabase, promptRunId, projectId, actionRequest);
     } 
     // Handle SET_FUTURE_REMINDER action type specially
     else if (decision === "SET_FUTURE_REMINDER" || actionData.action_type === "set_future_reminder") {
