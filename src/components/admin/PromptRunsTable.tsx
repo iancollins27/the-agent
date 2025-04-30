@@ -78,10 +78,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       <TableHeader>
         <TableRow>
           <TableHead>Time</TableHead>
-          <TableHead>Type</TableHead>
           <TableHead>Project</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Rating</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -100,13 +97,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                   {formatRelativeTime(run.created_at)}
                 </span>
               </div>
-            </TableCell>
-            <TableCell>
-              {run.workflow_prompt_type && (
-                <Badge variant="outline" className="capitalize">
-                  {(run.workflow_prompt_type as WorkflowType).replace(/_/g, ' ')}
-                </Badge>
-              )}
             </TableCell>
             <TableCell>
               {run.project_name ? (
@@ -130,44 +120,33 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 <span className="text-muted-foreground italic">No project</span>
               )}
             </TableCell>
-            <TableCell>
-              <PromptRunStatusBadge status={run.status} />
-            </TableCell>
-            <TableCell>
-              <PromptRunRating
-                rating={run.feedback_rating}
-                onRatingChange={(rating) => onRatingChange(run.id, rating)}
-              />
-            </TableCell>
-            <TableCell className="text-right space-x-1">
-              {reviewFilter === 'not-reviewed' && !run.reviewed && (
+            <TableCell className="text-right space-x-2">
+              {!run.reviewed && (
                 <Button
                   onClick={() => handleMarkReviewed(run.id)}
                   size="sm"
-                  variant="ghost"
+                  variant="outline"
                 >
                   <Star className="h-4 w-4 mr-1" />
-                  <span className="sr-only">Mark as reviewed</span>
+                  Mark as reviewed
                 </Button>
               )}
               <Button
                 onClick={() => onViewDetails(run)}
                 size="sm"
-                variant="ghost"
-                className="hover:bg-muted"
+                variant="outline"
               >
                 <Eye className="h-4 w-4 mr-1" />
-                <span className="sr-only">View details</span>
+                View details
               </Button>
               <Button
                 onClick={() => handleRerunPrompt(run.id)}
                 size="sm"
-                variant="ghost"
-                className="hover:bg-muted"
+                variant="outline"
                 title="Rerun prompt"
               >
                 <RotateCw className="h-4 w-4 mr-1" />
-                <span className="sr-only">Rerun prompt</span>
+                Rerun
               </Button>
             </TableCell>
           </TableRow>
