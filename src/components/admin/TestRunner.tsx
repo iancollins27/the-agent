@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { WorkflowType } from "@/types/workflow";
+import { WorkflowType } from "@/types/workflow"; // Import from the shared type definition
 
 type TestRunnerProps = {
   selectedPromptIds: string[];
@@ -35,7 +35,7 @@ const TestRunner = ({
       .select('type')
       .in('id', promptIds);
       
-    return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
+    return data?.some(prompt => prompt.type === 'mcp_orchestrator' as WorkflowType) || false;
   };
   
   const runTest = async () => {

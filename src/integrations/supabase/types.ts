@@ -1182,6 +1182,7 @@ export type Database = {
         | "action_detection_execution"
         | "multi_project_analysis"
         | "multi_project_message_generation"
+        | "mcp_orchestrator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1308,6 +1309,7 @@ export const Constants = {
         "action_detection_execution",
         "multi_project_analysis",
         "multi_project_message_generation",
+        "mcp_orchestrator",
       ],
     },
   },

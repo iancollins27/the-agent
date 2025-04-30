@@ -13,15 +13,31 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
   const isMCPExecution = promptRun.toolLogsCount ? 
     promptRun.toolLogsCount > 0 : // Use the property if it exists
     Array.isArray(promptRun.toolLogs) && promptRun.toolLogs.length > 0; // Fallback to checking toolLogs array
+
+  const toolsUsed = promptRun.toolLogs?.map(log => log.tool_name).filter((value, index, self) => 
+    self.indexOf(value) === index
+  ) || [];
   
   return (
     <Card className="border border-muted">
       {isMCPExecution && (
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center">
-            <Tool className="h-4 w-4 mr-2 text-blue-500" />
-            <span>Model Context Protocol Input</span>
-            <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700">MCP</Badge>
+          <CardTitle className="text-base flex items-center flex-wrap">
+            <div className="flex items-center">
+              <Tool className="h-4 w-4 mr-2 text-blue-500" />
+              <span>Model Context Protocol Input</span>
+              <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700">MCP</Badge>
+            </div>
+            
+            {toolsUsed.length > 0 && (
+              <div className="ml-auto flex flex-wrap gap-1 mt-1 sm:mt-0">
+                {toolsUsed.map(tool => (
+                  <Badge key={tool} variant="secondary" className="text-xs">
+                    {tool}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
       )}
