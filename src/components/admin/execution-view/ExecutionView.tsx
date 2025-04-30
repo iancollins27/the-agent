@@ -207,7 +207,7 @@ const ExecutionView: React.FC = () => {
             <div>
               <div className="text-muted-foreground">Cost</div>
               <div className="font-medium">
-                ${promptRun.usd_cost ? parseFloat(promptRun.usd_cost).toFixed(4) : '0.0000'}
+                ${promptRun.usd_cost ? promptRun.usd_cost.toString() : '0.0000'}
               </div>
             </div>
           </div>
