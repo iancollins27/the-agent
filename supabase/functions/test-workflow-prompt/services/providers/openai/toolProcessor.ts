@@ -3,6 +3,15 @@ import { logToolCall } from "../../../database/tool-logs.ts";
 import { createActionRecord } from "../../../database/actions.ts";
 import { requestHumanReview } from "../../../human-service.ts";
 
+// Define valid action types to match database constraints
+const VALID_ACTION_TYPES = [
+  "message",
+  "data_update", 
+  "set_future_reminder",
+  "human_in_loop",
+  "knowledge_query"
+];
+
 export async function processToolCall(supabase: any, toolName: string, args: any, promptRunId: string, projectId: string) {
   const toolCallId = `call_${Math.random().toString(36).substring(2, 15)}`;
   const startTime = Date.now();
@@ -37,15 +46,47 @@ export async function processToolCall(supabase: any, toolName: string, args: any
         
       case "create_action_record":
       case "generate_action":
-        // Make sure decision is included from detect_action call
-        if (args.decision) {
-          // Create an action record with the decision
-          result = await createActionRecord(supabase, promptRunId, projectId, args);
-        } else {
-          console.warn("Missing decision in create_action_record call");
-          // Attempt to call createActionRecord anyway, the function should handle missing decision
-          result = await createActionRecord(supabase, promptRunId, projectId, args);
+        // Normalize args structure if coming from generate_action
+        const actionData = { ...args };
+        
+        // Handle conversion from generate_action parameters to create_action_record format
+        if (toolName === "generate_action" && actionData.action_type && actionData.recipient_role) {
+          // Map recipient_role to recipient
+          actionData.recipient = actionData.recipient_role;
+          delete actionData.recipient_role;
+          
+          // Add decision if not present
+          if (!actionData.decision) {
+            actionData.decision = "ACTION_NEEDED";
+          }
+          
+          // Make sure action_type is valid
+          if (!VALID_ACTION_TYPES.includes(actionData.action_type)) {
+            // Map common action types to valid ones
+            if (actionData.action_type.toLowerCase().includes("message") || 
+                actionData.action_type.toLowerCase().includes("communication") ||
+                actionData.action_type.toLowerCase().includes("contact") || 
+                actionData.action_type.toLowerCase().includes("schedule")) {
+              actionData.action_type = "message";
+            } else if (actionData.action_type.toLowerCase().includes("reminder")) {
+              actionData.action_type = "set_future_reminder";
+            } else if (actionData.action_type.toLowerCase().includes("update")) {
+              actionData.action_type = "data_update";
+            } else {
+              // Default to message for unknown types
+              actionData.action_type = "message";
+            }
+          }
         }
+        
+        // Make sure decision is included from detect_action call
+        if (!actionData.decision) {
+          console.warn("Missing decision in action record call");
+          actionData.decision = "ACTION_NEEDED"; // Default to ACTION_NEEDED
+        }
+        
+        // Create an action record with the decision
+        result = await createActionRecord(supabase, promptRunId, projectId, actionData);
         break;
         
       case "knowledge_base_lookup":

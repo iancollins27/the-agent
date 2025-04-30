@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { handleMessageAction } from "./messageActionHandler.ts";
 import { handleOtherActionTypes } from "./otherActionHandler.ts";
@@ -13,7 +12,40 @@ export async function handleActionNeeded(
   actionData: any
 ) {
   // Extract action type from response or default to message
-  const actionType = actionData.action_type || "message";
+  let actionType = actionData.action_type || "message";
+  
+  // Normalize action type to match database constraints
+  switch (actionType.toLowerCase()) {
+    case "communication":
+    case "contact":
+    case "schedule":
+    case "schedule site visit":
+    case "send message":
+      actionType = "message";
+      break;
+    case "reminder":
+    case "set reminder":
+      actionType = "set_future_reminder";
+      break;
+    case "update data":
+    case "change data":
+      actionType = "data_update";
+      break;
+    case "human review":
+    case "ask human":
+      actionType = "human_in_loop";
+      break;
+    case "search knowledge":
+    case "query knowledge":
+      actionType = "knowledge_query";
+      break;
+    default:
+      // Keep as is if it already matches a valid type
+      break;
+  }
+
+  // Update the action_type in actionData
+  actionData.action_type = actionType;
   
   console.log("Action type detected:", actionType);
   
