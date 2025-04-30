@@ -1,7 +1,6 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,11 +134,10 @@ Remember:
 - Provide clear reasoning for your decisions`;
       }
 
-      // Use the .insert() method with the explicit type cast
       const { data, error } = await supabase
         .from('workflow_prompts')
         .insert({ 
-          type: promptType as any,  // Use type assertion here
+          type: promptType,
           prompt_text: defaultPromptText
         })
         .select();
@@ -196,6 +194,10 @@ Remember:
     );
   }
 
+  // Filter out the MCP orchestrator prompt from the display, but keep it in the missing prompts list
+  const displayPrompts = prompts?.filter(prompt => prompt.type !== 'mcp_orchestrator');
+  const hasMcpPrompt = prompts?.some(prompt => prompt.type === 'mcp_orchestrator');
+
   return (
     <div className="grid gap-6">
       {missingPrompts.length > 0 && (
@@ -225,7 +227,17 @@ Remember:
         </Alert>
       )}
 
-      {prompts?.map((prompt) => (
+      {/* Information about MCP Orchestrator prompt */}
+      {hasMcpPrompt && (
+        <Alert className="mb-6 border-blue-100 bg-blue-50">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            The MCP Orchestrator prompt is configured in the dedicated MCP tab. Please go to the MCP tab to view or edit it.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {displayPrompts?.map((prompt) => (
         <PromptEditor
           key={prompt.id}
           prompt={prompt}

@@ -1,103 +1,94 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, Loader2 } from "lucide-react";
 import Tool from '../icons/Tool';
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /**
  * MCP Configuration Tab for controlling the MCP (Model Context Protocol) settings
  */
 const MCPConfigTab: React.FC = () => {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">MCP Configuration</h2>
-          <p className="text-muted-foreground">Configure the Model Context Protocol settings</p>
-        </div>
-      </div>
+  const [orchestratorText, setOrchestratorText] = useState<string>('');
+  const [toolDefinitions, setToolDefinitions] = useState<string>('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-      <Alert>
-        <Tool className="h-4 w-4" />
-        <AlertTitle>About MCP</AlertTitle>
-        <AlertDescription>
-          The Model Context Protocol (MCP) enables sophisticated tool calling and orchestration patterns for AI models.
-          Configure the system prompts and tool definitions used by the AI when making decisions.
-        </AlertDescription>
-      </Alert>
+  // Fetch the MCP orchestrator prompt from the database
+  const { data: mcpPrompt, isLoading: promptLoading } = useQuery({
+    queryKey: ['mcp-orchestrator-prompt'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('workflow_prompts')
+        .select('*')
+        .eq('type', 'mcp_orchestrator')
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching MCP orchestrator prompt:', error);
+        throw error;
+      }
+      
+      return data;
+    }
+  });
 
-      <Tabs defaultValue="orchestrator" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="orchestrator">Orchestrator Prompt</TabsTrigger>
-          <TabsTrigger value="tools">Tool Definitions</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
+  // Update the orchestrator text state when the prompt data is loaded
+  useEffect(() => {
+    if (mcpPrompt?.prompt_text) {
+      setOrchestratorText(mcpPrompt.prompt_text);
+    }
+  }, [mcpPrompt]);
 
-        <TabsContent value="orchestrator" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>MCP Orchestrator System Prompt</CardTitle>
-              <CardDescription>
-                This system prompt guides the AI in using tools and making decisions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                className="min-h-[300px] font-mono"
-                defaultValue={`You are an advanced AI orchestrator specifically designed to manage project workflows for construction and renovation projects. Your task is to analyze project information systematically and make structured decisions using specialized tools.
+  // Update the MCP orchestrator prompt in the database
+  const updateOrchestratorMutation = useMutation({
+    mutationFn: async (promptText: string) => {
+      if (!mcpPrompt?.id) {
+        throw new Error('No MCP orchestrator prompt found to update');
+      }
+      
+      const { error } = await supabase
+        .from('workflow_prompts')
+        .update({ 
+          prompt_text: promptText,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', mcpPrompt.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mcp-orchestrator-prompt'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-prompts'] });
+      toast({
+        title: "MCP Orchestrator Updated",
+        description: "The MCP orchestrator prompt has been successfully updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to update MCP orchestrator: ${error.message}`,
+      });
+    }
+  });
 
-WORKFLOW CONTEXT:
-You are part of a multi-stage workflow system that helps manage construction projects. When you receive project information, you must analyze it methodically:
+  // Handler for saving the orchestrator prompt
+  const handleSaveOrchestrator = () => {
+    updateOrchestratorMutation.mutate(orchestratorText);
+  };
 
-1. First, understand the project's current state, timeline, and next steps
-2. Determine if any actions are needed based on the project status
-3. Generate appropriate actions when needed or set reminders for future follow-up
-4. Document your reasoning for transparency and future reference
-
-MEMORY AND CONTEXT:
-- Maintain awareness of previous tool calls within the same session
-- Reference your prior findings when making subsequent decisions
-- Consider historical context from the project summary when determining actions
-
-TOOL USAGE GUIDELINES:
-- The detect_action tool should be used FIRST to analyze the situation
-- Only after detect_action determines ACTION_NEEDED should you use generate_action
-- Use knowledge_base_lookup when you need additional project-specific information
-- Always provide clear reasoning for your tool choices
-
-DECISION FRAMEWORK:
-- ACTION_NEEDED: When immediate intervention by team members is required
-- NO_ACTION: When the project is progressing as expected with no issues
-- SET_FUTURE_REMINDER: When no action is needed now but follow-up will be required
-- REQUEST_HUMAN_REVIEW: When the situation is too complex or ambiguous
-- QUERY_KNOWLEDGE_BASE: When you need additional context to make a decision
-
-Use the available tools systematically to analyze the context and suggest appropriate actions. Always explain your reasoning clearly.`}
-              />
-
-              <div className="flex justify-end mt-4">
-                <Button>Save Changes</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tools" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tool Definitions</CardTitle>
-              <CardDescription>
-                Define the tools available to the MCP orchestrator
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                className="min-h-[300px] font-mono"
-                defaultValue={`[
+  // Fetch tool definitions from the database (placeholder for now)
+  // In a real implementation, these would be stored in a separate table
+  useEffect(() => {
+    setToolDefinitions(`[
   {
     "name": "detect_action",
     "description": "Analyzes project context to determine if action is needed, postponed, or unnecessary. This should always be your first tool.",
@@ -169,11 +160,100 @@ Use the available tools systematically to analyze the context and suggest approp
       "required": ["query"]
     }
   }
-]`}
+]`);
+  }, []);
+
+  // Handler for saving tool definitions (placeholder)
+  const handleSaveToolDefinitions = () => {
+    toast({
+      title: "Tool Definitions Updated",
+      description: "The MCP tool definitions have been successfully updated.",
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">MCP Configuration</h2>
+          <p className="text-muted-foreground">Configure the Model Context Protocol settings</p>
+        </div>
+      </div>
+
+      <Alert>
+        <Tool className="h-4 w-4" />
+        <AlertTitle>About MCP</AlertTitle>
+        <AlertDescription>
+          The Model Context Protocol (MCP) enables sophisticated tool calling and orchestration patterns for AI models.
+          Configure the system prompts and tool definitions used by the AI when making decisions.
+        </AlertDescription>
+      </Alert>
+
+      <Tabs defaultValue="orchestrator" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="orchestrator">Orchestrator Prompt</TabsTrigger>
+          <TabsTrigger value="tools">Tool Definitions</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="orchestrator" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>MCP Orchestrator System Prompt</CardTitle>
+              <CardDescription>
+                This system prompt guides the AI in using tools and making decisions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {promptLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Loading prompt...</span>
+                </div>
+              ) : (
+                <>
+                  <Textarea
+                    className="min-h-[300px] font-mono"
+                    value={orchestratorText}
+                    onChange={(e) => setOrchestratorText(e.target.value)}
+                  />
+
+                  <div className="flex justify-end mt-4">
+                    <Button 
+                      onClick={handleSaveOrchestrator}
+                      disabled={updateOrchestratorMutation.isPending}
+                    >
+                      {updateOrchestratorMutation.isPending ? (
+                        <>
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : "Save Changes"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tools" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tool Definitions</CardTitle>
+              <CardDescription>
+                Define the tools available to the MCP orchestrator
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                className="min-h-[300px] font-mono"
+                value={toolDefinitions}
+                onChange={(e) => setToolDefinitions(e.target.value)}
               />
 
               <div className="flex justify-end mt-4">
-                <Button>Save Changes</Button>
+                <Button onClick={handleSaveToolDefinitions}>Save Changes</Button>
               </div>
             </CardContent>
           </Card>

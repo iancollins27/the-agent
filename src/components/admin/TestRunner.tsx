@@ -35,7 +35,7 @@ const TestRunner = ({
       .select('type')
       .in('id', promptIds);
       
-    return data?.some(prompt => prompt.type === 'mcp_orchestrator' as WorkflowType) || false;
+    return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
   };
   
   const runTest = async () => {
