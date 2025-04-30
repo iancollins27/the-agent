@@ -1,7 +1,7 @@
 
 export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
   'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 
-  'multi_project_message_generation';
+  'multi_project_message_generation' | 'mcp_orchestrator';
 
 export type WorkflowPrompt = {
   id: string;
@@ -63,7 +63,8 @@ export const workflowTitles: Record<WorkflowType, string> = {
   action_execution: "Action Execution",
   action_detection_execution: "Action Detection & Execution",
   multi_project_analysis: "Multi-Project Analysis",
-  multi_project_message_generation: "Multi-Project Message Generation"
+  multi_project_message_generation: "Multi-Project Message Generation",
+  mcp_orchestrator: "MCP Orchestrator"
 };
 
 export const availableVariables = {
@@ -123,5 +124,16 @@ export const availableVariables = {
     { name: "rooferName", description: "The name of the roofer" },
     { name: "projectData", description: "Array of projects and their details" },
     { name: "current_date", description: "Today's date" }
+  ],
+  mcp_orchestrator: [
+    { name: "summary", description: "The current project summary" },
+    { name: "track_name", description: "The name of the project track" },
+    { name: "track_roles", description: "Roles defined for the project track" },
+    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
+    { name: "current_date", description: "Today's date" },
+    { name: "next_step", description: "The current next step in the project" },
+    { name: "property_address", description: "The property address for the project" },
+    { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" },
+    { name: "available_tools", description: "List of tools available to the orchestrator" }
   ]
 };

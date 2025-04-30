@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProjectManagerNav from "../components/ProjectManagerNav";
@@ -6,6 +7,7 @@ import PromptsTab from "../components/admin/PromptsTab";
 import TestingTab from "../components/admin/TestingTab";
 import PromptRunsTab from "../components/admin/PromptRunsTab";
 import FeedbackTab from "../components/admin/FeedbackTab";
+import MCPConfigTab from "../components/admin/MCPConfigTab";
 import { ObservabilityTab } from "../components/admin/observability/ObservabilityTab";
 import { Routes, Route, Outlet, NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -27,7 +29,7 @@ const AdminConsole: React.FC = () => {
     // Otherwise render the tabbed interface
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(8, 1fr)' }}>
           <TabsTrigger value="prompt-runs">Prompt Runs</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
@@ -35,6 +37,7 @@ const AdminConsole: React.FC = () => {
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="observability">Metrics</TabsTrigger>
           <TabsTrigger value="executions">Executions</TabsTrigger>
+          <TabsTrigger value="mcp">MCP</TabsTrigger>
         </TabsList>
         
         <TabsContent value="prompt-runs">
@@ -63,6 +66,10 @@ const AdminConsole: React.FC = () => {
 
         <TabsContent value="executions">
           <ExecutionsList />
+        </TabsContent>
+        
+        <TabsContent value="mcp">
+          <MCPConfigTab />
         </TabsContent>
       </Tabs>
     );

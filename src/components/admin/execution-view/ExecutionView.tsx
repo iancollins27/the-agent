@@ -8,6 +8,7 @@ import Tool from '../../icons/Tool';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import PromptInput from './tabs/PromptInput';
 import PromptOutput from './tabs/PromptOutput';
 import ToolLogs from './tabs/ToolLogs';
@@ -124,6 +125,9 @@ const ExecutionView: React.FC = () => {
   const workflowType = promptRun.workflow_prompts?.type || 'Unknown';
   const modelName = promptRun.ai_model || 'Unknown Model';
 
+  // Add toolLogsCount to promptRun for PromptInput component
+  promptRun.toolLogsCount = toolLogs.length;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -138,9 +142,9 @@ const ExecutionView: React.FC = () => {
           <div className="flex items-center bg-blue-50 text-blue-800 px-3 py-1 rounded-md">
             <Tool className="h-4 w-4 mr-1" />
             <span className="font-medium">MCP Execution</span>
-            <span className="ml-2 text-blue-600 text-xs bg-blue-100 px-2 py-0.5 rounded-full">
+            <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-600 border-blue-200">
               {toolLogs.length} Tool Calls
-            </span>
+            </Badge>
           </div>
         )}
       </div>
