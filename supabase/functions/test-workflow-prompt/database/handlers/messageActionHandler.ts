@@ -53,7 +53,7 @@ export async function handleMessageAction(
   
   console.log("Recipient:", recipient);
   
-  // Extract sender info
+  // Extract sender info with default fallback to BidList Project Manager
   const sender = actionData.sender || 
     (actionData.action_payload && actionData.action_payload.sender) || 
     "BidList Project Manager";
@@ -70,6 +70,12 @@ export async function handleMessageAction(
     
     senderId = await findContactId(supabase, sender, projectId);
     console.log(`Sender ID resolution: ${sender} -> ${senderId || 'Not found'}`);
+    
+    // If senderId is not found but sender contains "BidList" or "Project Manager", try finding a project manager contact
+    if (!senderId && (sender.includes("BidList") || sender.includes("Project Manager"))) {
+      senderId = await findContactId(supabase, "Project Manager", projectId);
+      console.log(`Fallback sender ID resolution for Project Manager: ${senderId || 'Not found'}`);
+    }
   } catch (contactError) {
     console.error("Error finding contacts:", contactError);
   }

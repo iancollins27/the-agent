@@ -3,6 +3,7 @@ import { corsHeaders } from "../utils/cors.ts";
 import { logPromptRun } from "../database/index.ts";
 import { replaceVariables } from "../utils.ts";
 import { handleAIResponse } from "./aiResponseHandler.ts";
+import { getMilestoneInstructions } from "../database/milestone.ts";
 
 export async function handleRequest(supabase: any, requestBody: any) {
   const { 
@@ -26,6 +27,27 @@ export async function handleRequest(supabase: any, requestBody: any) {
   
   if (!promptText) {
     throw new Error("Prompt text is required");
+  }
+
+  // Fetch milestone instructions if needed for the project
+  let milestoneInstructions = null;
+  if (projectId && contextData.next_step) {
+    try {
+      const projectTrackId = contextData.track_id || null;
+      milestoneInstructions = await getMilestoneInstructions(supabase, contextData.next_step, projectTrackId);
+      
+      if (milestoneInstructions) {
+        console.log(`Found milestone instructions for step "${contextData.next_step}". Length: ${milestoneInstructions.length} chars`);
+        // Add milestone instructions to context data
+        contextData.milestone_instructions = milestoneInstructions;
+      } else {
+        console.log(`No milestone instructions found for step "${contextData.next_step}"`);
+        contextData.milestone_instructions = "No specific instructions available for this milestone.";
+      }
+    } catch (milestoneError) {
+      console.error("Error fetching milestone instructions:", milestoneError);
+      contextData.milestone_instructions = "Error retrieving milestone instructions.";
+    }
   }
   
   // We'll still perform the variable replacement for logging purposes

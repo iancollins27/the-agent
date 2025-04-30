@@ -24,6 +24,8 @@ IMPORTANT GUIDELINES:
 - Tool calls must be made sequentially, waiting for each tool's response before making the next call
 - Don't send communications directly, instead create action records for review
 - For timestamps, use ISO format YYYY-MM-DD
+- For message actions, ALWAYS specify both the sender and recipient
+- When creating message actions, the sender should always be "BidList Project Manager" unless otherwise specified
 
 TOOL CALL RULES:
 - ALWAYS make each tool call separately, not as a batch
@@ -44,7 +46,7 @@ function formatAvailableTools(tools: string[]): string {
     'detect_action': 'Analyzes project context and determines if any action should be taken. Returns decision: ACTION_NEEDED, NO_ACTION, SET_FUTURE_REMINDER, REQUEST_HUMAN_REVIEW, or QUERY_KNOWLEDGE_BASE.',
     'create_action_record': 'Creates a specific action record based on the detection results. This should be called as a separate tool call after detect_action returns ACTION_NEEDED.',
     'knowledge_base_lookup': 'Queries the knowledge base for relevant information.',
-    'generate_action': 'DEPRECATED: Use create_action_record instead.'
+    'generate_action': 'Creates a specific action for team members to execute. Similar to create_action_record but with slightly different parameters.'
   };
   
   return tools.map(tool => {
