@@ -79,6 +79,24 @@ export async function processToolCall(supabase: any, toolName: string, args: any
           }
         }
         
+        // For message actions, ensure message content is specific and actionable
+        if (actionData.action_type === "message") {
+          // Remove description field as requested
+          if (actionData.description) {
+            console.log("Removing description field as requested");
+            delete actionData.description;
+          }
+          
+          // Make sure we have a good message content
+          if (!actionData.message_text && !actionData.message && !actionData.message_content) {
+            console.warn("No message content provided in message action");
+            return {
+              status: "error",
+              error: "Message actions must include specific message content"
+            };
+          }
+        }
+        
         // Make sure decision is included from detect_action call
         if (!actionData.decision) {
           console.warn("Missing decision in action record call");
