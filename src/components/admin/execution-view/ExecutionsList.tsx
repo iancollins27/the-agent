@@ -4,7 +4,7 @@ import { PromptRun } from '@/components/admin/types';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Loader2, Search, Filter, RefreshCw } from 'lucide-react';
+import { Loader2, Search, Filter } from 'lucide-react';
 import { 
   Table, 
   TableHeader, 
@@ -40,7 +40,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
 
 const ExecutionsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,7 +48,6 @@ const ExecutionsList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [hasToolCalls, setHasToolCalls] = useState(false);
-  const { toast } = useToast();
 
   // Function to fetch executions
   const fetchExecutions = async () => {
@@ -137,7 +135,7 @@ const ExecutionsList: React.FC = () => {
   };
 
   // Query for executions
-  const { data: executions, isLoading, refetch, isFetching } = useQuery({
+  const { data: executions, isLoading, refetch } = useQuery({
     queryKey: ['executions', currentPage, pageSize, statusFilter, searchTerm, hasToolCalls],
     queryFn: fetchExecutions,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -153,24 +151,6 @@ const ExecutionsList: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1); // Reset to first page when searching
-  };
-
-  // Handle manual refresh
-  const handleRefresh = async () => {
-    try {
-      await refetch();
-      toast({
-        title: "Data refreshed",
-        description: "The execution list has been updated.",
-      });
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-      toast({
-        variant: "destructive",
-        title: "Refresh failed",
-        description: "There was an error refreshing the data."
-      });
-    }
   };
 
   // Handle pagination
@@ -288,19 +268,6 @@ const ExecutionsList: React.FC = () => {
               className="gap-2"
             >
               {hasToolCalls ? "✓ " : ""} With Tool Calls
-            </Button>
-          </div>
-
-          {/* Refresh Button */}
-          <div>
-            <Button
-              onClick={handleRefresh}
-              variant="outline"
-              size="icon"
-              disabled={isFetching}
-              title="Refresh executions"
-            >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
