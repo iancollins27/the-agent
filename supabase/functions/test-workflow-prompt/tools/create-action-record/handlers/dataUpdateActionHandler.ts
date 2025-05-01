@@ -3,6 +3,7 @@
  * Handler for data update action type
  */
 import { DataUpdateActionParams } from '../types.ts';
+import { validateRequiredParams } from '../../../utils/validation.ts';
 
 export async function handleDataUpdateAction(
   supabase: any,
@@ -11,8 +12,10 @@ export async function handleDataUpdateAction(
   actionData: DataUpdateActionParams
 ): Promise<{ action_record_id?: string, error?: string }> {
   try {
-    if (!actionData.field || actionData.value === undefined) {
-      throw new Error("Field and value are required for data update actions");
+    // Validate required parameters
+    const validation = validateRequiredParams(actionData, ['field', 'value']);
+    if (!validation.valid) {
+      return { error: validation.errors.join(', ') };
     }
     
     // Create an action payload with the data update details

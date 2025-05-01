@@ -3,6 +3,7 @@
  * Handler for human review action type
  */
 import { HumanReviewActionParams } from '../types.ts';
+import { validateRequiredParams } from '../../../utils/validation.ts';
 
 export async function handleHumanReviewAction(
   supabase: any,
@@ -11,8 +12,10 @@ export async function handleHumanReviewAction(
   actionData: HumanReviewActionParams
 ): Promise<{ action_record_id?: string, error?: string }> {
   try {
-    if (!actionData.review_reason) {
-      throw new Error("Review reason is required for human review actions");
+    // Validate required parameters
+    const validation = validateRequiredParams(actionData, ['review_reason']);
+    if (!validation.valid) {
+      return { error: validation.errors.join(', ') };
     }
     
     // Create an action payload with the human review details

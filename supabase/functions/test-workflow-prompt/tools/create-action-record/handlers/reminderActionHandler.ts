@@ -3,6 +3,7 @@
  * Handler for reminder action type
  */
 import { ReminderActionParams } from '../types.ts';
+import { validateRequiredParams } from '../../../utils/validation.ts';
 
 export async function handleReminderAction(
   supabase: any,
@@ -17,6 +18,12 @@ export async function handleReminderAction(
   error?: string;
 }> {
   try {
+    // Validate required parameters
+    const validation = validateRequiredParams(actionData, ['check_reason']);
+    if (!validation.valid) {
+      return { error: validation.errors.join(', ') };
+    }
+    
     // Calculate the next check date
     const daysUntilCheck = actionData.days_until_check || 7;
     const nextCheckDate = new Date();
