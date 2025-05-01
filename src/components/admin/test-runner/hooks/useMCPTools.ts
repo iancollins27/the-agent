@@ -29,7 +29,8 @@ export const useMCPTools = () => {
         // that accesses the tool registry
         setAvailableTools([
           'detect_action', 
-          'create_action_record'
+          'create_action_record',
+          'knowledge_base_lookup'
           // Adding more tools as they become available
         ]);
       } else {

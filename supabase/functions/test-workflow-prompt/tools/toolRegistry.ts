@@ -61,7 +61,17 @@ export function filterTools(enabledTools: string[]): Array<{
     };
   };
 }> {
-  return Object.values(tools)
+  // If no tools are specified, return all tools
+  if (!enabledTools || enabledTools.length === 0) {
+    console.log("No tools specified in filterTools, returning all tools");
+    return getToolDefinitions();
+  }
+
+  // Log which tools we're looking for
+  console.log(`Filtering for tools: ${enabledTools.join(', ')}`);
+  
+  // Return only tools that are enabled
+  const filtered = Object.values(tools)
     .filter(tool => enabledTools.includes(tool.name))
     .map(tool => ({
       type: "function",
@@ -71,4 +81,24 @@ export function filterTools(enabledTools: string[]): Array<{
         parameters: tool.schema
       }
     }));
+  
+  console.log(`Found ${filtered.length} matching tools`);
+  
+  // If no tools were found but some were requested, return at least the core tools
+  if (filtered.length === 0 && enabledTools.length > 0) {
+    console.log("No matching tools found, defaulting to core tools");
+    const coreTools = ['detect_action', 'create_action_record'];
+    return Object.values(tools)
+      .filter(tool => coreTools.includes(tool.name))
+      .map(tool => ({
+        type: "function",
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.schema
+        }
+      }));
+  }
+  
+  return filtered;
 }

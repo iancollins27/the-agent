@@ -21,10 +21,15 @@ export async function processMCPRequest(
     throw new Error("OpenAI API key not configured");
   }
 
-  // Filter available tools based on what's in contextData
-  const availableTools = contextData.available_tools && Array.isArray(contextData.available_tools) 
-    ? filterTools(contextData.available_tools)
-    : getToolDefinitions();
+  // Default to all available tools if none specified
+  let availableTools;
+  if (contextData.available_tools && Array.isArray(contextData.available_tools) && contextData.available_tools.length > 0) {
+    console.log(`Filtering tools based on specified tools: ${contextData.available_tools.join(', ')}`);
+    availableTools = filterTools(contextData.available_tools);
+  } else {
+    console.log("No specific tools provided, using all available tools");
+    availableTools = getToolDefinitions();
+  }
 
   console.log(`Available tools: ${availableTools.map(t => t.function.name).join(", ")}`);
 
