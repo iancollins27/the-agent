@@ -7,7 +7,7 @@
 export * from './types';
 
 // Re-export tool registry functions
-export * from './registry';
+export * from './registry.ts'; // Add file extension to fix import
 
 // Re-export individual tools
 export * from './detect-action';
