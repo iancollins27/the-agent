@@ -1,9 +1,8 @@
-
 /**
  * Handler for message action type
  */
-import { MessageActionParams } from '../types';
-import { extractMessageContent } from '../../utils/formatting';
+import { MessageActionParams } from '../types.ts';
+import { extractMessageContent } from '../../utils/formatting.ts';
 
 export async function handleMessageAction(
   supabase: any,

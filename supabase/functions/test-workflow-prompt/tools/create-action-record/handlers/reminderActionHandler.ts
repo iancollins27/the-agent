@@ -1,8 +1,7 @@
-
 /**
  * Handler for reminder action type
  */
-import { ReminderActionParams } from '../types';
+import { ReminderActionParams } from '../types.ts';
 
 export async function handleReminderAction(
   supabase: any,

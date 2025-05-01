@@ -1,8 +1,7 @@
-
 /**
  * Handler for human review action type
  */
-import { HumanReviewActionParams } from '../types';
+import { HumanReviewActionParams } from '../types.ts';
 
 export async function handleHumanReviewAction(
   supabase: any,

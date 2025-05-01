@@ -1,8 +1,7 @@
-
 /**
  * Handler for data update action type
  */
-import { DataUpdateActionParams } from '../types';
+import { DataUpdateActionParams } from '../types.ts';
 
 export async function handleDataUpdateAction(
   supabase: any,

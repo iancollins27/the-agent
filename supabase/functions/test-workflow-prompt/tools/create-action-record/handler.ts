@@ -1,14 +1,13 @@
-
 /**
  * Implementation logic for the create_action_record tool
  */
-import { validateCreateActionRecordParams } from './schema';
-import { CreateActionRecordParams, CreateActionRecordResult } from './types';
-import { handleMessageAction } from './handlers/messageActionHandler';
-import { handleReminderAction } from './handlers/reminderActionHandler';
-import { handleDataUpdateAction } from './handlers/dataUpdateActionHandler';
-import { handleHumanReviewAction } from './handlers/humanReviewActionHandler';
-import { createToolExecutionLogger } from '../utils/logging';
+import { validateCreateActionRecordParams } from './schema.ts';
+import { CreateActionRecordParams, CreateActionRecordResult } from './types.ts';
+import { handleMessageAction } from './handlers/messageActionHandler.ts';
+import { handleReminderAction } from './handlers/reminderActionHandler.ts';
+import { handleDataUpdateAction } from './handlers/dataUpdateActionHandler.ts';
+import { handleHumanReviewAction } from './handlers/humanReviewActionHandler.ts';
+import { createToolExecutionLogger } from '../utils/logging.ts';
 
 const executeWithLogging = createToolExecutionLogger();
 

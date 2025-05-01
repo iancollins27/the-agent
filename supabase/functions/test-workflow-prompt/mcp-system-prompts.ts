@@ -2,7 +2,7 @@
 /**
  * System prompts for MCP orchestration
  */
-import { formatToolDefinitions } from './tools/registry';
+import { formatToolDefinitions } from './tools/registry.ts';
 
 export const getMCPOrchestratorPrompt = (availableTools: string[], milestoneInstructions?: string): string => {
   const milestoneSection = milestoneInstructions 
@@ -71,3 +71,4 @@ TOOL CALL RULES:
 
 When in doubt, focus on: What specific action will most effectively move this project forward?`;
 };
+

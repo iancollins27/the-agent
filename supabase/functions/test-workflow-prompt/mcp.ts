@@ -2,7 +2,7 @@
 /**
  * Model Context Protocol (MCP) utilities
  */
-import { getToolDefinitionsByNames } from './tools/registry';
+import { getToolDefinitionsByNames } from './tools/registry.ts';
 
 /**
  * Creates a new MCP conversation context
