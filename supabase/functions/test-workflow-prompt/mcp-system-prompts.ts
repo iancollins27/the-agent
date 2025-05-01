@@ -2,6 +2,7 @@
 /**
  * System prompts for MCP orchestration
  */
+import { formatToolDefinitions } from './tools/registry';
 
 export const getMCPOrchestratorPrompt = (availableTools: string[], milestoneInstructions?: string): string => {
   const milestoneSection = milestoneInstructions 
@@ -17,7 +18,7 @@ Please consider these milestone-specific instructions when analyzing the project
 Your goal is to analyze the project context and determine what actions should be taken.
 
 AVAILABLE TOOLS:
-${formatAvailableTools(availableTools)}
+${formatToolDefinitions(availableTools)}
 
 ${milestoneSection}
 WORKFLOW PROCESS:
@@ -35,6 +36,16 @@ ACTION CREATION GUIDELINES:
 - For messages, identify the correct recipient (e.g., Homeowner, Project Manager, Roofer) based on the context
 - Do not include a description field unless absolutely necessary
 - Do not create more than one action for the same purpose
+
+MESSAGE CONTENT GUIDELINES:
+- Always include specific details about what action is needed
+- Reference relevant project information to provide context
+- Be concise yet thorough in your communication
+- Use a professional and clear tone
+- Include any relevant dates or deadlines
+- Be specific about what you're requesting from the recipient
+- Include a clear subject or purpose at the beginning of the message
+- Always end with a clear call to action or next step
 
 IMPORTANT GUIDELINES:
 - Always think step-by-step
@@ -60,21 +71,3 @@ TOOL CALL RULES:
 
 When in doubt, focus on: What specific action will most effectively move this project forward?`;
 };
-
-function formatAvailableTools(tools: string[]): string {
-  if (!tools || tools.length === 0) {
-    return "No tools available.";
-  }
-  
-  const toolDescriptions: Record<string, string> = {
-    'detect_action': 'Analyzes project context and determines if any action should be taken. Returns decision: ACTION_NEEDED, NO_ACTION, SET_FUTURE_REMINDER, REQUEST_HUMAN_REVIEW, or QUERY_KNOWLEDGE_BASE.',
-    'create_action_record': 'Creates a specific action record based on the detection results. This should be called as a separate tool call after detect_action returns ACTION_NEEDED.',
-    'knowledge_base_lookup': 'Queries the knowledge base for relevant information.',
-    'generate_action': 'Creates a specific action for team members to execute. Similar to create_action_record but with slightly different parameters.'
-  };
-  
-  return tools.map(tool => {
-    const description = toolDescriptions[tool] || 'No description available.';
-    return `- ${tool}: ${description}`;
-  }).join('\n');
-}
