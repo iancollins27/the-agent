@@ -1,11 +1,157 @@
 
-/**
- * Process OpenAI tool calls using the new tools system
- */
-import { executeToolCall } from "../../../tools/toolExecutor.ts";
 import { logToolCall } from "../../../database/tool-logs.ts";
+import { createActionRecord } from "../../../database/actions.ts";
+import { requestHumanReview } from "../../../human-service.ts";
+
+// Define valid action types to match database constraints
+const VALID_ACTION_TYPES = [
+  "message",
+  "data_update", 
+  "set_future_reminder",
+  "human_in_loop",
+  "knowledge_query"
+];
 
 export async function processToolCall(supabase: any, toolName: string, args: any, promptRunId: string, projectId: string) {
-  // Execute the tool call using the new tool executor
-  return await executeToolCall(supabase, toolName, args, promptRunId, projectId);
+  const toolCallId = `call_${Math.random().toString(36).substring(2, 15)}`;
+  const startTime = Date.now();
+  let status = 200;
+  let result;
+  let argsString;
+  
+  try {
+    // Convert args to string for logging
+    try {
+      argsString = typeof args === 'string' ? args : JSON.stringify(args);
+    } catch (e) {
+      argsString = "Error stringifying args";
+    }
+    
+    // Log the tool call before execution
+    await logToolCall(supabase, promptRunId, toolName, toolCallId, argsString, "", 0, 0);
+
+    // Process different tool types
+    switch (toolName) {
+      case "detect_action":
+        // Simply return the args as the result for detect_action
+        result = { 
+          decision: args.decision,
+          reason: args.reason,
+          priority: args.priority || "medium",
+          reminderSet: args.decision === "SET_FUTURE_REMINDER",
+          reminderDays: args.days_until_check, 
+          status: "success"
+        };
+        break;
+        
+      case "create_action_record":
+      case "generate_action":
+        // Normalize args structure if coming from generate_action
+        const actionData = { ...args };
+        
+        // Handle conversion from generate_action parameters to create_action_record format
+        if (toolName === "generate_action" && actionData.action_type && actionData.recipient_role) {
+          // Map recipient_role to recipient
+          actionData.recipient = actionData.recipient_role;
+          delete actionData.recipient_role;
+          
+          // Add decision if not present
+          if (!actionData.decision) {
+            actionData.decision = "ACTION_NEEDED";
+          }
+          
+          // Make sure action_type is valid
+          if (!VALID_ACTION_TYPES.includes(actionData.action_type)) {
+            // Map common action types to valid ones
+            if (actionData.action_type.toLowerCase().includes("message") || 
+                actionData.action_type.toLowerCase().includes("communication") ||
+                actionData.action_type.toLowerCase().includes("contact") || 
+                actionData.action_type.toLowerCase().includes("schedule")) {
+              actionData.action_type = "message";
+            } else if (actionData.action_type.toLowerCase().includes("reminder")) {
+              actionData.action_type = "set_future_reminder";
+            } else if (actionData.action_type.toLowerCase().includes("update")) {
+              actionData.action_type = "data_update";
+            } else {
+              // Default to message for unknown types
+              actionData.action_type = "message";
+            }
+          }
+        }
+        
+        // For message actions, ensure message content is specific and actionable
+        if (actionData.action_type === "message") {
+          // Remove description field as requested
+          if (actionData.description) {
+            console.log("Removing description field as requested");
+            delete actionData.description;
+          }
+          
+          // Make sure we have a good message content
+          if (!actionData.message_text && !actionData.message && !actionData.message_content) {
+            console.warn("No message content provided in message action");
+            return {
+              status: "error",
+              error: "Message actions must include specific message content"
+            };
+          }
+        }
+        
+        // Make sure decision is included from detect_action call
+        if (!actionData.decision) {
+          console.warn("Missing decision in action record call");
+          actionData.decision = "ACTION_NEEDED"; // Default to ACTION_NEEDED
+        }
+        
+        // Create an action record with the decision
+        result = await createActionRecord(supabase, promptRunId, projectId, actionData);
+        break;
+        
+      case "knowledge_base_lookup":
+        // Knowledge lookup is disabled for now
+        result = { 
+          status: "error",
+          error: "Knowledge base lookup is currently disabled",
+          results: []
+        };
+        break;
+        
+      default:
+        status = 400;
+        result = { 
+          status: "error",
+          error: `Unknown tool: ${toolName}`
+        };
+    }
+  } catch (error) {
+    console.error(`Error executing tool ${toolName}:`, error);
+    status = 500;
+    result = {
+      status: "error",
+      error: error.message || "Unknown error"
+    };
+  }
+
+  // Calculate duration
+  const duration = Date.now() - startTime;
+  
+  // Log the result
+  try {
+    const resultString = typeof result === 'string' ? result : JSON.stringify(result);
+    await logToolCall(
+      supabase, 
+      promptRunId, 
+      toolName, 
+      toolCallId, 
+      argsString || "", 
+      resultString, 
+      status, 
+      duration
+    );
+    console.log(`Logged tool call ${toolName} with ID ${toolCallId}`);
+  } catch (logError) {
+    console.error("Error logging tool call:", logError);
+  }
+
+  return result;
 }
