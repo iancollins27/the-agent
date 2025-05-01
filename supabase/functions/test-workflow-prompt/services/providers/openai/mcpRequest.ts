@@ -5,6 +5,7 @@ import { createMCPContext, getDefaultTools, addToolResult, extractToolCallsFromO
 import { processToolCall } from "./toolProcessor.ts";
 import { calculateCost } from "./costCalculator.ts";
 import { requestHumanReview } from "../../../human-service.ts";
+import { getMCPOrchestratorPrompt } from "../../../mcp-system-prompts.ts";
 
 export async function processMCPRequest(
   systemPrompt: string,
@@ -31,8 +32,17 @@ export async function processMCPRequest(
   // Get user message from contextData if available, or use default
   const userPrompt = contextData.user_message || "Analyze this project and determine the next actions.";
   
-  // Initialize MCP context
-  let context = createMCPContext(systemPrompt, userPrompt, availableTools);
+  // Use the getMCPOrchestratorPrompt function to generate the system prompt with milestone instructions
+  const milestoneInstructions = contextData.milestone_instructions || null;
+  const enhancedSystemPrompt = getMCPOrchestratorPrompt(
+    availableTools.map(t => t.function.name),
+    milestoneInstructions
+  );
+  
+  console.log("Using milestone instructions in system prompt:", milestoneInstructions ? "YES" : "NO");
+  
+  // Initialize MCP context with the enhanced system prompt
+  let context = createMCPContext(enhancedSystemPrompt, userPrompt, availableTools);
 
   let finalAnswer = "";
   let toolOutputs: any[] = [];
@@ -40,6 +50,9 @@ export async function processMCPRequest(
   let iterationCount = 0;
   let lastToolDecision = null; // Track the last decision from detect_action tool
   let processedToolCallIds = new Set(); // Track processed tool call IDs to avoid duplicates
+  
+  // Track tool call counts to detect loops
+  const toolCallCounts: Record<string, number> = {};
   
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
@@ -114,6 +127,30 @@ export async function processMCPRequest(
           if (processedToolCallIds.has(call.id)) {
             console.log(`Skipping already processed tool call ID: ${call.id}`);
             continue;
+          }
+          
+          // Track tool call counts to detect loops
+          toolCallCounts[call.name] = (toolCallCounts[call.name] || 0) + 1;
+          
+          // Check for excessive tool calls of the same type (potential loop)
+          if (toolCallCounts[call.name] > 3) {
+            console.warn(`Excessive calls to ${call.name} detected (${toolCallCounts[call.name]} times). Possible loop.`);
+            
+            // If it's the create_action_record tool, we might be in a loop
+            if (call.name === "create_action_record" && toolCallCounts[call.name] > 3) {
+              console.warn("Detected potential infinite loop with create_action_record - terminating iterations");
+              finalAnswer = "The system detected a potential infinite loop in tool calls. Analysis was terminated to prevent redundant actions. Please review the generated actions for completeness.";
+              
+              // Add final warning message to the context
+              context.messages.push({
+                role: "system",
+                content: "WARNING: Potential infinite loop detected with create_action_record tool. Processing terminated."
+              });
+              
+              // Break out of the while loop
+              iterationCount = MAX_ITERATIONS;
+              break;
+            }
           }
           
           console.log(`Processing tool call: ${call.name}, id: ${call.id}`);
