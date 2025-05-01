@@ -2,8 +2,8 @@
 /**
  * Tool executor - handles execution of tools with validation and error handling
  */
-import { getToolByName } from './registry';
-import { logToolCall } from '../database/tool-logs';
+import { getToolByName } from './registry.ts';
+import { logToolCall } from '../database/tool-logs.ts';
 
 export async function executeToolCall(
   supabase: any, 

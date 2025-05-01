@@ -2,9 +2,9 @@
 /**
  * Central registry of all available tools
  */
-import { Tool, ToolDefinition } from './types';
-import { detectActionTool } from './detect-action';
-import { createActionRecordTool } from './create-action-record';
+import { Tool, ToolDefinition } from './types.ts';
+import { detectActionTool } from './detect-action/index.ts';
+import { createActionRecordTool } from './create-action-record/index.ts';
 
 // Register all tools in the system
 const toolRegistry: Record<string, Tool> = {

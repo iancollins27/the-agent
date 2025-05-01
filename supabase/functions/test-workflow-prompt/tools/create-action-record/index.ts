@@ -2,10 +2,10 @@
 /**
  * Main export for the create_action_record tool
  */
-import { createActionRecordSchema, validateCreateActionRecordParams } from './schema';
-import { handleCreateActionRecord } from './handler';
-import { Tool } from '../types';
-import { CreateActionRecordParams, CreateActionRecordResult } from './types';
+import { createActionRecordSchema, validateCreateActionRecordParams } from './schema.ts';
+import { handleCreateActionRecord } from './handler.ts';
+import { Tool } from '../types.ts';
+import { CreateActionRecordParams, CreateActionRecordResult } from './types.ts';
 
 export const createActionRecordTool: Tool<CreateActionRecordParams, CreateActionRecordResult> = {
   definition: createActionRecordSchema,
@@ -22,4 +22,4 @@ export {
   DataUpdateActionParams,
   ReminderActionParams,
   HumanReviewActionParams
-} from './types';
+} from './types.ts';

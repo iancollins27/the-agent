@@ -4,14 +4,14 @@
  */
 
 // Re-export tool types
-export * from './types';
+export * from './types.ts';
 
 // Re-export tool registry functions
 export * from './registry.ts'; // Add file extension to fix import
 
 // Re-export individual tools
-export * from './detect-action';
-export * from './create-action-record';
+export * from './detect-action/index.ts';
+export * from './create-action-record/index.ts';
 
 // Export tool executor
-export * from './toolExecutor';
+export * from './toolExecutor.ts';
