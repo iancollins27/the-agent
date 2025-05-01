@@ -1,11 +1,12 @@
 
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
-import { createMCPContext, getDefaultTools, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
-import { processToolCall } from "./toolProcessor.ts";
+import { createMCPContext, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
 import { calculateCost } from "./costCalculator.ts";
 import { requestHumanReview } from "../../../human-service.ts";
 import { getMCPOrchestratorPrompt } from "../../../mcp-system-prompts.ts";
+import { getToolDefinitions, filterTools } from "../../../tools/toolRegistry.ts";
+import { executeToolCall } from "../../../tools/toolExecutor.ts";
 
 export async function processMCPRequest(
   systemPrompt: string,
@@ -22,10 +23,8 @@ export async function processMCPRequest(
 
   // Filter available tools based on what's in contextData
   const availableTools = contextData.available_tools && Array.isArray(contextData.available_tools) 
-    ? getDefaultTools().filter(tool => 
-        contextData.available_tools.includes(tool.function.name)
-      )
-    : getDefaultTools();
+    ? filterTools(contextData.available_tools)
+    : getToolDefinitions();
 
   console.log(`Available tools: ${availableTools.map(t => t.function.name).join(", ")}`);
 
@@ -187,8 +186,15 @@ export async function processMCPRequest(
                 console.log("Setting default sender to BidList Project Manager");
               }
             }
-            
-            const toolResult = await processToolCall(supabase, call.name, call.arguments, promptRunId, projectId);
+
+            // Use the new executeToolCall function from toolExecutor
+            const toolResult = await executeToolCall(
+              supabase, 
+              call.name, 
+              call.arguments, 
+              promptRunId, 
+              projectId
+            );
             
             // Store the tool output for later processing
             toolOutputs.push({
