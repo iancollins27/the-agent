@@ -29,7 +29,7 @@ export async function executeToolCall(
     projectId
   };
   
-  // Log and execute the tool
+  // Generate a consistent tool call ID
   const toolCallId = `call_${Math.random().toString(36).substring(2, 15)}`;
   const startTime = Date.now();
   let argsString = '';
@@ -42,23 +42,13 @@ export async function executeToolCall(
       argsString = "Error stringifying args";
     }
     
-    // Log start of tool call
-    await logToolCall(
-      supabase, 
-      promptRunId, 
-      toolName, 
-      toolCallId, 
-      argsString, 
-      "", 
-      0, 
-      0
-    );
-    
-    // Execute tool
+    // Execute the tool first - don't log until we have results
     const result = await tool.execute(args, context);
     
-    // Calculate duration and log result
+    // Calculate duration
     const duration = Date.now() - startTime;
+    
+    // Format the result for logging
     let resultString = '';
     try {
       resultString = typeof result === 'string' ? result : JSON.stringify(result);
@@ -66,6 +56,7 @@ export async function executeToolCall(
       resultString = "Error stringifying result";
     }
     
+    // Log the tool call with complete information - only log ONCE after execution
     await logToolCall(
       supabase, 
       promptRunId, 
@@ -94,6 +85,7 @@ export async function executeToolCall(
       errorResultString = `{"status":"error","error":"Failed to stringify error"}`;
     }
     
+    // Only log once with the error information
     await logToolCall(
       supabase, 
       promptRunId, 

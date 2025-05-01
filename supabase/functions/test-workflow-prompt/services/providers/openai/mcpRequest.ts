@@ -1,4 +1,3 @@
-
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
 import { createMCPContext, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
@@ -57,6 +56,10 @@ export async function processMCPRequest(
   
   // Track tool call counts to detect loops
   const toolCallCounts: Record<string, number> = {};
+  // Define tool limits - especially limit detect_action to 1 call
+  const toolLimits: Record<string, number> = {
+    detect_action: 1
+  };
   
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
@@ -133,11 +136,26 @@ export async function processMCPRequest(
             continue;
           }
           
-          // Track tool call counts to detect loops
+          // Check if the tool has reached its limit
+          if (toolLimits[call.name] && toolCallCounts[call.name] >= toolLimits[call.name]) {
+            console.log(`Tool ${call.name} has reached its limit (${toolLimits[call.name]}). Skipping call.`);
+            
+            // Add a system message explaining the tool limit
+            const limitMessage = {
+              role: "system",
+              content: `The tool '${call.name}' has reached its maximum allowed calls (${toolLimits[call.name]}). Please use the results from previous calls.`
+            };
+            context.messages.push(limitMessage);
+            
+            // Skip processing this tool call
+            continue;
+          }
+          
+          // Track tool call counts 
           toolCallCounts[call.name] = (toolCallCounts[call.name] || 0) + 1;
           
           // Check for excessive tool calls of the same type (potential loop)
-          if (toolCallCounts[call.name] > 3) {
+          if (!toolLimits[call.name] && toolCallCounts[call.name] > 3) {
             console.warn(`Excessive calls to ${call.name} detected (${toolCallCounts[call.name]} times). Possible loop.`);
             
             // If it's the create_action_record tool, we might be in a loop

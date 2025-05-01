@@ -3,11 +3,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Hook to handle MCP-related functionality
+ * Hook to handle MCP-related functionality with tool call limits
  */
 export const useMCPTools = () => {
   const [useMCP, setUseMCP] = useState<boolean>(false);
   const [availableTools, setAvailableTools] = useState<string[]>([]);
+  const [toolLimits, setToolLimits] = useState<Record<string, number>>({
+    detect_action: 1, // Limit detect_action to 1 call
+  });
 
   // Check if MCP Orchestrator prompt is selected
   const hasMCPOrchestrator = async (promptIds: string[]): Promise<boolean> => {
@@ -47,12 +50,28 @@ export const useMCPTools = () => {
     
     return availableTools;
   };
+  
+  // Get the limit for a specific tool
+  const getToolLimit = (toolName: string): number => {
+    return toolLimits[toolName] || 0; // 0 means no limit
+  };
+  
+  // Update the limit for a specific tool
+  const setToolLimit = (toolName: string, limit: number): void => {
+    setToolLimits(prev => ({
+      ...prev,
+      [toolName]: limit
+    }));
+  };
 
   return {
     useMCP,
     setUseMCP,
     hasMCPOrchestrator,
     getAvailableTools,
-    availableTools
+    availableTools,
+    getToolLimit,
+    setToolLimit,
+    toolLimits
   };
 };
