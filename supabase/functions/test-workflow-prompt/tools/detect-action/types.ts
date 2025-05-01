@@ -2,9 +2,11 @@
 /**
  * Type definitions for the detect_action tool
  */
-import { ActionDecision, ActionPriority } from '../types';
+import { ActionDecision, ActionPriority } from '../types.ts';
 
 export interface DetectActionParams {
+  content?: string;
+  project_context?: string;
   decision: ActionDecision;
   reason: string;
   priority?: ActionPriority;

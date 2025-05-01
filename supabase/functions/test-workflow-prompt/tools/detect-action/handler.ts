@@ -2,9 +2,9 @@
 /**
  * Implementation logic for the detect_action tool
  */
-import { validateDetectActionParams } from './schema';
-import { DetectActionParams, DetectActionResult } from './types';
-import { createToolExecutionLogger } from '../utils/logging';
+import { validateDetectActionParams } from './schema.ts';
+import { DetectActionParams, DetectActionResult } from './types.ts';
+import { createToolExecutionLogger } from '../utils/logging.ts';
 
 const executeWithLogging = createToolExecutionLogger();
 
