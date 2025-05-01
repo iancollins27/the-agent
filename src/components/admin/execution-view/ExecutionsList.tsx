@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PromptRun } from '@/components/admin/types';
@@ -41,6 +40,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 
 const ExecutionsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,6 +49,7 @@ const ExecutionsList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [hasToolCalls, setHasToolCalls] = useState(false);
+  const { toast } = useToast();
 
   // Function to fetch executions
   const fetchExecutions = async () => {
@@ -152,6 +153,24 @@ const ExecutionsList: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1); // Reset to first page when searching
+  };
+
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast({
+        title: "Data refreshed",
+        description: "The execution list has been updated.",
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast({
+        variant: "destructive",
+        title: "Refresh failed",
+        description: "There was an error refreshing the data."
+      });
+    }
   };
 
   // Handle pagination
@@ -275,7 +294,7 @@ const ExecutionsList: React.FC = () => {
           {/* Refresh Button */}
           <div>
             <Button
-              onClick={() => refetch()}
+              onClick={handleRefresh}
               variant="outline"
               size="icon"
               disabled={isFetching}
