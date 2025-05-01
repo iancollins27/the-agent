@@ -2,7 +2,7 @@
 /**
  * Type definitions for the create_action_record tool
  */
-import { ActionDecision, ActionPriority, ActionType } from '../types';
+import { ActionDecision, ActionPriority, ActionType } from '../types.ts';
 
 export interface ActionRecordBase {
   decision: ActionDecision;
