@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import PromptRunsTable from '../PromptRunsTable';
 import PromptRunDetails from '../PromptRunDetails';
@@ -12,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import TablePagination from '../tables/TablePagination';
-import { RefreshCw } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -23,7 +21,6 @@ const PromptRunsTab: React.FC = () => {
   const [reviewFilter, setReviewFilter] = useState("not-reviewed");
   const [currentPage, setCurrentPage] = useState(1);
   const [searchAddress, setSearchAddress] = useState("");
-  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const { promptRuns, setPromptRuns, loading, fetchPromptRuns } = usePromptRunData(statusFilter);
   const { handleRatingChange, handleFeedbackChange } = usePromptRunActions(setPromptRuns, setSelectedRun);
@@ -39,12 +36,6 @@ const PromptRunsTab: React.FC = () => {
         run.id === promptRunId ? { ...run, reviewed: true } : run
       )
     );
-  };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchPromptRuns();
-    setIsRefreshing(false);
   };
 
   const handlePromptRerun = () => {
@@ -93,15 +84,6 @@ const PromptRunsTab: React.FC = () => {
           setSearchAddress={setSearchAddress}
         />
         <div className="flex items-center space-x-4">
-          <Button 
-            onClick={handleRefresh} 
-            variant="outline" 
-            disabled={isRefreshing}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? "Refreshing..." : "Refresh"}
-          </Button>
           <Label>Show:</Label>
           <RadioGroup 
             value={reviewFilter} 
