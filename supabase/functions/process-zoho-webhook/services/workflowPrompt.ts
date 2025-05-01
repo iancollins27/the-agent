@@ -53,12 +53,17 @@ export async function generateWorkflowPrompt(
       businessLogicData.trackName || ''
     );
     
+    // Add the milestone instructions explicitly if they exist
+    const finalPrompt = businessLogicData.nextStepInstructions 
+      ? `Milestone Instructions: ${businessLogicData.nextStepInstructions}\n\n${formattedPrompt}` 
+      : formattedPrompt;
+    
     // For now, return an empty array of actions
     // In a full implementation, we would parse the AI response to detect actions
     return {
       summary: '', // We'll fill this after AI processing
       actions: [],
-      formattedPrompt  // Return the formatted prompt so we can use it in runWorkflowPrompt
+      formattedPrompt: finalPrompt  // Return the formatted prompt so we can use it in runWorkflowPrompt
     };
   } catch (error) {
     console.error('Error generating workflow prompt:', error);

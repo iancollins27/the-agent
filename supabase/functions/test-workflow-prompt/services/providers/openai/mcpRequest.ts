@@ -33,7 +33,7 @@ export async function processMCPRequest(
   console.log(`Available tools: ${availableTools.map(t => t.function.name).join(", ")}`);
 
   // Get user message from contextData if available, or use default
-  const userPrompt = contextData.user_message || "Analyze this project and determine the next actions.";
+  let userPrompt = contextData.user_message || "Analyze this project and determine the next actions.";
   
   // Use the getMCPOrchestratorPrompt function to generate the system prompt with milestone instructions
   const milestoneInstructions = contextData.milestone_instructions || null;
@@ -43,6 +43,11 @@ export async function processMCPRequest(
   );
   
   console.log("Using milestone instructions in system prompt:", milestoneInstructions ? "YES" : "NO");
+  
+  // Add milestone instructions to the user prompt if available
+  if (milestoneInstructions) {
+    userPrompt = `Milestone Instructions: ${milestoneInstructions}\n\n${userPrompt}`;
+  }
   
   // Initialize MCP context with the enhanced system prompt
   let context = createMCPContext(enhancedSystemPrompt, userPrompt, availableTools);
