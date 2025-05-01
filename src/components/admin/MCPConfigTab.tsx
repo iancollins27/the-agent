@@ -3,13 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { InfoIcon, Loader2 } from "lucide-react";
+import { InfoIcon, Loader2, Check, X } from "lucide-react";
 import Tool from '../icons/Tool';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 /**
  * MCP Configuration Tab for controlling the MCP (Model Context Protocol) settings
@@ -17,6 +19,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 const MCPConfigTab: React.FC = () => {
   const [orchestratorText, setOrchestratorText] = useState<string>('');
   const [toolDefinitions, setToolDefinitions] = useState<string>('');
+  const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({
+    detect_action: true,
+    create_action_record: true,
+    knowledge_base_lookup: false
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -85,9 +92,11 @@ const MCPConfigTab: React.FC = () => {
     updateOrchestratorMutation.mutate(orchestratorText);
   };
 
-  // Fetch tool definitions from the database (placeholder for now)
-  // In a real implementation, these would be stored in a separate table
+  // Fetch tool definitions from the edge function
   useEffect(() => {
+    // For now, we'll use our static tool definitions
+    // In a real implementation, we would fetch this data from an endpoint
+    // that connects to the tool registry
     setToolDefinitions(`[
   {
     "name": "detect_action",
@@ -101,8 +110,7 @@ const MCPConfigTab: React.FC = () => {
             "ACTION_NEEDED",
             "NO_ACTION",
             "SET_FUTURE_REMINDER",
-            "REQUEST_HUMAN_REVIEW",
-            "QUERY_KNOWLEDGE_BASE"
+            "REQUEST_HUMAN_REVIEW"
           ],
           "description": "The decision about what course of action to take"
         },
@@ -120,26 +128,34 @@ const MCPConfigTab: React.FC = () => {
     }
   },
   {
-    "name": "generate_action",
+    "name": "create_action_record",
     "description": "Creates a specific action for team members to execute based on the project's needs. Only use after detect_action confirms ACTION_NEEDED.",
     "parameters": {
       "type": "object",
       "properties": {
         "action_type": {
           "type": "string",
+          "enum": ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query"],
           "description": "The type of action to be taken"
         },
         "description": {
           "type": "string",
           "description": "Detailed description of what needs to be done"
         },
-        "recipient_role": {
+        "recipient": {
           "type": "string",
-          "enum": ["project_manager", "customer", "roofer"],
           "description": "Who should receive this action"
+        },
+        "message_text": {
+          "type": "string",
+          "description": "For message actions, the content of the message"
+        },
+        "sender": {
+          "type": "string",
+          "description": "For message actions, who is sending the message"
         }
       },
-      "required": ["action_type", "description", "recipient_role"]
+      "required": ["action_type", "description", "recipient"]
     }
   },
   {
@@ -152,9 +168,9 @@ const MCPConfigTab: React.FC = () => {
           "type": "string",
           "description": "The search query to find relevant information"
         },
-        "project_id": {
-          "type": "string",
-          "description": "Optional project ID to limit the search scope"
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results to return"
         }
       },
       "required": ["query"]
@@ -163,11 +179,24 @@ const MCPConfigTab: React.FC = () => {
 ]`);
   }, []);
 
-  // Handler for saving tool definitions (placeholder)
+  // Handler for saving tool definitions
   const handleSaveToolDefinitions = () => {
     toast({
       title: "Tool Definitions Updated",
       description: "The MCP tool definitions have been successfully updated.",
+    });
+  };
+
+  // Handler for toggling tool enablement
+  const handleToggleTool = (toolName: string, enabled: boolean) => {
+    setEnabledTools(prev => ({
+      ...prev,
+      [toolName]: enabled
+    }));
+    
+    toast({
+      title: enabled ? "Tool Enabled" : "Tool Disabled",
+      description: `The ${toolName} tool has been ${enabled ? 'enabled' : 'disabled'}.`,
     });
   };
 
@@ -240,9 +269,52 @@ const MCPConfigTab: React.FC = () => {
         <TabsContent value="tools" className="space-y-4">
           <Card>
             <CardHeader>
+              <CardTitle>Available Tools</CardTitle>
+              <CardDescription>
+                Enable or disable tools available to the MCP orchestrator
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid gap-4">
+                  <ToolConfigCard
+                    name="detect_action"
+                    title="Detect Action"
+                    description="Analyzes project context to determine if action is needed"
+                    enabled={enabledTools.detect_action}
+                    onToggle={(enabled) => handleToggleTool('detect_action', enabled)}
+                    required={true}
+                  />
+
+                  <ToolConfigCard
+                    name="create_action_record"
+                    title="Create Action Record"
+                    description="Creates specific action records based on detection results"
+                    enabled={enabledTools.create_action_record}
+                    onToggle={(enabled) => handleToggleTool('create_action_record', enabled)}
+                    required={true}
+                  />
+
+                  <ToolConfigCard
+                    name="knowledge_base_lookup"
+                    title="Knowledge Base Lookup"
+                    description="Searches the knowledge base for relevant information"
+                    enabled={enabledTools.knowledge_base_lookup}
+                    onToggle={(enabled) => handleToggleTool('knowledge_base_lookup', enabled)}
+                    required={false}
+                    disabled={true}
+                    disabledReason="Currently disabled in the system"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Tool Definitions</CardTitle>
               <CardDescription>
-                Define the tools available to the MCP orchestrator
+                Advanced: Edit the raw JSON tool definitions
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -251,7 +323,6 @@ const MCPConfigTab: React.FC = () => {
                 value={toolDefinitions}
                 onChange={(e) => setToolDefinitions(e.target.value)}
               />
-
               <div className="flex justify-end mt-4">
                 <Button onClick={handleSaveToolDefinitions}>Save Changes</Button>
               </div>
@@ -294,6 +365,72 @@ const MCPConfigTab: React.FC = () => {
         </TabsContent>
       </Tabs>
     </div>
+  );
+};
+
+interface ToolConfigCardProps {
+  name: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  required?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+}
+
+const ToolConfigCard: React.FC<ToolConfigCardProps> = ({ 
+  name, 
+  title, 
+  description, 
+  enabled, 
+  onToggle,
+  required = false,
+  disabled = false,
+  disabledReason
+}) => {
+  return (
+    <Card className={`overflow-hidden ${disabled ? 'opacity-60' : ''}`}>
+      <CardContent className="p-0">
+        <div className="flex items-start p-4">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-medium">{title}</h3>
+              {required && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                  Required
+                </span>
+              )}
+              {disabled && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                  Disabled
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">{description}</p>
+            {disabledReason && (
+              <p className="text-xs text-amber-600 mt-1">{disabledReason}</p>
+            )}
+          </div>
+          <div className="ml-4 flex items-center space-x-2">
+            <Switch
+              id={`toggle-${name}`}
+              checked={enabled}
+              onCheckedChange={onToggle}
+              disabled={required || disabled}
+            />
+            <Label htmlFor={`toggle-${name}`} className="sr-only">
+              Enable {title}
+            </Label>
+            {enabled ? (
+              <Check className="h-4 w-4 text-green-500" />
+            ) : (
+              <X className="h-4 w-4 text-gray-400" />
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

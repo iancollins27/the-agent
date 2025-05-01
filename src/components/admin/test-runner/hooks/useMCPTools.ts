@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export const useMCPTools = () => {
   const [useMCP, setUseMCP] = useState<boolean>(false);
+  const [availableTools, setAvailableTools] = useState<string[]>([]);
 
   // Check if MCP Orchestrator prompt is selected
   const hasMCPOrchestrator = async (promptIds: string[]): Promise<boolean> => {
@@ -20,15 +21,30 @@ export const useMCPTools = () => {
     return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
   };
   
+  // Fetch available tools when MCP mode changes
+  useEffect(() => {
+    const fetchTools = async () => {
+      if (useMCP) {
+        // In a real implementation, we'd fetch this from a backend endpoint
+        // that accesses the tool registry
+        setAvailableTools([
+          'detect_action', 
+          'create_action_record'
+          // Adding more tools as they become available
+        ]);
+      } else {
+        setAvailableTools([]);
+      }
+    };
+    
+    fetchTools();
+  }, [useMCP]);
+  
   // Get available tools based on MCP mode
   const getAvailableTools = (useMCPMode: boolean): string[] => {
     if (!useMCPMode) return [];
     
-    return [
-      'detect_action', 
-      'create_action_record'
-      // Removing 'knowledge_base_lookup' from available tools
-    ];
+    return availableTools;
   };
 
   return {
@@ -36,5 +52,6 @@ export const useMCPTools = () => {
     setUseMCP,
     hasMCPOrchestrator,
     getAvailableTools,
+    availableTools
   };
 };
