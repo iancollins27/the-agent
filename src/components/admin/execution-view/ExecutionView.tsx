@@ -13,13 +13,15 @@ import PromptInput from './tabs/PromptInput';
 import PromptOutput from './tabs/PromptOutput';
 import ToolLogs from './tabs/ToolLogs';
 import ProjectContext from './tabs/ProjectContext';
+import ActionRecords from './tabs/ActionRecords';
 
 const ExecutionView: React.FC = () => {
   const { executionId } = useParams();
+  const promptRunId = executionId; // Alias for clarity and consistency
   const [activeTab, setActiveTab] = useState("prompt-input");
   
   const { data: execution, isLoading, error } = useQuery({
-    queryKey: ['execution', executionId],
+    queryKey: ['execution', promptRunId],
     queryFn: async () => {
       // Fetch the prompt run
       const { data: promptRun, error: promptRunError } = await supabase
@@ -40,7 +42,7 @@ const ExecutionView: React.FC = () => {
           project_id,
           workflow_prompts(type)
         `)
-        .eq('id', executionId)
+        .eq('id', promptRunId)
         .single();
 
       if (promptRunError) throw promptRunError;
@@ -49,7 +51,7 @@ const ExecutionView: React.FC = () => {
       const { data: toolLogs, error: toolLogsError } = await supabase
         .from('tool_logs')
         .select('*')
-        .eq('prompt_run_id', executionId)
+        .eq('prompt_run_id', promptRunId)
         .order('created_at', { ascending: true });
 
       if (toolLogsError) console.error("Error fetching tool logs:", toolLogsError);
@@ -74,30 +76,42 @@ const ExecutionView: React.FC = () => {
         else console.error("Error fetching project:", projectError);
       }
 
+      // Fetch related action records if any
+      const { data: actionRecords, error: actionRecordsError } = await supabase
+        .from('action_records')
+        .select('id')
+        .eq('prompt_run_id', promptRunId);
+
+      if (actionRecordsError) console.error("Error fetching action records count:", actionRecordsError);
+
       // Create an enhanced promptRun object with additional data
       const enhancedPromptRun = {
         ...promptRun,
         toolLogsCount: toolLogs?.length || 0,
-        toolLogs
+        toolLogs,
+        actionRecordsCount: actionRecords?.length || 0
       };
 
       console.log("Enhanced promptRun:", {
         id: enhancedPromptRun.id,
         hasMCP: toolLogs?.length > 0,
+        hasActions: actionRecords?.length > 0,
         promptInputLength: promptRun.prompt_input ? promptRun.prompt_input.length : 0
       });
 
       return {
         promptRun: enhancedPromptRun,
         toolLogs: toolLogs || [],
-        project
+        project,
+        actionRecordsCount: actionRecords?.length || 0
       };
     },
-    enabled: !!executionId,
+    enabled: !!promptRunId,
     staleTime: 1000 * 60 * 5 // 5 minutes
   });
 
   const isMCPExecution = execution?.toolLogs?.length > 0;
+  const hasActionRecords = execution?.actionRecordsCount > 0;
 
   if (isLoading) {
     return (
@@ -125,7 +139,7 @@ const ExecutionView: React.FC = () => {
         <Info className="h-5 w-5" />
         <AlertTitle>No Data Found</AlertTitle>
         <AlertDescription>
-          No execution found with the ID: {executionId}
+          No prompt run found with the ID: {promptRunId}
         </AlertDescription>
       </Alert>
     );
@@ -142,21 +156,32 @@ const ExecutionView: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Execution Details</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Prompt Run Details</h1>
           <p className="text-muted-foreground">
             {formattedCreatedAt} • {workflowType} • {modelName}
           </p>
         </div>
         
-        {isMCPExecution && (
-          <div className="flex items-center bg-blue-50 text-blue-800 px-3 py-1 rounded-md">
-            <Tool className="h-4 w-4 mr-1" />
-            <span className="font-medium">MCP Execution</span>
-            <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-600 border-blue-200">
-              {toolLogs.length} Tool {toolLogs.length === 1 ? 'Call' : 'Calls'}
-            </Badge>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {isMCPExecution && (
+            <div className="flex items-center bg-blue-50 text-blue-800 px-3 py-1 rounded-md">
+              <Tool className="h-4 w-4 mr-1" />
+              <span className="font-medium">MCP Execution</span>
+              <Badge variant="outline" className="ml-2 bg-blue-100 text-blue-600 border-blue-200">
+                {toolLogs.length} Tool {toolLogs.length === 1 ? 'Call' : 'Calls'}
+              </Badge>
+            </div>
+          )}
+          
+          {hasActionRecords && (
+            <div className="flex items-center bg-amber-50 text-amber-800 px-3 py-1 rounded-md">
+              <span className="font-medium">Actions Created</span>
+              <Badge variant="outline" className="ml-2 bg-amber-100 text-amber-600 border-amber-200">
+                {execution.actionRecordsCount} {execution.actionRecordsCount === 1 ? 'Action' : 'Actions'}
+              </Badge>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Project context card */}
@@ -179,11 +204,14 @@ const ExecutionView: React.FC = () => {
       
       {/* Tabs for displaying different aspects of the execution */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4">
+        <TabsList className="grid grid-cols-5">
           <TabsTrigger value="prompt-input">Input</TabsTrigger>
           <TabsTrigger value="prompt-output">Output</TabsTrigger>
           <TabsTrigger value="tool-logs" disabled={!isMCPExecution}>
-            Tool Logs ({toolLogs.length})
+            Tool Logs {isMCPExecution && `(${toolLogs.length})`}
+          </TabsTrigger>
+          <TabsTrigger value="action-records" disabled={!hasActionRecords}>
+            Actions {hasActionRecords && `(${execution.actionRecordsCount})`}
           </TabsTrigger>
           <TabsTrigger value="project-context">Context</TabsTrigger>
         </TabsList>
@@ -198,6 +226,10 @@ const ExecutionView: React.FC = () => {
         
         <TabsContent value="tool-logs" className="mt-4">
           <ToolLogs promptRunId={promptRun.id} />
+        </TabsContent>
+        
+        <TabsContent value="action-records" className="mt-4">
+          <ActionRecords promptRunId={promptRun.id} />
         </TabsContent>
         
         <TabsContent value="project-context" className="mt-4">
@@ -233,7 +265,7 @@ const ExecutionView: React.FC = () => {
           <div className="flex justify-between w-full text-xs text-muted-foreground">
             <div>Prompt Tokens: {promptRun.prompt_tokens || 'Unknown'}</div>
             <div>Completion Tokens: {promptRun.completion_tokens || 'Unknown'}</div>
-            <div>Execution ID: {promptRun.id.slice(0, 8)}</div>
+            <div>Prompt Run ID: {promptRun.id.slice(0, 8)}</div>
           </div>
         </CardFooter>
       </Card>
