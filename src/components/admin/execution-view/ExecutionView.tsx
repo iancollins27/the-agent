@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -37,7 +38,6 @@ const ExecutionView: React.FC = () => {
           usd_cost,
           workflow_prompt_id,
           project_id,
-          original_prompt,
           workflow_prompts(type)
         `)
         .eq('id', executionId)
@@ -78,15 +78,13 @@ const ExecutionView: React.FC = () => {
       const enhancedPromptRun = {
         ...promptRun,
         toolLogsCount: toolLogs?.length || 0,
-        toolLogs,
-        originalPrompt: promptRun.original_prompt
+        toolLogs
       };
 
       console.log("Enhanced promptRun:", {
         id: enhancedPromptRun.id,
         hasMCP: toolLogs?.length > 0,
-        hasOriginalPrompt: Boolean(promptRun.original_prompt),
-        originalPromptLength: promptRun.original_prompt ? promptRun.original_prompt.length : 0
+        promptInputLength: promptRun.prompt_input ? promptRun.prompt_input.length : 0
       });
 
       return {
