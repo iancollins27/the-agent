@@ -73,6 +73,9 @@ export async function handleRequest(supabase: any, requestBody: any) {
     }
   }
   
+  // Store the original prompt text before variable replacement for MCP
+  let originalPrompt = finalPromptText;
+
   // Perform the variable replacement only for non-MCP requests
   // For MCP, we'll do the variable replacement in the getMCPOrchestratorPrompt function
   let finalPrompt = finalPromptText;
@@ -131,7 +134,7 @@ export async function handleRequest(supabase: any, requestBody: any) {
     knowledgeResults: response.knowledgeResults || [],
     toolOutputs: response.toolOutputs || [],
     // We'll include the original prompt for reference but not for display
-    originalPrompt: useMCP ? finalPrompt : null
+    originalPrompt: useMCP ? originalPrompt : null
   };
 }
 

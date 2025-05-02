@@ -17,6 +17,9 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
     promptRun.toolLogsCount > 0 : // Use the property if it exists
     Array.isArray(promptRun.toolLogs) && promptRun.toolLogs.length > 0; // Fallback to checking toolLogs array
 
+  // Check for originalPrompt field which contains the actual prompt for MCP executions
+  const mcpOriginalPrompt = promptRun.originalPrompt || '';
+  
   const toolsUsed = promptRun.toolLogs?.map(log => log.tool_name).filter((value, index, self) => 
     self.indexOf(value) === index
   ) || [];
@@ -24,7 +27,10 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
   // Parse the prompt input to extract system prompt and milestone instructions
   const parsePromptInput = () => {
     try {
-      const input = promptRun.prompt_input || '';
+      // For MCP, use the originalPrompt if available
+      const input = isMCPExecution && mcpOriginalPrompt ? 
+                    mcpOriginalPrompt : 
+                    (promptRun.prompt_input || '');
       
       // Check if this is likely a system prompt with milestone instructions
       if (input.includes('MILESTONE INSTRUCTIONS:')) {
@@ -43,11 +49,25 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
       return { systemPrompt: '', milestoneInstructions: '', userPrompt: input };
     } catch (e) {
       console.error('Error parsing prompt input:', e);
-      return { systemPrompt: '', milestoneInstructions: '', userPrompt: promptRun.prompt_input || '' };
+      return { 
+        systemPrompt: '', 
+        milestoneInstructions: '', 
+        userPrompt: isMCPExecution && mcpOriginalPrompt ? mcpOriginalPrompt : (promptRun.prompt_input || 'No prompt input available') 
+      };
     }
   };
 
   const { systemPrompt, milestoneInstructions, userPrompt } = parsePromptInput();
+  
+  // Debug information to help troubleshoot
+  console.log('PromptInput rendering:', {
+    isMCPExecution,
+    mcpOriginalPrompt: mcpOriginalPrompt ? 'Present (length: ' + mcpOriginalPrompt.length + ')' : 'Not present',
+    viewType,
+    systemPrompt: systemPrompt ? 'Present (length: ' + systemPrompt.length + ')' : 'Not present',
+    milestoneInstructions: milestoneInstructions ? 'Present (length: ' + milestoneInstructions.length + ')' : 'Not present',
+    userPrompt: userPrompt ? 'Present (length: ' + userPrompt.length + ')' : 'Not present',
+  });
   
   return (
     <Card className="border border-muted">
@@ -83,7 +103,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
       <CardContent className={isMCPExecution ? "pt-2" : "pt-6"}>
         <TabsContent value="raw" className={viewType === 'raw' ? 'block' : 'hidden'}>
           <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
-            {promptRun.prompt_input || 'No prompt input available'}
+            {isMCPExecution && mcpOriginalPrompt ? mcpOriginalPrompt : (promptRun.prompt_input || 'No prompt input available')}
           </div>
         </TabsContent>
         
@@ -117,7 +137,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
             </div>
           ) : (
             <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
-              {promptRun.prompt_input || 'No prompt input available'}
+              {isMCPExecution && mcpOriginalPrompt ? mcpOriginalPrompt : (promptRun.prompt_input || 'No prompt input available')}
             </div>
           )}
         </TabsContent>
