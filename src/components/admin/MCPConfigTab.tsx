@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +19,6 @@ const MCPConfigTab: React.FC = () => {
   const [orchestratorText, setOrchestratorText] = useState<string>('');
   const [toolDefinitions, setToolDefinitions] = useState<string>('');
   const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({
-    detect_action: true,
     create_action_record: true,
     knowledge_base_lookup: false
   });
@@ -98,35 +96,6 @@ const MCPConfigTab: React.FC = () => {
     // In a real implementation, we would fetch this data from an endpoint
     // that connects to the tool registry
     setToolDefinitions(`[
-  {
-    "name": "detect_action",
-    "description": "Analyzes project context to determine if action is needed, postponed, or unnecessary. This should always be your first tool.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "decision": {
-          "type": "string",
-          "enum": [
-            "ACTION_NEEDED",
-            "NO_ACTION",
-            "SET_FUTURE_REMINDER",
-            "REQUEST_HUMAN_REVIEW"
-          ],
-          "description": "The decision about what course of action to take"
-        },
-        "reason": {
-          "type": "string",
-          "description": "Detailed explanation of your decision-making process and reasoning"
-        },
-        "priority": {
-          "type": "string",
-          "enum": ["high", "medium", "low"],
-          "description": "The priority level of the action or reminder"
-        }
-      },
-      "required": ["decision", "reason"]
-    }
-  },
   {
     "name": "create_action_record",
     "description": "Creates a specific action for team members to execute based on the project's needs. Only use after detect_action confirms ACTION_NEEDED.",
@@ -278,18 +247,9 @@ const MCPConfigTab: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid gap-4">
                   <ToolConfigCard
-                    name="detect_action"
-                    title="Detect Action"
-                    description="Analyzes project context to determine if action is needed"
-                    enabled={enabledTools.detect_action}
-                    onToggle={(enabled) => handleToggleTool('detect_action', enabled)}
-                    required={true}
-                  />
-
-                  <ToolConfigCard
                     name="create_action_record"
                     title="Create Action Record"
-                    description="Creates specific action records based on detection results"
+                    description="Creates specific action records based on the orchestrator's decisions"
                     enabled={enabledTools.create_action_record}
                     onToggle={(enabled) => handleToggleTool('create_action_record', enabled)}
                     required={true}

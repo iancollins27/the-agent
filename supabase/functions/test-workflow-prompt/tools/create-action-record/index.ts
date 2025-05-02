@@ -8,7 +8,7 @@ import { handleCreateActionRecord } from './handler.ts';
 
 export const createActionRecord: Tool = {
   name: "create_action_record",
-  description: "Creates an action record based on the detect_action result. Use when decision is ACTION_NEEDED.",
+  description: "Creates an action record based on your analysis. Use this when you determine an action is needed (message, data update, or set a reminder).",
   schema: createActionRecordSchema,
   execute: handleCreateActionRecord
 };

@@ -31,27 +31,20 @@ export async function createActionRecord(
       return { status: "error", error: "Missing actionData" };
     }
     
-    // Parse the decision from the AI response
-    // If decision wasn't explicitly provided, default to ACTION_NEEDED since this is the create_action_record tool
-    const decision = actionData.decision || "ACTION_NEEDED";
+    // Get the action type
+    const actionType = actionData.action_type;
+    if (!actionType) {
+      console.error("Error: Missing action_type in action record data");
+      return { status: "error", error: "Missing action_type" };
+    }
     
-    // Only create an action record if the decision is ACTION_NEEDED
-    if (decision === "ACTION_NEEDED" || !decision) {
-      // Prepare data for action creation
-      const actionRequest = {
-        ...actionData,
-        decision: "ACTION_NEEDED" // Ensure decision is properly set
-      };
-      
-      return await handleActionNeeded(supabase, promptRunId, projectId, actionRequest);
-    } 
-    // Handle SET_FUTURE_REMINDER action type specially
-    else if (decision === "SET_FUTURE_REMINDER" || actionData.action_type === "set_future_reminder") {
+    // Handle based on action type
+    if (actionType === "set_future_reminder") {
       return await handleFutureReminder(supabase, promptRunId, projectId, actionData);
-    } else {
-      console.log("No action needed based on AI decision:", decision);
-      // Return a valid object even when no action is taken
-      return { status: "no_action", message: `No action needed: ${decision || "unknown decision"}` };
+    } 
+    else {
+      // For all other action types (message, data_update, human_in_loop, knowledge_query)
+      return await handleActionNeeded(supabase, promptRunId, projectId, actionData);
     }
   } catch (error) {
     console.error("Error creating action record:", error);

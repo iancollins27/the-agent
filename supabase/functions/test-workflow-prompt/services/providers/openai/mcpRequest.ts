@@ -56,15 +56,10 @@ export async function processMCPRequest(
   let toolOutputs: any[] = [];
   const MAX_ITERATIONS = 5; // Prevent infinite loops
   let iterationCount = 0;
-  let lastToolDecision = null; // Track the last decision from detect_action tool
   let processedToolCallIds = new Set(); // Track processed tool call IDs to avoid duplicates
   
   // Track tool call counts to detect loops
   const toolCallCounts: Record<string, number> = {};
-  // Define tool limits - especially limit detect_action to 1 call
-  const toolLimits: Record<string, number> = {
-    detect_action: 1
-  };
   
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
@@ -141,26 +136,10 @@ export async function processMCPRequest(
             continue;
           }
           
-          // Check if the tool has reached its limit
-          if (toolLimits[call.name] && toolCallCounts[call.name] >= toolLimits[call.name]) {
-            console.log(`Tool ${call.name} has reached its limit (${toolLimits[call.name]}). Skipping call.`);
-            
-            // Add a system message explaining the tool limit
-            const limitMessage = {
-              role: "system",
-              content: `The tool '${call.name}' has reached its maximum allowed calls (${toolLimits[call.name]}). Please use the results from previous calls.`
-            };
-            context.messages.push(limitMessage);
-            
-            // Skip processing this tool call
-            continue;
-          }
-          
-          // Track tool call counts 
+          // Check for excessive tool calls of the same type (potential loop)
           toolCallCounts[call.name] = (toolCallCounts[call.name] || 0) + 1;
           
-          // Check for excessive tool calls of the same type (potential loop)
-          if (!toolLimits[call.name] && toolCallCounts[call.name] > 3) {
+          if (toolCallCounts[call.name] > 3) {
             console.warn(`Excessive calls to ${call.name} detected (${toolCallCounts[call.name]} times). Possible loop.`);
             
             // If it's the create_action_record tool, we might be in a loop
@@ -184,38 +163,15 @@ export async function processMCPRequest(
           processedToolCallIds.add(call.id); // Mark as processed
         
           try {
-            // If this is a detect_action call, store the decision
-            if (call.name === "detect_action" && call.arguments && call.arguments.decision) {
-              lastToolDecision = call.arguments.decision;
-              console.log(`Detected action decision: ${lastToolDecision}`);
-            }
-            
-            // If this is a create_action_record call, add the decision if it's missing
-            if ((call.name === "create_action_record" || call.name === "generate_action") && lastToolDecision) {
-              // Make sure we have the arguments as an object
-              if (typeof call.arguments === "string") {
-                try {
-                  call.arguments = JSON.parse(call.arguments);
-                } catch (e) {
-                  // If parsing fails, keep it as is
-                }
-              }
-              
-              // Add the decision if it's an object and missing the decision
-              if (typeof call.arguments === "object" && !call.arguments.decision) {
-                call.arguments.decision = lastToolDecision;
-              }
-              
-              // Ensure sender is set for message actions
-              if (call.name === "create_action_record" && 
-                  call.arguments.action_type === "message" && 
-                  !call.arguments.sender) {
-                call.arguments.sender = "BidList Project Manager";
-                console.log("Setting default sender to BidList Project Manager");
-              }
+            // Ensure sender is set for message actions
+            if (call.name === "create_action_record" && 
+                call.arguments.action_type === "message" && 
+                !call.arguments.sender) {
+              call.arguments.sender = "BidList Project Manager";
+              console.log("Setting default sender to BidList Project Manager");
             }
 
-            // Use the new executeToolCall function from toolExecutor
+            // Use the executeToolCall function from toolExecutor
             const toolResult = await executeToolCall(
               supabase, 
               call.name, 

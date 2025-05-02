@@ -11,43 +11,52 @@ export const createActionRecordSchema = {
       enum: ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query"],
       description: "The type of action to create"
     },
-    description: {
+    decision: {
       type: "string",
-      description: "Description of the action"
+      enum: ["ACTION_NEEDED", "NO_ACTION", "SET_FUTURE_REMINDER", "REQUEST_HUMAN_REVIEW"],
+      description: "The decision made by the orchestrator (included for backwards compatibility)"
     },
-    recipient: {
+    priority: {
       type: "string",
-      description: "Who should receive this action"
-    },
-    sender: {
-      type: "string",
-      description: "Who is sending this action"
-    },
-    message_text: {
-      type: "string", 
-      description: "For 'message' action type, the text of the message"
+      enum: ["low", "medium", "high", "urgent"],
+      description: "Priority of the action"
     },
     days_until_check: {
       type: "integer",
-      description: "For 'set_future_reminder' action type, days until the check"
+      description: "If SET_FUTURE_REMINDER is selected, how many days until the check should occur"
     },
     check_reason: {
-      type: "string", 
-      description: "For 'set_future_reminder' action type, reason for the check"
-    },
-    field: {
       type: "string",
-      description: "For 'data_update' action type, the field to update"
+      description: "If SET_FUTURE_REMINDER is selected, why the check should occur"
     },
-    value: {
-      type: "string", 
-      description: "For 'data_update' action type, the value to set"
-    },
-    decision: {
+    sender: {
       type: "string",
-      enum: ["NO_ACTION", "ACTION_NEEDED", "SET_FUTURE_REMINDER", "REQUEST_HUMAN_REVIEW"],
-      description: "The decision that led to this action being created"
+      description: "For message actions, who is sending the message (e.g. BidList Project Manager)"
+    },
+    recipient: {
+      type: "string",
+      description: "For message actions, who should receive the message (e.g. Homeowner, Solar Rep, Roofer)"
+    },
+    message_text: {
+      type: "string",
+      description: "For message actions, the content of the message"
+    },
+    description: {
+      type: "string",
+      description: "A brief description of the action"
+    },
+    reason: {
+      type: "string",
+      description: "Reason for the action or decision"
+    },
+    data_field: {
+      type: "string",
+      description: "For data_update actions, the field to update"
+    },
+    data_value: {
+      type: "string",
+      description: "For data_update actions, the new value for the field"
     }
   },
-  required: ["action_type", "description"]
+  required: ["action_type"]
 };

@@ -9,7 +9,7 @@ export const useMCPTools = () => {
   const [useMCP, setUseMCP] = useState<boolean>(false);
   const [availableTools, setAvailableTools] = useState<string[]>([]);
   const [toolLimits, setToolLimits] = useState<Record<string, number>>({
-    detect_action: 1, // Limit detect_action to 1 call
+    // Tool limits can be added here if needed in the future
   });
 
   // Check if MCP Orchestrator prompt is selected
@@ -31,7 +31,6 @@ export const useMCPTools = () => {
         // In a real implementation, we'd fetch this from a backend endpoint
         // that accesses the tool registry
         setAvailableTools([
-          'detect_action', 
           'create_action_record',
           'knowledge_base_lookup'
           // Adding more tools as they become available
