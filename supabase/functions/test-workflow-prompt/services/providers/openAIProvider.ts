@@ -1,4 +1,6 @@
-import { processOpenAIRequest } from "./openai/index.ts";
+
+import { executeMCPRequest } from "../mcpService.ts";
+import { processStandardRequest } from "./openai/standardRequest.ts";
 
 /**
  * Process an AI request using OpenAI
@@ -24,17 +26,15 @@ export async function processOpenAIRequest(
   
   // Check whether to use MCP or standard request
   if (useMCP) {
-    const { processMCPRequest } = await import("./openai/mcpRequest.ts");
-    return await processMCPRequest(
-      prompt,
-      model,
+    return await executeMCPRequest(
       supabase,
-      promptRunId,
       projectId || '',
-      contextData
+      contextData,
+      'openai',
+      model,
+      promptRunId
     );
   } else {
-    const { processStandardRequest } = await import("./openai/standardRequest.ts");
     return await processStandardRequest(
       prompt,
       model,
@@ -44,5 +44,3 @@ export async function processOpenAIRequest(
     );
   }
 }
-
-export { processOpenAIRequest };

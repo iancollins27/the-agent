@@ -1,11 +1,14 @@
 
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+
 export async function logPromptRun(
   supabase: SupabaseClient,
   projectId: string | null, 
   workflowPromptId: string | null, 
   promptInput: string,
   aiProvider: string,
-  aiModel: string
+  aiModel: string,
+  initiatedBy: string = 'manual' // Added initiatedBy parameter with default value
 ) {
   try {
     // Ensure promptInput is not empty or undefined
@@ -21,6 +24,7 @@ export async function logPromptRun(
       ai_provider: aiProvider,
       ai_model: aiModel,
       input_length: promptInput.length,
+      initiated_by: initiatedBy,
     });
 
     // Create base insert object
@@ -31,6 +35,7 @@ export async function logPromptRun(
       status: 'PENDING',
       ai_provider: aiProvider,
       ai_model: aiModel,
+      // Add initiated_by metadata in future column if needed
     };
 
     // Insert the prompt run record

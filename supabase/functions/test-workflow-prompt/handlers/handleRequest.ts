@@ -1,7 +1,8 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../utils/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { logPromptRun } from '../database/tool-logs.ts';
+import { logPromptRun } from '../database/prompt-runs.ts'; 
 import { replaceVariables } from '../utils.ts';
 import { handleAIResponse } from '../services/aiResponseHandler.ts';
 
@@ -210,30 +211,4 @@ export async function handleRequest(req: Request) {
       }
     );
   }
-}
-
-/**
- * Replaces variables in the prompt with data from the context
- */
-function replaceVariables(prompt: string, context: Record<string, any>): string {
-  let finalPrompt = prompt;
-  
-  // Replace simple string variables
-  for (const key in context) {
-    if (typeof context[key] === 'string' || typeof context[key] === 'number') {
-      finalPrompt = finalPrompt.replace(new RegExp(`{{${key}}}`, 'g'), String(context[key]));
-    }
-  }
-  
-  // Handle JSON stringify for complex objects
-  if (context.projectData && typeof context.projectData === 'object') {
-    try {
-      const projectDataString = JSON.stringify(context.projectData, null, 2);
-      finalPrompt = finalPrompt.replace(new RegExp(`{{projectData}}`, 'g'), projectDataString);
-    } catch (error) {
-      console.error("Error stringifying projectData:", error);
-    }
-  }
-  
-  return finalPrompt;
 }

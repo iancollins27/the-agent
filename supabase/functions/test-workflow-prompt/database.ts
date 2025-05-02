@@ -2,11 +2,17 @@
 // Re-export functions from database module for backward compatibility
 import {
   logPromptRun,
-  updatePromptRunWithResult,
+  updatePromptRunWithResult
+} from "./database/prompt-runs.ts";
+
+import {
   setProjectNextCheckDate,
-  setNextCheckDate,
+  setNextCheckDate
+} from "./database/projects.ts";
+
+import {
   createActionRecord
-} from "./database/index.ts";
+} from "./database/actions.ts";
 
 export {
   logPromptRun,
