@@ -1,8 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { handleRequest } from "./services/requestHandler.ts";
-import { corsHeaders } from "./utils/cors.ts";
+import { handleRequest } from './handlers/handleRequest.ts';
+import { corsHeaders } from './utils/cors.ts';
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -10,55 +9,42 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 console.log("Starting test-workflow-prompt function, connecting to Supabase at:", supabaseUrl);
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    console.log("Handling OPTIONS preflight request");
-    return new Response(null, { 
+// Add better logging for MCP usage
+function logWithTime(message: string) {
+  const now = new Date();
+  const timeString = now.toISOString();
+  console.log(`[${timeString}] ${message}`);
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
       headers: corsHeaders,
-      status: 200 // Explicitly set status code to 200 for OPTIONS
+      status: 200
     });
   }
-  
+
   try {
-    let requestBody;
-    try {
-      requestBody = await req.json();
-      console.log("Received request with body:", JSON.stringify(requestBody, null, 2).substring(0, 500) + "...");
-    } catch (parseError) {
-      console.error("Error parsing request body:", parseError);
-      throw new Error("Invalid JSON in request body");
-    }
+    logWithTime('Starting test-workflow-prompt function, connecting to Supabase at: ' + 
+      Deno.env.get('SUPABASE_URL')?.substring(0, 30) + '...');
     
-    console.log("Processing request through handleRequest");
-    const response = await handleRequest(supabase, requestBody);
+    const response = await handleRequest(req);
+    logWithTime('Successfully processed request, returning response');
     
-    // Return the response with CORS headers
-    const headers = new Headers(corsHeaders);
-    
-    // Add Content-Type header if not already present
-    if (!headers.has("Content-Type")) {
-      headers.set("Content-Type", "application/json");
-    }
-    
-    console.log("Successfully processed request, returning response");
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: headers
-    });
+    return response;
   } catch (error) {
-    console.error("Error in test-workflow-prompt function:", error);
-    
+    logWithTime(`Error processing request: ${error.message}`);
     return new Response(
-      JSON.stringify({
-        error: error.message,
+      JSON.stringify({ 
+        error: error.message || 'An unexpected error occurred',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       }),
       {
+        status: 500,
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        status: 500,
+          'Content-Type': 'application/json'
+        }
       }
     );
   }

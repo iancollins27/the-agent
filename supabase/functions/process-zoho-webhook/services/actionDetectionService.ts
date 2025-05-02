@@ -54,8 +54,8 @@ export async function runActionDetection(
       next_step: nextStep || '',
       new_data: JSON.stringify(projectData),
       is_reminder_check: false,
-      milestone_instructions: milestoneInstructions || '', // Include milestone instructions
-      property_address: propertyAddress || '' // Include property address
+      milestone_instructions: milestoneInstructions || '',
+      property_address: propertyAddress || ''
     };
     
     console.log('Calling action detection workflow with context:', Object.keys(actionContext));
@@ -89,6 +89,120 @@ export async function runActionDetection(
   } catch (error) {
     console.error('Error in action detection process:', error);
     return null;
+  }
+}
+
+/**
+ * Run action detection and execution workflow with MCP for a project
+ * @param supabase Supabase client
+ * @param projectId Project ID
+ * @param summary Project summary
+ * @param trackName Track name
+ * @param trackRoles Track roles
+ * @param trackBasePrompt Track base prompt
+ * @param nextStep Next step
+ * @param projectData Project data
+ * @param milestoneInstructions Milestone instructions
+ * @param aiProvider AI provider
+ * @param aiModel AI model
+ * @param propertyAddress Property address for the project
+ * @returns Result of the MCP action detection workflow
+ */
+export async function runActionDetectionWithMCP(
+  supabase: any,
+  projectId: string,
+  summary: string,
+  trackName: string,
+  trackRoles: string,
+  trackBasePrompt: string,
+  nextStep: string,
+  projectData: any,
+  milestoneInstructions: string,
+  aiProvider: string,
+  aiModel: string,
+  propertyAddress: string = ''
+) {
+  try {
+    console.log('Running MCP-based action detection and execution...');
+    
+    // Get the MCP orchestrator prompt
+    const { data: mcpPrompt, error: mcpPromptError } = await supabase
+      .from('workflow_prompts')
+      .select('*')
+      .eq('type', 'mcp_orchestrator')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (mcpPromptError || !mcpPrompt || !mcpPrompt.prompt_text) {
+      console.error('No MCP orchestrator prompt found in the database:', mcpPromptError);
+      // Fall back to the standard action detection
+      console.log('Falling back to standard action detection method');
+      return await runActionDetection(
+        supabase, projectId, summary, trackName, trackRoles, trackBasePrompt, 
+        nextStep, projectData, milestoneInstructions, aiProvider, aiModel, propertyAddress
+      );
+    }
+    
+    // Format the context for the MCP orchestrator prompt
+    const mcpContext = {
+      summary: summary,
+      track_name: trackName || 'Default Track',
+      track_roles: trackRoles || '',
+      track_base_prompt: trackBasePrompt || '',
+      current_date: new Date().toISOString().split('T')[0],
+      next_step: nextStep || '',
+      new_data: JSON.stringify(projectData),
+      is_reminder_check: false,
+      milestone_instructions: milestoneInstructions || '',
+      property_address: propertyAddress || '',
+      available_tools: ['create_action_record', 'knowledge_base_lookup']
+    };
+    
+    console.log('Calling MCP workflow with context:', Object.keys(mcpContext));
+    
+    // Call the test-workflow-prompt function with MCP enabled
+    const { data: mcpResult, error: mcpError } = await supabase.functions.invoke(
+      'test-workflow-prompt',
+      {
+        body: {
+          promptType: 'mcp_orchestrator', // Use MCP orchestrator prompt type
+          promptText: mcpPrompt.prompt_text,
+          projectId: projectId,
+          contextData: mcpContext,
+          aiProvider: aiProvider,
+          aiModel: aiModel,
+          workflowPromptId: mcpPrompt.id,
+          initiatedBy: 'zoho-webhook',
+          useMCP: true // Enable MCP processing
+        }
+      }
+    );
+    
+    if (mcpError) {
+      console.error('Error invoking MCP workflow:', mcpError);
+      // Fall back to the standard action detection on error
+      console.log('Falling back to standard action detection method after MCP error');
+      return await runActionDetection(
+        supabase, projectId, summary, trackName, trackRoles, trackBasePrompt, 
+        nextStep, projectData, milestoneInstructions, aiProvider, aiModel, propertyAddress
+      );
+    }
+    
+    console.log('MCP workflow completed successfully:', 
+      mcpResult?.actionRecordId ? `Created action record: ${mcpResult.actionRecordId}` : 
+      mcpResult?.toolOutputs ? `Generated ${mcpResult.toolOutputs.length} tool outputs` : 
+      'No action needed');
+    
+    return mcpResult;
+  } catch (error) {
+    console.error('Error in MCP action detection process:', error);
+    // Fall back to the standard action detection on exception
+    console.log('Falling back to standard action detection method due to exception');
+    return await runActionDetection(
+      supabase, projectId, summary, trackName, trackRoles, trackBasePrompt, 
+      nextStep, projectData, milestoneInstructions, aiProvider, aiModel, propertyAddress
+    );
   }
 }
 

@@ -1,110 +1,78 @@
 
 /**
- * System prompts for MCP orchestration
+ * MCP system prompts
  */
-import { replaceVariables } from "./utils.ts";
 
-export const getMCPOrchestratorPrompt = (
-  availableTools: string[], 
-  milestoneInstructions?: string,
-  customPromptText?: string,
-  contextData?: any
-): string => {
-  // If no context data is provided, we can't do variable replacement
-  if (!contextData) {
-    console.warn("No context data provided for variable replacement in MCP orchestrator prompt");
-  }
-
-  // Format available tools as a string for template replacement
-  const formattedTools = formatAvailableTools(availableTools);
-  
-  // Add formatted tools to context data for variable replacement
-  if (contextData) {
-    contextData.available_tools = formattedTools;
+/**
+ * Generates the MCP orchestrator prompt for use with the MCP
+ * @param toolNames List of available tool names
+ * @param milestoneInstructions Milestone-specific instructions
+ * @param customPrompt Custom orchestrator prompt from the database
+ * @param contextData Context data for the MCP
+ * @returns The formatted MCP orchestrator prompt
+ */
+export function getMCPOrchestratorPrompt(
+  toolNames: string[],
+  milestoneInstructions: string | null,
+  customPrompt: string | null,
+  contextData: Record<string, any>
+): string {
+  // If we have a custom prompt from the database, use that as the base
+  if (customPrompt) {
+    // Replace variables in the custom prompt
+    let formattedPrompt = customPrompt;
     
-    // If milestone instructions are provided, add them to context data
-    if (milestoneInstructions) {
-      contextData.milestone_instructions = milestoneInstructions;
-    }
+    // Try to replace common variables in the prompt
+    const variablesToReplace = {
+      '{{available_tools}}': toolNames.join(', '),
+      '{{milestone_instructions}}': milestoneInstructions || 'No specific milestone instructions available.',
+      '{{property_address}}': contextData.property_address || '[No property address provided]',
+      '{{current_date}}': contextData.current_date || new Date().toISOString().split('T')[0],
+      '{{track_name}}': contextData.track_name || 'Default Track',
+      '{{track_base_prompt}}': contextData.track_base_prompt || '',
+      '{{track_roles}}': contextData.track_roles || '',
+      '{{next_step}}': contextData.next_step || '',
+      '{{summary}}': contextData.summary || '[No project summary provided]',
+    };
+    
+    // Replace each variable
+    Object.entries(variablesToReplace).forEach(([variable, value]) => {
+      formattedPrompt = formattedPrompt.replace(new RegExp(variable, 'g'), value);
+    });
+    
+    return formattedPrompt;
   }
   
-  // Log what we're using for the prompt
-  console.log("Using custom prompt:", customPromptText ? "YES" : "NO");
-  
-  // If a custom prompt text is provided, use it with variable replacement
-  if (customPromptText && contextData) {
-    console.log("Using custom orchestrator prompt with variable replacement");
-    return replaceVariables(customPromptText, contextData);
-  }
+  // Default orchestrator prompt if no custom prompt is provided
+  return `You are an AI orchestrator using the Model Context Protocol. Your task is to analyze a project summary and determine if any actions should be taken.
 
-  // Default prompt if no custom prompt is provided
-  const defaultPromptTemplate = `You are an AI orchestrator that manages project workflows using a series of specialized tools.
-Your goal is to analyze the project context and determine what actions should be taken.
+Project Summary:
+${contextData.summary || '[No project summary provided]'}
 
-AVAILABLE TOOLS:
-${formattedTools}
+Project Track: ${contextData.track_name || 'Default Track'}
+Track Roles: ${contextData.track_roles || ''}
+Next Step: ${contextData.next_step || ''}
+Current Date: ${contextData.current_date || new Date().toISOString().split('T')[0]}
+Property Address: ${contextData.property_address || '[No property address provided]'}
 
-WORKFLOW PROCESS:
-1. First, analyze the project context and determine if any action is needed
-2. If action is needed, use the create_action_record tool to create that action
-3. For data queries, use knowledge_base_lookup to search the knowledge base
-4. Your job is to make decisions and then use tools to implement those decisions
+Available Tools:
+${toolNames.join(', ')}
 
-ACTION CREATION GUIDELINES:
-- When creating message actions, write specific, actionable messages tailored to the recipient's role
-- Never create generic messages like "Please review" or "Action needed" - be specific about what needs to be done
-- Always select the most appropriate recipient based on their role in the project
-- Messages should be written in a professional, clear tone as if they will be sent directly to the recipient
-- Do not include technical instructions or system notes in message content
-- For messages, identify the correct recipient (e.g., Homeowner, Project Manager, Roofer) based on the context
-- Do not include a description field unless absolutely necessary
-- Do not create more than one action for the same purpose
+Milestone-Specific Instructions:
+${milestoneInstructions || 'No specific milestone instructions available.'}
 
-DECISION MAKING GUIDELINES:
-- Analyze the project state and determine if action is needed
-- Consider the type of action needed: message, data_update, set_future_reminder, human_in_loop, or knowledge_query
-- If no action is needed, explicitly state that and provide your reasoning
-- If a reminder should be set for a future date, use create_action_record with action_type: "set_future_reminder"
+Track-Level Instructions:
+${contextData.track_base_prompt || ''}
 
-IMPORTANT GUIDELINES:
-- Always think step-by-step
-- Consider the current state of the project and next steps required
-- Be concise and specific with your reasoning
-- Each tool must be called separately as an individual tool call
-- Tool calls must be made sequentially, waiting for each tool's response before making the next call
-- Don't send communications directly, instead create action records for review
-- For timestamps, use ISO format YYYY-MM-DD
-- For message actions, ALWAYS specify both the sender and recipient
-- When creating message actions, the sender should always be "BidList Project Manager" unless otherwise specified
-- NEVER call the same tool with the same parameters more than once
-- NEVER create duplicate action records for the same purpose
-- AVOID INFINITE LOOPS: Do not create multiple similar actions - if you've already created an action for a specific purpose, DO NOT create another one
+Follow these steps:
+1. Analyze the project summary and current state
+2. Determine if any action is needed based on:
+   - The milestone instructions
+   - The current next step
+   - The project summary
+   - Any other relevant context
+3. If action is needed, use the appropriate tool (create_action_record, knowledge_base_lookup)
+4. Be specific in your reasoning and provide clear explanations
 
-TOOL CALL RULES:
-- ALWAYS make each tool call separately, not as a batch
-- Include all required parameters for each tool call
-- Wait for the response from each tool call before proceeding to the next action
-- Never attempt to execute two tool calls at once
-
-When in doubt, focus on: What specific action will most effectively move this project forward?`;
-
-  // Return the default prompt (no variable replacement needed as it's hardcoded)
-  return defaultPromptTemplate;
-};
-
-function formatAvailableTools(tools: string[]): string {
-  if (!tools || tools.length === 0) {
-    return "No tools available.";
-  }
-  
-  const toolDescriptions: Record<string, string> = {
-    'create_action_record': 'Creates a specific action record based on your analysis. Use this to implement your decisions about what action should be taken.',
-    'knowledge_base_lookup': 'Queries the knowledge base for relevant information.',
-    'generate_action': 'Creates a specific action for team members to execute. Similar to create_action_record but with slightly different parameters.'
-  };
-  
-  return tools.map(tool => {
-    const description = toolDescriptions[tool] || 'No description available.';
-    return `- ${tool}: ${description}`;
-  }).join('\n');
+Always think step by step and provide clear reasoning for your decisions.`;
 }

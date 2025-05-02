@@ -5,7 +5,7 @@ import { processWebhookRequest, createErrorResponse, createSuccessResponse } fro
 import { normalizeWebhookData } from '../services/normalizer.ts'
 import { processWebhookBusinessLogic } from '../services/businessLogic.ts'
 import { generateWorkflowPrompt, runWorkflowPrompt } from '../services/workflowPrompt.ts'
-import { detectAndProcessActions } from '../services/actionDetection.ts'
+import { runActionDetectionWithMCP } from '../services/actionDetectionService.ts'
 
 /**
  * Main handler for processing the Zoho webhook
@@ -108,15 +108,22 @@ export async function handleZohoWebhook(req: Request) {
       return createErrorResponse(`Workflow prompt error: ${error.message}`, 500);
     }
 
-    // Step 5: Run action detection and execution
+    // Step 5: Run action detection and execution using MCP
     let actionResult = {};
     try {
-      actionResult = await detectAndProcessActions(
+      actionResult = await runActionDetectionWithMCP(
         supabase,
         businessLogicResult.projectId,
         workflowResult.summary,
-        businessLogicResult,
-        projectData
+        businessLogicResult.trackName,
+        businessLogicResult.trackRoles,
+        businessLogicResult.trackBasePrompt,
+        businessLogicResult.nextStepInstructions,
+        projectData,
+        businessLogicResult.milestoneInstructions || '',
+        businessLogicResult.aiProvider,
+        businessLogicResult.aiModel,
+        businessLogicResult.propertyAddress
       );
     } catch (error) {
       console.error('Error detecting actions:', error);
