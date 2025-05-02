@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronUp, Code, Input, Output, Info } from "lucide-react";
+import { ChevronDown, ChevronUp, Code, FileInput, FileOutput, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Parameter {
@@ -79,7 +79,7 @@ const ToolDefinitionCard: React.FC<ToolDefinitionCardProps> = ({ tool }) => {
         <div className={cn("px-4 pb-4", !expanded && "hidden")}>
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
-              <Input className="h-4 w-4 text-blue-600" />
+              <FileInput className="h-4 w-4 text-blue-600" />
               <h3 className="font-medium text-sm">Input Parameters</h3>
             </div>
             
@@ -127,7 +127,7 @@ const ToolDefinitionCard: React.FC<ToolDefinitionCardProps> = ({ tool }) => {
           {tool.returnType && (
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Output className="h-4 w-4 text-green-600" />
+                <FileOutput className="h-4 w-4 text-green-600" />
                 <h3 className="font-medium text-sm">Return Value</h3>
               </div>
               <div className="rounded-md border p-3 bg-gray-50">
