@@ -1,4 +1,3 @@
-
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
 import { createMCPContext, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
@@ -68,6 +67,13 @@ export async function processMCPRequest(
   }
   
   console.log("Using custom orchestrator prompt from database:", orchestratorPromptText ? "YES" : "NO");
+  
+  // Make sure available tools are properly formatted for variable replacement
+  if (contextData.available_tools && Array.isArray(contextData.available_tools)) {
+    // Convert array to formatted string for the template
+    const toolNames = availableTools.map(t => t.function.name);
+    console.log(`Available tools for context: ${toolNames.join(', ')}`);
+  }
   
   // Use the getMCPOrchestratorPrompt function with the full context data
   const enhancedSystemPrompt = getMCPOrchestratorPrompt(

@@ -22,9 +22,18 @@ export const getMCPOrchestratorPrompt = (
     // Do variable replacement on the custom prompt if context data is available
     let finalPrompt = contextData ? replaceVariables(customPromptText, contextData) : customPromptText;
     
+    console.log("Finished variable replacement, result starts with:", finalPrompt.substring(0, 200) + "...");
+    
+    // Check if milestone instructions section is already included in the template after variable replacement
+    const hasMilestoneInstructions = finalPrompt.includes('MILESTONE INSTRUCTIONS:');
+    
+    // Check if available tools section is already included in the template after variable replacement
+    const hasAvailableTools = finalPrompt.includes('AVAILABLE TOOLS:');
+    
     // Add milestone instructions section if not already included in the custom prompt
     // and milestones are provided
-    if (!finalPrompt.includes('MILESTONE INSTRUCTIONS:') && milestoneInstructions) {
+    if (!hasMilestoneInstructions && milestoneInstructions) {
+      console.log("Adding milestone instructions section (not found in template)");
       const milestoneSection = `
 MILESTONE INSTRUCTIONS:
 ${milestoneInstructions}
@@ -32,15 +41,20 @@ ${milestoneInstructions}
 Please consider these milestone-specific instructions when analyzing the project and determining actions.
 `;
       finalPrompt += milestoneSection;
+    } else if (hasMilestoneInstructions) {
+      console.log("Skipping milestone instructions section (already present in template)");
     }
     
     // Format available tools if not already included in the prompt after variable replacement
-    if (!finalPrompt.includes('AVAILABLE TOOLS:') && availableTools.length > 0) {
+    if (!hasAvailableTools && availableTools.length > 0) {
+      console.log("Adding available tools section (not found in template)");
       const toolsSection = `
 AVAILABLE TOOLS:
 ${formatAvailableTools(availableTools)}
 `;
       finalPrompt += toolsSection;
+    } else if (hasAvailableTools) {
+      console.log("Skipping available tools section (already present in template)");
     }
     
     return finalPrompt;
