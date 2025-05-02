@@ -5,6 +5,8 @@
 
 export async function getLatestWorkflowPrompt(supabase: any, type: string): Promise<any> {
   try {
+    console.log(`Fetching latest workflow prompt of type: ${type}`);
+    
     const { data: prompt, error } = await supabase
       .from('workflow_prompts')
       .select('*')
@@ -19,6 +21,10 @@ export async function getLatestWorkflowPrompt(supabase: any, type: string): Prom
     }
     
     console.log(`Retrieved ${type} prompt:`, prompt ? "YES" : "NO");
+    if (prompt) {
+      console.log(`Prompt ID: ${prompt.id}, Length: ${prompt.prompt_text?.length || 0} characters`);
+    }
+    
     return prompt;
   } catch (error) {
     console.error(`Error in getLatestWorkflowPrompt for ${type}:`, error);

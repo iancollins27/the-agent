@@ -112,8 +112,20 @@ export function replaceVariables(template: string, contextData: any): string {
     return current;
   };
   
-  // Replace all variables in the template
+  // Find all variables in the template
+  const variables: string[] = [];
   let match;
+  while ((match = variableRegex.exec(template)) !== null) {
+    variables.push(match[1].trim());
+  }
+  
+  // Log all variables that will be replaced
+  if (variables.length > 0) {
+    console.log("Variables to replace:", variables.join(", "));
+  }
+  
+  // Replace all variables in the template
+  variableRegex.lastIndex = 0; // Reset regex index
   while ((match = variableRegex.exec(template)) !== null) {
     const fullMatch = match[0]; // {{variableName}}
     const variableName = match[1].trim(); // variableName
@@ -136,6 +148,8 @@ export function replaceVariables(template: string, contextData: any): string {
     } else {
       formattedValue = String(value);
     }
+    
+    console.log(`Replacing {{${variableName}}} with: ${typeof value === 'object' ? '[object]' : formattedValue.substring(0, 50) + (formattedValue.length > 50 ? '...' : '')}`);
     
     // Update the result, replacing just this occurrence
     // Need to use replace with a string, not regex, to avoid special char issues

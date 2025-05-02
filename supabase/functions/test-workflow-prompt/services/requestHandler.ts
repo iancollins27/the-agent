@@ -67,7 +67,11 @@ export async function handleRequest(supabase: any, requestBody: any) {
     }
   }
   
-  // We'll still perform the variable replacement for logging purposes
+  // Ensure default values for variables that might be missing
+  contextData.is_reminder_check = contextData.is_reminder_check || false;
+  contextData.available_tools = contextData.available_tools || [];
+  
+  // Perform the variable replacement
   let finalPrompt = replaceVariables(finalPromptText, contextData);
   console.log("Final prompt after variable replacement:", finalPrompt);
   
