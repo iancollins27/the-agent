@@ -43,6 +43,7 @@ export const useContextData = () => {
         track_name: projectData.project_tracks?.name || 'Default Track',
         track_base_prompt: projectData.project_tracks?.["track base prompt"] || '',
         track_roles: projectData.project_tracks?.Roles || '',
+        track_id: projectData.project_track || null, // Explicitly include track_id
         current_date: new Date().toISOString().split('T')[0],
         milestone_instructions: '',
         action_description: 'Sample action for testing',

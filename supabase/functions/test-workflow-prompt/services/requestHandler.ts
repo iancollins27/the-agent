@@ -55,7 +55,13 @@ export async function handleRequest(supabase: any, requestBody: any) {
   if (projectId && contextData.next_step) {
     try {
       const projectTrackId = contextData.track_id || null;
-      console.log("Missing required parameters:", { nextStep: contextData.next_step, projectTrackId });
+      
+      // Improve logging to diagnose the issue
+      if (!projectTrackId) {
+        console.warn(`Missing track_id for milestone: ${contextData.next_step}. Cannot fetch milestone instructions.`);
+      } else {
+        console.log(`Fetching milestone instructions for step "${contextData.next_step}" with track_id: ${projectTrackId}`);
+      }
       
       milestoneInstructions = await getMilestoneInstructions(supabase, contextData.next_step, projectTrackId);
       
@@ -64,7 +70,7 @@ export async function handleRequest(supabase: any, requestBody: any) {
         // Add milestone instructions to context data
         contextData.milestone_instructions = milestoneInstructions;
       } else {
-        console.log(`No milestone instructions found for step "${contextData.next_step}"`);
+        console.log(`No milestone instructions found for step "${contextData.next_step}" with track_id: ${projectTrackId}`);
         contextData.milestone_instructions = "No specific instructions available for this milestone.";
       }
     } catch (milestoneError) {

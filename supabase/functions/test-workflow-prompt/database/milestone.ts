@@ -7,8 +7,13 @@
  * @returns Milestone instructions if found, null otherwise
  */
 export async function getMilestoneInstructions(supabase: any, nextStep: string, projectTrackId: string | null) {
-  if (!nextStep || !projectTrackId) {
-    console.log('Missing required parameters:', { nextStep, projectTrackId });
+  if (!nextStep) {
+    console.log('Missing next_step parameter, cannot fetch milestone instructions');
+    return null;
+  }
+  
+  if (!projectTrackId) {
+    console.log('Missing projectTrackId parameter, cannot fetch milestone instructions for step:', nextStep);
     return null;
   }
 
@@ -50,6 +55,7 @@ export async function getMilestoneInstructions(supabase: any, nextStep: string, 
         if (caseInsensitiveMatch) {
           console.log('Found a case-insensitive match:', caseInsensitiveMatch.step_title);
           console.log('This suggests a case sensitivity issue in the data');
+          return caseInsensitiveMatch.prompt_instructions;
         }
       } else {
         console.log('No milestones found for track ID:', projectTrackId);

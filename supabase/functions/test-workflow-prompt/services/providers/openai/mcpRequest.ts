@@ -1,3 +1,4 @@
+
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
 import { createMCPContext, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
@@ -53,7 +54,19 @@ export async function processMCPRequest(
   
   // Extract milestone instructions from context data
   const milestoneInstructions = contextData.milestone_instructions || null;
-  console.log("Using milestone instructions in system prompt:", milestoneInstructions ? "YES" : "NO");
+  
+  // Log milestone information for debugging
+  console.log("Milestone instructions available:", milestoneInstructions ? "YES" : "NO");
+  if (milestoneInstructions) {
+    console.log("Milestone instructions preview:", milestoneInstructions.substring(0, 100) + "...");
+  } else {
+    console.log("No milestone instructions found. Next step:", contextData.next_step);
+    console.log("Track ID available:", contextData.track_id ? "YES" : "NO");
+    if (contextData.track_id) {
+      console.log("Track ID:", contextData.track_id);
+    }
+  }
+  
   console.log("Using custom orchestrator prompt from database:", orchestratorPromptText ? "YES" : "NO");
   
   // Use the getMCPOrchestratorPrompt function with the full context data
