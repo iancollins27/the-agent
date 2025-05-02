@@ -15,54 +15,35 @@ export const getMCPOrchestratorPrompt = (
     console.warn("No context data provided for variable replacement in MCP orchestrator prompt");
   }
 
-  // If a custom prompt text is provided, use it instead of the default
-  if (customPromptText) {
-    console.log("Using custom orchestrator prompt text");
+  // Format available tools as a string for template replacement
+  const formattedTools = formatAvailableTools(availableTools);
+  
+  // Add formatted tools to context data for variable replacement
+  if (contextData) {
+    contextData.available_tools = formattedTools;
     
-    // Do variable replacement on the custom prompt if context data is available
-    let finalPrompt = contextData ? replaceVariables(customPromptText, contextData) : customPromptText;
-    
-    // Add milestone instructions section if not already included in the custom prompt
-    // and milestones are provided
-    if (!finalPrompt.includes('MILESTONE INSTRUCTIONS:') && milestoneInstructions) {
-      const milestoneSection = `
-MILESTONE INSTRUCTIONS:
-${milestoneInstructions}
-
-Please consider these milestone-specific instructions when analyzing the project and determining actions.
-`;
-      finalPrompt += milestoneSection;
+    // If milestone instructions are provided, add them to context data
+    if (milestoneInstructions) {
+      contextData.milestone_instructions = milestoneInstructions;
     }
-    
-    // Format available tools if not already included in the prompt after variable replacement
-    if (!finalPrompt.includes('AVAILABLE TOOLS:') && availableTools.length > 0) {
-      const toolsSection = `
-AVAILABLE TOOLS:
-${formatAvailableTools(availableTools)}
-`;
-      finalPrompt += toolsSection;
-    }
-    
-    return finalPrompt;
+  }
+  
+  // Log what we're using for the prompt
+  console.log("Using custom prompt:", customPromptText ? "YES" : "NO");
+  
+  // If a custom prompt text is provided, use it with variable replacement
+  if (customPromptText && contextData) {
+    console.log("Using custom orchestrator prompt with variable replacement");
+    return replaceVariables(customPromptText, contextData);
   }
 
   // Default prompt if no custom prompt is provided
-  const milestoneSection = milestoneInstructions 
-    ? `
-MILESTONE INSTRUCTIONS:
-${milestoneInstructions}
-
-Please consider these milestone-specific instructions when analyzing the project and determining actions.
-`
-    : '';
-
   const defaultPromptTemplate = `You are an AI orchestrator that manages project workflows using a series of specialized tools.
 Your goal is to analyze the project context and determine what actions should be taken.
 
 AVAILABLE TOOLS:
-${formatAvailableTools(availableTools)}
+${formattedTools}
 
-${milestoneSection}
 WORKFLOW PROCESS:
 1. First, analyze the project context and determine if any action is needed
 2. If action is needed, use the create_action_record tool to create that action

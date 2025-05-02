@@ -1,4 +1,3 @@
-
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
 import { createMCPContext, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
@@ -32,7 +31,9 @@ export async function processMCPRequest(
     availableTools = getToolDefinitions();
   }
 
-  console.log(`Available tools: ${availableTools.map(t => t.function.name).join(", ")}`);
+  // Get tool names for prompt formatting
+  const toolNames = availableTools.map(t => t.function.name);
+  console.log(`Available tool names for prompt: ${toolNames.join(", ")}`);
 
   // Get user message from contextData if available, or use default
   let userPrompt = contextData.user_message || "Analyze this project and determine the next actions.";
@@ -71,7 +72,7 @@ export async function processMCPRequest(
   
   // Use the getMCPOrchestratorPrompt function with the full context data
   const enhancedSystemPrompt = getMCPOrchestratorPrompt(
-    availableTools.map(t => t.function.name),
+    toolNames,
     milestoneInstructions,
     orchestratorPromptText,
     contextData  // Pass the entire context data for variable replacement
