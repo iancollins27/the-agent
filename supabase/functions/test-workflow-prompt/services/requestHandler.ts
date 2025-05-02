@@ -4,6 +4,7 @@ import { logPromptRun } from "../database/index.ts";
 import { replaceVariables } from "../utils.ts";
 import { handleAIResponse } from "./aiResponseHandler.ts";
 import { getMilestoneInstructions } from "../database/milestone.ts";
+import { getLatestWorkflowPrompt } from "../database/workflow-prompts.ts";
 
 export async function handleRequest(supabase: any, requestBody: any) {
   const { 
@@ -24,8 +25,24 @@ export async function handleRequest(supabase: any, requestBody: any) {
   if (requestBody.initiatedBy) {
     console.log(`Initiated by: ${requestBody.initiatedBy}`);
   }
+
+  // For MCP orchestrator prompts, always get the latest prompt from database
+  let finalPromptText = promptText;
+  if (promptType === 'mcp_orchestrator' && !finalPromptText) {
+    try {
+      const mcpPrompt = await getLatestWorkflowPrompt(supabase, 'mcp_orchestrator');
+      if (mcpPrompt && mcpPrompt.prompt_text) {
+        console.log("Using MCP orchestrator prompt from database instead of provided prompt");
+        finalPromptText = mcpPrompt.prompt_text;
+      } else {
+        console.warn("No MCP orchestrator prompt found in database");
+      }
+    } catch (err) {
+      console.error("Error fetching MCP orchestrator prompt:", err);
+    }
+  }
   
-  if (!promptText) {
+  if (!finalPromptText) {
     throw new Error("Prompt text is required");
   }
 
@@ -51,7 +68,7 @@ export async function handleRequest(supabase: any, requestBody: any) {
   }
   
   // We'll still perform the variable replacement for logging purposes
-  let finalPrompt = replaceVariables(promptText, contextData);
+  let finalPrompt = replaceVariables(finalPromptText, contextData);
   console.log("Final prompt after variable replacement:", finalPrompt);
   
   let promptRunId = null;

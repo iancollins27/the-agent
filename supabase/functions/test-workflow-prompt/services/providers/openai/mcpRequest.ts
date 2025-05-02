@@ -6,6 +6,7 @@ import { requestHumanReview } from "../../../human-service.ts";
 import { getMCPOrchestratorPrompt } from "../../../mcp-system-prompts.ts";
 import { getToolDefinitions, filterTools } from "../../../tools/toolRegistry.ts";
 import { executeToolCall } from "../../../tools/toolExecutor.ts";
+import { getLatestWorkflowPrompt } from "../../../database/workflow-prompts.ts";
 
 export async function processMCPRequest(
   systemPrompt: string,
@@ -35,14 +36,31 @@ export async function processMCPRequest(
   // Get user message from contextData if available, or use default
   let userPrompt = contextData.user_message || "Analyze this project and determine the next actions.";
   
+  // Fetch the MCP orchestrator prompt from the database
+  let orchestratorPromptText = null;
+  try {
+    const mcpPrompt = await getLatestWorkflowPrompt(supabase, 'mcp_orchestrator');
+    if (mcpPrompt && mcpPrompt.prompt_text) {
+      console.log("Using MCP orchestrator prompt from database");
+      orchestratorPromptText = mcpPrompt.prompt_text;
+    } else {
+      console.log("No MCP orchestrator prompt found in database, using default");
+    }
+  } catch (err) {
+    console.error("Error fetching MCP orchestrator prompt:", err);
+    console.log("Using default MCP orchestrator prompt");
+  }
+  
   // Use the getMCPOrchestratorPrompt function to generate the system prompt with milestone instructions
   const milestoneInstructions = contextData.milestone_instructions || null;
   const enhancedSystemPrompt = getMCPOrchestratorPrompt(
     availableTools.map(t => t.function.name),
-    milestoneInstructions
+    milestoneInstructions,
+    orchestratorPromptText
   );
   
   console.log("Using milestone instructions in system prompt:", milestoneInstructions ? "YES" : "NO");
+  console.log("Using custom orchestrator prompt from database:", orchestratorPromptText ? "YES" : "NO");
   
   // Add milestone instructions to the user prompt if available
   if (milestoneInstructions) {

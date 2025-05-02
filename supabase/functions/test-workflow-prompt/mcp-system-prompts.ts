@@ -3,7 +3,40 @@
  * System prompts for MCP orchestration
  */
 
-export const getMCPOrchestratorPrompt = (availableTools: string[], milestoneInstructions?: string): string => {
+export const getMCPOrchestratorPrompt = (
+  availableTools: string[], 
+  milestoneInstructions?: string,
+  customPromptText?: string
+): string => {
+  // If a custom prompt text is provided, use it instead of the default
+  if (customPromptText) {
+    // Add milestone instructions to the custom prompt if available
+    const milestoneSection = milestoneInstructions 
+      ? `
+MILESTONE INSTRUCTIONS:
+${milestoneInstructions}
+
+Please consider these milestone-specific instructions when analyzing the project and determining actions.
+`
+      : '';
+
+    // Replace {{milestone_instructions}} placeholder with actual instructions if present
+    let finalPrompt = customPromptText;
+    
+    // Replace {{available_tools}} placeholder with formatted tool list
+    if (finalPrompt.includes('{{available_tools}}')) {
+      finalPrompt = finalPrompt.replace('{{available_tools}}', formatAvailableTools(availableTools));
+    }
+    
+    // Add milestone instructions if they aren't already included in the prompt
+    if (!finalPrompt.includes('MILESTONE INSTRUCTIONS:') && milestoneInstructions) {
+      finalPrompt += milestoneSection;
+    }
+    
+    return finalPrompt;
+  }
+
+  // Default prompt if no custom prompt is provided
   const milestoneSection = milestoneInstructions 
     ? `
 MILESTONE INSTRUCTIONS:
