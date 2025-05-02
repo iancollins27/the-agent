@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import ToolDefinitionsPanel from './MCP/ToolDefinitionsPanel';
 
 /**
  * MCP Configuration Tab for controlling the MCP (Model Context Protocol) settings
@@ -98,7 +99,7 @@ const MCPConfigTab: React.FC = () => {
     setToolDefinitions(`[
   {
     "name": "create_action_record",
-    "description": "Creates a specific action for team members to execute based on the project's needs. Only use after detect_action confirms ACTION_NEEDED.",
+    "description": "Creates a specific action for team members to execute based on the project's needs.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -124,7 +125,7 @@ const MCPConfigTab: React.FC = () => {
           "description": "For message actions, who is sending the message"
         }
       },
-      "required": ["action_type", "description", "recipient"]
+      "required": ["action_type"]
     }
   },
   {
@@ -149,7 +150,8 @@ const MCPConfigTab: React.FC = () => {
   }, []);
 
   // Handler for saving tool definitions
-  const handleSaveToolDefinitions = () => {
+  const handleSaveToolDefinitions = (updatedDefinitions: string) => {
+    setToolDefinitions(updatedDefinitions);
     toast({
       title: "Tool Definitions Updated",
       description: "The MCP tool definitions have been successfully updated.",
@@ -270,24 +272,11 @@ const MCPConfigTab: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Tool Definitions</CardTitle>
-              <CardDescription>
-                Advanced: Edit the raw JSON tool definitions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                className="min-h-[300px] font-mono"
-                value={toolDefinitions}
-                onChange={(e) => setToolDefinitions(e.target.value)}
-              />
-              <div className="flex justify-end mt-4">
-                <Button onClick={handleSaveToolDefinitions}>Save Changes</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <ToolDefinitionsPanel 
+            rawDefinitions={toolDefinitions}
+            onSave={handleSaveToolDefinitions}
+            isSaving={false}
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
