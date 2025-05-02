@@ -2,35 +2,45 @@
 /**
  * System prompts for MCP orchestration
  */
+import { replaceVariables } from "./utils.ts";
 
 export const getMCPOrchestratorPrompt = (
   availableTools: string[], 
   milestoneInstructions?: string,
-  customPromptText?: string
+  customPromptText?: string,
+  contextData?: any
 ): string => {
+  // If no context data is provided, we can't do variable replacement
+  if (!contextData) {
+    console.warn("No context data provided for variable replacement in MCP orchestrator prompt");
+  }
+
   // If a custom prompt text is provided, use it instead of the default
   if (customPromptText) {
-    // Add milestone instructions to the custom prompt if available
-    const milestoneSection = milestoneInstructions 
-      ? `
+    console.log("Using custom orchestrator prompt text");
+    
+    // Do variable replacement on the custom prompt if context data is available
+    let finalPrompt = contextData ? replaceVariables(customPromptText, contextData) : customPromptText;
+    
+    // Add milestone instructions section if not already included in the custom prompt
+    // and milestones are provided
+    if (!finalPrompt.includes('MILESTONE INSTRUCTIONS:') && milestoneInstructions) {
+      const milestoneSection = `
 MILESTONE INSTRUCTIONS:
 ${milestoneInstructions}
 
 Please consider these milestone-specific instructions when analyzing the project and determining actions.
-`
-      : '';
-
-    // Replace {{milestone_instructions}} placeholder with actual instructions if present
-    let finalPrompt = customPromptText;
-    
-    // Replace {{available_tools}} placeholder with formatted tool list
-    if (finalPrompt.includes('{{available_tools}}')) {
-      finalPrompt = finalPrompt.replace('{{available_tools}}', formatAvailableTools(availableTools));
+`;
+      finalPrompt += milestoneSection;
     }
     
-    // Add milestone instructions if they aren't already included in the prompt
-    if (!finalPrompt.includes('MILESTONE INSTRUCTIONS:') && milestoneInstructions) {
-      finalPrompt += milestoneSection;
+    // Format available tools if not already included in the prompt after variable replacement
+    if (!finalPrompt.includes('AVAILABLE TOOLS:') && availableTools.length > 0) {
+      const toolsSection = `
+AVAILABLE TOOLS:
+${formatAvailableTools(availableTools)}
+`;
+      finalPrompt += toolsSection;
     }
     
     return finalPrompt;
@@ -46,7 +56,7 @@ Please consider these milestone-specific instructions when analyzing the project
 `
     : '';
 
-  return `You are an AI orchestrator that manages project workflows using a series of specialized tools.
+  const defaultPromptTemplate = `You are an AI orchestrator that manages project workflows using a series of specialized tools.
 Your goal is to analyze the project context and determine what actions should be taken.
 
 AVAILABLE TOOLS:
@@ -96,6 +106,9 @@ TOOL CALL RULES:
 - Never attempt to execute two tool calls at once
 
 When in doubt, focus on: What specific action will most effectively move this project forward?`;
+
+  // Return the default prompt (no variable replacement needed as it's hardcoded)
+  return defaultPromptTemplate;
 };
 
 function formatAvailableTools(tools: string[]): string {

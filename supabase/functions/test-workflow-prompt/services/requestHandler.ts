@@ -26,6 +26,10 @@ export async function handleRequest(supabase: any, requestBody: any) {
     console.log(`Initiated by: ${requestBody.initiatedBy}`);
   }
 
+  // Ensure default values for variables that might be missing
+  contextData.is_reminder_check = contextData.is_reminder_check || false;
+  contextData.available_tools = contextData.available_tools || [];
+  
   // For MCP orchestrator prompts, always get the latest prompt from database
   let finalPromptText = promptText;
   if (promptType === 'mcp_orchestrator' && !finalPromptText) {
@@ -51,6 +55,8 @@ export async function handleRequest(supabase: any, requestBody: any) {
   if (projectId && contextData.next_step) {
     try {
       const projectTrackId = contextData.track_id || null;
+      console.log("Missing required parameters:", { nextStep: contextData.next_step, projectTrackId });
+      
       milestoneInstructions = await getMilestoneInstructions(supabase, contextData.next_step, projectTrackId);
       
       if (milestoneInstructions) {
@@ -67,13 +73,15 @@ export async function handleRequest(supabase: any, requestBody: any) {
     }
   }
   
-  // Ensure default values for variables that might be missing
-  contextData.is_reminder_check = contextData.is_reminder_check || false;
-  contextData.available_tools = contextData.available_tools || [];
-  
-  // Perform the variable replacement
-  let finalPrompt = replaceVariables(finalPromptText, contextData);
-  console.log("Final prompt after variable replacement:", finalPrompt);
+  // Perform the variable replacement only for non-MCP requests
+  // For MCP, we'll do the variable replacement in the getMCPOrchestratorPrompt function
+  let finalPrompt = finalPromptText;
+  if (!useMCP || promptType !== 'mcp_orchestrator') {
+    finalPrompt = replaceVariables(finalPromptText, contextData);
+    console.log("Final prompt after variable replacement:", finalPrompt.substring(0, 200) + "...");
+  } else {
+    console.log("Skipping variable replacement in handler for MCP orchestrator - will be handled by MCP processor");
+  }
   
   let promptRunId = null;
   

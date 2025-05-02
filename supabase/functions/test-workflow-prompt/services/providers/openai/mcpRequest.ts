@@ -51,21 +51,22 @@ export async function processMCPRequest(
     console.log("Using default MCP orchestrator prompt");
   }
   
-  // Use the getMCPOrchestratorPrompt function to generate the system prompt with milestone instructions
+  // Extract milestone instructions from context data
   const milestoneInstructions = contextData.milestone_instructions || null;
-  const enhancedSystemPrompt = getMCPOrchestratorPrompt(
-    availableTools.map(t => t.function.name),
-    milestoneInstructions,
-    orchestratorPromptText
-  );
-  
   console.log("Using milestone instructions in system prompt:", milestoneInstructions ? "YES" : "NO");
   console.log("Using custom orchestrator prompt from database:", orchestratorPromptText ? "YES" : "NO");
   
-  // Add milestone instructions to the user prompt if available
-  if (milestoneInstructions) {
-    userPrompt = `Milestone Instructions: ${milestoneInstructions}\n\n${userPrompt}`;
-  }
+  // Use the getMCPOrchestratorPrompt function with the full context data
+  const enhancedSystemPrompt = getMCPOrchestratorPrompt(
+    availableTools.map(t => t.function.name),
+    milestoneInstructions,
+    orchestratorPromptText,
+    contextData  // Pass the entire context data for variable replacement
+  );
+  
+  // Add debug logging for the resulting prompt
+  console.log("Enhanced system prompt first 200 chars:", 
+              enhancedSystemPrompt.substring(0, 200) + "...");
   
   // Initialize MCP context with the enhanced system prompt
   let context = createMCPContext(enhancedSystemPrompt, userPrompt, availableTools);
@@ -162,7 +163,7 @@ export async function processMCPRequest(
             
             // If it's the create_action_record tool, we might be in a loop
             if (call.name === "create_action_record" && toolCallCounts[call.name] > 3) {
-              console.warn("Detected potential infinite loop with create_action_record - terminating iterations");
+              console.warn("Detected potential infinite loop with create_action_record tool - terminating iterations");
               finalAnswer = "The system detected a potential infinite loop in tool calls. Analysis was terminated to prevent redundant actions. Please review the generated actions for completeness.";
               
               // Add final warning message to the context
