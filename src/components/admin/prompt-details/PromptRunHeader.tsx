@@ -31,7 +31,7 @@ const PromptRunHeader: React.FC<PromptRunHeaderProps> = ({
             </Badge>
           )}
           <Badge variant="secondary" className="font-mono text-xs">
-            ID: {promptRun.id.substring(0, 8)}...
+            ID: {promptRun.id}
           </Badge>
         </div>
       </div>
