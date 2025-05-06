@@ -15,7 +15,14 @@ type StoredFilterValues = {
 
 export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
   const [values, setValues] = useState<StoredFilterValues>({
-    ...defaultValues,
+    hideReviewed: true,
+    excludeReminderActions: true,
+    timeFilter: defaultValues.timeFilter,
+    statusFilter: defaultValues.statusFilter,
+    onlyMyProjects: true,
+    projectManagerFilter: null,
+    groupByRoofer: true,
+    sortRooferAlphabetically: true, // Always true, but keeping for backward compatibility
     onlyPendingActions: true
   });
 

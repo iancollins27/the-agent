@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { PromptRun, workflowTitles, WorkflowType } from './types';
 import PromptRunStatusBadge from './PromptRunStatusBadge';
+import { supabase } from "@/integrations/supabase/client";
 
 interface PromptRunsTableProps {
   promptRuns: PromptRun[];
@@ -52,6 +53,18 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
 }) => {
   const handleMarkReviewed = async (id: string) => {
     try {
+      // Update the database first
+      const { error } = await supabase
+        .from('prompt_runs')
+        .update({ reviewed: true })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating prompt run in database:', error);
+        return;
+      }
+      
+      // Then update the UI through the callback
       onRunReviewed(id);
     } catch (error) {
       console.error('Error marking prompt run as reviewed:', error);

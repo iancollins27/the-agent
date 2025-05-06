@@ -58,10 +58,13 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
       groups[rooferKey].push(run);
     });
     
-    return Object.entries(groups).map(([roofer, runs]) => ({
-      roofer,
-      runs
-    }));
+    // Sort roofer groups alphabetically
+    return Object.entries(groups)
+      .sort(([rooferA], [rooferB]) => rooferA.localeCompare(rooferB))
+      .map(([roofer, runs]) => ({
+        roofer,
+        runs
+      }));
   };
   
   const rooferGroups = groupByRoofer ? groupPromptRunsByRoofer() : [];

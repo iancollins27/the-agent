@@ -123,16 +123,6 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
             >
               Group by Roofer
             </DropdownMenuCheckboxItem>
-            
-            {groupByRoofer && (
-              <DropdownMenuCheckboxItem
-                checked={sortRooferAlphabetically}
-                onCheckedChange={(value) => handleFilterChange(setSortRooferAlphabetically, value)}
-                className="pl-8"
-              >
-                Sort Alphabetically
-              </DropdownMenuCheckboxItem>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
         
