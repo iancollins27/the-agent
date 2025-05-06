@@ -24,12 +24,15 @@ const PromptRunHeader: React.FC<PromptRunHeaderProps> = ({
         <DialogDescription>
           Created at {new Date(promptRun.created_at).toLocaleString()}
         </DialogDescription>
-        <div className="mt-2 text-sm flex items-center">
+        <div className="mt-2 text-sm flex flex-wrap items-center gap-2">
           {promptRun.project_address && (
             <Badge variant="outline" className="font-normal">
               {promptRun.project_address}
             </Badge>
           )}
+          <Badge variant="secondary" className="font-mono text-xs">
+            ID: {promptRun.id.substring(0, 8)}...
+          </Badge>
         </div>
       </div>
       
