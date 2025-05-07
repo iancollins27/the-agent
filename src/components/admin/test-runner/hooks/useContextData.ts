@@ -11,7 +11,7 @@ export const useContextData = () => {
     availableTools: string[] = []
   ) => {
     try {
-      // Fetch project data
+      // Fetch project data with explicit type casting to avoid deep type instantiation
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select(`
@@ -19,7 +19,7 @@ export const useContextData = () => {
           companies (
             name
           ),
-          project_tracks (
+          project_tracks!inner (
             id, 
             name,
             Roles,
