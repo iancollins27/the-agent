@@ -80,7 +80,9 @@ const FeedbackTab = () => {
                       variant="secondary"
                       className="bg-blue-600 hover:bg-blue-700 text-white"
                       asChild
-                      onClick={(e) => e.stopPropagation()} // Prevent row click
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent row click event
+                      }}
                     >
                       <Link
                         to={run.project_crm_url}
