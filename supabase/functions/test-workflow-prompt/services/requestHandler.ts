@@ -29,7 +29,6 @@ export async function handleRequest(supabase: any, requestBody: any) {
   // Ensure default values for variables that might be missing
   contextData.is_reminder_check = contextData.is_reminder_check || false;
   contextData.available_tools = contextData.available_tools || [];
-  contextData.project_id = projectId; // Add project_id to context data
   
   // For MCP orchestrator prompts, always get the latest prompt from database
   let finalPromptText = promptText;

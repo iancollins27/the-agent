@@ -134,7 +134,6 @@ export const availableVariables = {
     { name: "next_step", description: "The current next step in the project" },
     { name: "property_address", description: "The property address for the project" },
     { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" },
-    { name: "available_tools", description: "List of tools available to the orchestrator" },
-    { name: "project_id", description: "UUID of the current project" }
+    { name: "available_tools", description: "List of tools available to the orchestrator" }
   ]
 };
