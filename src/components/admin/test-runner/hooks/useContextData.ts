@@ -22,9 +22,8 @@ export const useContextData = () => {
           project_tracks (
             id, 
             name,
-            description,
             Roles,
-            base_prompt
+            "track base prompt"
           )
         `)
         .eq('id', projectId)
@@ -49,7 +48,7 @@ export const useContextData = () => {
         track_id: projectData.project_track,
         track_name: projectData.project_tracks?.name,
         track_roles: projectData.project_tracks?.Roles,
-        track_base_prompt: projectData.project_tracks?.base_prompt,
+        track_base_prompt: projectData.project_tracks?.["track base prompt"],
         current_date: new Date().toISOString().split('T')[0],
         is_reminder_check: false,
         company_name: projectData.companies?.name,
