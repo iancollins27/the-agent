@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { PromptRun } from '../admin/types';
 import PromptRunsTable from '../admin/PromptRunsTable';
 import RooferPromptRunsCard from './RooferPromptRunsCard';
+import { Smile } from 'lucide-react';
 
 interface ProjectManagerContentProps {
   loading: boolean;
@@ -80,15 +81,21 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   
   if (filteredPromptRuns.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-        <h3 className="text-lg font-medium mb-2">No Prompt Runs Found</h3>
-        <p className="text-gray-600 whitespace-pre-line">{getEmptyStateMessage()}</p>
+      <div className="bg-white p-8 rounded-lg shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+        <Smile className="h-16 w-16 text-green-400 mb-4" />
+        <h3 className="text-xl font-medium mb-2">You're all caught up!</h3>
+        <p className="text-gray-600 max-w-md">
+          You currently have no pending projects that require your attention.
+        </p>
         
-        {/* Debug info */}
-        <div className="mt-6 p-4 bg-slate-50 rounded text-xs text-slate-500">
-          <p>Debug info:</p>
-          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
-        </div>
+        {process.env.NODE_ENV === 'development' && (
+          <details className="mt-6 text-left w-full text-xs bg-slate-50 p-2 rounded border">
+            <summary className="cursor-pointer text-slate-500 font-mono">Debug information</summary>
+            <pre className="mt-2 text-slate-600 overflow-x-auto">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          </details>
+        )}
       </div>
     );
   }
