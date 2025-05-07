@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +22,8 @@ const MCPConfigTab: React.FC = () => {
   const [toolDefinitions, setToolDefinitions] = useState<string>('');
   const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({
     create_action_record: true,
-    knowledge_base_lookup: false
+    knowledge_base_lookup: false,
+    data_fetch: true
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -145,6 +147,33 @@ const MCPConfigTab: React.FC = () => {
       },
       "required": ["query"]
     }
+  },
+  {
+    "name": "data_fetch",
+    "description": "Fetches data from CRM systems for a specific company and resource type",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "company_id": {
+          "type": "string",
+          "description": "UUID of the company to fetch data for"
+        },
+        "resource": {
+          "type": "string",
+          "enum": ["project", "task", "note", "email", "sms"],
+          "description": "Type of resource to fetch (project, task, note, email, sms)"
+        },
+        "resource_id": {
+          "type": "string",
+          "description": "Optional ID of specific resource to fetch. If omitted, returns all resources of the specified type."
+        },
+        "include_raw": {
+          "type": "boolean",
+          "description": "Whether to include raw provider data in the response (defaults to false)"
+        }
+      },
+      "required": ["company_id", "resource"]
+    }
   }
 ]`);
   }, []);
@@ -266,6 +295,15 @@ const MCPConfigTab: React.FC = () => {
                     required={false}
                     disabled={true}
                     disabledReason="Currently disabled in the system"
+                  />
+
+                  <ToolConfigCard
+                    name="data_fetch"
+                    title="Data Fetch"
+                    description="Fetches data from integrated CRM systems"
+                    enabled={enabledTools.data_fetch}
+                    onToggle={(enabled) => handleToggleTool('data_fetch', enabled)}
+                    required={false}
                   />
                 </div>
               </div>
