@@ -17,6 +17,7 @@ export const usePromptRunDetails = ({
 }: UsePromptRunDetailsProps) => {
   const [feedbackDescription, setFeedbackDescription] = useState<string>('');
   const [feedbackTags, setFeedbackTags] = useState<string>('');
+  const [feedbackReview, setFeedbackReview] = useState<string>('');
   const [activeTab, setActiveTab] = useState('details');
   const [isRerunning, setIsRerunning] = useState(false);
 
@@ -24,12 +25,14 @@ export const usePromptRunDetails = ({
     if (promptRun) {
       setFeedbackDescription(promptRun.feedback_description || '');
       setFeedbackTags((promptRun.feedback_tags || []).join(', '));
+      setFeedbackReview(promptRun.feedback_review || '');
     }
   }, [promptRun]);
 
   const handleSaveFeedback = (onFeedbackChange?: (promptRunId: string, feedback: { 
     description?: string; 
-    tags?: string[] 
+    tags?: string[];
+    review?: string;
   }) => void) => {
     if (onFeedbackChange && promptRun) {
       const tags = feedbackTags
@@ -39,7 +42,8 @@ export const usePromptRunDetails = ({
       
       onFeedbackChange(promptRun.id, {
         description: feedbackDescription || null,
-        tags: tags.length > 0 ? tags : null
+        tags: tags.length > 0 ? tags : null,
+        review: feedbackReview || null
       });
     }
   };
@@ -86,6 +90,8 @@ export const usePromptRunDetails = ({
     setFeedbackDescription,
     feedbackTags,
     setFeedbackTags,
+    feedbackReview,
+    setFeedbackReview,
     activeTab,
     setActiveTab,
     isRerunning,

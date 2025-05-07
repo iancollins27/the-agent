@@ -11,11 +11,17 @@ import PromptRunRating from './PromptRunRating';
 import PromptSection from './prompt-details/PromptSection';
 import { ExternalLink } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const FeedbackTab = () => {
-  const { promptRuns, loading } = usePromptRunData('COMPLETED');
+  const { promptRuns, loading, setPromptRuns } = usePromptRunData('COMPLETED');
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [feedbackReview, setFeedbackReview] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   // Filter prompt runs to only show those with feedback
   const feedbackRuns = promptRuns.filter(run => run.feedback_description);
@@ -33,12 +39,57 @@ const FeedbackTab = () => {
 
   const handleRowClick = (run: PromptRun) => {
     setSelectedRun(run);
+    setFeedbackReview(run.feedback_review || '');
     setIsModalOpen(true);
   };
   
   const handleOpenCRM = (e: React.MouseEvent, url: string) => {
     e.stopPropagation(); // Stop event propagation to prevent row click
     window.open(url, '_blank');
+  };
+
+  const handleSaveFeedbackReview = async () => {
+    if (!selectedRun) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('prompt_runs')
+        .update({ feedback_review: feedbackReview })
+        .eq('id', selectedRun.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setPromptRuns(prev => 
+        prev.map(run => 
+          run.id === selectedRun.id 
+            ? { ...run, feedback_review: feedbackReview } 
+            : run
+        )
+      );
+      
+      // Update selected run
+      setSelectedRun(prev => 
+        prev ? { ...prev, feedback_review: feedbackReview } : null
+      );
+
+      toast({
+        title: "Feedback review saved",
+        description: "Your feedback review has been saved successfully."
+      });
+    } catch (error) {
+      console.error('Error saving feedback review:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save feedback review. Please try again."
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (loading) {
@@ -162,6 +213,27 @@ const FeedbackTab = () => {
                     <div>
                       <span className="text-sm font-medium">Feedback:</span>
                       <p className="text-sm mt-1">{selectedRun.feedback_description || 'No feedback provided'}</p>
+                    </div>
+
+                    {/* Feedback Review Section */}
+                    <div className="pt-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium">Feedback Review:</span>
+                        <Button 
+                          size="sm" 
+                          onClick={handleSaveFeedbackReview}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? "Saving..." : "Save Review"}
+                        </Button>
+                      </div>
+                      <Textarea
+                        value={feedbackReview}
+                        onChange={(e) => setFeedbackReview(e.target.value)}
+                        placeholder="Enter your review of this feedback..."
+                        className="w-full"
+                        rows={3}
+                      />
                     </div>
                   </div>
                 </div>

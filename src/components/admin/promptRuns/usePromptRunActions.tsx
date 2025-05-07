@@ -47,13 +47,18 @@ export const usePromptRunActions = (
     }
   };
 
-  const handleFeedbackChange = async (promptRunId: string, feedback: { description?: string; tags?: string[] }) => {
+  const handleFeedbackChange = async (promptRunId: string, feedback: { 
+    description?: string; 
+    tags?: string[]; 
+    review?: string;
+  }) => {
     try {
       const { error } = await supabase
         .from('prompt_runs')
         .update({
           feedback_description: feedback.description,
-          feedback_tags: feedback.tags
+          feedback_tags: feedback.tags,
+          feedback_review: feedback.review
         })
         .eq('id', promptRunId);
 
@@ -68,7 +73,8 @@ export const usePromptRunActions = (
             ? { 
                 ...run, 
                 feedback_description: feedback.description || null, 
-                feedback_tags: feedback.tags || null 
+                feedback_tags: feedback.tags || null,
+                feedback_review: feedback.review || null
               } 
             : run
         )
@@ -80,7 +86,8 @@ export const usePromptRunActions = (
           ? { 
               ...prev, 
               feedback_description: feedback.description || null, 
-              feedback_tags: feedback.tags || null 
+              feedback_tags: feedback.tags || null,
+              feedback_review: feedback.review || null
             } 
           : prev
       );

@@ -1,4 +1,3 @@
-
 export interface ActionRecord {
   id: string;
   project_id?: string;
@@ -47,6 +46,7 @@ export interface PromptRun {
   feedback_rating?: number;
   feedback_description?: string;
   feedback_tags?: string[];
+  feedback_review?: string;
   completed_at?: string;
   reviewed?: boolean;
   project_id?: string;
@@ -71,21 +71,6 @@ export interface PromptRun {
   
   // Tool logs related data
   toolLogsCount?: number;
-}
-
-export interface ToolLog {
-  id: string;
-  created_at: string;
-  prompt_run_id: string;
-  tool_name: string;
-  tool_call_id?: string;
-  tool_args?: string;
-  tool_result?: string;
-  duration_ms: number;
-  status_code: number;
-  input_hash?: string;
-  output_trim?: string;
-  error_message?: string | null;
 }
 
 export type WorkflowType = 

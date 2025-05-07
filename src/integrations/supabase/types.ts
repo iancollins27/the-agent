@@ -785,6 +785,7 @@ export type Database = {
           error_message: string | null
           feedback_description: string | null
           feedback_rating: number | null
+          feedback_review: string | null
           feedback_tags: string[] | null
           id: string
           project_id: string | null
@@ -805,6 +806,7 @@ export type Database = {
           error_message?: string | null
           feedback_description?: string | null
           feedback_rating?: number | null
+          feedback_review?: string | null
           feedback_tags?: string[] | null
           id?: string
           project_id?: string | null
@@ -825,6 +827,7 @@ export type Database = {
           error_message?: string | null
           feedback_description?: string | null
           feedback_rating?: number | null
+          feedback_review?: string | null
           feedback_tags?: string[] | null
           id?: string
           project_id?: string | null

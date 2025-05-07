@@ -15,7 +15,8 @@ type PromptRunDetailsProps = {
   onRatingChange: (promptRunId: string, rating: number | null) => void;
   onFeedbackChange?: (promptRunId: string, feedback: { 
     description?: string; 
-    tags?: string[] 
+    tags?: string[];
+    review?: string;
   }) => void;
   onPromptRerun?: () => void;
 };
@@ -33,6 +34,8 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
     setFeedbackDescription,
     feedbackTags,
     setFeedbackTags,
+    feedbackReview,
+    setFeedbackReview,
     activeTab,
     setActiveTab,
     isRerunning,
@@ -55,7 +58,8 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
       
       onFeedbackChange(promptRun.id, {
         description: feedbackDescription || null,
-        tags: tags.length > 0 ? tags : null
+        tags: tags.length > 0 ? tags : null,
+        review: feedbackReview || null
       });
     }
   };
@@ -80,8 +84,10 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
               promptRun={promptRun}
               feedbackDescription={feedbackDescription}
               feedbackTags={feedbackTags}
+              feedbackReview={feedbackReview}
               setFeedbackDescription={setFeedbackDescription}
               setFeedbackTags={setFeedbackTags}
+              setFeedbackReview={setFeedbackReview}
               handleSaveFeedback={handleSaveFeedbackClick}
               onRatingChange={onRatingChange}
             />
