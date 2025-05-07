@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { PromptRun } from './types';
 import PromptRunRating from './PromptRunRating';
 import PromptSection from './prompt-details/PromptSection';
+import { ExternalLink } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 const FeedbackTab = () => {
   const { promptRuns, loading } = usePromptRunData('COMPLETED');
@@ -33,6 +35,11 @@ const FeedbackTab = () => {
     setSelectedRun(run);
     setIsModalOpen(true);
   };
+  
+  const handleOpenCRM = (e: React.MouseEvent, url: string) => {
+    e.stopPropagation(); // Stop event propagation to prevent row click
+    window.open(url, '_blank');
+  };
 
   if (loading) {
     return <div>Loading feedback...</div>;
@@ -53,6 +60,7 @@ const FeedbackTab = () => {
               <TableHead>Feedback Description</TableHead>
               <TableHead>Feedback Tags</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -69,6 +77,19 @@ const FeedbackTab = () => {
                   {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}
                 </TableCell>
                 <TableCell>{formatDate(run.created_at)}</TableCell>
+                <TableCell>
+                  {run.project_crm_url && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={(e) => handleOpenCRM(e, run.project_crm_url!)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Open CRM
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -79,14 +100,28 @@ const FeedbackTab = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           {selectedRun && (
             <>
-              <DialogHeader>
-                <DialogTitle>Feedback Details</DialogTitle>
-                <DialogDescription>
-                  {selectedRun.project_address ? `Project: ${selectedRun.project_address}` : 'No project address available'}
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {formatDate(selectedRun.created_at)}
-                  </p>
-                </DialogDescription>
+              <DialogHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <DialogTitle>Feedback Details</DialogTitle>
+                  <DialogDescription>
+                    {selectedRun.project_address ? `Project: ${selectedRun.project_address}` : 'No project address available'}
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {formatDate(selectedRun.created_at)}
+                    </p>
+                  </DialogDescription>
+                </div>
+                
+                {selectedRun.project_crm_url && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => window.open(selectedRun.project_crm_url, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Open CRM
+                  </Button>
+                )}
               </DialogHeader>
 
               <div className="space-y-6 mt-4">
