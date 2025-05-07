@@ -382,6 +382,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          integration_mode: string
           is_active: boolean | null
           provider_name: string
           provider_type: string
@@ -394,6 +395,7 @@ export type Database = {
           company_id: string
           created_at?: string
           id?: string
+          integration_mode?: string
           is_active?: boolean | null
           provider_name: string
           provider_type: string
@@ -406,6 +408,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           id?: string
+          integration_mode?: string
           is_active?: boolean | null
           provider_name?: string
           provider_type?: string

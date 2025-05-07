@@ -6,10 +6,12 @@
 import { Tool } from './types.ts';
 import { createActionRecord } from './create-action-record/index.ts';
 import { knowledgeBaseLookup } from './knowledge-base-lookup/index.ts';
+import { dataFetch } from './data-fetch/index.ts';
 
 const tools: Record<string, Tool> = {
   create_action_record: createActionRecord,
   knowledge_base_lookup: knowledgeBaseLookup,
+  data_fetch: dataFetch,
   // Additional tools can be registered here
 };
 
@@ -85,7 +87,7 @@ export function filterTools(enabledTools: string[]): Array<{
   // If no tools were found but some were requested, return at least the core tools
   if (filtered.length === 0 && enabledTools.length > 0) {
     console.log("No matching tools found, defaulting to core tools");
-    const coreTools = ['create_action_record'];
+    const coreTools = ['create_action_record', 'data_fetch'];
     return Object.values(tools)
       .filter(tool => coreTools.includes(tool.name))
       .map(tool => ({

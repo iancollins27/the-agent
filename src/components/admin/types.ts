@@ -1,3 +1,4 @@
+
 export interface ActionRecord {
   id: string;
   project_id?: string;
@@ -93,3 +94,11 @@ export const workflowTitles: Record<WorkflowType, string> = {
   multi_project_message_generation: 'Multi-Project Message',
   mcp_orchestrator: 'MCP Orchestrator'
 };
+
+export interface CrmData {
+  provider: string;
+  resource: string;
+  data: any;
+  raw?: any;
+  fetched_at: string;
+}
