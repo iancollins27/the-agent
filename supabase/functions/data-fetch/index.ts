@@ -22,13 +22,13 @@ serve(async (req) => {
     const { body, error } = await validateRequest(req);
     if (error) return error;
 
-    const { company_id, resource, resource_id = null, include_raw = false } = body;
+    const { project_id, include_raw = false } = body;
 
-    console.log(`Processing data.fetch request: company=${company_id}, resource=${resource}, id=${resource_id || "all"}`);
+    console.log(`Processing data.fetch request: project=${project_id}`);
 
     // Initialize router and fetch data
     const router = new DataFetchRouter(supabase);
-    const result = await router.fetchData(company_id, resource, resource_id, include_raw);
+    const result = await router.fetchProjectData(project_id, include_raw);
 
     return new Response(
       JSON.stringify({

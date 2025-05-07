@@ -3,43 +3,32 @@ import { Tool, ToolResult } from '../types.ts';
 
 export const dataFetch: Tool = {
   name: "data_fetch",
-  description: "Fetches data from CRM systems for a specific company and resource type. Use this to get information about projects, tasks, notes, emails, or SMS.",
+  description: "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes. Use this to get a complete view of a project's current state.",
   schema: {
     type: "object",
     properties: {
-      company_id: {
+      project_id: {
         type: "string",
-        description: "UUID of the company to fetch data for"
-      },
-      resource: {
-        type: "string",
-        enum: ["project", "task", "note", "email", "sms"],
-        description: "Type of resource to fetch (project, task, note, email, sms)"
-      },
-      resource_id: {
-        type: "string",
-        description: "Optional ID of specific resource to fetch. If omitted, returns all resources of the specified type."
+        description: "UUID of the project to fetch data for"
       },
       include_raw: {
         type: "boolean",
         description: "Whether to include raw provider data in the response (defaults to false)"
       }
     },
-    required: ["company_id", "resource"]
+    required: ["project_id"]
   },
   
   async execute(args: any, context: any): Promise<ToolResult> {
     try {
-      const { company_id, resource, resource_id, include_raw = false } = args;
+      const { project_id, include_raw = false } = args;
       
-      console.log(`Executing data_fetch tool: company=${company_id}, resource=${resource}, id=${resource_id || "all"}`);
+      console.log(`Executing data_fetch tool: project=${project_id}`);
       
       // Make request to data-fetch edge function
       const response = await context.supabase.functions.invoke('data-fetch', {
         body: {
-          company_id,
-          resource,
-          resource_id,
+          project_id,
           include_raw
         }
       });
@@ -47,15 +36,18 @@ export const dataFetch: Tool = {
       if (response.error) {
         return {
           status: "error",
-          error: `Failed to fetch data: ${response.error.message || "Unknown error"}`
+          error: `Failed to fetch project data: ${response.error.message || "Unknown error"}`
         };
       }
       
       return {
         status: "success",
         provider: response.data.provider,
-        resource: response.data.resource,
-        data: response.data.data,
+        project: response.data.project,
+        contacts: response.data.contacts,
+        communications: response.data.communications,
+        tasks: response.data.tasks,
+        notes: response.data.notes,
         ...(response.data.raw && { raw: response.data.raw }),
         fetched_at: response.data.fetched_at
       };

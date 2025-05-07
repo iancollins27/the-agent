@@ -9,6 +9,110 @@ export class DataFetchRouter {
     this.supabase = supabase;
   }
 
+  async fetchProjectData(projectId: string, includeRaw: boolean): Promise<any> {
+    try {
+      // First, get the project and its company_id
+      const { data: project, error: projectError } = await this.supabase
+        .from("projects")
+        .select("*, companies(*)")
+        .eq("id", projectId)
+        .single();
+
+      if (projectError) {
+        throw new Error(`Failed to fetch project details: ${projectError.message}`);
+      }
+
+      if (!project) {
+        throw new Error(`No project found with ID: ${projectId}`);
+      }
+
+      const companyId = project.company_id;
+      if (!companyId) {
+        throw new Error(`Project does not have an associated company`);
+      }
+
+      // Get company integration info
+      const { data: integration, error } = await this.supabase
+        .from("company_integrations")
+        .select("provider_name, provider_type, api_key, api_secret, account_id, integration_mode")
+        .eq("company_id", companyId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Failed to fetch company integration details: ${error.message}`);
+      }
+
+      if (!integration) {
+        throw new Error(`No active integration found for company_id: ${companyId}`);
+      }
+
+      // Initialize the appropriate connector based on provider_name
+      const connector = this.getConnector(integration.provider_name, integration);
+      
+      // Fetch project details from CRM
+      const projectDetails = await connector.fetchResource('project', projectId);
+      
+      // Fetch contacts for this project
+      const { data: contacts, error: contactsError } = await this.supabase
+        .from("project_contacts")
+        .select("contact_id, contacts(*)")
+        .eq("project_id", projectId);
+        
+      if (contactsError) {
+        throw new Error(`Failed to fetch project contacts: ${contactsError.message}`);
+      }
+      
+      // Fetch communications for this project
+      const { data: communications, error: commsError } = await this.supabase
+        .from("communications")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("timestamp", { ascending: false })
+        .limit(20);
+        
+      if (commsError) {
+        throw new Error(`Failed to fetch communications: ${commsError.message}`);
+      }
+      
+      // Fetch tasks (can be from CRM depending on integration)
+      const tasks = await connector.fetchResource('task', null, projectId);
+      
+      // Fetch notes (can be from CRM depending on integration)  
+      const notes = await connector.fetchResource('note', null, projectId);
+
+      // Process result into a comprehensive response
+      const response: any = {
+        project: {
+          ...project,
+          ...projectDetails.data
+        },
+        contacts: contacts?.map(c => c.contacts) || [],
+        communications: communications || [],
+        tasks: tasks.data || [],
+        notes: notes.data || [],
+        provider: integration.provider_name,
+        fetched_at: new Date().toISOString()
+      };
+
+      // Include raw data if requested
+      if (includeRaw) {
+        response.raw = {
+          project: projectDetails.raw,
+          tasks: tasks.raw,
+          notes: notes.raw
+        };
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Router error:", error);
+      throw error;
+    }
+  }
+  
+  // Original fetchData method remains for backward compatibility
   async fetchData(companyId: string, resourceType: string, resourceId: string | null, includeRaw: boolean): Promise<any> {
     try {
       // Get company integration info
