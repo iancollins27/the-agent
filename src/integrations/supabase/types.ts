@@ -634,6 +634,7 @@ export type Database = {
           step_order: number | null
           step_title: string | null
           track_id: string | null
+          track_id_name: string | null
         }
         Insert: {
           created_at?: string
@@ -643,6 +644,7 @@ export type Database = {
           step_order?: number | null
           step_title?: string | null
           track_id?: string | null
+          track_id_name?: string | null
         }
         Update: {
           created_at?: string
@@ -652,6 +654,7 @@ export type Database = {
           step_order?: number | null
           step_title?: string | null
           track_id?: string | null
+          track_id_name?: string | null
         }
         Relationships: [
           {

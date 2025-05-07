@@ -57,6 +57,7 @@ const FeedbackTab = () => {
             <TableRow>
               <TableHead>Project Address</TableHead>
               <TableHead>Project Manager</TableHead>
+              <TableHead>Rating</TableHead>
               <TableHead>Feedback Description</TableHead>
               <TableHead>Feedback Tags</TableHead>
               <TableHead>Date</TableHead>
@@ -72,6 +73,12 @@ const FeedbackTab = () => {
               >
                 <TableCell>{run.project_address || 'N/A'}</TableCell>
                 <TableCell>{run.project_manager || 'No manager assigned'}</TableCell>
+                <TableCell>
+                  <PromptRunRating 
+                    rating={run.feedback_rating || null} 
+                    size="sm"
+                  />
+                </TableCell>
                 <TableCell>{run.feedback_description}</TableCell>
                 <TableCell>
                   {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}
