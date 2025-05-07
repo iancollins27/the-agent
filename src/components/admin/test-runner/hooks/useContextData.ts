@@ -1,77 +1,73 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-/**
- * Hook for preparing context data for test runs
- */
 export const useContextData = () => {
-  // Prepare context data for the test run
-  const prepareContextData = async (projectId: string, isMultiProjectTest: boolean, availableTools: string[]) => {
+  /**
+   * Prepares context data for a project, including track-related information
+   */
+  const prepareContextData = async (
+    projectId: string,
+    isMultiProjectTest: boolean = false,
+    availableTools: string[] = []
+  ) => {
     try {
-      // Fetch the project details
+      // Fetch project data
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select(`
-          id,
-          crm_id,
-          summary,
-          next_step,
-          company_id,
-          project_track,
-          Address,
-          companies(name),
-          project_tracks(name, "track base prompt", Roles)
+          *,
+          companies (
+            name
+          ),
+          project_tracks (
+            id, 
+            name,
+            description,
+            Roles,
+            base_prompt
+          )
         `)
         .eq('id', projectId)
         .single();
+
+      if (projectError) throw projectError;
+
+      // Fetch contacts for the project
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('project_id', projectId);
+
+      if (contactsError) throw contactsError;
       
-      if (projectError) {
-        console.error("Error fetching project:", projectError);
-        throw projectError;
-      }
-      
-      if (!projectData) {
-        console.error("No project data found for ID:", projectId);
-        throw new Error("Project not found");
-      }
-      
-      // Prepare context data
+      // Create context data object
       const contextData = {
-        summary: projectData.summary || '',
-        next_step: projectData.next_step || '',
-        company_name: projectData.companies?.name || 'Unknown Company',
-        track_name: projectData.project_tracks?.name || 'Default Track',
-        track_base_prompt: projectData.project_tracks?.["track base prompt"] || '',
-        track_roles: projectData.project_tracks?.Roles || '',
-        track_id: projectData.project_track || null, // Explicitly include track_id
+        project_id: projectId,
+        summary: projectData.summary,
+        next_step: projectData.next_step,
+        property_address: projectData.Address,
+        track_id: projectData.project_track,
+        track_name: projectData.project_tracks?.name,
+        track_roles: projectData.project_tracks?.Roles,
+        track_base_prompt: projectData.project_tracks?.base_prompt,
         current_date: new Date().toISOString().split('T')[0],
-        milestone_instructions: '',
-        action_description: 'Sample action for testing',
-        isMultiProjectTest: isMultiProjectTest,
-        property_address: projectData.Address || '',
+        is_reminder_check: false,
+        company_name: projectData.companies?.name,
+        contacts: contacts,
         available_tools: availableTools
       };
-      
-      // Get milestone instructions if this is a next step
-      if (projectData.next_step) {
-        const { data: milestoneData } = await supabase
-          .from('project_track_milestones')
-          .select('prompt_instructions')
-          .eq('track_id', projectData.project_track)
-          .eq('step_title', projectData.next_step)
-          .maybeSingle();
-          
-        if (milestoneData) {
-          contextData.milestone_instructions = milestoneData.prompt_instructions || '';
-        }
-      }
 
-      return { projectData, contextData };
+      return {
+        projectData,
+        contextData
+      };
     } catch (error) {
       console.error("Error preparing context data:", error);
       throw error;
     }
   };
 
-  return { prepareContextData };
+  return {
+    prepareContextData
+  };
 };
