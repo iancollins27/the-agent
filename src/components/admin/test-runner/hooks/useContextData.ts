@@ -1,6 +1,33 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// Define explicit interface for project data to prevent deep type instantiation
+interface ProjectData {
+  id: string;
+  summary: string;
+  next_step: string;
+  Address: string;
+  project_track: string;
+  companies?: {
+    name: string;
+  };
+  project_tracks?: {
+    id: string;
+    name: string;
+    Roles: string;
+    "track base prompt": string;
+  };
+}
+
+interface ContactData {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone_number: string | null;
+  role: string;
+  // Add any other contact fields that might be needed
+}
+
 export const useContextData = () => {
   /**
    * Prepares context data for a project, including track-related information
@@ -11,7 +38,7 @@ export const useContextData = () => {
     availableTools: string[] = []
   ) => {
     try {
-      // Fetch project data with explicit type casting to avoid deep type instantiation
+      // Fetch project data with explicit type annotation to avoid deep type instantiation
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select(`
@@ -39,7 +66,7 @@ export const useContextData = () => {
 
       if (contactsError) throw contactsError;
       
-      // Create context data object
+      // Create context data object with explicit type casting to avoid deep nesting
       const contextData = {
         project_id: projectId,
         summary: projectData.summary,
