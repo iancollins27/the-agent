@@ -377,6 +377,7 @@ export type Database = {
       company_integrations: {
         Row: {
           account_id: string | null
+          api_call_json: Json | null
           api_key: string
           api_secret: string | null
           company_id: string
@@ -390,6 +391,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          api_call_json?: Json | null
           api_key: string
           api_secret?: string | null
           company_id: string
@@ -403,6 +405,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          api_call_json?: Json | null
           api_key?: string
           api_secret?: string | null
           company_id?: string

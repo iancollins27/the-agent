@@ -4,7 +4,7 @@ import { BaseConnector, CanonicalProject, CanonicalContact, CanonicalNote, Canon
 export class ZohoConnector implements BaseConnector {
   private supabase: any;
   private config: any;
-  private token: string | null = null;
+  private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
   
   constructor(supabase: any, config: any) {
@@ -43,49 +43,88 @@ export class ZohoConnector implements BaseConnector {
     }
   }
   
-  private async getAuthToken(): Promise<string> {
+  private async getAccessToken(): Promise<string> {
     // Check if we have a valid token
     const now = Date.now();
-    if (this.token && this.tokenExpiresAt > now) {
-      return this.token;
+    if (this.accessToken && this.tokenExpiresAt > now) {
+      console.log("Using cached access token");
+      return this.accessToken;
     }
     
-    // If we don't have a token or it's expired, get a new one
+    console.log("Getting new access token using refresh token");
+    
+    // If we don't have a token or it's expired, get a new one using refresh token
     try {
-      // In a real implementation, we would use the refresh token to get a new token
-      // For now, we'll just use the API key from the config
-      if (!this.config.api_key) {
-        throw new Error("No API key provided in configuration");
+      if (!this.config.api_secret) {
+        throw new Error("No refresh token provided in configuration");
       }
       
-      // For development, we'll just use the API key as token
-      // In production, implement proper OAuth flow with refresh tokens
-      this.token = this.config.api_key;
+      const refreshToken = this.config.api_secret; // Using api_secret field to store the refresh token
+      const clientId = this.config.api_key; // Using api_key field to store the client ID
       
-      // Set token expiry to 50 minutes (Zoho tokens usually last 60 minutes)
-      this.tokenExpiresAt = now + 50 * 60 * 1000;
+      // Get client secret from integration configuration
+      const apiCallJson = this.config.api_call_json || {};
+      const clientSecret = apiCallJson.client_secret;
       
-      return this.token;
+      if (!clientId || !refreshToken || !clientSecret) {
+        throw new Error("Missing OAuth credentials (client ID, client secret, or refresh token)");
+      }
+      
+      // Determine the auth URL based on datacenter
+      const datacenter = apiCallJson.datacenter || "com";
+      const tokenUrl = `https://accounts.zoho.${datacenter}/oauth/v2/token`;
+      
+      // Build request for token refresh
+      const body = new URLSearchParams();
+      body.append('refresh_token', refreshToken);
+      body.append('client_id', clientId);
+      body.append('client_secret', clientSecret);
+      body.append('grant_type', 'refresh_token');
+      
+      console.log(`Requesting new access token from ${tokenUrl}`);
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Zoho OAuth error: ${response.status} - ${errorText}`);
+      }
+      
+      const tokenData = await response.json();
+      this.accessToken = tokenData.access_token;
+      
+      // Set token expiry (typically 1 hour for Zoho, minus 5 min buffer)
+      this.tokenExpiresAt = now + ((tokenData.expires_in || 3600) - 300) * 1000;
+      
+      console.log(`New access token obtained, expires at ${new Date(this.tokenExpiresAt).toISOString()}`);
+      return this.accessToken;
     } catch (error) {
-      console.error("Error getting Zoho auth token:", error);
+      console.error("Error getting Zoho access token:", error);
       throw new Error(`Zoho authentication failed: ${error.message}`);
     }
   }
   
   private async makeZohoRequest(endpoint: string, params: Record<string, string> = {}): Promise<any> {
     try {
-      // Get auth token
-      const token = await this.getAuthToken();
+      // Get access token
+      const token = await this.getAccessToken();
       
       // Build URL with query params
-      let url = endpoint;
-      const queryParams = new URLSearchParams(params).toString();
-      if (queryParams) {
-        url = `${url}?${queryParams}`;
-      }
+      const url = new URL(endpoint);
+      Object.keys(params).forEach(key => {
+        url.searchParams.append(key, params[key]);
+      });
+      
+      console.log(`Making Zoho API request to: ${url.toString()}`);
       
       // Make request
-      const response = await fetch(url, {
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
           'Authorization': `Zoho-oauthtoken ${token}`,
@@ -112,55 +151,111 @@ export class ZohoConnector implements BaseConnector {
     }
     
     try {
-      // Get company information and account details
-      const { data: company, error: companyError } = await this.supabase
-        .from("companies")
-        .select("*")
-        .eq("id", this.config.company_id)
-        .single();
-      
-      if (companyError) {
-        throw new Error(`Could not fetch company information: ${companyError.message}`);
-      }
-      
       // Get CRM ID from project
       const { data: project, error: projectError } = await this.supabase
         .from("projects")
-        .select("crm_id")
+        .select("crm_id, Address, summary, next_step, company_id, companies(name)")
         .eq("id", projectId)
         .single();
       
       if (projectError || !project) {
-        throw new Error(`Could not fetch project CRM ID: ${projectError?.message || "Project not found"}`);
+        throw new Error(`Could not fetch project info: ${projectError?.message || "Project not found"}`);
       }
       
-      // For development, we'll return a stub response
-      // In production, use company.zoho_id and this.config.account_id to build the URL
-      console.log(`Would make Zoho API call for project with CRM ID: ${project.crm_id}`);
+      // Get API call configuration
+      const apiCallJson = this.config.api_call_json || {};
       
-      // Construct the URL we would use in production
-      // const baseUrl = "https://www.zohoapis.com"; // This would be dynamic based on datacenter
-      // const endpoint = `${baseUrl}/creator/v2.1/data/${this.config.account_id}/${company.zoho_app_link_name}/report/All_Bids/${project.crm_id}`;
-      // const response = await this.makeZohoRequest(endpoint);
+      // Extract necessary parameters from configuration
+      const baseUrl = apiCallJson.base_url || "www.zohoapis.com";
+      const accountOwnerName = apiCallJson.account_owner_name || this.config.account_id;
+      const appLinkName = apiCallJson.app_link_name;
+      const reportLinkName = apiCallJson.report_link_name || "All_Bids";
+      const fieldsConfig = apiCallJson.fields_config || "all";
+      const fields = apiCallJson.fields;
       
-      // For now, return structured mock data
-      const mockProject = {
+      if (!appLinkName) {
+        throw new Error("Missing app_link_name in configuration");
+      }
+      
+      if (!project.crm_id) {
+        throw new Error("Project has no CRM ID");
+      }
+      
+      // Construct API endpoint
+      const endpoint = `https://${baseUrl}/creator/v2.1/data/${accountOwnerName}/${appLinkName}/report/${reportLinkName}/${project.crm_id}`;
+      
+      // Set up parameters
+      const params: Record<string, string> = {
+        field_config: fieldsConfig
+      };
+      
+      if (fieldsConfig === 'custom' && fields) {
+        params.fields = fields;
+      }
+      
+      // Make the request
+      console.log(`Fetching project data from Zoho for CRM ID: ${project.crm_id}`);
+      const response = await this.makeZohoRequest(endpoint, params);
+      
+      // Extract and transform the data
+      const zohoData = response.data || {};
+      
+      // Create canonical project from Zoho response
+      const canonicalProject: CanonicalProject = {
         id: projectId,
-        name: `Project for CRM ID ${project.crm_id}`,
-        status: "In Progress",
-        stage: "Design Review",
-        next_step: "Finalize Design",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        name: zohoData.Property_ID || zohoData.Name || zohoData.Project_Name || project.Address,
+        address: zohoData.Property_Address || project.Address,
+        status: zohoData.Status || project.Project_status,
+        next_step: zohoData.Next_Step || project.next_step,
+        created_at: zohoData.Created_Time || new Date().toISOString(),
+        updated_at: zohoData.Modified_Time || new Date().toISOString(),
+        summary: zohoData.Description || project.summary,
+        // Map additional fields from Zoho
+        zoho_fields: Object.keys(zohoData).reduce((acc: any, key: string) => {
+          // Skip standard fields we've already mapped
+          if (!['id', 'Property_ID', 'Name', 'Project_Name', 'Property_Address', 
+              'Status', 'Next_Step', 'Created_Time', 'Modified_Time', 'Description'].includes(key)) {
+            acc[key] = zohoData[key];
+          }
+          return acc;
+        }, {})
       };
       
       return {
-        data: mockProject,
-        raw: { crm_id: project.crm_id }
+        data: canonicalProject,
+        raw: response
       };
     } catch (error) {
       console.error("Error fetching project from Zoho:", error);
-      throw error;
+      
+      // Return basic project info from database if API fails
+      try {
+        const { data: project } = await this.supabase
+          .from("projects")
+          .select("id, crm_id, summary, next_step, Address, Project_status, companies(name)")
+          .eq("id", projectId)
+          .single();
+        
+        const fallbackProject: CanonicalProject = {
+          id: projectId,
+          name: project?.Address || 'Unknown Project',
+          status: project?.Project_status || 'Unknown',
+          next_step: project?.next_step || '',
+          address: project?.Address || '',
+          summary: project?.summary || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          error: error.message
+        };
+        
+        return {
+          data: fallbackProject,
+          raw: { error: error.message, fallback: true }
+        };
+      } catch (fallbackError) {
+        // If even the fallback fails, throw the original error
+        throw error;
+      }
     }
   }
   
@@ -181,38 +276,59 @@ export class ZohoConnector implements BaseConnector {
         throw new Error(`Could not fetch project CRM ID: ${projectError?.message || "Project not found"}`);
       }
       
-      console.log(`Would make Zoho API call for tasks related to CRM ID: ${project.crm_id}`);
+      if (!project.crm_id) {
+        throw new Error("Project has no CRM ID");
+      }
       
-      // In a real implementation, make API call to Zoho to get tasks
-      // For now, return mock data
-      const mockTasks = [
-        {
-          id: `task-1-${projectId}`,
-          title: "Review design documents",
-          description: "Review all architectural plans before submitting",
-          status: "In Progress",
-          due_date: new Date(Date.now() + 86400000).toISOString(),
-          assignee: "John Doe",
-          created_at: new Date().toISOString()
-        },
-        {
-          id: `task-2-${projectId}`,
-          title: "Submit permit application",
-          description: "Submit all required paperwork to the city",
-          status: "Pending",
-          due_date: new Date(Date.now() + 172800000).toISOString(),
-          assignee: "Jane Smith",
-          created_at: new Date().toISOString()
-        }
-      ];
+      // Get API call configuration
+      const apiCallJson = this.config.api_call_json || {};
+      
+      // Check if tasks configuration exists
+      const tasksConfig = apiCallJson.tasks;
+      if (!tasksConfig || !tasksConfig.endpoint) {
+        console.log("No tasks configuration found, returning empty list");
+        return {
+          data: [],
+          raw: { warning: "No tasks configuration found" }
+        };
+      }
+      
+      // Prepare endpoint with project CRM ID
+      const endpoint = tasksConfig.endpoint.replace('{project_crm_id}', project.crm_id);
+      
+      // Make request
+      const response = await this.makeZohoRequest(endpoint, tasksConfig.params || {});
+      
+      // Transform data to canonical format
+      const tasks: CanonicalTask[] = (response.data || []).map((task: any) => ({
+        id: task.ID || `task-${Math.random().toString(36).substring(2, 11)}`,
+        title: task.Title || task.Name || 'Untitled Task',
+        description: task.Description || '',
+        status: task.Status || 'Open',
+        due_date: task.Due_Date || null,
+        assignee: task.Assignee || task.Owner || '',
+        created_at: task.Created_Time || new Date().toISOString(),
+        priority: task.Priority || 'Normal',
+        zoho_fields: Object.keys(task).reduce((acc: any, key: string) => {
+          // Skip standard fields we've already mapped
+          if (!['ID', 'Title', 'Name', 'Description', 'Status', 'Due_Date', 
+              'Assignee', 'Owner', 'Created_Time', 'Priority'].includes(key)) {
+            acc[key] = task[key];
+          }
+          return acc;
+        }, {})
+      }));
       
       return {
-        data: mockTasks,
-        raw: { crm_id: project.crm_id }
+        data: tasks,
+        raw: response
       };
     } catch (error) {
       console.error("Error fetching tasks from Zoho:", error);
-      throw error;
+      return {
+        data: [],
+        raw: { error: error.message }
+      };
     }
   }
   
@@ -233,33 +349,56 @@ export class ZohoConnector implements BaseConnector {
         throw new Error(`Could not fetch project CRM ID: ${projectError?.message || "Project not found"}`);
       }
       
-      console.log(`Would make Zoho API call for notes related to CRM ID: ${project.crm_id}`);
+      if (!project.crm_id) {
+        throw new Error("Project has no CRM ID");
+      }
       
-      // In a real implementation, make API call to Zoho to get notes
-      // For now, return mock data
-      const mockNotes = [
-        {
-          id: `note-1-${projectId}`,
-          content: "Customer requested a change to the roofing material",
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          author: "John Doe"
-        },
-        {
-          id: `note-2-${projectId}`,
-          title: "Permit Application",
-          content: "Permit application submitted, awaiting approval",
-          created_at: new Date(Date.now() - 43200000).toISOString(),
-          author: "Jane Smith"
-        }
-      ];
+      // Get API call configuration
+      const apiCallJson = this.config.api_call_json || {};
+      
+      // Check if notes configuration exists
+      const notesConfig = apiCallJson.notes;
+      if (!notesConfig || !notesConfig.endpoint) {
+        console.log("No notes configuration found, returning empty list");
+        return {
+          data: [],
+          raw: { warning: "No notes configuration found" }
+        };
+      }
+      
+      // Prepare endpoint with project CRM ID
+      const endpoint = notesConfig.endpoint.replace('{project_crm_id}', project.crm_id);
+      
+      // Make request
+      const response = await this.makeZohoRequest(endpoint, notesConfig.params || {});
+      
+      // Transform data to canonical format
+      const notes: CanonicalNote[] = (response.data || []).map((note: any) => ({
+        id: note.ID || `note-${Math.random().toString(36).substring(2, 11)}`,
+        title: note.Title || note.Subject || 'Untitled Note',
+        content: note.Content || note.Description || note.Note_Content || '',
+        author: note.Created_By || note.Author || '',
+        created_at: note.Created_Time || new Date().toISOString(),
+        zoho_fields: Object.keys(note).reduce((acc: any, key: string) => {
+          // Skip standard fields we've already mapped
+          if (!['ID', 'Title', 'Subject', 'Content', 'Description', 'Note_Content', 
+              'Created_By', 'Author', 'Created_Time'].includes(key)) {
+            acc[key] = note[key];
+          }
+          return acc;
+        }, {})
+      }));
       
       return {
-        data: mockNotes,
-        raw: { crm_id: project.crm_id }
+        data: notes,
+        raw: response
       };
     } catch (error) {
       console.error("Error fetching notes from Zoho:", error);
-      throw error;
+      return {
+        data: [],
+        raw: { error: error.message }
+      };
     }
   }
   
@@ -280,16 +419,27 @@ export class ZohoConnector implements BaseConnector {
         throw new Error(`Could not fetch project CRM ID: ${projectError?.message || "Project not found"}`);
       }
       
-      console.log(`Would make Zoho API call for emails related to CRM ID: ${project.crm_id}`);
+      const apiCallJson = this.config.api_call_json || {};
+      const emailsConfig = apiCallJson.emails;
+      
+      if (!emailsConfig || !emailsConfig.endpoint) {
+        return {
+          data: [],
+          raw: { warning: "No emails configuration found" }
+        };
+      }
       
       // For now, return empty array
       return {
         data: [],
-        raw: { crm_id: project.crm_id }
+        raw: { info: "Email fetching not fully implemented" }
       };
     } catch (error) {
       console.error("Error fetching emails from Zoho:", error);
-      throw error;
+      return {
+        data: [],
+        raw: { error: error.message }
+      };
     }
   }
   
@@ -310,16 +460,27 @@ export class ZohoConnector implements BaseConnector {
         throw new Error(`Could not fetch project CRM ID: ${projectError?.message || "Project not found"}`);
       }
       
-      console.log(`Would make Zoho API call for SMS messages related to CRM ID: ${project.crm_id}`);
+      const apiCallJson = this.config.api_call_json || {};
+      const smsConfig = apiCallJson.sms;
+      
+      if (!smsConfig || !smsConfig.endpoint) {
+        return {
+          data: [],
+          raw: { warning: "No SMS configuration found" }
+        };
+      }
       
       // For now, return empty array
       return {
         data: [],
-        raw: { crm_id: project.crm_id }
+        raw: { info: "SMS fetching not fully implemented" }
       };
     } catch (error) {
       console.error("Error fetching SMS from Zoho:", error);
-      throw error;
+      return {
+        data: [],
+        raw: { error: error.message }
+      };
     }
   }
 }

@@ -5,9 +5,11 @@
 
 import { Tool } from './types.ts';
 import { identifyProject } from './identify-project/index.ts';
+import { dataFetch } from './data-fetch/index.ts';
 
 const tools: Record<string, Tool> = {
   identify_project: identifyProject,
+  data_fetch: dataFetch
   // Additional tools will be registered here in the future
 };
 
