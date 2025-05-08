@@ -1,3 +1,4 @@
+
 /**
  * Tool to identify projects based on user input (ID, CRM ID, or description)
  */
@@ -70,7 +71,28 @@ export const identifyProject: Tool = {
       // Otherwise do a text search
       else {
         console.log(`Performing text search for: ${query}`);
-        projectsQuery = projectsQuery.or(`summary.ilike.%${query}%,Address.ilike.%${query}%,crm_id.ilike.%${query}%`);
+        // Improve text search to better handle addresses and descriptions
+        // Make text search case insensitive and more flexible with address parts
+        const searchTerms = query.toLowerCase().trim().split(/\s+/);
+        
+        // Build more sophisticated search conditions
+        let searchConditions = [];
+        
+        // Direct address match condition
+        searchConditions.push(`Address.ilike.%${query}%`);
+        
+        // Handle partial address matching (street names)
+        for (const term of searchTerms) {
+          if (term.length > 3) { // Only search for terms that are long enough to be meaningful
+            searchConditions.push(`Address.ilike.%${term}%`);
+          }
+        }
+        
+        // Handle other searchable fields
+        searchConditions.push(`summary.ilike.%${query}%`);
+        searchConditions.push(`crm_id.ilike.%${query}%`);
+        
+        projectsQuery = projectsQuery.or(searchConditions.join(','));
       }
       
       // Execute the query
