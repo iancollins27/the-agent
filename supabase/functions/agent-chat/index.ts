@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { getToolDefinitions } from './tools/toolRegistry.ts'
+import { executeToolCall } from './tools/toolExecutor.ts'
+import { createMCPContext, extractToolCallsFromOpenAI, addToolResult } from './mcp.ts'
+import { getChatSystemPrompt } from './mcp-system-prompts.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,363 +22,305 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { messages, projectId } = await req.json()
+    const { messages, projectId, streaming = false } = await req.json()
     
-    const { data: configData, error: configError } = await supabase
+    // Log the incoming request
+    console.log(`Agent chat request received: ${messages.length} messages${projectId ? `, project ID: ${projectId}` : ''}`)
+    
+    // Get chatbot configuration
+    const { data: configData } = await supabase
       .from('chatbot_config')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
-    
-    if (configError && configError.code !== 'PGRST116') {
-      console.error('Error fetching chatbot config:', configError);
-    }
+      .single()
+      .catch(err => {
+        console.log('Error fetching chatbot config:', err)
+        return { data: null }
+      })
     
     const botConfig = configData || {
-      system_prompt: `You are an intelligent project assistant that helps manage project workflows.
-      Answer questions about projects or workflow processes. If you don't know something, say so clearly.
-      When asked about schedules or timelines, check the summary and next_step fields for relevant information.
-      If no scheduling information is found, suggest contacting the project manager for more details.`,
+      system_prompt: null, // We'll use our default MCP system prompt
       model: 'gpt-4o-mini',
       temperature: 0.7,
       search_project_data: true
-    };
+    }
     
-    console.log('Using bot configuration:', botConfig);
+    console.log('Using bot configuration:', botConfig)
 
-    const { data: aiConfig, error: aiConfigError } = await supabase
+    // Get AI configuration
+    const { data: aiConfig } = await supabase
       .from('ai_config')
       .select('provider, model')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .single()
+      .catch(err => {
+        console.log('Error fetching AI config:', err)
+        return { data: null }
+      })
     
-    const aiProvider = aiConfig?.provider || 'openai';
-    const aiModel = botConfig.model || 'gpt-4o-mini';
+    const aiProvider = aiConfig?.provider || 'openai'
+    const aiModel = botConfig.model || 'gpt-4o-mini'
+    
+    // Get user profile if applicable
+    const authHeader = req.headers.get('Authorization')
+    let userProfile = null
+    let companyId = null
+    
+    if (authHeader) {
+      try {
+        const { data: userData } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
+        if (userData?.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*, profile_associated_company')
+            .eq('id', userData.user.id)
+            .single()
+          
+          userProfile = profile
+          companyId = profile?.profile_associated_company
+          console.log(`User authenticated: ${userData.user.email}, company ID: ${companyId}`)
+        }
+      } catch (authError) {
+        console.log('Error fetching user profile:', authError)
+      }
+    }
 
+    // Get the latest user message
     const latestUserMessage = messages.length > 0 && messages[messages.length - 1].role === 'user' 
       ? messages[messages.length - 1].content 
-      : '';
+      : ''
     
-    const crmIdMatch = latestUserMessage.match(/crm\s*id\s*(\d+)/i) || 
-                       latestUserMessage.match(/crmid\s*(\d+)/i) || 
-                       latestUserMessage.match(/project\s*(\d+)/i);
+    // Initialize context data
+    let contextData: any = { companyId }
+    let projectData = null
     
-    let projectData = null;
-    let searchContext = '';
-    let companyId = null;
-    
-    if (botConfig.search_project_data !== false) {
-      if (projectId) {
-        console.log('Fetching project data for ID:', projectId);
-        const { data: project, error: projectError } = await supabase
-          .from('projects')
-          .select(`
-            id, 
-            summary, 
-            next_step,
-            project_track,
-            company_id,
-            companies(name)
-          `)
-          .eq('id', projectId)
-          .single();
+    // If we have a project ID, load project data
+    if (projectId) {
+      console.log('Fetching project data for ID:', projectId)
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select(`
+          id, 
+          summary, 
+          next_step,
+          project_track,
+          company_id,
+          crm_id,
+          Project_status,
+          companies(name)
+        `)
+        .eq('id', projectId)
+        .single()
 
-        if (projectError) {
-          console.error('Error fetching project by ID:', projectError);
-        } else if (project) {
-          projectData = project;
-          companyId = project.company_id;
-          console.log('Found project data by ID:', project);
-        }
-      } else if (crmIdMatch && crmIdMatch[1]) {
-        const crmId = crmIdMatch[1];
-        console.log('Attempting to fetch project by CRM ID:', crmId);
-        
-        const { data: projects, error: crmError } = await supabase
-          .from('projects')
-          .select(`
-            id, 
-            summary, 
-            next_step,
-            project_track,
-            crm_id,
-            company_id,
-            companies(name)
-          `)
-          .eq('crm_id', crmId);
-        
-        if (crmError) {
-          console.error('Error fetching project by CRM ID:', crmError);
-        } else if (projects && projects.length > 0) {
-          projectData = projects[0];
-          companyId = projects[0].company_id;
-          console.log('Found project data by CRM ID:', projectData);
-          searchContext = `I found information for project with CRM ID ${crmId}.`;
-        } else {
-          searchContext = `I searched for a project with CRM ID ${crmId} but couldn't find any matching records.`;
-        }
+      if (projectError) {
+        console.error('Error fetching project by ID:', projectError)
+      } else if (project) {
+        projectData = project
+        companyId = project.company_id
+        contextData.projectData = projectData
+        console.log('Found project data by ID:', project)
       }
     }
 
-    let trackData = null;
-    if (projectData?.project_track) {
-      const { data: track, error: trackError } = await supabase
-        .from('project_tracks')
-        .select('id, name, description, Roles')
-        .eq('id', projectData.project_track)
-        .single();
-      
-      if (trackError) {
-        console.error('Error fetching project track:', trackError);
-      } else if (track) {
-        trackData = track;
-        console.log('Found project track data:', track);
-      }
-    }
-
-    const isKnowledgeQuery = 
-      latestUserMessage.toLowerCase().includes('knowledge base') ||
-      latestUserMessage.toLowerCase().includes('find information') ||
-      latestUserMessage.toLowerCase().includes('search for') ||
-      latestUserMessage.toLowerCase().includes('do you know') ||
-      latestUserMessage.toLowerCase().includes('tell me about');
-    
-    let knowledgeResults = [];
-    if (isKnowledgeQuery && companyId) {
-      knowledgeResults = await searchKnowledgeBase(supabase, companyId, latestUserMessage);
-      
-      if (knowledgeResults.length > 0) {
-        searchContext += `\nI found some relevant information in the knowledge base that might help answer your question:\n\n`;
-        
-        knowledgeResults.forEach((result, index) => {
-          searchContext += `Source ${index + 1}: ${result.title}\n`;
-          searchContext += `Content: ${result.content}\n\n`;
-        });
-        
-        searchContext += `I'll use this information to help answer your question.\n`;
-      }
-    }
-
-    const notionIntegrationRequest = 
-      latestUserMessage.toLowerCase().includes('connect notion') ||
-      latestUserMessage.toLowerCase().includes('integrate notion') ||
-      latestUserMessage.toLowerCase().includes('notion integration') ||
-      latestUserMessage.toLowerCase().includes('add notion') ||
-      (latestUserMessage.toLowerCase().includes('notion') && 
-       latestUserMessage.toLowerCase().includes('token'));
-    
-    const actionRequestPatterns = [
-      { pattern: /update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /change\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /set\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /schedule\s+(the\s+)?(.+?)\s+for\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /mark\s+(the\s+)?(.+?)\s+for\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /can you update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      { pattern: /please update\s+(the\s+)?(.+?)\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'data_update' },
-      
-      { pattern: /send\s+(a\s+)?message\s+to\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
-      { pattern: /send\s+(.+?)\s+a\s+message(?:\?|$|\.|;)/i, type: 'message' },
-      { pattern: /notify\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
-      { pattern: /let\s+(.+?)\s+know(?:\?|$|\.|;)/i, type: 'message' },
-      { pattern: /inform\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
-      { pattern: /contact\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' },
-      { pattern: /message\s+(.+?)(?:\?|$|\.|;)/i, type: 'message' }
-    ];
-
-    let actionRequest = null;
-    for (const { pattern, type } of actionRequestPatterns) {
-      const match = latestUserMessage.match(pattern);
-      if (match) {
-        console.log('Detected potential action request:', match);
-        actionRequest = { 
-          type, 
-          match: match.slice(1).filter(Boolean),
-          originalMatch: match[0]
-        };
-        break;
-      }
-    }
-
-    let systemPromptWithActions = botConfig.system_prompt;
-    
-    systemPromptWithActions += `\n\nIMPORTANT: You MUST help users update project data when they ask. If users ask you to update fields like installation dates, 
-schedules, or other project details, you SHOULD create an update action for them to approve.
-When a user asks something like "update the install date to March 16, 2025", you MUST respond with your willingness to help with the update
-and provide a JSON block that will be processed automatically.`;
-
-    systemPromptWithActions += `\n\nYou can search the company's knowledge base for information. If a user asks for information that might be in the knowledge base, 
-respond with what you know based on the search results I provide to you. If no knowledge base results are provided, tell the user that you don't have that information 
-in your knowledge base.`;
-
-    systemPromptWithActions += `\n\nYou can set reminders to check on projects at a future date. If a user asks to "remind me in 2 weeks about this project" or 
-"check this project again in 30 days", offer to set a reminder and respond with a JSON block in the format shown below.`;
-
-    if (notionIntegrationRequest) {
-      systemPromptWithActions += `\n\nIMPORTANT: The user is asking about integrating with Notion. Inform them that they can connect their Notion workspace by going to the Company Settings page and selecting the Knowledge Base tab.
-Let them know that they don't need to provide their credentials through the chat - they can do it securely through the dedicated settings page.`;
-    }
-
-    systemPromptWithActions += `\n\nFor data update requests, reply with:
-1. A normal conversational response confirming what will be updated
-2. A JSON block in this format:
-
-\`\`\`json
-{
-  "action_type": "data_update",
-  "field_to_update": "the field name to update (e.g. 'next_step', 'summary', etc.)",
-  "new_value": "the new value for the field",
-  "description": "A human-readable description of what's being updated"
-}
-\`\`\`
-
-For message sending requests (like "send a message to the customer"), reply with:
-1. A normal conversational response explaining that you can prepare a message request for approval
-2. A JSON block in this format:
-
-\`\`\`json
-{
-  "action_type": "message",
-  "recipient": "the intended recipient (e.g. 'customer', 'team', etc.)",
-  "message_content": "the suggested content of the message",
-  "description": "A brief description of what the message is about"
-}
-\`\`\`
-
-For setting reminders to check a project at a future date, reply with:
-1. A normal conversational response confirming the reminder will be set
-2. A JSON block in this format:
-
-\`\`\`json
-{
-  "action_type": "set_future_reminder",
-  "days_until_check": 14, // number of days until the check should happen
-  "check_reason": "Follow up on project progress",
-  "description": "A brief description of why we're setting a reminder"
-}
-\`\`\`
-
-The JSON block MUST be properly formatted as it will be automatically processed.`;
-
-    const systemMessage = {
-      role: 'system',
-      content: `${systemPromptWithActions}
-      ${searchContext}
-      ${projectData ? `
-        Current project information:
-        - Project ID: ${projectData.id}
-        - Company: ${projectData.companies?.name || 'Unknown'}
-        - ${projectData.crm_id ? `CRM ID: ${projectData.crm_id}` : ''}
-        - Summary: ${projectData.summary || 'No summary available'}
-        - Next Step: ${projectData.next_step || 'No next step defined'}
-        ${trackData ? `- Project Track: ${trackData.name}
-        - Track Description: ${trackData.description || 'No description available'}
-        - Track Roles: ${trackData.Roles || 'No roles defined'}` : ''}
-      ` : 'No specific project context is loaded.'}`
-    }
-
-    const fullMessages = [systemMessage, ...messages]
-
-    console.log('Sending messages to AI provider:', aiProvider, 'model:', aiModel);
-    console.log('Messages:', fullMessages);
-    
-    let promptRunId: string | null = null;
-    
+    // Create a prompt run record to track this conversation
+    let promptRunId: string | null = null
     try {
       const { data: promptRun, error: logError } = await supabase
         .from('prompt_runs')
         .insert({
           project_id: projectData?.id || null,
           prompt_input: JSON.stringify({
-            system: systemMessage.content,
+            system: "Chat conversation",
             user: latestUserMessage
           }),
           status: 'PENDING'
         })
         .select()
-        .single();
+        .single()
         
       if (logError) {
-        console.error('Error logging chat prompt run:', logError);
+        console.error('Error logging chat prompt run:', logError)
       } else {
-        promptRunId = promptRun.id;
-        console.log('Created prompt run with ID:', promptRunId);
+        promptRunId = promptRun.id
+        console.log('Created prompt run with ID:', promptRunId)
       }
     } catch (error) {
-      console.error('Error creating prompt run:', error);
+      console.error('Error creating prompt run:', error)
     }
 
-    let apiKey;
+    // Get API key for the selected provider
+    let apiKey
     if (aiProvider === 'openai') {
-      apiKey = Deno.env.get('OPENAI_API_KEY');
+      apiKey = Deno.env.get('OPENAI_API_KEY')
     } else if (aiProvider === 'claude') {
-      apiKey = Deno.env.get('CLAUDE_API_KEY');
-    } else if (aiProvider === 'deepseek') {
-      apiKey = Deno.env.get('DEEPSEEK_API_KEY');
+      apiKey = Deno.env.get('CLAUDE_API_KEY')
     } else {
-      apiKey = Deno.env.get('OPENAI_API_KEY');
+      apiKey = Deno.env.get('OPENAI_API_KEY')
     }
 
     if (!apiKey) {
-      throw new Error(`API key for ${aiProvider} is not configured`);
+      throw new Error(`API key for ${aiProvider} is not configured`)
     }
 
-    let aiResponse;
-    let error = null;
+    // Set up MCP with tools
+    const tools = getToolDefinitions()
+    const toolNames = tools.map(t => t.function.name)
     
-    try {
-      if (aiProvider === 'openai') {
-        aiResponse = await callOpenAI(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
-      } else if (aiProvider === 'claude') {
-        aiResponse = await callClaude(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
-      } else if (aiProvider === 'deepseek') {
-        aiResponse = await callDeepseek(fullMessages, apiKey, aiModel, botConfig.temperature || 0.7);
-      } else {
-        aiResponse = await callOpenAI(fullMessages, apiKey, 'gpt-4o-mini', botConfig.temperature || 0.7);
+    // Create the system prompt
+    const systemPrompt = getChatSystemPrompt(toolNames, contextData)
+    
+    // Get all user messages
+    const userMessages = messages.filter(m => m.role === 'user').map(m => m.content)
+    const latestPrompt = userMessages.length > 0 ? userMessages[userMessages.length - 1] : ''
+    
+    // Create MCP context
+    let mcpContext = createMCPContext(systemPrompt, latestPrompt, tools)
+    
+    // Add previous messages to the context (skip the first user message which is in createMCPContext)
+    // And start from the second message in the conversation
+    for (let i = 0; i < messages.length - 1; i++) {
+      if (messages[i].role !== 'system') { // Skip system messages as we use our own
+        mcpContext.messages.push({
+          role: messages[i].role,
+          content: messages[i].content
+        })
       }
-    } catch (e) {
-      error = e;
-      console.error('Error calling AI provider:', e);
-      aiResponse = "I'm sorry, I encountered an error while processing your request. Please try again later.";
     }
     
-    if (promptRunId) {
+    // If streaming is requested, set up streaming response
+    if (streaming) {
+      // This will be implemented later for streaming
+      // For now, fallback to non-streaming
+      console.log('Streaming requested but not yet implemented, falling back to non-streaming')
+    }
+    
+    // Process MCP conversation
+    let finalAnswer = ''
+    let actionRecordId = null
+    const MAX_ITERATIONS = 5 // Prevent infinite loops
+    let iterationCount = 0
+    let processedToolCallIds = new Set() // Track processed tool call IDs
+    
+    while (iterationCount < MAX_ITERATIONS) {
+      iterationCount++
+      console.log(`Starting MCP iteration ${iterationCount}`)
+
       try {
-        if (error) {
-          await supabase
-            .from('prompt_runs')
-            .update({
-              error_message: error.message || 'Unknown error',
-              status: 'ERROR',
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', promptRunId);
-        } else {
-          await supabase
-            .from('prompt_runs')
-            .update({
-              prompt_output: aiResponse,
-              status: 'COMPLETED',
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', promptRunId);
+        // Make API request to OpenAI
+        const payload = {
+          model: aiModel,
+          messages: mcpContext.messages,
+          temperature: botConfig.temperature || 0.7
         }
-      } catch (updateError) {
-        console.error('Error updating prompt run:', updateError);
+        
+        if (mcpContext.tools && mcpContext.tools.length > 0) {
+          // @ts-ignore - Add tools to payload if available
+          payload.tools = mcpContext.tools
+          // @ts-ignore - Set tool_choice to auto if tools are available
+          payload.tool_choice = "auto"
+        }
+        
+        console.log(`Sending AI request for iteration ${iterationCount} with ${mcpContext.messages.length} messages`)
+        
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`OpenAI API error: ${response.status} - ${errorText}`)
+          throw new Error(`OpenAI API error: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const message = data.choices[0].message
+        
+        // Add the assistant message to our context
+        mcpContext.messages.push(message)
+        
+        // Check if the model wants to use tools
+        const toolCalls = message.tool_calls
+        console.log(`Tool calls: ${toolCalls ? toolCalls.length : 0}`)
+
+        if (toolCalls && toolCalls.length > 0) {
+          // Process each tool call
+          const extractedToolCalls = extractToolCallsFromOpenAI(message)
+          
+          // Remove the assistant message we just added since we'll re-add it properly 
+          mcpContext.messages.pop()
+          
+          // Process each tool call in order
+          for (const call of extractedToolCalls) {
+            // Skip if we've already processed this tool call ID
+            if (processedToolCallIds.has(call.id)) {
+              console.log(`Skipping already processed tool call ID: ${call.id}`)
+              continue
+            }
+            
+            console.log(`Processing tool call: ${call.name}, id: ${call.id}`)
+            processedToolCallIds.add(call.id) // Mark as processed
+          
+            try {
+              // Execute the tool
+              const toolResult = await executeToolCall(
+                supabase,
+                call.name,
+                call.arguments,
+                userProfile,
+                companyId
+              )
+              
+              // Add the tool result to the context properly 
+              mcpContext = addToolResult(mcpContext, call.id, call.name, toolResult)
+            } 
+            catch (toolError) {
+              console.error(`Error executing tool ${call.name}: ${toolError}`)
+              
+              // Add error result
+              const errorResult = { 
+                status: "error", 
+                error: toolError.message || "Unknown tool execution error",
+                message: `Tool execution failed: ${toolError.message || "Unknown error"}`
+              }
+              
+              mcpContext = addToolResult(mcpContext, call.id, call.name, errorResult)
+            }
+          }
+        } else {
+          // The model has finished and provided a final answer
+          finalAnswer = message.content || "No response generated."
+          console.log("MCP conversation complete after " + iterationCount + " iterations")
+          break
+        }
+      } catch (error) {
+        console.error("Error in MCP iteration:", error)
+        finalAnswer = `Error during processing: ${error.message}`
+        break
+      }
+      
+      // Safety mechanism to prevent infinite loops
+      if (iterationCount === MAX_ITERATIONS) {
+        finalAnswer = "Maximum number of iterations reached. The conversation was terminated for safety reasons."
+        console.warn("MCP reached maximum iterations and was terminated")
       }
     }
 
-    console.log('AI response received:', aiResponse);
-    
-    let actionRecordId = null;
-    if (projectData && aiResponse) {
+    // Check if the response contains an action request and create an action record if needed
+    if (finalAnswer && projectData?.id) {
       try {
-        const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        const jsonMatch = finalAnswer.match(/```json\s*([\s\S]*?)\s*```/)
         if (jsonMatch && jsonMatch[1]) {
-          const actionData = JSON.parse(jsonMatch[1].trim());
-          console.log('Extracted action data:', actionData);
+          const actionData = JSON.parse(jsonMatch[1].trim())
+          console.log('Extracted action data:', actionData)
           
+          // Keep the existing action handling logic
           if (actionData.action_type === "data_update" && actionData.field_to_update && actionData.new_value) {
             const { data: actionRecord, error: actionError } = await supabase
               .from('action_records')
@@ -391,15 +337,16 @@ The JSON block MUST be properly formatted as it will be automatically processed.
                 status: 'pending'
               })
               .select()
-              .single();
+              .single()
             
             if (actionError) {
-              console.error('Error creating action record:', actionError);
+              console.error('Error creating action record:', actionError)
             } else {
-              actionRecordId = actionRecord.id;
-              console.log('Created data update action record:', actionRecord);
+              actionRecordId = actionRecord.id
+              console.log('Created data update action record:', actionRecord)
               
-              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+              // Remove the JSON block from the response
+              finalAnswer = finalAnswer.replace(/```json\s*[\s\S]*?\s*```/, '').trim()
             }
           } else if (actionData.action_type === "message" && actionData.recipient && actionData.message_content) {
             let recipientId = null;
@@ -458,7 +405,7 @@ The JSON block MUST be properly formatted as it will be automatically processed.
               actionRecordId = actionRecord.id;
               console.log('Created message action record:', actionRecord);
               
-              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+              finalAnswer = finalAnswer.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }
           } else if (actionData.action_type === "set_future_reminder" && actionData.days_until_check) {
             const { data: actionRecord, error: actionError } = await supabase
@@ -484,179 +431,46 @@ The JSON block MUST be properly formatted as it will be automatically processed.
               actionRecordId = actionRecord.id;
               console.log('Created reminder action record:', actionRecord);
               
-              aiResponse = aiResponse.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+              finalAnswer = finalAnswer.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
             }
           }
         }
       } catch (parseError) {
-        console.error('Error parsing action data:', parseError);
+        console.error('Error parsing action data:', parseError)
       }
     }
 
-    console.log('Final AI response returned:', aiResponse);
+    // Update prompt run with result
+    if (promptRunId) {
+      try {
+        await supabase
+          .from('prompt_runs')
+          .update({
+            prompt_output: finalAnswer,
+            status: 'COMPLETED',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', promptRunId)
+      } catch (updateError) {
+        console.error('Error updating prompt run:', updateError)
+      }
+    }
+
+    console.log('Final AI response returned:', finalAnswer.substring(0, 100) + '...')
+    
+    // Return the response
     return new Response(JSON.stringify({ 
-      reply: aiResponse,
+      reply: finalAnswer,
       projectData: projectData,
       actionRecordId: actionRecordId
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    })
   } catch (error) {
-    console.error('Error in agent-chat function:', error);
+    console.error('Error in agent-chat function:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    })
   }
-});
-
-async function searchKnowledgeBase(supabase, companyId, query) {
-  try {
-    const embedding = await generateEmbedding(query);
-    
-    if (!embedding) {
-      console.log('Could not generate embedding for search query');
-      return [];
-    }
-    
-    const { data, error } = await supabase.rpc('match_knowledge_embeddings', {
-      query_embedding: embedding,
-      match_threshold: 0.5,
-      match_count: 5,
-      company_id: companyId
-    });
-    
-    if (error) {
-      console.error('Error searching knowledge base:', error);
-      return [];
-    }
-    
-    return data || [];
-  } catch (error) {
-    console.error('Error in knowledge base search:', error);
-    return [];
-  }
-}
-
-async function generateEmbedding(text) {
-  try {
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) {
-      console.error('OpenAI API key is not configured');
-      return null;
-    }
-    
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: text
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('OpenAI API error:', error);
-      return null;
-    }
-
-    const result = await response.json();
-    return result.data[0].embedding;
-  } catch (error) {
-    console.error('Error generating search embedding:', error);
-    return null;
-  }
-}
-
-async function callOpenAI(messages, apiKey, model = 'gpt-4o-mini', temperature = 0.7) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: messages,
-      temperature: temperature,
-    }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    console.error('OpenAI API error:', data);
-    throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
-  }
-  
-  return data.choices[0].message.content;
-}
-
-async function callClaude(messages, apiKey, model = 'claude-3-haiku-20240307', temperature = 0.7) {
-  const claudeMessages = messages.map(msg => ({
-    role: msg.role === 'system' ? 'user' : msg.role,
-    content: msg.content
-  }));
-  
-  if (messages.find(msg => msg.role === 'system')) {
-    const firstUserIndex = claudeMessages.findIndex(msg => msg.role === 'user');
-    if (firstUserIndex >= 0) {
-      claudeMessages[firstUserIndex].content = 
-        `${messages.find(msg => msg.role === 'system').content}\n\nUser message: ${claudeMessages[firstUserIndex].content}`;
-    }
-    claudeMessages.shift();
-  }
-
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'X-API-Key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: claudeMessages,
-      max_tokens: 1000,
-      temperature: temperature,
-    }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    console.error('Claude API error:', data);
-    throw new Error(`Claude API error: ${data.error?.message || 'Unknown error'}`);
-  }
-  
-  return data.content[0].text;
-}
-
-async function callDeepseek(messages, apiKey, model = 'deepseek-chat', temperature = 0.7) {
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: messages,
-      temperature: temperature,
-      max_tokens: 1000,
-    }),
-  });
-
-  const data = await response.json();
-  
-  if (!response.ok) {
-    console.error('DeepSeek API error:', data);
-    throw new Error(`DeepSeek API error: ${data.error?.message || 'Unknown error'}`);
-  }
-  
-  return data.choices[0].message.content;
-}
+})

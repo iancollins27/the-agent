@@ -19,6 +19,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<ActionRecord | null>(null);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  // New state for streaming responses
+  const [isStreaming, setIsStreaming] = useState(false);
   const { toast } = useToast();
 
   const handleSendMessage = async (input: string) => {
@@ -29,8 +31,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
     try {
       const messageHistory = [...messages, userMessage].map(({ role, content }) => ({ role, content }));
       
+      // For now, streaming is disabled as it needs more implementation
+      const streaming = false;
+      
       const { data, error } = await supabase.functions.invoke('agent-chat', {
-        body: { messages: messageHistory, projectId }
+        body: { 
+          messages: messageHistory, 
+          projectId,
+          streaming // Will be used in future iterations
+        }
       });
 
       if (error) {
@@ -46,7 +55,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
       if (data.actionRecordId) {
         console.log('Action record created:', data.actionRecordId);
         
-        // Fetch action record details with explicit specification of relationships
         const { data: actionRecordData, error: actionError } = await supabase
           .from('action_records')
           .select(`
@@ -142,7 +150,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         />
       </CardFooter>
 
-      {/* Updated to match the expected props */}
       <ActionConfirmDialog
         action={pendingAction}
         isOpen={actionDialogOpen}
