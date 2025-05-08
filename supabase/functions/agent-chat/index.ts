@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 import { getChatSystemPrompt } from './mcp-system-prompts.ts'
-import { createMCPContextManager } from './mcp-context-manager.ts'
+import { createMCPContextManager } from './context/mcp-context-manager.ts'
 import { processActionRequest } from './action-processor.ts'
 import { logPromptCompletion, calculateOpenAICost } from './observability.ts'
 
