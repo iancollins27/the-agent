@@ -1,6 +1,6 @@
 
 export interface BaseConnector {
-  fetchResource(resourceType: string, resourceId: string | null): Promise<{
+  fetchResource(resourceType: string, resourceId: string | null, projectId?: string): Promise<{
     data: any;
     raw?: any;
   }>;
@@ -13,13 +13,14 @@ export interface ConnectorConfig {
   api_secret?: string;
   account_id?: string;
   integration_mode: string;
+  company_id: string; // Added to allow fetching company-specific configuration
 }
 
 // Define the canonical data models for normalized responses
 export interface CanonicalProject {
   id: string;
-  name: string;
-  status: string;
+  name?: string;
+  status?: string;
   stage?: string;
   next_step?: string;
   address?: string;
@@ -44,6 +45,7 @@ export interface CanonicalNote {
   content: string;
   created_at: string;
   author?: string;
+  title?: string;
   [key: string]: any;
 }
 

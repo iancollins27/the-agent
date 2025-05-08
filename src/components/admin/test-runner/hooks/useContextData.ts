@@ -36,7 +36,7 @@ interface ContextData {
   isMultiProjectTest: boolean;
   property_address: string;
   available_tools: string[];
-  project_id?: string; // Adding project_id to the context data
+  project_id: string; // This field is important for the data_fetch tool
 }
 
 /**
@@ -88,7 +88,7 @@ export const useContextData = () => {
         isMultiProjectTest: isMultiProjectTest,
         property_address: projectData.Address || '',
         available_tools: availableTools,
-        project_id: projectId // Add the project ID to the context data
+        project_id: projectId // Always include the project_id in context data
       };
       
       // Get milestone instructions if this is a next step

@@ -23,6 +23,13 @@ export const dataFetch: Tool = {
     try {
       const { project_id, include_raw = false } = args;
       
+      if (!project_id) {
+        return {
+          status: "error",
+          error: "Project ID is required"
+        };
+      }
+      
       console.log(`Executing data_fetch tool: project=${project_id}`);
       
       // Make request to data-fetch edge function
@@ -34,6 +41,7 @@ export const dataFetch: Tool = {
       });
       
       if (response.error) {
+        console.error("Data fetch error:", response.error);
         return {
           status: "error",
           error: `Failed to fetch project data: ${response.error.message || "Unknown error"}`

@@ -22,13 +22,28 @@ serve(async (req) => {
     const { body, error } = await validateRequest(req);
     if (error) return error;
 
+    if (!body.project_id) {
+      return new Response(
+        JSON.stringify({
+          status: "error",
+          error: "Project ID is required"
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400
+        }
+      );
+    }
+
     const { project_id, include_raw = false } = body;
 
-    console.log(`Processing data.fetch request: project=${project_id}`);
+    console.log(`Processing data-fetch request: project=${project_id}`);
 
     // Initialize router and fetch data
     const router = new DataFetchRouter(supabase);
     const result = await router.fetchProjectData(project_id, include_raw);
+
+    console.log(`Successfully fetched data for project ${project_id}`);
 
     return new Response(
       JSON.stringify({

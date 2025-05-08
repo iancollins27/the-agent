@@ -11,6 +11,12 @@ export class DataFetchRouter {
 
   async fetchProjectData(projectId: string, includeRaw: boolean): Promise<any> {
     try {
+      if (!projectId) {
+        throw new Error("Project ID is required");
+      }
+
+      console.log(`Fetching data for project: ${projectId}`);
+
       // First, get the project and its company_id
       const { data: project, error: projectError } = await this.supabase
         .from("projects")
@@ -82,8 +88,16 @@ export class DataFetchRouter {
         };
       }
 
+      // Add company_id to the integration object for use in the connector
+      const enhancedIntegration = {
+        ...integration,
+        company_id: companyId
+      };
+
       // Initialize the appropriate connector based on provider_name
-      const connector = this.getConnector(integration.provider_name, integration);
+      const connector = this.getConnector(integration.provider_name, enhancedIntegration);
+      
+      console.log(`Using ${integration.provider_name} connector to fetch project data`);
       
       // Fetch project details from CRM
       const projectDetails = await connector.fetchResource('project', projectId);
