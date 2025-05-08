@@ -1,6 +1,44 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// Define explicit interfaces to prevent deep type instantiation
+interface ProjectData {
+  id: string;
+  crm_id?: string;
+  summary?: string;
+  next_step?: string;
+  company_id?: string;
+  project_track?: string;
+  Address?: string;
+  companies?: { name?: string };
+  project_tracks?: { 
+    name?: string; 
+    "track base prompt"?: string; 
+    Roles?: string 
+  };
+}
+
+interface MilestoneData {
+  prompt_instructions?: string;
+}
+
+interface ContextData {
+  summary: string;
+  next_step: string;
+  company_name: string;
+  track_name: string;
+  track_base_prompt: string;
+  track_roles: string;
+  track_id: string | null;
+  current_date: string;
+  milestone_instructions: string;
+  action_description: string;
+  isMultiProjectTest: boolean;
+  property_address: string;
+  available_tools: string[];
+  project_id?: string; // Adding project_id to the context data
+}
+
 /**
  * Hook for preparing context data for test runs
  */
@@ -8,7 +46,7 @@ export const useContextData = () => {
   // Prepare context data for the test run
   const prepareContextData = async (projectId: string, isMultiProjectTest: boolean, availableTools: string[]) => {
     try {
-      // Fetch the project details
+      // Fetch the project details with explicit type annotation
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select(`
@@ -19,8 +57,8 @@ export const useContextData = () => {
           company_id,
           project_track,
           Address,
-          companies(name),
-          project_tracks(name, "track base prompt", Roles)
+          companies!inner(name),
+          project_tracks!inner(name, "track base prompt", Roles)
         `)
         .eq('id', projectId)
         .single();
@@ -35,21 +73,22 @@ export const useContextData = () => {
         throw new Error("Project not found");
       }
       
-      // Prepare context data
-      const contextData = {
+      // Prepare context data with explicit type annotation
+      const contextData: ContextData = {
         summary: projectData.summary || '',
         next_step: projectData.next_step || '',
         company_name: projectData.companies?.name || 'Unknown Company',
         track_name: projectData.project_tracks?.name || 'Default Track',
         track_base_prompt: projectData.project_tracks?.["track base prompt"] || '',
         track_roles: projectData.project_tracks?.Roles || '',
-        track_id: projectData.project_track || null, // Explicitly include track_id
+        track_id: projectData.project_track || null,
         current_date: new Date().toISOString().split('T')[0],
         milestone_instructions: '',
         action_description: 'Sample action for testing',
         isMultiProjectTest: isMultiProjectTest,
         property_address: projectData.Address || '',
-        available_tools: availableTools
+        available_tools: availableTools,
+        project_id: projectId // Add the project ID to the context data
       };
       
       // Get milestone instructions if this is a next step
@@ -66,7 +105,7 @@ export const useContextData = () => {
         }
       }
 
-      return { projectData, contextData };
+      return { projectData: projectData as ProjectData, contextData };
     } catch (error) {
       console.error("Error preparing context data:", error);
       throw error;

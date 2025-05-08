@@ -33,6 +33,7 @@ export function getMCPOrchestratorPrompt(
       '{{track_roles}}': contextData.track_roles || '',
       '{{next_step}}': contextData.next_step || '',
       '{{summary}}': contextData.summary || '[No project summary provided]',
+      '{{project_id}}': contextData.project_id || 'unknown', // Ensure project_id is available in the prompt
     };
     
     // Replace each variable
@@ -49,6 +50,7 @@ export function getMCPOrchestratorPrompt(
 Project Summary:
 ${contextData.summary || '[No project summary provided]'}
 
+Project ID: ${contextData.project_id || 'unknown'}
 Project Track: ${contextData.track_name || 'Default Track'}
 Track Roles: ${contextData.track_roles || ''}
 Next Step: ${contextData.next_step || ''}
@@ -71,8 +73,10 @@ Follow these steps:
    - The current next step
    - The project summary
    - Any other relevant context
-3. If action is needed, use the appropriate tool (create_action_record, knowledge_base_lookup)
+3. If action is needed, use the appropriate tool (data_fetch, create_action_record, knowledge_base_lookup)
 4. Be specific in your reasoning and provide clear explanations
+
+When using the data_fetch tool, make sure to use the project_id provided above.
 
 Always think step by step and provide clear reasoning for your decisions.`;
 }

@@ -16,7 +16,7 @@ export class DataFetchRouter {
         .from("projects")
         .select("*, companies(*)")
         .eq("id", projectId)
-        .single();
+        .maybeSingle(); // Using maybeSingle instead of single to prevent the error
 
       if (projectError) {
         throw new Error(`Failed to fetch project details: ${projectError.message}`);
@@ -44,8 +44,42 @@ export class DataFetchRouter {
         throw new Error(`Failed to fetch company integration details: ${error.message}`);
       }
 
+      // If no integration is found, return the project data without CRM data
       if (!integration) {
-        throw new Error(`No active integration found for company_id: ${companyId}`);
+        console.log(`No active integration found for company_id: ${companyId}, returning basic project data only`);
+        
+        // Fetch contacts for this project
+        const { data: contacts, error: contactsError } = await this.supabase
+          .from("project_contacts")
+          .select("contact_id, contacts(*)")
+          .eq("project_id", projectId);
+          
+        if (contactsError) {
+          throw new Error(`Failed to fetch project contacts: ${contactsError.message}`);
+        }
+        
+        // Fetch communications for this project
+        const { data: communications, error: commsError } = await this.supabase
+          .from("communications")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("timestamp", { ascending: false })
+          .limit(20);
+          
+        if (commsError) {
+          throw new Error(`Failed to fetch communications: ${commsError.message}`);
+        }
+        
+        // Return basic project data
+        return {
+          project: project,
+          contacts: contacts?.map(c => c.contacts) || [],
+          communications: communications || [],
+          tasks: [],
+          notes: [],
+          provider: "database-only",
+          fetched_at: new Date().toISOString()
+        };
       }
 
       // Initialize the appropriate connector based on provider_name
