@@ -51,4 +51,3 @@ export function getChatSystemPrompt(toolNames: string[] = [], contextData: any =
   "check this project again in 30 days", offer to set a reminder.
   `;
 }
-

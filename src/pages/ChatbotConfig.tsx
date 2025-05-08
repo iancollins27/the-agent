@@ -22,21 +22,19 @@ interface ChatbotConfig {
   model: ModelOption;
   temperature: number;
   search_project_data: boolean;
-  enable_mcp?: boolean;
   mcp_tool_definitions?: string;
   available_tools?: string[];
   created_at: string;
 }
 
 const ChatbotConfig = () => {
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [orchestratorPrompt, setOrchestratorPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelOption>('gpt-4o-mini');
   const [temperature, setTemperature] = useState(0.7);
   const [searchProjectData, setSearchProjectData] = useState(true);
   const [testMessage, setTestMessage] = useState('');
-  const [enableMCP, setEnableMCP] = useState(false);
   const [mcpToolDefinitions, setMcpToolDefinitions] = useState('');
   const [availableTools, setAvailableTools] = useState<string[]>(['create_action_record', 'knowledge_base_lookup']);
   const { toast } = useToast();
@@ -56,8 +54,8 @@ const ChatbotConfig = () => {
         .single();
       
       if (error) {
-        console.error('Error fetching system prompt:', error);
-        setSystemPrompt(
+        console.error('Error fetching orchestrator prompt:', error);
+        setOrchestratorPrompt(
           `You are an intelligent project assistant that helps manage project workflows.
 Answer questions about projects or workflow processes. If you don't know something, say so clearly.
 When asked about schedules or timelines, check the summary and next_step fields for relevant information.
@@ -65,15 +63,10 @@ If no scheduling information is found, suggest contacting the project manager fo
         );
       } else if (data) {
         const config = data as ChatbotConfig;
-        setSystemPrompt(config.system_prompt);
+        setOrchestratorPrompt(config.system_prompt);
         setSelectedModel(config.model || 'gpt-4o-mini');
         setTemperature(config.temperature || 0.7);
         setSearchProjectData(config.search_project_data !== false);
-        
-        // Set MCP configuration if available
-        if (config.enable_mcp !== undefined) {
-          setEnableMCP(config.enable_mcp);
-        }
         
         if (config.mcp_tool_definitions) {
           setMcpToolDefinitions(config.mcp_tool_definitions);
@@ -147,11 +140,12 @@ If no scheduling information is found, suggest contacting the project manager fo
     setIsSaving(true);
     try {
       const configData = {
-        system_prompt: systemPrompt,
+        system_prompt: orchestratorPrompt,
         model: selectedModel,
         temperature: temperature,
         search_project_data: searchProjectData,
-        enable_mcp: enableMCP,
+        // MCP is always enabled
+        enable_mcp: true,
         mcp_tool_definitions: mcpToolDefinitions,
         available_tools: availableTools
       };
@@ -207,16 +201,16 @@ If no scheduling information is found, suggest contacting the project manager fo
 
       <Tabs defaultValue="prompt">
         <TabsList>
-          <TabsTrigger value="prompt">System Prompt</TabsTrigger>
+          <TabsTrigger value="prompt">Orchestrator Prompt</TabsTrigger>
           <TabsTrigger value="settings">Model Settings</TabsTrigger>
-          <TabsTrigger value="mcp">MCP Configuration</TabsTrigger>
+          <TabsTrigger value="tools">Tool Configuration</TabsTrigger>
           <TabsTrigger value="test">Test Interface</TabsTrigger>
         </TabsList>
 
         <TabsContent value="prompt" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>System Prompt</CardTitle>
+              <CardTitle>Orchestrator Prompt</CardTitle>
               <CardDescription>
                 This is the instruction that primes the AI assistant's behavior and knowledge. 
                 This prompt will be sent at the beginning of every conversation.
@@ -229,10 +223,10 @@ If no scheduling information is found, suggest contacting the project manager fo
                 </div>
               ) : (
                 <Textarea 
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  value={orchestratorPrompt}
+                  onChange={(e) => setOrchestratorPrompt(e.target.value)}
                   className="min-h-[300px] font-mono text-sm"
-                  placeholder="Enter system prompt..."
+                  placeholder="Enter orchestrator prompt..."
                 />
               )}
             </CardContent>
@@ -333,33 +327,22 @@ If no scheduling information is found, suggest contacting the project manager fo
           </Card>
         </TabsContent>
 
-        <TabsContent value="mcp" className="space-y-6">
+        <TabsContent value="tools" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Model Context Protocol (MCP) Settings</CardTitle>
+              <CardTitle>Tool Configuration</CardTitle>
               <CardDescription>
-                Configure how the chatbot interacts with tools and external systems
+                Configure the tools available to the chatbot
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center space-x-2">
-                <Switch 
-                  id="enable-mcp" 
-                  checked={enableMCP}
-                  onCheckedChange={setEnableMCP}
-                />
-                <Label htmlFor="enable-mcp">Enable Model Context Protocol</Label>
-              </div>
+              <MCPInfoAlert />
 
-              {enableMCP && <MCPInfoAlert />}
-
-              {enableMCP && (
-                <ToolDefinitionsPanel 
-                  rawDefinitions={mcpToolDefinitions}
-                  onSave={handleToolDefinitionsSave}
-                  isSaving={isSaving}
-                />
-              )}
+              <ToolDefinitionsPanel 
+                rawDefinitions={mcpToolDefinitions}
+                onSave={handleToolDefinitionsSave}
+                isSaving={isSaving}
+              />
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button onClick={saveConfiguration} disabled={isSaving}>

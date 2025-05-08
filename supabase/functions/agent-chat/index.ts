@@ -41,6 +41,7 @@ serve(async (req) => {
         console.log('Error fetching chatbot config:', error);
       } else {
         configData = data;
+        console.log('Successfully fetched chatbot configuration');
       }
     } catch (err) {
       console.log('Exception when fetching chatbot config:', err);
@@ -51,7 +52,7 @@ serve(async (req) => {
       model: 'gpt-4o-mini',
       temperature: 0.7,
       search_project_data: true,
-      enable_mcp: false
+      enable_mcp: true // MCP is always enabled now
     }
     
     console.log('Using bot configuration:', botConfig)
@@ -230,17 +231,23 @@ serve(async (req) => {
       throw new Error(`API key for ${aiProvider} is not configured`)
     }
 
-    // Create the system prompt
-    const systemPrompt = getChatSystemPrompt([], contextData)
+    // Use the orchestrator prompt from the config if available, otherwise use the default
+    let systemPrompt;
+    if (botConfig.system_prompt) {
+      systemPrompt = botConfig.system_prompt;
+      console.log('Using orchestrator prompt from config');
+    } else {
+      systemPrompt = getChatSystemPrompt([], contextData);
+      console.log('Using default system prompt');
+    }
     
-    // Configure MCP based on settings
-    const useMcp = botConfig.enable_mcp === true;
+    // Configure available tools from settings
     const availableTools = botConfig.available_tools || [];
     
-    console.log(`MCP enabled: ${useMcp}, Available tools: ${availableTools.join(', ')}`);
+    console.log(`Available tools: ${availableTools.join(', ')}`);
     
-    // Create MCP context with first user message
-    const mcpContext = createMCPContextManager(systemPrompt, latestUserMessage, useMcp ? availableTools : [])
+    // Create MCP context with first user message - MCP is always enabled now
+    const mcpContext = createMCPContextManager(systemPrompt, latestUserMessage, availableTools)
     
     // Add previous messages to the context (except the last user message which is already added)
     for (let i = 0; i < messages.length - 1; i++) {
@@ -273,7 +280,7 @@ serve(async (req) => {
           temperature: botConfig.temperature || 0.7
         }
         
-        if (mcpContext.tools && mcpContext.tools.length > 0 && useMcp) {
+        if (mcpContext.tools && mcpContext.tools.length > 0) {
           // @ts-ignore - Add tools to payload
           payload.tools = mcpContext.tools
           // @ts-ignore - Set tool_choice to auto
