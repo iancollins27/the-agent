@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +11,8 @@ import { Loader2, Save } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ChatInterface from '@/components/Chat/ChatInterface';
+import ToolDefinitionsPanel from '@/components/admin/MCP/ToolDefinitionsPanel';
+import MCPInfoAlert from '@/components/admin/test-runner/MCPInfoAlert';
 
 type ModelOption = 'gpt-4o-mini' | 'gpt-4o';
 
@@ -19,6 +22,9 @@ interface ChatbotConfig {
   model: ModelOption;
   temperature: number;
   search_project_data: boolean;
+  enable_mcp?: boolean;
+  mcp_tool_definitions?: string;
+  available_tools?: string[];
   created_at: string;
 }
 
@@ -30,6 +36,9 @@ const ChatbotConfig = () => {
   const [temperature, setTemperature] = useState(0.7);
   const [searchProjectData, setSearchProjectData] = useState(true);
   const [testMessage, setTestMessage] = useState('');
+  const [enableMCP, setEnableMCP] = useState(false);
+  const [mcpToolDefinitions, setMcpToolDefinitions] = useState('');
+  const [availableTools, setAvailableTools] = useState<string[]>(['create_action_record', 'knowledge_base_lookup']);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -60,12 +69,78 @@ If no scheduling information is found, suggest contacting the project manager fo
         setSelectedModel(config.model || 'gpt-4o-mini');
         setTemperature(config.temperature || 0.7);
         setSearchProjectData(config.search_project_data !== false);
+        
+        // Set MCP configuration if available
+        if (config.enable_mcp !== undefined) {
+          setEnableMCP(config.enable_mcp);
+        }
+        
+        if (config.mcp_tool_definitions) {
+          setMcpToolDefinitions(config.mcp_tool_definitions);
+        } else {
+          // Set default tool definitions if none exist
+          setMcpToolDefinitions(getDefaultToolDefinitions());
+        }
+        
+        if (config.available_tools && Array.isArray(config.available_tools)) {
+          setAvailableTools(config.available_tools);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getDefaultToolDefinitions = () => {
+    return JSON.stringify([
+      {
+        "name": "create_action_record",
+        "description": "Creates a specific action for team members to execute based on the project's needs.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action_type": {
+              "type": "string",
+              "enum": ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query"],
+              "description": "The type of action to be taken"
+            },
+            "description": {
+              "type": "string",
+              "description": "Detailed description of what needs to be done"
+            },
+            "recipient": {
+              "type": "string",
+              "description": "Who should receive this action"
+            },
+            "message_text": {
+              "type": "string",
+              "description": "For message actions, the content of the message"
+            }
+          },
+          "required": ["action_type"]
+        }
+      },
+      {
+        "name": "knowledge_base_lookup",
+        "description": "Searches the knowledge base for relevant information about the project",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "The search query to find relevant information"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Maximum number of results to return"
+            }
+          },
+          "required": ["query"]
+        }
+      }
+    ], null, 2);
   };
 
   const saveConfiguration = async () => {
@@ -75,7 +150,10 @@ If no scheduling information is found, suggest contacting the project manager fo
         system_prompt: systemPrompt,
         model: selectedModel,
         temperature: temperature,
-        search_project_data: searchProjectData
+        search_project_data: searchProjectData,
+        enable_mcp: enableMCP,
+        mcp_tool_definitions: mcpToolDefinitions,
+        available_tools: availableTools
       };
       
       const { error } = await supabase
@@ -102,6 +180,24 @@ If no scheduling information is found, suggest contacting the project manager fo
     }
   };
 
+  const handleToolDefinitionsSave = (updatedDefinitions: string) => {
+    setMcpToolDefinitions(updatedDefinitions);
+    
+    // Extract tool names from the updated definitions
+    try {
+      const toolDefs = JSON.parse(updatedDefinitions);
+      const toolNames = toolDefs.map((tool: any) => tool.name);
+      setAvailableTools(toolNames);
+    } catch (error) {
+      console.error('Error parsing tool definitions:', error);
+    }
+    
+    toast({
+      title: "Tool Definitions Updated",
+      description: "Changes will be saved when you click 'Save Configuration'",
+    });
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <header className="mb-8">
@@ -113,6 +209,7 @@ If no scheduling information is found, suggest contacting the project manager fo
         <TabsList>
           <TabsTrigger value="prompt">System Prompt</TabsTrigger>
           <TabsTrigger value="settings">Model Settings</TabsTrigger>
+          <TabsTrigger value="mcp">MCP Configuration</TabsTrigger>
           <TabsTrigger value="test">Test Interface</TabsTrigger>
         </TabsList>
 
@@ -217,6 +314,52 @@ If no scheduling information is found, suggest contacting the project manager fo
                   page and set up your integration.
                 </p>
               </div>
+            </CardContent>
+            <CardFooter className="flex justify-end">
+              <Button onClick={saveConfiguration} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Configuration
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="mcp" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Model Context Protocol (MCP) Settings</CardTitle>
+              <CardDescription>
+                Configure how the chatbot interacts with tools and external systems
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="enable-mcp" 
+                  checked={enableMCP}
+                  onCheckedChange={setEnableMCP}
+                />
+                <Label htmlFor="enable-mcp">Enable Model Context Protocol</Label>
+              </div>
+
+              {enableMCP && <MCPInfoAlert />}
+
+              {enableMCP && (
+                <ToolDefinitionsPanel 
+                  rawDefinitions={mcpToolDefinitions}
+                  onSave={handleToolDefinitionsSave}
+                  isSaving={isSaving}
+                />
+              )}
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button onClick={saveConfiguration} disabled={isSaving}>
