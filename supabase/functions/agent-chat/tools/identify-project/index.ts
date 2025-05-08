@@ -1,4 +1,3 @@
-
 /**
  * Tool to identify projects based on user input (ID, CRM ID, or description)
  */
@@ -71,28 +70,29 @@ export const identifyProject: Tool = {
       // Otherwise do a text search
       else {
         console.log(`Performing text search for: ${query}`);
-        // Improve text search to better handle addresses and descriptions
-        // Make text search case insensitive and more flexible with address parts
-        const searchTerms = query.toLowerCase().trim().split(/\s+/);
         
-        // Build more sophisticated search conditions
-        let searchConditions = [];
-        
-        // Direct address match condition
-        searchConditions.push(`Address.ilike.%${query}%`);
-        
-        // Handle partial address matching (street names)
+        // Break query into words, drop very common / non-informative tokens.
+        const stopWords = new Set(['county', 'project', 'the', 'a', 'an', 'in', 'at', 'of']);
+        const searchTerms = query
+          .toLowerCase()
+          .trim()
+          .split(/\s+/)
+          .filter(t => t.length > 3 && !stopWords.has(t));
+
+        // Start with a broad match on the whole query for both Address and summary.
+        projectsQuery = projectsQuery
+          .ilike('Address', `%${query}%`)
+          .ilike('summary', `%${query}%`);
+
+        // Require every significant term to also appear in the Address (AND logic).
         for (const term of searchTerms) {
-          if (term.length > 3) { // Only search for terms that are long enough to be meaningful
-            searchConditions.push(`Address.ilike.%${term}%`);
-          }
+          projectsQuery = projectsQuery.ilike('Address', `%${term}%`);
         }
-        
-        // Handle other searchable fields
-        searchConditions.push(`summary.ilike.%${query}%`);
-        searchConditions.push(`crm_id.ilike.%${query}%`);
-        
-        projectsQuery = projectsQuery.or(searchConditions.join(','));
+
+        // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal.
+        if (!/^\d+$/.test(query.trim())) {
+          projectsQuery = projectsQuery.ilike('crm_id', `%${query}%`);
+        }
       }
       
       // Execute the query
