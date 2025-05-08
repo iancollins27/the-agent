@@ -1,9 +1,10 @@
+
 /**
  * MCP Context Manager
  * Handles the management of conversation context for the Model Context Protocol
  */
 
-import { getToolDefinitions } from './tools/toolRegistry.ts';
+import { getToolDefinitions, filterTools } from './tools/toolRegistry.ts';
 import { extractToolCallsFromOpenAI } from './mcp.ts';
 import { executeToolCall } from './tools/toolExecutor.ts';
 
@@ -19,14 +20,23 @@ export interface MCPContextManager {
   addSystemMessage: (content: string) => void;
 }
 
-export function createMCPContextManager(systemPrompt: string, userPrompt: string): MCPContextManager {
+export function createMCPContextManager(
+  systemPrompt: string, 
+  userPrompt: string, 
+  enabledTools: string[] = []
+): MCPContextManager {
+  // Get tool definitions based on configuration
+  const tools = enabledTools.length > 0 
+    ? filterTools(enabledTools) 
+    : getToolDefinitions();
+  
   // Create initial context with system and user messages
   const context = {
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
-    tools: getToolDefinitions(),
+    tools: tools,
     
     // Add a method to process LLM responses
     processResponse: async function(
@@ -106,6 +116,13 @@ export function createMCPContextManager(systemPrompt: string, userPrompt: string
               tool_call_id: call.id,
               content: JSON.stringify(toolResult)
             });
+            
+            // If this is a successful project identification, add a system message to prevent repeated lookups
+            if (call.name === 'identify_project' && 
+                toolResult?.status === 'success' && 
+                toolResult?.projects?.length > 0) {
+              this.addSystemMessage(`Project ${projectData.id} information is now in your context. You do not need to identify it again for follow-up questions. Focus on answering the user's questions directly using this context.`);
+            }
           } 
           catch (toolError) {
             console.error(`Error executing tool ${call.name}: ${toolError}`);
@@ -280,6 +297,7 @@ export function createMCPContextManager(systemPrompt: string, userPrompt: string
     
     // Add a method to insert system messages
     addSystemMessage: function(content: string) {
+      console.log('Adding system message:', content);
       this.messages.push({ role: 'system', content });
     }
   };

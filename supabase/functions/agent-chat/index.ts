@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -26,7 +27,7 @@ serve(async (req) => {
     
     console.log(`Agent chat request received: ${messages.length} messages${projectId ? `, project ID: ${projectId}` : ''}`)
     
-    // Get chatbot configuration - FIX: Remove .catch() and use try/catch instead
+    // Get chatbot configuration - Using try/catch instead of .catch()
     let configData = null;
     try {
       const { data, error } = await supabase
@@ -49,12 +50,13 @@ serve(async (req) => {
       system_prompt: null, 
       model: 'gpt-4o-mini',
       temperature: 0.7,
-      search_project_data: true
+      search_project_data: true,
+      enable_mcp: false
     }
     
     console.log('Using bot configuration:', botConfig)
 
-    // Get AI configuration - FIX: Remove .catch() and use try/catch instead
+    // Get AI configuration - Using try/catch instead of .catch()
     let aiConfig = null;
     try {
       const { data, error } = await supabase
@@ -109,9 +111,9 @@ serve(async (req) => {
     let contextData: any = { companyId }
     let projectData = null
     
-    // If we have a project ID, load project data
+    // Check if there's a project ID in the URL or a project is already in context from previous messages
     if (projectId) {
-      console.log('Fetching project data for ID:', projectId)
+      console.log('Fetching project data for ID from URL parameter:', projectId)
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select(`
@@ -133,7 +135,58 @@ serve(async (req) => {
         projectData = project
         companyId = project.company_id
         contextData.projectData = projectData
-        console.log('Found project data by ID:', project)
+        console.log('Found project data by ID from URL parameter:', project)
+        
+        // Add a system message to explicitly tell the AI that a project is in context
+        if (messages.length > 0 && messages[0].role === 'system') {
+          messages[0].content += `\n\nProject ${project.id} data is already in your context. Do not re-identify this project unless explicitly asked.`;
+        }
+      }
+    } else {
+      // Look for project context in previous messages
+      // Try to find if a project was already identified in the conversation
+      console.log('Checking for project context in previous messages');
+      
+      const toolResponseMessages = messages.filter(m => 
+        m.role === 'tool' && 
+        m.content && 
+        m.content.includes('identify_project') && 
+        m.content.includes('"status":"success"') &&
+        m.content.includes('"found":true')
+      );
+      
+      if (toolResponseMessages.length > 0) {
+        console.log('Found previous project identification in conversation history');
+        try {
+          // Get the most recent successful project identification
+          const lastToolResponse = toolResponseMessages[toolResponseMessages.length - 1];
+          const toolResult = JSON.parse(lastToolResponse.content);
+          
+          if (toolResult.projects && toolResult.projects.length > 0) {
+            console.log('Reusing previously identified project from conversation:', toolResult.projects[0]);
+            // We don't need to store the full project data here as it will be re-fetched
+            // by the identify_project tool if needed, but we can add a hint
+            contextData.previouslyIdentifiedProject = {
+              id: toolResult.projects[0].id,
+              crm_id: toolResult.projects[0].crm_id
+            };
+            
+            // Add a system message to explicitly tell the AI that a project was already identified
+            const systemMessage = {
+              role: 'system',
+              content: `The project with ID ${toolResult.projects[0].id} (CRM ID: ${toolResult.projects[0].crm_id}) has already been identified in the conversation. Use the existing context instead of looking it up again. Only re-identify if the user specifically asks about a different project.`
+            };
+            
+            // Insert as the second message to ensure it's near the beginning but after the initial system prompt
+            if (messages.length > 0) {
+              messages.splice(1, 0, systemMessage);
+            } else {
+              messages.push(systemMessage);
+            }
+          }
+        } catch (error) {
+          console.error('Error processing previous project identification:', error);
+        }
       }
     }
 
@@ -180,8 +233,14 @@ serve(async (req) => {
     // Create the system prompt
     const systemPrompt = getChatSystemPrompt([], contextData)
     
+    // Configure MCP based on settings
+    const useMcp = botConfig.enable_mcp === true;
+    const availableTools = botConfig.available_tools || [];
+    
+    console.log(`MCP enabled: ${useMcp}, Available tools: ${availableTools.join(', ')}`);
+    
     // Create MCP context with first user message
-    const mcpContext = createMCPContextManager(systemPrompt, latestUserMessage)
+    const mcpContext = createMCPContextManager(systemPrompt, latestUserMessage, useMcp ? availableTools : [])
     
     // Add previous messages to the context (except the last user message which is already added)
     for (let i = 0; i < messages.length - 1; i++) {
@@ -214,7 +273,7 @@ serve(async (req) => {
           temperature: botConfig.temperature || 0.7
         }
         
-        if (mcpContext.tools && mcpContext.tools.length > 0) {
+        if (mcpContext.tools && mcpContext.tools.length > 0 && useMcp) {
           // @ts-ignore - Add tools to payload
           payload.tools = mcpContext.tools
           // @ts-ignore - Set tool_choice to auto
@@ -278,6 +337,9 @@ serve(async (req) => {
         // If we've had a project identified, store it
         if (result.projectData && !projectData) {
           projectData = result.projectData;
+          
+          // Add a system message to tell the AI that this project is now in context
+          mcpContext.addSystemMessage(`Project ${result.projectData.id} information is now in your context. You do not need to identify it again for follow-up questions. Focus on answering the user's questions directly using this context.`);
         }
       } catch (error) {
         console.error("Error in MCP iteration:", error)

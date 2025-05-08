@@ -44,3 +44,45 @@ export function getToolDefinitions(): Array<{
     }
   }));
 }
+
+/**
+ * Filter tools based on enabled tool names
+ * @param enabledTools List of enabled tool names
+ * @returns Filtered list of tool definitions
+ */
+export function filterTools(enabledTools: string[]): Array<{
+  type: string;
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: string; 
+      properties: Record<string, any>;
+      required: string[];
+    };
+  };
+}> {
+  // If no tools are specified, return no tools
+  if (!enabledTools || enabledTools.length === 0) {
+    console.log("No tools specified in filterTools, returning empty tools array");
+    return [];
+  }
+
+  // Log which tools we're looking for
+  console.log(`Filtering for tools: ${enabledTools.join(', ')}`);
+  
+  // Return only tools that are enabled
+  const filtered = Object.values(tools)
+    .filter(tool => enabledTools.includes(tool.name))
+    .map(tool => ({
+      type: "function",
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.schema
+      }
+    }));
+  
+  console.log(`Found ${filtered.length} matching tools from ${enabledTools.length} requested`);
+  return filtered;
+}
