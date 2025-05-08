@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
@@ -27,17 +26,24 @@ serve(async (req) => {
     
     console.log(`Agent chat request received: ${messages.length} messages${projectId ? `, project ID: ${projectId}` : ''}`)
     
-    // Get chatbot configuration
-    const { data: configData } = await supabase
-      .from('chatbot_config')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-      .catch(err => {
-        console.log('Error fetching chatbot config:', err)
-        return { data: null }
-      })
+    // Get chatbot configuration - FIX: Remove .catch() and use try/catch instead
+    let configData = null;
+    try {
+      const { data, error } = await supabase
+        .from('chatbot_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (error) {
+        console.log('Error fetching chatbot config:', error);
+      } else {
+        configData = data;
+      }
+    } catch (err) {
+      console.log('Exception when fetching chatbot config:', err);
+    }
     
     const botConfig = configData || {
       system_prompt: null, 
@@ -48,17 +54,24 @@ serve(async (req) => {
     
     console.log('Using bot configuration:', botConfig)
 
-    // Get AI configuration
-    const { data: aiConfig } = await supabase
-      .from('ai_config')
-      .select('provider, model')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-      .catch(err => {
-        console.log('Error fetching AI config:', err)
-        return { data: null }
-      })
+    // Get AI configuration - FIX: Remove .catch() and use try/catch instead
+    let aiConfig = null;
+    try {
+      const { data, error } = await supabase
+        .from('ai_config')
+        .select('provider, model')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (error) {
+        console.log('Error fetching AI config:', error);
+      } else {
+        aiConfig = data;
+      }
+    } catch (err) {
+      console.log('Exception when fetching AI config:', err);
+    }
     
     const aiProvider = aiConfig?.provider || 'openai'
     const aiModel = botConfig.model || 'gpt-4o-mini'
