@@ -19,7 +19,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<ActionRecord | null>(null);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
-  // New state for streaming responses
+  const [partialMessage, setPartialMessage] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
   const { toast } = useToast();
 
@@ -27,18 +27,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
     const userMessage: Message = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
+    
+    // Reset streaming state
+    setIsStreaming(false);
+    setPartialMessage("");
 
     try {
       const messageHistory = [...messages, userMessage].map(({ role, content }) => ({ role, content }));
       
-      // For now, streaming is disabled as it needs more implementation
+      // For now, streaming is disabled until fully implemented
       const streaming = false;
       
       const { data, error } = await supabase.functions.invoke('agent-chat', {
         body: { 
           messages: messageHistory, 
           projectId,
-          streaming // Will be used in future iterations
+          streaming
         }
       });
 
@@ -123,12 +127,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
       });
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
   };
 
   const handleActionResolved = () => {
     setPendingAction(null);
   };
+
+  // This will be used when we implement streaming
+  const handleStreamingResponse = (chunk: string) => {
+    setIsStreaming(true);
+    setPartialMessage(prev => prev + chunk);
+  };
+
+  // Combine messages with any partial (streaming) message
+  const displayMessages = [...messages];
+  if (isStreaming && partialMessage) {
+    displayMessages.push({
+      role: 'assistant',
+      content: partialMessage
+    });
+  }
 
   return (
     <Card className={`flex flex-col h-[600px] ${className}`}>
@@ -138,7 +158,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
       
       <CardContent className="flex-1 overflow-hidden p-0">
         <div className="h-full overflow-y-auto">
-          <MessageList messages={messages} />
+          <MessageList messages={displayMessages} />
         </div>
       </CardContent>
       
