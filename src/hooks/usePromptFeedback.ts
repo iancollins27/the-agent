@@ -47,13 +47,21 @@ export const usePromptFeedback = (
     review?: string;
   }) => {
     try {
+      // Create update data object
+      const updateData: any = {
+        feedback_description: feedback.description,
+        feedback_tags: feedback.tags
+      };
+      
+      if (feedback.review !== undefined) {
+        updateData.feedback_review = feedback.review;
+        // Set reviewed flag to true when providing a review
+        updateData.reviewed = feedback.review ? true : null;
+      }
+      
       const { error } = await supabase
         .from('prompt_runs')
-        .update({
-          feedback_description: feedback.description,
-          feedback_tags: feedback.tags,
-          feedback_review: feedback.review
-        })
+        .update(updateData)
         .eq('id', promptRunId);
 
       if (error) {
@@ -67,7 +75,8 @@ export const usePromptFeedback = (
                 ...run, 
                 feedback_description: feedback.description || null, 
                 feedback_tags: feedback.tags || null,
-                feedback_review: feedback.review || null
+                feedback_review: feedback.review !== undefined ? feedback.review : run.feedback_review,
+                reviewed: feedback.review ? true : run.reviewed
               } 
             : run
         )

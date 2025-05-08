@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { PromptRun } from './types';
 import PromptRunRating from './PromptRunRating';
 import PromptSection from './prompt-details/PromptSection';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, CheckSquare, Square } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const FeedbackTab = () => {
   const { promptRuns, loading, setPromptRuns } = usePromptRunData('COMPLETED');
@@ -55,7 +56,10 @@ const FeedbackTab = () => {
     try {
       const { error } = await supabase
         .from('prompt_runs')
-        .update({ feedback_review: feedbackReview })
+        .update({ 
+          feedback_review: feedbackReview,
+          reviewed: true // Set reviewed flag to true when saving a review
+        })
         .eq('id', selectedRun.id);
 
       if (error) {
@@ -66,14 +70,14 @@ const FeedbackTab = () => {
       setPromptRuns(prev => 
         prev.map(run => 
           run.id === selectedRun.id 
-            ? { ...run, feedback_review: feedbackReview } 
+            ? { ...run, feedback_review: feedbackReview, reviewed: true } 
             : run
         )
       );
       
       // Update selected run
       setSelectedRun(prev => 
-        prev ? { ...prev, feedback_review: feedbackReview } : null
+        prev ? { ...prev, feedback_review: feedbackReview, reviewed: true } : null
       );
 
       toast({
@@ -111,6 +115,7 @@ const FeedbackTab = () => {
               <TableHead>Rating</TableHead>
               <TableHead>Feedback Description</TableHead>
               <TableHead>Feedback Tags</TableHead>
+              <TableHead>Reviewed</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -133,6 +138,9 @@ const FeedbackTab = () => {
                 <TableCell>{run.feedback_description}</TableCell>
                 <TableCell>
                   {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}
+                </TableCell>
+                <TableCell className="text-center">
+                  {run.reviewed ? <CheckSquare className="h-5 w-5 text-green-500" /> : <Square className="h-5 w-5 text-gray-300" />}
                 </TableCell>
                 <TableCell>{formatDate(run.created_at)}</TableCell>
                 <TableCell>
@@ -218,7 +226,19 @@ const FeedbackTab = () => {
                     {/* Feedback Review Section */}
                     <div className="pt-2">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium">Feedback Review:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Feedback Review:</span>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="reviewed" 
+                              checked={selectedRun.reviewed || false}
+                              disabled
+                            />
+                            <label htmlFor="reviewed" className="text-sm text-muted-foreground">
+                              {selectedRun.reviewed ? 'Reviewed' : 'Not reviewed'}
+                            </label>
+                          </div>
+                        </div>
                         <Button 
                           size="sm" 
                           onClick={handleSaveFeedbackReview}
