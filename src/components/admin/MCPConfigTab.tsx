@@ -14,6 +14,18 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import ToolDefinitionsPanel from './MCP/ToolDefinitionsPanel';
 
+// Define the chatbot config type that includes the available_tools property
+interface ChatbotConfig {
+  id: string;
+  created_at: string;
+  model: string;
+  search_project_data: boolean;
+  system_prompt: string;
+  temperature: number;
+  available_tools?: string[];
+  mcp_tool_definitions?: string;
+}
+
 /**
  * MCP Configuration Tab for controlling the MCP (Model Context Protocol) settings
  */
@@ -64,7 +76,7 @@ const MCPConfigTab: React.FC = () => {
         throw error;
       }
       
-      return data;
+      return data as ChatbotConfig;
     }
   });
 
@@ -77,7 +89,7 @@ const MCPConfigTab: React.FC = () => {
 
   // Update the enabled tools state when the chatbot config is loaded
   useEffect(() => {
-    if (chatbotConfig?.available_tools) {
+    if (chatbotConfig) {
       const toolsState: Record<string, boolean> = {
         create_action_record: false,
         identify_project: false,
@@ -86,7 +98,8 @@ const MCPConfigTab: React.FC = () => {
       };
       
       // Mark tools as enabled based on the config
-      chatbotConfig.available_tools.forEach((tool: string) => {
+      const availableTools = chatbotConfig.available_tools || [];
+      availableTools.forEach((tool: string) => {
         if (tool in toolsState) {
           toolsState[tool] = true;
         }
@@ -528,3 +541,4 @@ const ToolConfigCard: React.FC<ToolConfigCardProps> = ({
 };
 
 export default MCPConfigTab;
+

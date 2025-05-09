@@ -77,6 +77,9 @@ If no scheduling information is found, suggest contacting the project manager fo
         
         if (config.available_tools && Array.isArray(config.available_tools)) {
           setAvailableTools(config.available_tools);
+        } else {
+          // Set default available tools if none exist
+          setAvailableTools(['create_action_record', 'identify_project', 'data_fetch']);
         }
       }
     } catch (error) {
@@ -393,3 +396,4 @@ If no scheduling information is found, suggest contacting the project manager fo
 };
 
 export default ChatbotConfig;
+

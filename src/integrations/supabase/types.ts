@@ -1294,7 +1294,13 @@ export type Database = {
       }
     }
     Enums: {
-      contact_role: "Roofer" | "HO" | "BidList Project Manager" | "Solar"
+      contact_role:
+        | "Roofer"
+        | "HO"
+        | "BidList Project Manager"
+        | "Solar"
+        | "Solar Ops"
+        | "Solar Sales Rep"
       project_status: "Archived"
       provider_type_enum: "email" | "phone" | "crm"
       user_permission: "read" | "update_settings"
@@ -1422,7 +1428,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      contact_role: ["Roofer", "HO", "BidList Project Manager", "Solar"],
+      contact_role: [
+        "Roofer",
+        "HO",
+        "BidList Project Manager",
+        "Solar",
+        "Solar Ops",
+        "Solar Sales Rep",
+      ],
       project_status: ["Archived"],
       provider_type_enum: ["email", "phone", "crm"],
       user_permission: ["read", "update_settings"],
