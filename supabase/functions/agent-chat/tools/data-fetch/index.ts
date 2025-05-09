@@ -18,6 +18,10 @@ export const dataFetch: Tool = {
       include_raw: {
         type: "boolean",
         description: "Whether to include raw provider data in the response (defaults to false)"
+      },
+      source: {
+        type: "string",
+        description: "Optionally specify the data source (email, phone, crm) to fetch from. If not provided, all available sources will be used."
       }
     },
     required: ["project_id"]
@@ -25,7 +29,7 @@ export const dataFetch: Tool = {
   
   async execute(args: any, context: any): Promise<ToolResult> {
     try {
-      const { project_id, include_raw = false } = args;
+      const { project_id, include_raw = false, source = null } = args;
       
       if (!project_id) {
         return {
@@ -34,13 +38,14 @@ export const dataFetch: Tool = {
         };
       }
       
-      console.log(`Executing data_fetch tool: project=${project_id}`);
+      console.log(`Executing data_fetch tool: project=${project_id}${source ? `, source=${source}` : ''}`);
       
       // Make request to data-fetch edge function
       const response = await context.supabase.functions.invoke('data-fetch', {
         body: {
           project_id,
-          include_raw
+          include_raw,
+          source
         }
       });
       

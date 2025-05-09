@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { CommunicationRecordParams, CommDirection } from "../types.ts";
 
@@ -18,6 +19,9 @@ export async function createCommunicationRecord(
       break;
     case 'CALL':
       subtype = 'call_initiated';
+      break;
+    case 'CRM':
+      subtype = 'crm_update';
       break;
     default:
       subtype = `${channel.toLowerCase()}_message`;

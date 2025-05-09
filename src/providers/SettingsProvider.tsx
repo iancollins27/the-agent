@@ -17,7 +17,9 @@ interface CompanySettings {
   };
   default_email_provider?: string;
   default_phone_provider?: string;
+  default_crm_provider?: string;
   communication_settings?: Json;
+  crm_settings?: Json;
 }
 
 interface SettingsContextType {
@@ -86,6 +88,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updates.notion_settings = {
           ...companySettings.notion_settings,
           ...updates.notion_settings
+        };
+      }
+      
+      // Same for crm_settings if they exist
+      if (updates.crm_settings && companySettings.crm_settings) {
+        updates.crm_settings = {
+          ...companySettings.crm_settings,
+          ...updates.crm_settings
         };
       }
       

@@ -5,7 +5,7 @@ import { corsHeaders } from "./utils/headers.ts";
 
 interface IntegrationData {
   company_id: string;
-  provider_type: 'email' | 'phone';
+  provider_type: 'email' | 'phone' | 'crm';
   provider_name: string;
   api_key: string;
   api_secret?: string | null;
@@ -142,9 +142,31 @@ serve(async (req) => {
         );
       }
       
-      const updates = body.type === 'email' 
-        ? { default_email_provider: body.providerId } 
-        : { default_phone_provider: body.providerId };
+      let updateField;
+      switch(body.type) {
+        case 'email':
+          updateField = 'default_email_provider'; 
+          break;
+        case 'phone':
+          updateField = 'default_phone_provider'; 
+          break;
+        case 'crm':
+          updateField = 'default_crm_provider'; 
+          break;
+        default:
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Invalid provider type. Must be "email", "phone", or "crm".'
+            }),
+            { 
+              status: 400, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+      }
+      
+      const updates = { [updateField]: body.providerId };
         
       const { error } = await supabase
         .from('companies')
