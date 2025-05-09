@@ -15,10 +15,10 @@ export function initSupabaseClient() {
   );
 }
 
-// Valid roles for normalization
+// Valid roles for reference only (not used for normalization anymore)
 export const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
 
-// Role mapping to handle common variations
+// Role mapping is kept for reference but not used in the main logic anymore
 export const roleMapping: Record<string, string> = {
   // Homeowner variations
   'homeowner': 'HO',
@@ -48,35 +48,16 @@ export const roleMapping: Record<string, string> = {
   'bidlist': 'BidList Project Manager',
 };
 
-// Normalize role to ensure consistent casing and handle variations
+// This function is kept for backward compatibility but now just returns the original role
+// without any normalization, or 'HO' if the role is missing
 export function normalizeRole(role: string): string {
+  // If role is undefined or empty, return 'HO' as the default role
   if (!role || role.trim() === '') {
-    return 'Role Unknown';
+    console.log('No role provided, using default "HO"');
+    return 'HO';
   }
   
-  // Convert to lowercase for case-insensitive matching
-  const roleLower = role.toLowerCase().trim();
-  
-  // Check for exact matches in our mapping
-  if (roleMapping[roleLower]) {
-    return roleMapping[roleLower];
-  }
-  
-  // Check for partial matches in our mapping
-  for (const [key, value] of Object.entries(roleMapping)) {
-    if (roleLower.includes(key)) {
-      return value;
-    }
-  }
-  
-  // Check for case-insensitive matches with validRoles
-  for (const validRole of validRoles) {
-    if (validRole.toLowerCase() === roleLower) {
-      return validRole; // Use the properly cased version
-    }
-  }
-  
-  // Return original role if it doesn't match any known roles
-  console.log(`Role not mapped: "${role}", using default`);
-  return 'Role Unknown';
+  // Just return the original role without any normalization
+  console.log(`Using original role as provided: "${role}"`);
+  return role;
 }

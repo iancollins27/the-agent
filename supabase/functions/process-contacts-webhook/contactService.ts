@@ -1,7 +1,6 @@
 
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { ContactPayload, ContactProcessResult } from './types.ts';
-import { normalizeRole } from './utils.ts';
 
 // Find or create project by CRM ID
 export async function getProjectByCrmId(supabase: SupabaseClient, crmId: string): Promise<{ id: string }> {
@@ -33,10 +32,9 @@ export async function processContact(
   try {
     console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
     
-    // Normalize the role
-    const originalRole = contact.role;
-    const role = normalizeRole(contact.role);
-    console.log(`Normalized role: "${role}" (original: "${originalRole}")`);
+    // Use the original role directly without normalization
+    const role = contact.role;
+    console.log(`Using original role: "${role}"`);
     
     // Check if contact already exists with this email or phone number
     let contactQueryCondition = '';
@@ -103,14 +101,18 @@ export async function processContact(
     } else {
       // Create new contact
       console.log(`Creating new contact: ${contact.name} with role: ${role}`);
+      
+      // Handle the case where role is undefined or empty
+      const contactData = {
+        full_name: contact.name,
+        phone_number: contact.number,
+        email: contact.email,
+        role: role || 'HO' // Default to 'HO' only if role is undefined or empty
+      };
+      
       const { data: newContact, error: createError } = await supabase
         .from('contacts')
-        .insert({
-          full_name: contact.name,
-          phone_number: contact.number,
-          email: contact.email,
-          role: role
-        })
+        .insert(contactData)
         .select('id')
         .single();
         
