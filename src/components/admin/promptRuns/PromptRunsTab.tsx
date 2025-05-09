@@ -38,7 +38,7 @@ const PromptRunsTab: React.FC = () => {
     );
   };
 
-  const handlePromptRerun = () => {
+  const handlePromptRerun = (promptRunId?: string) => {
     setCurrentPage(1);
     fetchPromptRuns();
   };

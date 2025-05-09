@@ -10,7 +10,7 @@ interface RooferPromptRunsCardProps {
   onViewDetails: (run: PromptRun) => void;
   onRatingChange: (promptRunId: string, rating: number | null) => void;
   onRunReviewed: (promptRunId: string) => void;
-  onPromptRerun?: () => void;
+  onPromptRerun?: (promptRunId: string) => void;
 }
 
 const RooferPromptRunsCard: React.FC<RooferPromptRunsCardProps> = ({

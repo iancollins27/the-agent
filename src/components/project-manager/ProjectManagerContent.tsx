@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { PromptRun } from '../admin/types';
 import PromptRunsTable from '../admin/PromptRunsTable';
@@ -22,7 +21,7 @@ interface ProjectManagerContentProps {
   onViewDetails: (run: PromptRun) => void;
   onRatingChange: (promptRunId: string, rating: number | null) => void;
   onRunReviewed: (promptRunId: string) => void;
-  onPromptRerun?: () => void;
+  onPromptRerun?: (promptRunId: string) => void;
 }
 
 const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({

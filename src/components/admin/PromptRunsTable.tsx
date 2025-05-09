@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { RotateCw } from 'lucide-react';
@@ -21,7 +22,7 @@ interface PromptRunsTableProps {
   onViewDetails: (promptRun: PromptRun) => void;
   onRunReviewed: (id: string) => void;
   reviewFilter?: string;
-  onPromptRerun?: () => void;
+  onPromptRerun?: (promptRunId: string) => void;
 }
 
 export const formatRelativeTime = (date: string): string => {
@@ -72,9 +73,11 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
 
   const handleRerunPrompt = async (promptRunId: string) => {
     try {
-      // Here you would implement the logic to rerun a prompt
       console.log('Rerunning prompt:', promptRunId);
-      onPromptRerun?.();
+      // Call the callback with the prompt run ID
+      if (onPromptRerun) {
+        onPromptRerun(promptRunId);
+      }
     } catch (error) {
       console.error('Error rerunning prompt:', error);
     }
