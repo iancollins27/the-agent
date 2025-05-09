@@ -14,12 +14,12 @@ interface CompanySettings {
     database_id: string;
     page_id: string;
     last_sync?: string | null;
-  };
-  default_email_provider?: string;
-  default_phone_provider?: string;
-  default_crm_provider?: string;
+  } | null;
+  default_email_provider?: string | null;
+  default_phone_provider?: string | null;
+  default_crm_provider?: string | null;
   communication_settings?: Json;
-  crm_settings?: Json;
+  crm_settings?: Json | null;
 }
 
 interface SettingsContextType {
