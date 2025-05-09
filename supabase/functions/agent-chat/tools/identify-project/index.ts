@@ -1,12 +1,16 @@
+
 /**
  * Tool to identify projects based on user input (ID, CRM ID, or description)
+ * Enhanced with semantic vector search
  */
 
 import { Tool, ToolResult } from '../types.ts';
+import { generateOpenAIEmbedding, formatEmbeddingForDB } from '../../utils/embeddingUtils.ts';
+import { VectorSearchResult } from '../../utils/types.ts';
 
 export const identifyProject: Tool = {
   name: "identify_project",
-  description: "Identifies projects based on ID, CRM ID, or description. Use this to find relevant projects when the user mentions a project or asks about a specific project.",
+  description: "Identifies projects based on ID, CRM ID, or semantic search of description. Use this to find relevant projects when the user mentions a project or asks about a specific project.",
   schema: {
     type: "object",
     properties: {
@@ -36,100 +40,140 @@ export const identifyProject: Tool = {
       console.log(`Executing identify_project tool: query="${query}"`);
 
       // First try exact match by ID or CRM ID
-      let projectsQuery = context.supabase
-        .from('projects')
-        .select(`
-          id, 
-          crm_id, 
-          summary, 
-          next_step,
-          project_track,
-          company_id,
-          companies(name),
-          Address,
-          Project_status
-        `);
-        
-      // Apply company filter if provided
-      if (company_id) {
-        projectsQuery = projectsQuery.eq('company_id', company_id);
-      }
-      
-      // Try exact ID match
       const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       
       if (uuidPattern.test(query)) {
         console.log(`Query appears to be a UUID, searching by ID`);
-        projectsQuery = projectsQuery.eq('id', query);
+        const { data: exactMatches, error: exactError } = await context.supabase
+          .from('projects')
+          .select(`
+            id, 
+            crm_id, 
+            summary, 
+            next_step,
+            project_track,
+            company_id,
+            companies(name),
+            Address,
+            Project_status
+          `)
+          .eq('id', query)
+          .maybeSingle();
+          
+        if (exactError) {
+          console.error("Error in exact ID search:", exactError);
+        } else if (exactMatches) {
+          return {
+            status: "success",
+            projects: [{
+              id: exactMatches.id,
+              crm_id: exactMatches.crm_id,
+              summary: exactMatches.summary,
+              next_step: exactMatches.next_step,
+              address: exactMatches.Address,
+              status: exactMatches.Project_status,
+              company: exactMatches.companies?.name
+            }],
+            found: true,
+            count: 1,
+            message: `Found exact project match for ID "${query}"`
+          };
+        }
       } 
+      
       // Try exact CRM ID match
-      else if (/^\d+$/.test(query)) {
+      if (/^\d+$/.test(query)) {
         console.log(`Query appears to be a number, searching by CRM ID`);
-        projectsQuery = projectsQuery.eq('crm_id', query);
+        const { data: crmMatches, error: crmError } = await context.supabase
+          .from('projects')
+          .select(`
+            id, 
+            crm_id, 
+            summary, 
+            next_step,
+            project_track,
+            company_id,
+            companies(name),
+            Address,
+            Project_status
+          `)
+          .eq('crm_id', query)
+          .maybeSingle();
+          
+        if (crmError) {
+          console.error("Error in CRM ID search:", crmError);
+        } else if (crmMatches) {
+          return {
+            status: "success",
+            projects: [{
+              id: crmMatches.id,
+              crm_id: crmMatches.crm_id,
+              summary: crmMatches.summary,
+              next_step: crmMatches.next_step,
+              address: crmMatches.Address,
+              status: crmMatches.Project_status,
+              company: crmMatches.companies?.name
+            }],
+            found: true,
+            count: 1,
+            message: `Found exact project match for CRM ID "${query}"`
+          };
+        }
       } 
-      // Otherwise do a text search
-      else {
-        console.log(`Performing text search for: ${query}`);
+      
+      // If no exact matches, perform semantic search using embeddings
+      console.log(`Performing semantic vector search for: ${query}`);
+      
+      try {
+        // Generate embedding for the query
+        const queryEmbedding = await generateOpenAIEmbedding(query);
+        const formattedEmbedding = formatEmbeddingForDB(queryEmbedding);
         
-        // Break query into words, drop very common / non-informative tokens.
-        const stopWords = new Set(['county', 'project', 'the', 'a', 'an', 'in', 'at', 'of']);
-        const searchTerms = query
-          .toLowerCase()
-          .trim()
-          .split(/\s+/)
-          .filter(t => t.length > 3 && !stopWords.has(t));
-
-        // Start with a broad match on the whole query for both Address and summary.
-        projectsQuery = projectsQuery
-          .ilike('Address', `%${query}%`)
-          .ilike('summary', `%${query}%`);
-
-        // Require every significant term to also appear in the Address (AND logic).
-        for (const term of searchTerms) {
-          projectsQuery = projectsQuery.ilike('Address', `%${term}%`);
+        // Perform vector search
+        const { data: vectorResults, error: vectorError } = await context.supabase.rpc(
+          'search_projects_by_vector',
+          {
+            search_embedding: formattedEmbedding,
+            match_threshold: 0.2,
+            match_count: 5,
+            p_company_id: company_id || null
+          }
+        );
+        
+        if (vectorError) {
+          console.error("Error in vector search:", vectorError);
+          // Fall back to traditional search if vector search fails
+          return await performTraditionalSearch(query, company_id, context);
         }
-
-        // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal.
-        if (!/^\d+$/.test(query.trim())) {
-          projectsQuery = projectsQuery.ilike('crm_id', `%${query}%`);
+        
+        if (vectorResults && vectorResults.length > 0) {
+          return {
+            status: "success",
+            projects: vectorResults.map((p: VectorSearchResult) => ({
+              id: p.id,
+              crm_id: p.crm_id,
+              summary: p.summary,
+              next_step: p.next_step,
+              address: p.address,
+              status: p.status,
+              company: p.company_name,
+              similarity: p.similarity
+            })),
+            found: true,
+            count: vectorResults.length,
+            message: `Found ${vectorResults.length} project(s) matching "${query}" using semantic search`
+          };
         }
+        
+        // Fall back to traditional search if vector search returns no results
+        console.log("Vector search returned no results, falling back to traditional search");
+        return await performTraditionalSearch(query, company_id, context);
+        
+      } catch (embeddingError) {
+        console.error("Error generating embedding or performing vector search:", embeddingError);
+        // Fall back to traditional search if there's an error with vector search
+        return await performTraditionalSearch(query, company_id, context);
       }
-      
-      // Execute the query
-      const { data: projects, error } = await projectsQuery.limit(5);
-      
-      if (error) {
-        console.error("Error searching for projects:", error);
-        return {
-          status: "error",
-          error: `Database error: ${error.message}`
-        };
-      }
-      
-      if (!projects || projects.length === 0) {
-        return {
-          status: "success",
-          projects: [],
-          found: false,
-          message: `No projects found matching "${query}"`
-        };
-      }
-      
-      return {
-        status: "success",
-        projects: projects.map(p => ({
-          id: p.id,
-          crm_id: p.crm_id,
-          summary: p.summary,
-          next_step: p.next_step,
-          address: p.Address,
-          status: p.Project_status,
-          company: p.companies?.name
-        })),
-        found: true,
-        count: projects.length,
-        message: `Found ${projects.length} project(s) matching "${query}"`
-      };
     } catch (error) {
       console.error("Error executing identify_project tool:", error);
       return {
@@ -139,3 +183,85 @@ export const identifyProject: Tool = {
     }
   }
 };
+
+/**
+ * Fallback method that performs traditional text search using ILIKE
+ */
+async function performTraditionalSearch(query: string, company_id: string | undefined, context: any): Promise<ToolResult> {
+  console.log(`Performing traditional text search for: ${query}`);
+  
+  // Break query into words, drop very common / non-informative tokens.
+  const stopWords = new Set(['county', 'project', 'the', 'a', 'an', 'in', 'at', 'of']);
+  const searchTerms = query
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(t => t.length > 3 && !stopWords.has(t));
+
+  let projectsQuery = context.supabase
+    .from('projects')
+    .select(`
+      id, 
+      crm_id, 
+      summary, 
+      next_step,
+      project_track,
+      company_id,
+      companies(name),
+      Address,
+      Project_status
+    `);
+    
+  // Apply company filter if provided
+  if (company_id) {
+    projectsQuery = projectsQuery.eq('company_id', company_id);
+  }
+    
+  // Start with a broad match on the whole query for both Address and summary.
+  let orConditions = [];
+  orConditions.push(`Address.ilike.%${query}%`);
+  orConditions.push(`summary.ilike.%${query}%`);
+  
+  // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal.
+  if (!/^\d+$/.test(query.trim())) {
+    orConditions.push(`crm_id.ilike.%${query}%`);
+  }
+  
+  projectsQuery = projectsQuery.or(orConditions.join(','));
+
+  // Execute the query
+  const { data: projects, error } = await projectsQuery.limit(5);
+  
+  if (error) {
+    console.error("Error searching for projects:", error);
+    return {
+      status: "error",
+      error: `Database error: ${error.message}`
+    };
+  }
+  
+  if (!projects || projects.length === 0) {
+    return {
+      status: "success",
+      projects: [],
+      found: false,
+      message: `No projects found matching "${query}"`
+    };
+  }
+  
+  return {
+    status: "success",
+    projects: projects.map(p => ({
+      id: p.id,
+      crm_id: p.crm_id,
+      summary: p.summary,
+      next_step: p.next_step,
+      address: p.Address,
+      status: p.Project_status,
+      company: p.companies?.name
+    })),
+    found: true,
+    count: projects.length,
+    message: `Found ${projects.length} project(s) matching "${query}" using traditional search`
+  };
+}

@@ -386,7 +386,7 @@ export type Database = {
           integration_mode: string
           is_active: boolean | null
           provider_name: string
-          provider_type: string
+          provider_type: Database["public"]["Enums"]["provider_type_enum"]
           updated_at: string
         }
         Insert: {
@@ -400,7 +400,7 @@ export type Database = {
           integration_mode?: string
           is_active?: boolean | null
           provider_name: string
-          provider_type: string
+          provider_type: Database["public"]["Enums"]["provider_type_enum"]
           updated_at?: string
         }
         Update: {
@@ -414,7 +414,7 @@ export type Database = {
           integration_mode?: string
           is_active?: boolean | null
           provider_name?: string
-          provider_type?: string
+          provider_type?: Database["public"]["Enums"]["provider_type_enum"]
           updated_at?: string
         }
         Relationships: [
@@ -716,8 +716,10 @@ export type Database = {
           next_check_date: string | null
           next_step: string | null
           project_manager: string | null
+          project_name: string | null
           Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
+          search_vector: string | null
           summary: string | null
         }
         Insert: {
@@ -731,8 +733,10 @@ export type Database = {
           next_check_date?: string | null
           next_step?: string | null
           project_manager?: string | null
+          project_name?: string | null
           Project_status?: Database["public"]["Enums"]["project_status"] | null
           project_track?: string | null
+          search_vector?: string | null
           summary?: string | null
         }
         Update: {
@@ -746,8 +750,10 @@ export type Database = {
           next_check_date?: string | null
           next_step?: string | null
           project_manager?: string | null
+          project_name?: string | null
           Project_status?: Database["public"]["Enums"]["project_status"] | null
           project_track?: string | null
+          search_vector?: string | null
           summary?: string | null
         }
         Relationships: [
@@ -972,31 +978,37 @@ export type Database = {
           id: string | null
           is_active: boolean | null
           provider_name: string | null
-          provider_type: string | null
+          provider_type:
+            | Database["public"]["Enums"]["provider_type_enum"]
+            | null
           updated_at: string | null
         }
         Insert: {
           account_id?: string | null
-          api_key?: never
-          api_secret?: never
+          api_key?: string | null
+          api_secret?: string | null
           company_id?: string | null
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
           provider_name?: string | null
-          provider_type?: string | null
+          provider_type?:
+            | Database["public"]["Enums"]["provider_type_enum"]
+            | null
           updated_at?: string | null
         }
         Update: {
           account_id?: string | null
-          api_key?: never
-          api_secret?: never
+          api_key?: string | null
+          api_secret?: string | null
           company_id?: string | null
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
           provider_name?: string | null
-          provider_type?: string | null
+          provider_type?:
+            | Database["public"]["Enums"]["provider_type_enum"]
+            | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1048,6 +1060,10 @@ export type Database = {
           account_id: string
         }[]
       }
+      get_project_search_text: {
+        Args: { project_id: string }
+        Returns: string
+      }
       get_projects_due_for_check: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1061,8 +1077,10 @@ export type Database = {
           next_check_date: string | null
           next_step: string | null
           project_manager: string | null
+          project_name: string | null
           Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
+          search_vector: string | null
           summary: string | null
         }[]
       }
@@ -1145,6 +1163,26 @@ export type Database = {
           similarity: number
         }[]
       }
+      search_projects_by_vector: {
+        Args: {
+          search_embedding: string
+          match_threshold?: number
+          match_count?: number
+          p_company_id?: string
+        }
+        Returns: {
+          id: string
+          crm_id: string
+          summary: string
+          next_step: string
+          project_track: string
+          company_id: string
+          company_name: string
+          address: string
+          status: string
+          similarity: number
+        }[]
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown
@@ -1185,6 +1223,7 @@ export type Database = {
     Enums: {
       contact_role: "Roofer" | "HO" | "BidList Project Manager" | "Solar"
       project_status: "Archived"
+      provider_type_enum: "email" | "phone" | "crm"
       user_permission: "read" | "update_settings"
       workflow_type:
         | "summary_generation"
@@ -1312,6 +1351,7 @@ export const Constants = {
     Enums: {
       contact_role: ["Roofer", "HO", "BidList Project Manager", "Solar"],
       project_status: ["Archived"],
+      provider_type_enum: ["email", "phone", "crm"],
       user_permission: ["read", "update_settings"],
       workflow_type: [
         "summary_generation",

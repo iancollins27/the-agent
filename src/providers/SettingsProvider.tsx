@@ -84,7 +84,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // For notion_settings, merge with existing settings
       if (updates.notion_settings && companySettings.notion_settings) {
         updates.notion_settings = {
-          ...companySettings.notion_settings,
+          ...companySettings.notion_settings || {},
           ...updates.notion_settings
         };
       }
