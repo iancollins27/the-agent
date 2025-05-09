@@ -86,7 +86,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // For notion_settings, merge with existing settings
       if (updates.notion_settings && companySettings.notion_settings) {
         updates.notion_settings = {
-          ...companySettings.notion_settings,
+          ...(companySettings.notion_settings || {}),
           ...updates.notion_settings
         };
       }
@@ -94,7 +94,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // Same for crm_settings if they exist
       if (updates.crm_settings && companySettings.crm_settings) {
         updates.crm_settings = {
-          ...companySettings.crm_settings,
+          ...(companySettings.crm_settings || {}),
           ...updates.crm_settings
         };
       }
