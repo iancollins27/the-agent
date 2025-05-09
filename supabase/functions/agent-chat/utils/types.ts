@@ -19,4 +19,6 @@ export interface VectorSearchResult {
   address: string | null;
   status: string | null;
   similarity: number;
+  project_name?: string | null;
 }
+

@@ -55,6 +55,7 @@ export const identifyProject: Tool = {
             company_id,
             companies(name),
             Address,
+            project_name,
             Project_status
           `)
           .eq('id', query)
@@ -71,6 +72,7 @@ export const identifyProject: Tool = {
               summary: exactMatches.summary,
               next_step: exactMatches.next_step,
               address: exactMatches.Address,
+              project_name: exactMatches.project_name,
               status: exactMatches.Project_status,
               company: exactMatches.companies?.name
             }],
@@ -95,6 +97,7 @@ export const identifyProject: Tool = {
             company_id,
             companies(name),
             Address,
+            project_name,
             Project_status
           `)
           .eq('crm_id', query)
@@ -111,6 +114,7 @@ export const identifyProject: Tool = {
               summary: crmMatches.summary,
               next_step: crmMatches.next_step,
               address: crmMatches.Address,
+              project_name: crmMatches.project_name,
               status: crmMatches.Project_status,
               company: crmMatches.companies?.name
             }],
@@ -147,6 +151,55 @@ export const identifyProject: Tool = {
         }
         
         if (vectorResults && vectorResults.length > 0) {
+          // Get complete project data for each result to ensure we have all the fields we need
+          const projectIds = vectorResults.map((p: VectorSearchResult) => p.id);
+          const { data: fullProjects, error: projectsError } = await context.supabase
+            .from('projects')
+            .select(`
+              id, 
+              crm_id, 
+              summary, 
+              next_step,
+              project_track,
+              company_id,
+              companies(name),
+              Address,
+              project_name,
+              Project_status
+            `)
+            .in('id', projectIds);
+            
+          if (projectsError) {
+            console.error("Error getting full project details:", projectsError);
+          } else if (fullProjects && fullProjects.length > 0) {
+            // Merge the similarity scores with the full project data
+            const projectsWithSimilarity = fullProjects.map(project => {
+              const vectorResult = vectorResults.find((v: VectorSearchResult) => v.id === project.id);
+              return {
+                id: project.id,
+                crm_id: project.crm_id,
+                summary: project.summary,
+                next_step: project.next_step,
+                address: project.Address,
+                project_name: project.project_name,
+                status: project.Project_status,
+                company: project.companies?.name,
+                similarity: vectorResult?.similarity || 0
+              };
+            });
+            
+            // Sort by similarity, highest first
+            projectsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
+            
+            return {
+              status: "success",
+              projects: projectsWithSimilarity,
+              found: true,
+              count: projectsWithSimilarity.length,
+              message: `Found ${projectsWithSimilarity.length} project(s) matching "${query}" using semantic search`
+            };
+          }
+          
           return {
             status: "success",
             projects: vectorResults.map((p: VectorSearchResult) => ({
@@ -155,6 +208,7 @@ export const identifyProject: Tool = {
               summary: p.summary,
               next_step: p.next_step,
               address: p.address,
+              project_name: p.project_name,
               status: p.status,
               company: p.company_name,
               similarity: p.similarity
@@ -209,6 +263,7 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       company_id,
       companies(name),
       Address,
+      project_name,
       Project_status
     `);
     
@@ -221,6 +276,7 @@ async function performTraditionalSearch(query: string, company_id: string | unde
   let orConditions = [];
   orConditions.push(`Address.ilike.%${query}%`);
   orConditions.push(`summary.ilike.%${query}%`);
+  orConditions.push(`project_name.ilike.%${query}%`);
   
   // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal.
   if (!/^\d+$/.test(query.trim())) {
@@ -257,6 +313,7 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       summary: p.summary,
       next_step: p.next_step,
       address: p.Address,
+      project_name: p.project_name,
       status: p.Project_status,
       company: p.companies?.name
     })),

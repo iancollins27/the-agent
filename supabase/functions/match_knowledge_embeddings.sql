@@ -1,36 +1,31 @@
 
-CREATE OR REPLACE FUNCTION match_knowledge_embeddings(
-  query_embedding vector(1536),
-  match_threshold float,
-  match_count int,
-  company_id uuid
-)
-RETURNS TABLE (
-  id uuid,
-  company_id uuid,
-  content text,
-  title text,
-  url text,
-  similarity float
-)
-LANGUAGE plpgsql
-AS $$
+CREATE OR REPLACE FUNCTION public.search_projects_by_vector(search_embedding vector, match_threshold double precision DEFAULT 0.2, match_count integer DEFAULT 5, p_company_id uuid DEFAULT NULL::uuid)
+ RETURNS TABLE(id uuid, crm_id text, summary text, next_step text, project_track text, company_id uuid, company_name text, address text, status text, similarity double precision, project_name text)
+ LANGUAGE plpgsql
+AS $function$
 BEGIN
   RETURN QUERY
   SELECT
-    ke.id,
-    ke.company_id,
-    ke.content,
-    ke.title,
-    ke.url,
-    1 - (ke.embedding <=> query_embedding) as similarity
+    p.id,
+    p.crm_id,
+    p.summary,
+    p.next_step,
+    p.project_track,
+    p.company_id,
+    c.name as company_name,
+    p."Address" as address,
+    p."Project_status" as status,
+    1 - (p.search_vector <=> search_embedding) AS similarity,
+    p.project_name
   FROM
-    knowledge_base_embeddings ke
+    projects p
+  LEFT JOIN
+    companies c ON p.company_id = c.id
   WHERE
-    ke.company_id = match_knowledge_embeddings.company_id
-    AND 1 - (ke.embedding <=> query_embedding) > match_threshold
+    p.search_vector IS NOT NULL
+    AND (p_company_id IS NULL OR p.company_id = p_company_id)
   ORDER BY
-    ke.embedding <=> query_embedding
+    p.search_vector <=> search_embedding
   LIMIT match_count;
 END;
-$$;
+$function$;
