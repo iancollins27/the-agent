@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +21,18 @@ interface ChatbotConfig {
   search_project_data: boolean;
   system_prompt: string;
   temperature: number;
+  available_tools?: string[];
+  mcp_tool_definitions?: string;
+}
+
+// Define the mutation input type to include available_tools
+interface ChatbotConfigUpdateInput {
+  id?: string;
+  created_at?: string;
+  model?: string;
+  search_project_data?: boolean;
+  system_prompt?: string;
+  temperature?: number;
   available_tools?: string[];
   mcp_tool_definitions?: string;
 }
@@ -157,9 +168,14 @@ const MCPConfigTab: React.FC = () => {
         throw new Error(`Failed to fetch current config: ${fetchError.message}`);
       }
 
+      // Use the ChatbotConfigUpdateInput type for the update payload
+      const updatePayload: ChatbotConfigUpdateInput = { available_tools: tools };
+
+      console.log("Updating tools with payload:", updatePayload);
+
       const { error } = await supabase
         .from('chatbot_config')
-        .update({ available_tools: tools })
+        .update(updatePayload)
         .eq('id', existingConfig.id);
 
       if (error) throw error;
@@ -541,4 +557,3 @@ const ToolConfigCard: React.FC<ToolConfigCardProps> = ({
 };
 
 export default MCPConfigTab;
-

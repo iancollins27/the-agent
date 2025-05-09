@@ -14,6 +14,7 @@ const tools: Record<string, Tool> = {
 };
 
 export function getAvailableTools(): Record<string, Tool> {
+  console.log(`Available tools in registry: ${Object.keys(tools).join(', ')}`);
   return tools;
 }
 
@@ -77,6 +78,7 @@ export function filterTools(enabledTools: string[]): Array<{
 
   // Log which tools we're looking for
   console.log(`Filtering for tools: ${enabledTools.join(', ')}`);
+  console.log(`Available tools: ${Object.keys(tools).join(', ')}`);
   
   // Return only tools that are enabled
   const filtered = Object.values(tools)
