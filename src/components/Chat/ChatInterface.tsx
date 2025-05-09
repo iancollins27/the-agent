@@ -21,6 +21,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [partialMessage, setPartialMessage] = useState<string>("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSendMessage = async (input: string) => {
@@ -42,12 +43,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
         body: { 
           messages: messageHistory, 
           projectId,
+          conversationId,  // Send the conversation ID if we have one
           streaming
         }
       });
 
       if (error) {
         throw new Error(error.message);
+      }
+
+      // Store the conversation ID for subsequent messages
+      if (data.conversationId) {
+        setConversationId(data.conversationId);
       }
 
       setMessages(prev => [
@@ -141,6 +148,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
     setPartialMessage(prev => prev + chunk);
   };
 
+  // Add a function to clear the conversation (reset context)
+  const handleClearConversation = () => {
+    setMessages([]);
+    setConversationId(null);
+    toast({
+      title: "Conversation cleared",
+      description: "Started a new conversation",
+    });
+  };
+
   // Combine messages with any partial (streaming) message
   const displayMessages = [...messages];
   if (isStreaming && partialMessage) {
@@ -152,8 +169,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, pre
 
   return (
     <Card className={`flex flex-col h-[600px] ${className}`}>
-      <CardHeader className="px-4 py-3 border-b shrink-0">
+      <CardHeader className="px-4 py-3 border-b shrink-0 flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Project Assistant</CardTitle>
+        {messages.length > 0 && (
+          <button 
+            className="text-sm text-gray-400 hover:text-gray-600"
+            onClick={handleClearConversation}
+          >
+            Clear conversation
+          </button>
+        )}
       </CardHeader>
       
       <CardContent className="flex-1 overflow-hidden p-0">

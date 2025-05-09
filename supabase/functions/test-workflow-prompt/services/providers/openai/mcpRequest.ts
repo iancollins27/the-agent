@@ -1,12 +1,22 @@
+
 import { updatePromptRunWithResult } from "../../../database/prompt-runs.ts";
 import { updatePromptRunMetrics } from "../../../database/tool-logs.ts";
-import { createMCPContext, addToolResult, extractToolCallsFromOpenAI } from "../../../mcp.ts";
+import { createMCPContext, addToolResult, extractToolCallsFromOpenAI, loadMCPContext, saveMCPContext } from "../../../mcp.ts";
 import { calculateCost } from "./costCalculator.ts";
 import { requestHumanReview } from "../../../human-service.ts";
 import { getMCPOrchestratorPrompt } from "../../../mcp-system-prompts.ts";
 import { getToolDefinitions, filterTools } from "../../../tools/toolRegistry.ts";
 import { executeToolCall } from "../../../tools/toolExecutor.ts";
 import { getLatestWorkflowPrompt } from "../../../database/workflow-prompts.ts";
+import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
+
+// Helper function to generate a UUID for conversation IDs
+function generateConversationId(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export async function processMCPRequest(
   systemPrompt: string,
@@ -20,6 +30,10 @@ export async function processMCPRequest(
   if (!openAIApiKey) {
     throw new Error("OpenAI API key not configured");
   }
+
+  // Get or create a conversation ID
+  const conversationId = contextData.conversationId || generateConversationId();
+  console.log(`Using conversation ID: ${conversationId}`);
 
   // Default to all available tools if none specified
   let availableTools;
@@ -82,8 +96,25 @@ export async function processMCPRequest(
   console.log("Enhanced system prompt first 200 chars:", 
               enhancedSystemPrompt.substring(0, 200) + "...");
   
-  // Initialize MCP context with the enhanced system prompt
-  let context = createMCPContext(enhancedSystemPrompt, userPrompt, availableTools);
+  // Try to load existing conversation context from KV store or create new one
+  let context;
+  const existingContext = await loadMCPContext(conversationId);
+  
+  if (existingContext) {
+    console.log(`Using existing test conversation context for ID: ${conversationId}`);
+    context = existingContext;
+    
+    // Add the new user message to the existing context if it's not already there
+    const lastMessage = context.messages[context.messages.length - 1];
+    if (lastMessage.role !== 'user' || lastMessage.content !== userPrompt) {
+      console.log(`Adding new user prompt to existing context: ${userPrompt.substring(0, 50)}...`);
+      context.messages.push({ role: 'user', content: userPrompt });
+    }
+  } else {
+    // Initialize MCP context with the enhanced system prompt
+    console.log(`Creating new test conversation context with ID: ${conversationId}`);
+    context = createMCPContext(enhancedSystemPrompt, userPrompt, availableTools);
+  }
 
   let finalAnswer = "";
   let toolOutputs: any[] = [];
@@ -96,7 +127,7 @@ export async function processMCPRequest(
   
   while (iterationCount < MAX_ITERATIONS) {
     iterationCount++;
-    console.log(`Starting MCP iteration ${iterationCount}`);
+    console.log(`Starting MCP iteration ${iterationCount} for conversation ${conversationId}`);
 
     try {
       // Make API request to OpenAI
@@ -244,10 +275,16 @@ export async function processMCPRequest(
             });
           }
         }
+        
+        // Save context after processing tool calls
+        await saveMCPContext(conversationId, context);
       } else {
         // The model has finished and provided a final answer
         finalAnswer = message.content || "No response generated.";
         console.log("MCP conversation complete after " + iterationCount + " iterations");
+        
+        // Save the final context
+        await saveMCPContext(conversationId, context);
         break;
       }
     } catch (error) {
@@ -273,7 +310,8 @@ export async function processMCPRequest(
   
   return { 
     result: finalAnswer, 
-    toolOutputs: toolOutputs.length > 0 ? toolOutputs : undefined 
+    toolOutputs: toolOutputs.length > 0 ? toolOutputs : undefined,
+    conversationId: conversationId
   };
 }
 

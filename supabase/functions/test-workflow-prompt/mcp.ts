@@ -1,3 +1,4 @@
+
 // MCP related functions
 import { filterTools, getToolDefinitions } from './tools/toolRegistry.ts';
 
@@ -12,6 +13,52 @@ export function createMCPContext(systemPrompt: string, userPrompt: string, tools
     ],
     tools: tools
   };
+}
+
+/**
+ * Load an existing MCP context from the KV store
+ */
+export async function loadMCPContext(conversationId: string): Promise<any | null> {
+  try {
+    const kv = await Deno.openKv();
+    const contextKey = ["test_conversations", conversationId];
+    const result = await kv.get(contextKey);
+    kv.close();
+    
+    if (result && result.value) {
+      console.log(`Loaded existing test conversation context for ID: ${conversationId}`);
+      return result.value;
+    }
+    
+    console.log(`No existing test context found for conversation ID: ${conversationId}`);
+    return null;
+  } catch (error) {
+    console.error(`Error loading test conversation context: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Save the current MCP context to the KV store
+ */
+export async function saveMCPContext(conversationId: string, context: any): Promise<boolean> {
+  try {
+    const kv = await Deno.openKv();
+    const contextKey = ["test_conversations", conversationId];
+    
+    // Set TTL to 24 hours (in milliseconds)
+    const ttl = 24 * 60 * 60 * 1000;
+    const expireAt = new Date(Date.now() + ttl);
+    
+    await kv.set(contextKey, context, { expireIn: ttl });
+    kv.close();
+    
+    console.log(`Saved test conversation context for ID: ${conversationId}, expires at ${expireAt.toISOString()}`);
+    return true;
+  } catch (error) {
+    console.error(`Error saving test conversation context: ${error.message}`);
+    return false;
+  }
 }
 
 /**
