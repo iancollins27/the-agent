@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +13,7 @@ import CompanySettings from "./pages/CompanySettings";
 import MermaidDiagrams from "./pages/MermaidDiagrams";
 import ProjectManager from "./pages/ProjectManager";
 import ExecutionView from "./components/admin/execution-view/ExecutionView";
+import UpdateProjectEmbeddings from "./pages/UpdateProjectEmbeddings";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +97,7 @@ const App = () => (
             </ProtectedRoute>
           }
         />
+        <Route path="/update-project-embeddings" element={<UpdateProjectEmbeddings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </TooltipProvider>
