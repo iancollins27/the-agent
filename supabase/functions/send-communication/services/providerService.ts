@@ -107,28 +107,13 @@ async function getDefaultProvider(
   actionId?: string,
   sourceIp: string = 'unknown'
 ): Promise<ProviderInfo | null> {
-  let providerType: string;
-  let defaultProviderColumn: string;
-  
-  // Map channel to provider type and column name
-  switch(channel.toLowerCase()) {
-    case 'email':
-      providerType = 'email';
-      defaultProviderColumn = 'default_email_provider';
-      break;
-    case 'crm':
-      providerType = 'crm';
-      defaultProviderColumn = 'default_crm_provider';
-      break;
-    default: // phone, sms, call, etc.
-      providerType = 'phone';
-      defaultProviderColumn = 'default_phone_provider';
-      break;
-  }
+  const providerType = channel === 'email' ? 'email' : 'phone';
   
   console.log(`Looking up default ${providerType} provider for company ${companyId}`);
   
   // Get the default provider ID for this channel
+  const defaultProviderColumn = channel === 'email' ? 'default_email_provider' : 'default_phone_provider';
+  
   const { data: companyData, error: companyError } = await supabase
     .from('companies')
     .select(defaultProviderColumn)

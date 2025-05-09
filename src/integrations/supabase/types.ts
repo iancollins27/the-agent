@@ -386,7 +386,7 @@ export type Database = {
           integration_mode: string
           is_active: boolean | null
           provider_name: string
-          provider_type: Database["public"]["Enums"]["provider_type_enum"]
+          provider_type: string
           updated_at: string
         }
         Insert: {
@@ -400,7 +400,7 @@ export type Database = {
           integration_mode?: string
           is_active?: boolean | null
           provider_name: string
-          provider_type: Database["public"]["Enums"]["provider_type_enum"]
+          provider_type: string
           updated_at?: string
         }
         Update: {
@@ -414,7 +414,7 @@ export type Database = {
           integration_mode?: string
           is_active?: boolean | null
           provider_name?: string
-          provider_type?: Database["public"]["Enums"]["provider_type_enum"]
+          provider_type?: string
           updated_at?: string
         }
         Relationships: [
@@ -972,37 +972,31 @@ export type Database = {
           id: string | null
           is_active: boolean | null
           provider_name: string | null
-          provider_type:
-            | Database["public"]["Enums"]["provider_type_enum"]
-            | null
+          provider_type: string | null
           updated_at: string | null
         }
         Insert: {
           account_id?: string | null
-          api_key?: string | null
-          api_secret?: string | null
+          api_key?: never
+          api_secret?: never
           company_id?: string | null
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
           provider_name?: string | null
-          provider_type?:
-            | Database["public"]["Enums"]["provider_type_enum"]
-            | null
+          provider_type?: string | null
           updated_at?: string | null
         }
         Update: {
           account_id?: string | null
-          api_key?: string | null
-          api_secret?: string | null
+          api_key?: never
+          api_secret?: never
           company_id?: string | null
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
           provider_name?: string | null
-          provider_type?:
-            | Database["public"]["Enums"]["provider_type_enum"]
-            | null
+          provider_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1191,7 +1185,6 @@ export type Database = {
     Enums: {
       contact_role: "Roofer" | "HO" | "BidList Project Manager" | "Solar"
       project_status: "Archived"
-      provider_type_enum: "email" | "phone" | "crm"
       user_permission: "read" | "update_settings"
       workflow_type:
         | "summary_generation"
@@ -1319,7 +1312,6 @@ export const Constants = {
     Enums: {
       contact_role: ["Roofer", "HO", "BidList Project Manager", "Solar"],
       project_status: ["Archived"],
-      provider_type_enum: ["email", "phone", "crm"],
       user_permission: ["read", "update_settings"],
       workflow_type: [
         "summary_generation",

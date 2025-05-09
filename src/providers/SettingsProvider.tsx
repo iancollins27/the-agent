@@ -14,12 +14,10 @@ interface CompanySettings {
     database_id: string;
     page_id: string;
     last_sync?: string | null;
-  } | null;
-  default_email_provider?: string | null;
-  default_phone_provider?: string | null;
-  default_crm_provider?: string | null;
+  };
+  default_email_provider?: string;
+  default_phone_provider?: string;
   communication_settings?: Json;
-  crm_settings?: Json | null;
 }
 
 interface SettingsContextType {
@@ -86,16 +84,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // For notion_settings, merge with existing settings
       if (updates.notion_settings && companySettings.notion_settings) {
         updates.notion_settings = {
-          ...(companySettings.notion_settings || {}),
+          ...companySettings.notion_settings,
           ...updates.notion_settings
-        };
-      }
-      
-      // Same for crm_settings if they exist
-      if (updates.crm_settings && companySettings.crm_settings) {
-        updates.crm_settings = {
-          ...(companySettings.crm_settings || {}),
-          ...updates.crm_settings
         };
       }
       

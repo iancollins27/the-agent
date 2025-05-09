@@ -19,10 +19,8 @@ const CommunicationSettings: React.FC = () => {
   const { toast } = useToast();
   const [emailProviders, setEmailProviders] = useState<CommunicationProvider[]>([]);
   const [phoneProviders, setPhoneProviders] = useState<CommunicationProvider[]>([]);
-  const [crmProviders, setCrmProviders] = useState<CommunicationProvider[]>([]);
   const [selectedEmailProvider, setSelectedEmailProvider] = useState<string>('');
   const [selectedPhoneProvider, setSelectedPhoneProvider] = useState<string>('');
-  const [selectedCrmProvider, setSelectedCrmProvider] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -46,12 +44,10 @@ const CommunicationSettings: React.FC = () => {
         if (data) {
           console.log('Fetched providers:', data);
           const emailProvs = data.filter(p => p.provider_type === 'email');
-          const phoneProvs = data.filter(p => p.provider_type === 'phone');
-          const crmProvs = data.filter(p => p.provider_type === 'crm');
+          const phoneProvs = data.filter(p => p.provider_type === 'phone' || p.provider_type === 'sms');
           
           setEmailProviders(emailProvs);
           setPhoneProviders(phoneProvs);
-          setCrmProviders(crmProvs);
         }
       } catch (error) {
         console.error('Error fetching providers:', error);
@@ -71,7 +67,6 @@ const CommunicationSettings: React.FC = () => {
       // Set selected providers from company settings
       setSelectedEmailProvider(companySettings.default_email_provider || '');
       setSelectedPhoneProvider(companySettings.default_phone_provider || '');
-      setSelectedCrmProvider(companySettings.default_crm_provider || '');
     }
   }, [companySettings?.id, toast]);
 
@@ -80,8 +75,7 @@ const CommunicationSettings: React.FC = () => {
     try {
       await updateCompanySettings({
         default_email_provider: selectedEmailProvider,
-        default_phone_provider: selectedPhoneProvider,
-        default_crm_provider: selectedCrmProvider
+        default_phone_provider: selectedPhoneProvider
       });
       
       toast({
@@ -170,7 +164,7 @@ const CommunicationSettings: React.FC = () => {
                 <SelectValue placeholder="Select an email provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {emailProviders.map((provider) => (
                   <SelectItem key={provider.id} value={provider.id}>
                     {provider.provider_name}
@@ -190,28 +184,8 @@ const CommunicationSettings: React.FC = () => {
                 <SelectValue placeholder="Select a phone/SMS provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {phoneProviders.map((provider) => (
-                  <SelectItem key={provider.id} value={provider.id}>
-                    {provider.provider_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="crm-provider">Default CRM Provider</Label>
-            <Select 
-              value={selectedCrmProvider} 
-              onValueChange={setSelectedCrmProvider}
-            >
-              <SelectTrigger id="crm-provider">
-                <SelectValue placeholder="Select a CRM provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">None</SelectItem>
-                {crmProviders.map((provider) => (
                   <SelectItem key={provider.id} value={provider.id}>
                     {provider.provider_name}
                   </SelectItem>
