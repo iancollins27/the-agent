@@ -125,8 +125,8 @@ export const identifyProject: Tool = {
         }
       } 
       
-      // If no exact matches, perform semantic search using embeddings
-      console.log(`Performing semantic vector search for: ${query}`);
+      // If no exact matches, try vector search first if available
+      console.log(`Attempting semantic vector search for: ${query}`);
       
       try {
         // Generate embedding for the query
@@ -199,35 +199,18 @@ export const identifyProject: Tool = {
               message: `Found ${projectsWithSimilarity.length} project(s) matching "${query}" using semantic search`
             };
           }
-          
-          return {
-            status: "success",
-            projects: vectorResults.map((p: VectorSearchResult) => ({
-              id: p.id,
-              crm_id: p.crm_id,
-              summary: p.summary,
-              next_step: p.next_step,
-              address: p.address,
-              project_name: p.project_name,
-              status: p.status,
-              company: p.company_name,
-              similarity: p.similarity
-            })),
-            found: true,
-            count: vectorResults.length,
-            message: `Found ${vectorResults.length} project(s) matching "${query}" using semantic search`
-          };
         }
         
         // Fall back to traditional search if vector search returns no results
-        console.log("Vector search returned no results, falling back to traditional search");
-        return await performTraditionalSearch(query, company_id, context);
+        console.log("Vector search returned no results or had issues, falling back to traditional search");
         
       } catch (embeddingError) {
         console.error("Error generating embedding or performing vector search:", embeddingError);
-        // Fall back to traditional search if there's an error with vector search
-        return await performTraditionalSearch(query, company_id, context);
       }
+      
+      // Always perform traditional search as a fallback or if vector search fails
+      return await performTraditionalSearch(query, company_id, context);
+      
     } catch (error) {
       console.error("Error executing identify_project tool:", error);
       return {
@@ -244,14 +227,11 @@ export const identifyProject: Tool = {
 async function performTraditionalSearch(query: string, company_id: string | undefined, context: any): Promise<ToolResult> {
   console.log(`Performing traditional text search for: ${query}`);
   
-  // Break query into words, drop very common / non-informative tokens.
-  const stopWords = new Set(['county', 'project', 'the', 'a', 'an', 'in', 'at', 'of']);
-  const searchTerms = query
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-    .filter(t => t.length > 3 && !stopWords.has(t));
-
+  // Break query into words for more flexible searching
+  const searchTerms = query.toLowerCase().trim().split(/\s+/);
+  console.log(`Search terms: ${searchTerms.join(', ')}`);
+  
+  // Start building the query
   let projectsQuery = context.supabase
     .from('projects')
     .select(`
@@ -272,20 +252,27 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     projectsQuery = projectsQuery.eq('company_id', company_id);
   }
     
-  // Fix: Instead of using comma-separated OR conditions which can break with addresses,
-  // we'll use multiple .or() filters chained together
+  // Build the filter - search in Address field (case insensitive)
+  let filterExpression = '';
+  
+  // First, try to match the whole query string against the address
   projectsQuery = projectsQuery.or(`Address.ilike.%${query}%`);
   
-  // Add additional OR conditions
-  projectsQuery = projectsQuery.or(`summary.ilike.%${query}%`);
-  projectsQuery = projectsQuery.or(`project_name.ilike.%${query}%`);
+  // Then try each word separately for better matching
+  searchTerms.forEach(term => {
+    if (term.length > 2) { // Skip very short words
+      projectsQuery = projectsQuery.or(`Address.ilike.%${term}%`);
+      projectsQuery = projectsQuery.or(`project_name.ilike.%${term}%`);
+      projectsQuery = projectsQuery.or(`summary.ilike.%${term}%`);
+    }
+  });
   
-  // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal
+  // Allow partial numeric / alphanumeric match on CRM ID
   if (!/^\d+$/.test(query.trim())) {
     projectsQuery = projectsQuery.or(`crm_id.ilike.%${query}%`);
   }
 
-  // Execute the query
+  // Execute the query with a reasonable limit
   const { data: projects, error } = await projectsQuery.limit(5);
   
   if (error) {
@@ -297,6 +284,7 @@ async function performTraditionalSearch(query: string, company_id: string | unde
   }
   
   if (!projects || projects.length === 0) {
+    console.log(`No projects found matching "${query}"`);
     return {
       status: "success",
       projects: [],
@@ -304,6 +292,8 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       message: `No projects found matching "${query}"`
     };
   }
+  
+  console.log(`Found ${projects.length} projects matching "${query}"`);
   
   return {
     status: "success",

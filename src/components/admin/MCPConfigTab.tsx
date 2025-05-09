@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +22,7 @@ const MCPConfigTab: React.FC = () => {
   const [toolDefinitions, setToolDefinitions] = useState<string>('');
   const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({
     create_action_record: true,
+    identify_project: true,
     knowledge_base_lookup: false,
     data_fetch: true
   });
@@ -46,12 +48,53 @@ const MCPConfigTab: React.FC = () => {
     }
   });
 
+  // Fetch the chatbot config to get enabled tools
+  const { data: chatbotConfig, isLoading: configLoading } = useQuery({
+    queryKey: ['chatbot-config'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chatbot_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching chatbot config:', error);
+        throw error;
+      }
+      
+      return data;
+    }
+  });
+
   // Update the orchestrator text state when the prompt data is loaded
   useEffect(() => {
     if (mcpPrompt?.prompt_text) {
       setOrchestratorText(mcpPrompt.prompt_text);
     }
   }, [mcpPrompt]);
+
+  // Update the enabled tools state when the chatbot config is loaded
+  useEffect(() => {
+    if (chatbotConfig?.available_tools) {
+      const toolsState: Record<string, boolean> = {
+        create_action_record: false,
+        identify_project: false,
+        knowledge_base_lookup: false,
+        data_fetch: false
+      };
+      
+      // Mark tools as enabled based on the config
+      chatbotConfig.available_tools.forEach((tool: string) => {
+        if (tool in toolsState) {
+          toolsState[tool] = true;
+        }
+      });
+      
+      setEnabledTools(toolsState);
+    }
+  }, [chatbotConfig]);
 
   // Update the MCP orchestrator prompt in the database
   const updateOrchestratorMutation = useMutation({
@@ -87,9 +130,77 @@ const MCPConfigTab: React.FC = () => {
     }
   });
 
+  // Update the chatbot config in the database
+  const updateToolsMutation = useMutation({
+    mutationFn: async (tools: string[]) => {
+      const { data: existingConfig, error: fetchError } = await supabase
+        .from('chatbot_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch current config: ${fetchError.message}`);
+      }
+
+      const { error } = await supabase
+        .from('chatbot_config')
+        .update({ available_tools: tools })
+        .eq('id', existingConfig.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chatbot-config'] });
+      toast({
+        title: "Tool Configuration Updated",
+        description: "The available tools for the chatbot have been updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to update tools configuration: ${error.message}`,
+      });
+    }
+  });
+
   // Handler for saving the orchestrator prompt
   const handleSaveOrchestrator = () => {
     updateOrchestratorMutation.mutate(orchestratorText);
+  };
+
+  // Handler for saving tool definitions
+  const handleSaveToolDefinitions = (updatedDefinitions: string) => {
+    setToolDefinitions(updatedDefinitions);
+    toast({
+      title: "Tool Definitions Updated",
+      description: "The MCP tool definitions have been successfully updated.",
+    });
+  };
+
+  // Handler for toggling tool enablement
+  const handleToggleTool = (toolName: string, enabled: boolean) => {
+    const updatedTools = {
+      ...enabledTools,
+      [toolName]: enabled
+    };
+    
+    setEnabledTools(updatedTools);
+    
+    // Save the updated tools configuration
+    const enabledToolNames = Object.entries(updatedTools)
+      .filter(([_, isEnabled]) => isEnabled)
+      .map(([name]) => name);
+      
+    updateToolsMutation.mutate(enabledToolNames);
+    
+    toast({
+      title: enabled ? "Tool Enabled" : "Tool Disabled",
+      description: `The ${toolName} tool has been ${enabled ? 'enabled' : 'disabled'}.`,
+    });
   };
 
   // Fetch tool definitions from the edge function
@@ -130,6 +241,24 @@ const MCPConfigTab: React.FC = () => {
     }
   },
   {
+    "name": "identify_project",
+    "description": "Identifies projects based on ID, CRM ID, or semantic search of description. Use this to find relevant projects when the user mentions a project or asks about a specific project.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query (project ID, CRM ID, address, or descriptive text)"
+        },
+        "company_id": {
+          "type": "string",
+          "description": "Optional company ID to filter search to specific company"
+        }
+      },
+      "required": ["query"]
+    }
+  },
+  {
     "name": "knowledge_base_lookup",
     "description": "Searches the knowledge base for relevant information about the project",
     "parameters": {
@@ -167,28 +296,6 @@ const MCPConfigTab: React.FC = () => {
   }
 ]`);
   }, []);
-
-  // Handler for saving tool definitions
-  const handleSaveToolDefinitions = (updatedDefinitions: string) => {
-    setToolDefinitions(updatedDefinitions);
-    toast({
-      title: "Tool Definitions Updated",
-      description: "The MCP tool definitions have been successfully updated.",
-    });
-  };
-
-  // Handler for toggling tool enablement
-  const handleToggleTool = (toolName: string, enabled: boolean) => {
-    setEnabledTools(prev => ({
-      ...prev,
-      [toolName]: enabled
-    }));
-    
-    toast({
-      title: enabled ? "Tool Enabled" : "Tool Disabled",
-      description: `The ${toolName} tool has been ${enabled ? 'enabled' : 'disabled'}.`,
-    });
-  };
 
   return (
     <div className="space-y-6">
@@ -273,6 +380,15 @@ const MCPConfigTab: React.FC = () => {
                     description="Creates specific action records based on the orchestrator's decisions"
                     enabled={enabledTools.create_action_record}
                     onToggle={(enabled) => handleToggleTool('create_action_record', enabled)}
+                    required={true}
+                  />
+
+                  <ToolConfigCard
+                    name="identify_project"
+                    title="Identify Project"
+                    description="Searches and identifies projects based on descriptions, addresses, or IDs"
+                    enabled={enabledTools.identify_project}
+                    onToggle={(enabled) => handleToggleTool('identify_project', enabled)}
                     required={true}
                   />
 

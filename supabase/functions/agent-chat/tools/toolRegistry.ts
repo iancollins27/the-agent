@@ -18,6 +18,7 @@ export function getAvailableTools(): Record<string, Tool> {
 }
 
 export function getTool(name: string): Tool | undefined {
+  console.log(`Getting tool: ${name}, available: ${Object.keys(tools).includes(name)}`);
   return tools[name];
 }
 
@@ -37,6 +38,7 @@ export function getToolDefinitions(): Array<{
     };
   };
 }> {
+  console.log(`Getting tool definitions for ${Object.keys(tools).length} tools`);
   return Object.values(tools).map(tool => ({
     type: "function",
     function: {
@@ -64,10 +66,13 @@ export function filterTools(enabledTools: string[]): Array<{
     };
   };
 }> {
-  // If no tools are specified, return no tools
+  // If no tools are specified, return default tools
   if (!enabledTools || enabledTools.length === 0) {
-    console.log("No tools specified in filterTools, returning empty tools array");
-    return [];
+    console.log("No tools specified in filterTools, returning default tools");
+    return getToolDefinitions().filter(tool => 
+      tool.function.name === 'identify_project' || 
+      tool.function.name === 'data_fetch'
+    );
   }
 
   // Log which tools we're looking for
@@ -86,5 +91,15 @@ export function filterTools(enabledTools: string[]): Array<{
     }));
   
   console.log(`Found ${filtered.length} matching tools from ${enabledTools.length} requested`);
+  
+  // If no tools were found but some were requested, return default tools
+  if (filtered.length === 0 && enabledTools.length > 0) {
+    console.log("No matching tools found, defaulting to core tools");
+    return getToolDefinitions().filter(tool => 
+      tool.function.name === 'identify_project' || 
+      tool.function.name === 'data_fetch'
+    );
+  }
+  
   return filtered;
 }

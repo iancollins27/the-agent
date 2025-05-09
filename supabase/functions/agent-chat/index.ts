@@ -63,7 +63,8 @@ serve(async (req) => {
       model: 'gpt-4o-mini',
       temperature: 0.7,
       search_project_data: true,
-      enable_mcp: true // MCP is always enabled now
+      enable_mcp: true, // MCP is always enabled now
+      available_tools: ['identify_project', 'data_fetch'] // Default tools if not specified
     }
     
     console.log('Using bot configuration:', botConfig)
@@ -250,7 +251,7 @@ serve(async (req) => {
     }
     
     // Configure available tools from settings
-    const availableTools = botConfig.available_tools || [];
+    const availableTools = botConfig.available_tools || ['identify_project', 'data_fetch'];
     
     console.log(`Available tools: ${availableTools.join(', ')}`);
     
