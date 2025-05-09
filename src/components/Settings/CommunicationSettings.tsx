@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSettings } from "@/providers/SettingsProvider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Json } from "@/integrations/supabase/types";
 
-export function CommunicationSettings() {
+// Change to default export
+export default function CommunicationSettings() {
   const { companySettings, updateCompanySettings } = useSettings();
   const [isEmailEnabled, setIsEmailEnabled] = useState(false);
   const [isSmsEnabled, setIsSmsEnabled] = useState(false);
@@ -15,9 +17,11 @@ export function CommunicationSettings() {
   const [defaultProvider, setDefaultProvider] = useState<string | undefined>(companySettings?.default_email_provider);
   
   useEffect(() => {
-    setIsEmailEnabled(companySettings?.communication_settings?.email_enabled === true);
-    setIsSmsEnabled(companySettings?.communication_settings?.sms_enabled === true);
-    setIsCrmEnabled(companySettings?.communication_settings?.crm_enabled === true);
+    // Fix TypeScript errors by properly checking and casting the communication_settings
+    const commSettings = companySettings?.communication_settings as Record<string, boolean> | undefined;
+    setIsEmailEnabled(commSettings?.email_enabled === true);
+    setIsSmsEnabled(commSettings?.sms_enabled === true);
+    setIsCrmEnabled(commSettings?.crm_enabled === true);
     setDefaultProvider(companySettings?.default_email_provider);
   }, [companySettings]);
 
@@ -85,7 +89,9 @@ export function CommunicationSettings() {
           </Select>
         </div>
       </CardContent>
-      <Button onClick={handleSettingsUpdate}>Update Settings</Button>
+      <div className="p-6 pt-0">
+        <Button onClick={handleSettingsUpdate}>Update Settings</Button>
+      </div>
     </Card>
   );
 }
