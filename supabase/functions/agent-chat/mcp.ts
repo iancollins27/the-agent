@@ -3,32 +3,18 @@
  * Model Context Protocol (MCP) utilities for the agent-chat
  */
 
-import { getToolDefinitions, filterTools } from './tools/toolRegistry.ts';
+import { getToolDefinitions } from './tools/toolRegistry.ts';
 
 /**
  * Create a context object for the MCP conversation
  */
 export function createMCPContext(systemPrompt: string, userPrompt: string, tools: any[] = []) {
-  // Get tool definitions or filter based on provided tool names
-  const toolDefs = tools.length > 0 && Array.isArray(tools) && typeof tools[0] === 'string' 
-    ? filterTools(tools)
-    : tools.length > 0 
-      ? tools 
-      : getToolDefinitions();
-  
-  console.log(`Creating MCP context with ${toolDefs.length} tools`);
-  
   return {
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
-    tools: toolDefs,
-    
-    // Helper method to add a system message
-    addSystemMessage: function(content: string) {
-      this.messages.push({ role: 'system', content });
-    }
+    tools: tools
   };
 }
 

@@ -14,12 +14,10 @@ const tools: Record<string, Tool> = {
 };
 
 export function getAvailableTools(): Record<string, Tool> {
-  console.log(`Available tools in registry: ${Object.keys(tools).join(', ')}`);
   return tools;
 }
 
 export function getTool(name: string): Tool | undefined {
-  console.log(`Getting tool: ${name}, available: ${Object.keys(tools).includes(name)}`);
   return tools[name];
 }
 
@@ -39,7 +37,6 @@ export function getToolDefinitions(): Array<{
     };
   };
 }> {
-  console.log(`Getting tool definitions for ${Object.keys(tools).length} tools`);
   return Object.values(tools).map(tool => ({
     type: "function",
     function: {
@@ -67,18 +64,14 @@ export function filterTools(enabledTools: string[]): Array<{
     };
   };
 }> {
-  // If no tools are specified, return default tools
+  // If no tools are specified, return no tools
   if (!enabledTools || enabledTools.length === 0) {
-    console.log("No tools specified in filterTools, returning default tools");
-    return getToolDefinitions().filter(tool => 
-      tool.function.name === 'identify_project' || 
-      tool.function.name === 'data_fetch'
-    );
+    console.log("No tools specified in filterTools, returning empty tools array");
+    return [];
   }
 
   // Log which tools we're looking for
   console.log(`Filtering for tools: ${enabledTools.join(', ')}`);
-  console.log(`Available tools: ${Object.keys(tools).join(', ')}`);
   
   // Return only tools that are enabled
   const filtered = Object.values(tools)
@@ -93,15 +86,5 @@ export function filterTools(enabledTools: string[]): Array<{
     }));
   
   console.log(`Found ${filtered.length} matching tools from ${enabledTools.length} requested`);
-  
-  // If no tools were found but some were requested, return default tools
-  if (filtered.length === 0 && enabledTools.length > 0) {
-    console.log("No matching tools found, defaulting to core tools");
-    return getToolDefinitions().filter(tool => 
-      tool.function.name === 'identify_project' || 
-      tool.function.name === 'data_fetch'
-    );
-  }
-  
   return filtered;
 }
