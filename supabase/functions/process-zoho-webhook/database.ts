@@ -19,3 +19,9 @@ export {
 export { 
   setNextCheckDate,
 } from './database/action.ts';
+
+export {
+  createIntegrationJob,
+  getIntegrationJobs,
+  updateIntegrationJobStatus,
+} from './database/integration.ts';

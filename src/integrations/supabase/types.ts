@@ -465,6 +465,79 @@ export type Database = {
           },
         ]
       }
+      integration_job_queue: {
+        Row: {
+          action_record_id: string | null
+          company_id: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          next_retry_at: string | null
+          operation_type: string
+          payload: Json
+          processed_at: string | null
+          project_id: string | null
+          resource_type: string
+          result: Json | null
+          retry_count: number | null
+          status: string
+        }
+        Insert: {
+          action_record_id?: string | null
+          company_id: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          next_retry_at?: string | null
+          operation_type: string
+          payload: Json
+          processed_at?: string | null
+          project_id?: string | null
+          resource_type: string
+          result?: Json | null
+          retry_count?: number | null
+          status?: string
+        }
+        Update: {
+          action_record_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          next_retry_at?: string | null
+          operation_type?: string
+          payload?: Json
+          processed_at?: string | null
+          project_id?: string | null
+          resource_type?: string
+          result?: Json | null
+          retry_count?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_job_queue_action_record_id_fkey"
+            columns: ["action_record_id"]
+            isOneToOne: false
+            referencedRelation: "action_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_job_queue_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_job_queue_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_key_access_logs: {
         Row: {
           access_reason: string | null

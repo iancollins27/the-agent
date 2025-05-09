@@ -145,6 +145,69 @@ export async function recordCommunicationFailure(
   }
 }
 
+export async function processCrmWrite(
+  actionId: string,
+  payload: any
+): Promise<any> {
+  try {
+    // Create job in the integration queue
+    const { data: job, error: jobError } = await supabase
+      .from('integration_job_queue')
+      .insert({
+        company_id: payload.company_id,
+        project_id: payload.project_id || null,
+        action_record_id: actionId,
+        operation_type: payload.operation_type === 'create' ? 'write' : 
+                        payload.operation_type === 'update' ? 'write' : 'delete',
+        resource_type: payload.resource_type,
+        payload: {
+          resourceType: payload.resource_type,
+          resourceId: payload.resource_id,
+          data: payload.data,
+          operationType: payload.operation_type
+        },
+        status: 'pending'
+      })
+      .select()
+      .single();
+    
+    if (jobError) {
+      throw new Error(`Failed to create integration job: ${jobError.message}`);
+    }
+    
+    // Record the job creation in the action record
+    await supabase
+      .from('action_records')
+      .update({
+        execution_result: {
+          status: 'integration_job_created',
+          timestamp: new Date().toISOString(),
+          job_id: job.id,
+          details: `Created job to ${payload.operation_type} ${payload.resource_type} in CRM`
+        }
+      })
+      .eq('id', actionId);
+    
+    return job;
+  } catch (error) {
+    console.error('Error processing CRM write:', error);
+    
+    // Record the failure
+    await supabase
+      .from('action_records')
+      .update({
+        execution_result: {
+          status: 'integration_job_failed',
+          timestamp: new Date().toISOString(),
+          error: error.message || 'Unknown error'
+        }
+      })
+      .eq('id', actionId);
+    
+    throw error;
+  }
+}
+
 export async function processNotionIntegration(
   actionId: string,
   companyId: string | null,
@@ -292,6 +355,18 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           toast.error(commError.message || "Failed to send the message");
           await recordCommunicationFailure(action.id, commError.message || "Unknown error");
           throw commError; // Re-throw so the caller knows there was an error
+        }
+        break;
+      
+      case 'crm_write':
+        toast.info("Processing CRM write operation...");
+        try {
+          await processCrmWrite(action.id, actionPayload);
+          toast.success("CRM write operation queued successfully");
+        } catch (crmError: any) {
+          console.error('Error processing CRM write:', crmError);
+          toast.error(crmError.message || "Failed to queue CRM write operation");
+          throw crmError;
         }
         break;
         

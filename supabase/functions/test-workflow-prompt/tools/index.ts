@@ -1,14 +1,15 @@
 
-/**
- * Export all tools for MCP
- */
+import { createActionRecord } from './create-action-record/index.ts';
+import { dataFetch } from './data-fetch/index.ts';
+import { knowledgeBaseLookup } from './knowledge-base-lookup/index.ts';
+import { crmDataWrite } from './crm-data-write/index.ts';
+import { Tool } from './types.ts';
+
+export const tools: Tool[] = [
+  createActionRecord,
+  dataFetch,
+  knowledgeBaseLookup,
+  crmDataWrite
+];
 
 export * from './types.ts';
-export * from './toolRegistry.ts';
-export * from './toolExecutor.ts';
-
-// Re-export individual tools
-export * from './create-action-record/index.ts';
-export * from './knowledge-base-lookup/index.ts';
-export * from './data-fetch/index.ts';
-

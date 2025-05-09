@@ -1,74 +1,110 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { handleActionNeeded } from "./handlers/actionDecisionHandler.ts";
-import { handleFutureReminder } from "./handlers/reminderHandler.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { Database } from "../types.ts";
 
-/**
- * Creates an action record from action detection+execution results
- * Improved error handling to ensure a consistent return format
- */
-export async function createActionRecord(
-  supabase: SupabaseClient,
-  promptRunId: string, 
-  projectId: string, 
-  actionData: any
-) {
-  try {
-    console.log("Creating action record with data:", JSON.stringify(actionData, null, 2));
-    
-    if (!projectId) {
-      console.error("Error: Missing projectId for action record");
-      return { status: "error", error: "Missing projectId" };
-    }
-    
-    if (!promptRunId) {
-      console.error("Error: Missing promptRunId for action record");
-      return { status: "error", error: "Missing promptRunId" };
-    }
-    
-    if (!actionData) {
-      console.error("Error: Missing actionData for action record");
-      return { status: "error", error: "Missing actionData" };
-    }
-    
-    // Get the action type
-    const actionType = actionData.action_type;
-    if (!actionType) {
-      console.error("Error: Missing action_type in action record data");
-      return { status: "error", error: "Missing action_type" };
-    }
-    
-    // Handle based on action type
-    if (actionType === "set_future_reminder") {
-      return await handleFutureReminder(supabase, promptRunId, projectId, actionData);
-    } 
-    else {
-      // For all other action types (message, data_update, human_in_loop, knowledge_query)
-      return await handleActionNeeded(supabase, promptRunId, projectId, actionData);
-    }
-  } catch (error) {
-    console.error("Error creating action record:", error);
-    // Return structured error object with status field
-    return { 
-      status: "error", 
-      error: error.message || "Unknown error in createActionRecord" 
-    };
-  }
+// Initialize the Supabase client
+const supabase = createClient<Database>(
+  Deno.env.get("SUPABASE_URL") as string,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string
+);
+
+interface ActionRecordParams {
+  action_type: string;
+  project_id?: string;
+  message?: string;
+  recipient_id?: string;
+  requires_approval?: boolean;
+  action_payload: Record<string, any>;
+  sender_ID?: string;
+  sender_phone?: string;
 }
 
 /**
- * Creates a reminder record with specified check-in days
- * This is a convenience function for creating reminders directly
+ * Create an action record in the database
+ * @returns The ID of the newly created action record, or null if creation failed
  */
-export async function createReminder(
-  supabase: SupabaseClient,
-  promptRunId: string,
-  projectId: string,
-  daysUntilCheck: number,
-  checkReason: string
-) {
-  return await handleFutureReminder(supabase, promptRunId, projectId, {
-    days_until_check: daysUntilCheck,
-    check_reason: checkReason
+export async function createActionRecord(params: ActionRecordParams): Promise<string | null> {
+  // Set default values
+  const requiresApproval = params.requires_approval ?? true;
+
+  try {
+    const { data: actionRecord, error } = await supabase
+      .from("action_records")
+      .insert({
+        action_type: params.action_type,
+        project_id: params.project_id || null,
+        message: params.message || null,
+        recipient_id: params.recipient_id || null,
+        requires_approval: requiresApproval,
+        action_payload: params.action_payload,
+        status: requiresApproval ? "pending" : "approved",
+        sender_ID: params.sender_ID || null,
+        sender_phone: params.sender_phone || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating action record:", error);
+      return null;
+    }
+
+    return actionRecord?.id || null;
+  } catch (error) {
+    console.error("Error creating action record:", error);
+    return null;
+  }
+}
+
+interface ReminderParams {
+  projectId: string;
+  daysUntilCheck: number;
+  checkReason: string;
+  requiresApproval?: boolean;
+}
+
+/**
+ * Create a reminder action record
+ */
+export async function createReminder(params: ReminderParams): Promise<string | null> {
+  return createActionRecord({
+    action_type: "set_future_reminder",
+    project_id: params.projectId,
+    requires_approval: params.requiresApproval ?? true,
+    action_payload: {
+      days_until_check: params.daysUntilCheck,
+      check_reason: params.checkReason,
+    },
+    message: `Set a reminder to check this project in ${params.daysUntilCheck} days: ${params.checkReason}`
+  });
+}
+
+interface CrmWriteParams {
+  projectId: string;
+  resourceType: 'project' | 'task' | 'note' | 'contact';
+  operationType: 'create' | 'update' | 'delete';
+  data: Record<string, any>;
+  resourceId?: string;
+  companyId: string;
+  requiresApproval?: boolean;
+}
+
+/**
+ * Create a CRM write action record
+ */
+export async function createCrmWriteAction(params: CrmWriteParams): Promise<string | null> {
+  return createActionRecord({
+    action_type: "crm_write",
+    project_id: params.projectId,
+    requires_approval: params.requiresApproval ?? true,
+    action_payload: {
+      resource_type: params.resourceType,
+      operation_type: params.operationType,
+      resource_id: params.resourceId,
+      data: params.data,
+      company_id: params.companyId,
+      description: `${params.operationType.charAt(0).toUpperCase() + params.operationType.slice(1)} ${params.resourceType} in CRM`
+    },
+    message: `${params.operationType.charAt(0).toUpperCase() + params.operationType.slice(1)} ${params.resourceType} in CRM with the following data: ${JSON.stringify(params.data)}`
   });
 }
