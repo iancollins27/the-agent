@@ -1,4 +1,3 @@
-
 /**
  * Model Context Protocol (MCP) utilities for the agent-chat
  */
@@ -21,7 +20,13 @@ export function createMCPContext(systemPrompt: string, userPrompt: string, tools
 /**
  * Add a tool result to the context
  */
-export function addToolResult(context: any, toolId: string, toolName: string, result: any) {
+export function addToolResult(
+  context: any,
+  toolId: string,
+  toolName: string,
+  toolArgs: any,
+  result: any
+) {
   // Format result to string if needed
   const resultString = typeof result === 'string' ? result : JSON.stringify(result);
   
@@ -53,14 +58,15 @@ export function addToolResult(context: any, toolId: string, toolName: string, re
   } else {
     // Add the tool call as a new message to the context
     // First check if we're already adding a duplicate
+    const argsString = JSON.stringify(toolArgs || {});
+
     const duplicateCall = context.messages.some(m => 
       m.role === 'assistant' && 
       m.tool_calls && 
       m.tool_calls.some(tc => 
         tc.function && 
         tc.function.name === toolName && 
-        // Compare only if we have arguments
-        (tc.function.arguments ? tc.function.arguments === JSON.stringify({}) : true)
+        tc.function.arguments === argsString
       )
     );
     
@@ -75,7 +81,7 @@ export function addToolResult(context: any, toolId: string, toolName: string, re
             type: 'function',
             function: {
               name: toolName,
-              arguments: JSON.stringify({}),  // This is ignored, but needed for the format
+              arguments: argsString,
             }
           }
         ]

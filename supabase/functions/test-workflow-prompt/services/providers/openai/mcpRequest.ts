@@ -222,7 +222,7 @@ export async function processMCPRequest(
             
             // Add the tool result to the context properly 
             // This will add both the assistant tool call and the tool response
-            context = addToolResult(context, call.id, call.name, toolResult);
+            context = addToolResult(context, call.id, call.name, call.arguments, toolResult);
           } 
           catch (toolError) {
             console.error(`Error executing tool ${call.name}: ${toolError}`);
@@ -234,7 +234,7 @@ export async function processMCPRequest(
               message: `Tool execution failed: ${toolError.message || "Unknown error"}`
             };
             
-            context = addToolResult(context, call.id, call.name, errorResult);
+            context = addToolResult(context, call.id, call.name, call.arguments, errorResult);
             
             // Store the error in tool outputs
             toolOutputs.push({
