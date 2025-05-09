@@ -1,170 +1,167 @@
-// Keep whatever imports or dependencies you have at the top
-import { Contact } from './types.ts';
 
-export async function getProjectByCrmId(supabase, crmId: string) {
-  console.log(`Looking up project with CRM ID: ${crmId}`);
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { ContactPayload, ContactProcessResult } from './types.ts';
+import { normalizeRole } from './utils.ts';
+
+// Find or create project by CRM ID
+export async function getProjectByCrmId(supabase: SupabaseClient, crmId: string): Promise<{ id: string }> {
+  console.log(`Looking for project with CRM ID: ${crmId}`);
+  console.log(`Type of CRM ID: ${typeof crmId}`);
+  console.log(`Raw CRM ID value: ${crmId}`);
   
-  const { data: project, error } = await supabase
+  const { data: project, error: projectError } = await supabase
     .from('projects')
-    .select('*')
+    .select('id')
     .eq('crm_id', crmId)
     .single();
-  
-  if (error) {
-    console.error('Error fetching project:', error);
-    throw new Error(`Project not found with CRM ID: ${crmId}`);
+
+  if (projectError) {
+    console.error('Error finding project:', projectError);
+    throw new Error(`Project with Bid_ID ${crmId} not found: ${projectError.message}`);
   }
-  
-  console.log(`Found project: ${project.id} (${project.project_name || 'unnamed'})`);
+
+  console.log(`Found project with ID: ${project.id} for Bid_ID: ${crmId}`);
   return project;
 }
 
-export async function processContact(supabase, contact: Contact, projectId: string) {
+// Process a single contact
+export async function processContact(
+  supabase: SupabaseClient, 
+  contact: ContactPayload, 
+  projectId: string
+): Promise<ContactProcessResult> {
   try {
-    console.log(`Processing contact: ${JSON.stringify(contact)}`);
+    console.log(`Processing contact: ${contact.name}, ${contact.email}, ${contact.number}, role: ${contact.role}`);
     
-    // Validate contact data
-    if (!contact.name) {
-      return { 
-        status: 'error', 
-        message: 'Contact name is required',
-        contactId: null
-      };
+    // Normalize the role
+    const originalRole = contact.role;
+    const role = normalizeRole(contact.role);
+    console.log(`Normalized role: "${role}" (original: "${originalRole}")`);
+    
+    // Check if contact already exists with this email or phone number
+    let contactQueryCondition = '';
+    
+    // Build the query condition based on available contact details
+    if (contact.email && contact.number) {
+      contactQueryCondition = `email.eq.${contact.email},phone_number.eq.${contact.number}`;
+    } else if (contact.email) {
+      contactQueryCondition = `email.eq.${contact.email}`;
+    } else if (contact.number) {
+      contactQueryCondition = `phone_number.eq.${contact.number}`;
+    } else {
+      // If no email or phone, we can't reliably find the contact
+      console.log('No email or phone provided, treating as new contact');
+      contactQueryCondition = 'id.eq.00000000-0000-0000-0000-000000000000'; // Will not match anything
     }
     
-    // Role is already normalized in the main function using normalizeRole
-    // that fetches valid values from the database enum
-    
-    // Check if contact already exists
-    let existingContact = null;
-    
-    // First try to find by phone if provided
-    if (contact.phone) {
-      const { data: phoneMatch } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('phone_number', contact.phone)
-        .limit(1);
+    const { data: existingContacts, error: lookupError } = await supabase
+      .from('contacts')
+      .select('id, full_name, email, phone_number, role')
+      .or(contactQueryCondition);
       
-      if (phoneMatch && phoneMatch.length > 0) {
-        existingContact = phoneMatch[0];
-        console.log(`Found existing contact by phone: ${existingContact.id}`);
-      }
+    if (lookupError) {
+      console.error('Error looking up existing contact:', lookupError);
+      return { status: 'error', message: `Error looking up contact: ${lookupError.message}`, contact };
     }
-    
-    // If no match by phone, try by email
-    if (!existingContact && contact.email) {
-      const { data: emailMatch } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('email', contact.email)
-        .limit(1);
-      
-      if (emailMatch && emailMatch.length > 0) {
-        existingContact = emailMatch[0];
-        console.log(`Found existing contact by email: ${existingContact.id}`);
-      }
-    }
-    
-    // If no match by phone or email, try by name and role
-    if (!existingContact) {
-      const { data: nameMatch } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('full_name', contact.name)
-        .eq('role', contact.role || 'HO')
-        .limit(1);
-      
-      if (nameMatch && nameMatch.length > 0) {
-        existingContact = nameMatch[0];
-        console.log(`Found existing contact by name and role: ${existingContact.id}`);
-      }
-    }
-    
+
     let contactId;
     
-    // Update existing contact or create new one
-    if (existingContact) {
-      // Update existing contact with any new information
-      const updates = {};
+    if (existingContacts && existingContacts.length > 0) {
+      // Use existing contact but update its information
+      contactId = existingContacts[0].id;
+      console.log(`Updating existing contact with ID: ${contactId}`);
       
-      if (contact.email && !existingContact.email) updates.email = contact.email;
-      if (contact.phone && !existingContact.phone_number) updates.phone_number = contact.phone;
-      if (contact.role && existingContact.role === 'HO') updates.role = contact.role;
+      // Only update non-empty fields
+      const updateData: {
+        full_name?: string;
+        phone_number?: string;
+        email?: string;
+        role?: string;
+      } = {};
+      
+      if (contact.name && contact.name.trim() !== '') updateData.full_name = contact.name;
+      if (contact.number && contact.number.trim() !== '') updateData.phone_number = contact.number;
+      if (contact.email && contact.email.trim() !== '') updateData.email = contact.email;
+      if (role && role.trim() !== '') updateData.role = role;
       
       // Only update if there are changes
-      if (Object.keys(updates).length > 0) {
+      if (Object.keys(updateData).length > 0) {
         const { error: updateError } = await supabase
           .from('contacts')
-          .update(updates)
-          .eq('id', existingContact.id);
-        
+          .update(updateData)
+          .eq('id', contactId);
+          
         if (updateError) {
           console.error('Error updating contact:', updateError);
-        } else {
-          console.log(`Updated contact ${existingContact.id} with new info:`, updates);
+          return { status: 'error', message: `Error updating contact: ${updateError.message}`, contact };
         }
+        
+        console.log(`Successfully updated contact information for ID: ${contactId}`, updateData);
+      } else {
+        console.log(`No changes needed for contact ID: ${contactId}`);
       }
-      
-      contactId = existingContact.id;
     } else {
       // Create new contact
-      const { data: newContact, error: insertError } = await supabase
+      console.log(`Creating new contact: ${contact.name} with role: ${role}`);
+      const { data: newContact, error: createError } = await supabase
         .from('contacts')
         .insert({
           full_name: contact.name,
-          email: contact.email || null,
-          phone_number: contact.phone || null,
-          role: contact.role || 'HO'
+          phone_number: contact.number,
+          email: contact.email,
+          role: role
         })
-        .select()
+        .select('id')
         .single();
-      
-      if (insertError) {
-        console.error('Error creating contact:', insertError);
-        throw new Error(`Failed to create contact: ${insertError.message}`);
+        
+      if (createError) {
+        console.error('Error creating contact:', createError);
+        return { status: 'error', message: `Error creating contact: ${createError.message}`, contact };
       }
       
-      console.log(`Created new contact: ${newContact.id}`);
       contactId = newContact.id;
+      console.log(`Created new contact with ID: ${contactId}`);
     }
-    
-    // Associate contact with project if not already associated
-    const { data: existingAssociation } = await supabase
-      .from('project_contacts')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('contact_id', contactId);
-    
-    if (!existingAssociation || existingAssociation.length === 0) {
-      const { error: associationError } = await supabase
-        .from('project_contacts')
-        .insert({
-          project_id: projectId,
-          contact_id: contactId
-        });
-      
-      if (associationError) {
-        console.error('Error associating contact with project:', associationError);
-        throw new Error(`Failed to associate contact with project: ${associationError.message}`);
-      }
-      
-      console.log(`Associated contact ${contactId} with project ${projectId}`);
-    } else {
-      console.log(`Contact ${contactId} already associated with project ${projectId}`);
-    }
-    
-    return {
-      status: 'success',
-      message: existingContact ? 'Contact updated' : 'Contact created',
-      contactId
-    };
+
+    // Link contact to project if not already linked
+    await linkContactToProject(supabase, contactId, projectId);
+
+    return { status: 'success', contactId, contact };
   } catch (error) {
     console.error(`Error processing contact ${contact.name}:`, error);
-    return {
-      status: 'error',
-      message: error.message,
-      contactId: null
-    };
+    return { status: 'error', message: error.message, contact };
+  }
+}
+
+// Link contact to project if not already linked
+async function linkContactToProject(supabase: SupabaseClient, contactId: string, projectId: string): Promise<void> {
+  // Check if contact is already linked to project
+  const { data: existingLink, error: linkCheckError } = await supabase
+    .from('project_contacts')
+    .select('*')
+    .eq('project_id', projectId)
+    .eq('contact_id', contactId);
+    
+  if (linkCheckError) {
+    console.error('Error checking existing project-contact link:', linkCheckError);
+    throw new Error(`Error checking link: ${linkCheckError.message}`);
+  } 
+  
+  // Only create the link if it doesn't already exist
+  if (!existingLink || existingLink.length === 0) {
+    console.log(`Linking contact ${contactId} to project ${projectId}`);
+    const { error: linkError } = await supabase
+      .from('project_contacts')
+      .insert({
+        project_id: projectId,
+        contact_id: contactId
+      });
+      
+    if (linkError) {
+      console.error('Error linking contact to project:', linkError);
+      throw new Error(`Error linking contact to project: ${linkError.message}`);
+    }
+  } else {
+    console.log(`Contact ${contactId} already linked to project ${projectId}`);
   }
 }

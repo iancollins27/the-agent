@@ -15,48 +15,68 @@ export function initSupabaseClient() {
   );
 }
 
-// Retrieve valid roles from the database
-export async function getValidRoles(supabase) {
-  try {
-    // Query the Postgres system catalog to get enum values
-    const { data, error } = await supabase.rpc('get_enum_values', {
-      enum_name: 'contact_role'
-    });
+// Valid roles for normalization
+export const validRoles = ['Roofer', 'HO', 'BidList Project Manager', 'Solar'];
 
-    if (error) {
-      console.error('Error fetching enum values:', error);
-      // Return empty array as fallback
-      return [];
-    }
+// Role mapping to handle common variations
+export const roleMapping: Record<string, string> = {
+  // Homeowner variations
+  'homeowner': 'HO',
+  'home owner': 'HO',
+  'ho': 'HO',
+  'customer': 'HO',
+  'client': 'HO',
+  
+  // Roofer variations
+  'roofer': 'Roofer',
+  'roofing contractor': 'Roofer',
+  'roofing': 'Roofer',
+  'contractor': 'Roofer',
+  
+  // Solar variations
+  'solar': 'Solar',
+  'solar sales rep': 'Solar',
+  'solar rep': 'Solar',
+  'solar consultant': 'Solar',
+  'solar installer': 'Solar',
+  
+  // Project Manager variations
+  'bidlist project manager': 'BidList Project Manager',
+  'project manager': 'BidList Project Manager',
+  'pm': 'BidList Project Manager',
+  'manager': 'BidList Project Manager',
+  'bidlist': 'BidList Project Manager',
+};
 
-    console.log('Retrieved valid roles from database:', data);
-    return data || [];
-  } catch (error) {
-    console.error('Exception when fetching enum values:', error);
-    return [];
-  }
-}
-
-// Normalize role to ensure it matches a valid database enum value
-export async function normalizeRole(supabase, role: string): Promise<string> {
+// Normalize role to ensure consistent casing and handle variations
+export function normalizeRole(role: string): string {
   if (!role || role.trim() === '') {
-    return 'HO'; // Default to "HO" (Homeowner) as a valid fallback
+    return 'Role Unknown';
   }
   
-  // Get valid roles from the database
-  const validRoles = await getValidRoles(supabase);
-  
-  // Convert input to lowercase for case-insensitive matching
+  // Convert to lowercase for case-insensitive matching
   const roleLower = role.toLowerCase().trim();
   
-  // Check for exact matches with validRoles (case-insensitive)
-  for (const validRole of validRoles) {
-    if (validRole.toLowerCase() === roleLower) {
-      return validRole; // Use the properly cased version from the database
+  // Check for exact matches in our mapping
+  if (roleMapping[roleLower]) {
+    return roleMapping[roleLower];
+  }
+  
+  // Check for partial matches in our mapping
+  for (const [key, value] of Object.entries(roleMapping)) {
+    if (roleLower.includes(key)) {
+      return value;
     }
   }
   
-  // Return default value if no match found
-  console.log(`Role not matched with any valid enum value: "${role}", using default`);
-  return 'HO'; // Default to "HO" (Homeowner) as a valid fallback
+  // Check for case-insensitive matches with validRoles
+  for (const validRole of validRoles) {
+    if (validRole.toLowerCase() === roleLower) {
+      return validRole; // Use the properly cased version
+    }
+  }
+  
+  // Return original role if it doesn't match any known roles
+  console.log(`Role not mapped: "${role}", using default`);
+  return 'Role Unknown';
 }
