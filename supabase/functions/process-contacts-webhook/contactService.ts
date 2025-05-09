@@ -72,7 +72,7 @@ export async function processContact(supabase, contact: Contact, projectId: stri
         .from('contacts')
         .select('*')
         .eq('full_name', contact.name)
-        .eq('role', contact.role || 'Role Unknown')
+        .eq('role', contact.role || 'HO')
         .limit(1);
       
       if (nameMatch && nameMatch.length > 0) {
@@ -90,7 +90,7 @@ export async function processContact(supabase, contact: Contact, projectId: stri
       
       if (contact.email && !existingContact.email) updates.email = contact.email;
       if (contact.phone && !existingContact.phone_number) updates.phone_number = contact.phone;
-      if (contact.role && existingContact.role === 'Role Unknown') updates.role = contact.role;
+      if (contact.role && existingContact.role === 'HO') updates.role = contact.role;
       
       // Only update if there are changes
       if (Object.keys(updates).length > 0) {
@@ -115,7 +115,7 @@ export async function processContact(supabase, contact: Contact, projectId: stri
           full_name: contact.name,
           email: contact.email || null,
           phone_number: contact.phone || null,
-          role: contact.role || 'Role Unknown'
+          role: contact.role || 'HO'
         })
         .select()
         .single();

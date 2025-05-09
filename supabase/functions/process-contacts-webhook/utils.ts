@@ -40,7 +40,7 @@ export async function getValidRoles(supabase) {
 // Normalize role to ensure it matches a valid database enum value
 export async function normalizeRole(supabase, role: string): Promise<string> {
   if (!role || role.trim() === '') {
-    return 'Role Unknown';
+    return 'HO'; // Default to "HO" (Homeowner) as a valid fallback
   }
   
   // Get valid roles from the database
@@ -58,5 +58,5 @@ export async function normalizeRole(supabase, role: string): Promise<string> {
   
   // Return default value if no match found
   console.log(`Role not matched with any valid enum value: "${role}", using default`);
-  return 'Role Unknown';
+  return 'HO'; // Default to "HO" (Homeowner) as a valid fallback
 }
