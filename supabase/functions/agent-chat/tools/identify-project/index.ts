@@ -272,18 +272,18 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     projectsQuery = projectsQuery.eq('company_id', company_id);
   }
     
-  // Start with a broad match on the whole query for both Address and summary.
-  let orConditions = [];
-  orConditions.push(`Address.ilike.%${query}%`);
-  orConditions.push(`summary.ilike.%${query}%`);
-  orConditions.push(`project_name.ilike.%${query}%`);
+  // Fix: Instead of using comma-separated OR conditions which can break with addresses,
+  // we'll use multiple .or() filters chained together
+  projectsQuery = projectsQuery.or(`Address.ilike.%${query}%`);
   
-  // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal.
+  // Add additional OR conditions
+  projectsQuery = projectsQuery.or(`summary.ilike.%${query}%`);
+  projectsQuery = projectsQuery.or(`project_name.ilike.%${query}%`);
+  
+  // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal
   if (!/^\d+$/.test(query.trim())) {
-    orConditions.push(`crm_id.ilike.%${query}%`);
+    projectsQuery = projectsQuery.or(`crm_id.ilike.%${query}%`);
   }
-  
-  projectsQuery = projectsQuery.or(orConditions.join(','));
 
   // Execute the query
   const { data: projects, error } = await projectsQuery.limit(5);
