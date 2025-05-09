@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { corsHeaders, initSupabaseClient } from './utils.ts';
+import { corsHeaders, initSupabaseClient, normalizeRole } from './utils.ts';
 import { parseWebhookPayload } from './parser.ts';
 import { getProjectByCrmId, processContact } from './contactService.ts';
 import { WebhookPayload, ProcessResult } from './types.ts';
@@ -36,9 +36,15 @@ serve(async (req) => {
     // Get the project by CRM ID (Bid_ID)
     const project = await getProjectByCrmId(supabase, bidId);
 
-    // Process each contact
+    // Process each contact, normalizing the role using the database enum values
     const results = await Promise.all(
-      payload.contacts.map(contact => processContact(supabase, contact, project.id))
+      payload.contacts.map(async contact => {
+        // Normalize the role using our new function that checks against database enum values
+        if (contact.role) {
+          contact.role = await normalizeRole(supabase, contact.role);
+        }
+        return processContact(supabase, contact, project.id);
+      })
     );
 
     // Prepare the response
