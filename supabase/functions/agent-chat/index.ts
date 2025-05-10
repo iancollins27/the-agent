@@ -47,12 +47,14 @@ serve(async (req) => {
       );
     }
     
-    // Get available tools based on the request
-    const toolDefinitions = payload.availableTools && payload.availableTools.length > 0 
-      ? filterTools(payload.availableTools) 
-      : [];
+    // Get available tools based on the request or use all tools by default
+    const requestedToolNames = payload.availableTools && payload.availableTools.length > 0 
+      ? payload.availableTools 
+      : getToolNames();
+    
+    const toolDefinitions = filterTools(requestedToolNames);
 
-    console.log(`Available tools for this request: ${JSON.stringify(payload.availableTools || [])}`);
+    console.log(`Available tools for this request: ${JSON.stringify(requestedToolNames)}`);
     console.log(`Filtered tool definitions: ${JSON.stringify(toolDefinitions.map(t => t.function.name))}`);
     
     // Format tools for variable replacement in prompt
@@ -76,7 +78,7 @@ serve(async (req) => {
       systemPrompt = replaceVariables(payload.customPrompt, contextData);
     } else {
       // Use default prompt with tools if available
-      systemPrompt = getChatSystemPrompt(payload.availableTools || [], contextData);
+      systemPrompt = getChatSystemPrompt(requestedToolNames, contextData);
     }
 
     // Create system message with the formatted prompt
@@ -97,12 +99,8 @@ serve(async (req) => {
     const openAIRequestBody: any = {
       model: "gpt-4o",
       messages,
+      tools: toolDefinitions // Always set the tools property, even if it's an empty array
     };
-
-    // Only add tools if there are any available
-    if (toolDefinitions.length > 0) {
-      openAIRequestBody.tools = toolDefinitions;
-    }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
