@@ -73,18 +73,25 @@ export const identifyProject: Tool = {
           console.error("Error in exact ID search:", exactError);
         } else if (exactMatches) {
           console.log("Exact match found by ID, data:", JSON.stringify(exactMatches));
+          console.log("DEBUG - ID match types:", {
+            id_type: typeof exactMatches.id,
+            id_value: exactMatches.id,
+            company_id_type: typeof exactMatches.company_id,
+            company_id_value: exactMatches.company_id
+          });
+          
           return {
             status: "success",
             projects: [{
               id: exactMatches.id,
-              crm_id: exactMatches.crm_id,
-              summary: exactMatches.summary,
-              next_step: exactMatches.next_step,
-              address: exactMatches.Address,
-              project_name: exactMatches.project_name,
-              status: exactMatches.Project_status,
+              crm_id: exactMatches.crm_id || '',
+              summary: exactMatches.summary || '',
+              next_step: exactMatches.next_step || '',
+              address: exactMatches.Address || '',
+              project_name: exactMatches.project_name || '',
+              status: exactMatches.Project_status || '',
               company_id: exactMatches.company_id,
-              company_name: exactMatches.companies?.name
+              company_name: exactMatches.companies?.name || ''
             }],
             found: true,
             count: 1,
@@ -116,18 +123,25 @@ export const identifyProject: Tool = {
           console.error("Error in CRM ID search:", crmError);
         } else if (crmMatches) {
           console.log("Exact match found by CRM ID, data:", JSON.stringify(crmMatches));
+          console.log("DEBUG - CRM match types:", {
+            id_type: typeof crmMatches.id,
+            id_value: crmMatches.id,
+            company_id_type: typeof crmMatches.company_id,
+            company_id_value: crmMatches.company_id
+          });
+          
           return {
             status: "success",
             projects: [{
               id: crmMatches.id,
-              crm_id: crmMatches.crm_id,
-              summary: crmMatches.summary,
-              next_step: crmMatches.next_step,
-              address: crmMatches.Address,
-              project_name: crmMatches.project_name,
-              status: crmMatches.Project_status,
+              crm_id: crmMatches.crm_id || '',
+              summary: crmMatches.summary || '',
+              next_step: crmMatches.next_step || '',
+              address: crmMatches.Address || '',
+              project_name: crmMatches.project_name || '',
+              status: crmMatches.Project_status || '',
               company_id: crmMatches.company_id,
-              company_name: crmMatches.companies?.name
+              company_name: crmMatches.companies?.name || ''
             }],
             found: true,
             count: 1,
@@ -149,12 +163,39 @@ export const identifyProject: Tool = {
         // Debug: Log the SQL query parameters before execution
         console.log(`Vector search params: threshold=0.2, count=5, company_id=${company_id || 'null'}`);
         
+        // Debug: Log the RPC function call details
+        console.log("DEBUG - RPC function details:", {
+          function_name: "search_projects_by_vector",
+          parameters: {
+            search_embedding: "<<embedding vector>>",
+            match_threshold: 0.2,
+            match_count: 5,
+            p_company_id: company_id || null
+          },
+          parameter_types: {
+            search_embedding_type: "vector",
+            match_threshold_type: typeof 0.2,
+            match_count_type: typeof 5,
+            p_company_id_type: company_id ? typeof company_id : "null"
+          }
+        });
+        
+        // Log expected return types from SQL function
+        console.log("DEBUG - Expected return columns from SQL function:", [
+          "id (uuid/string)",
+          "crm_id (text/string)",
+          "summary (text/string)",
+          "next_step (text/string)",
+          "company_id (uuid/string)",
+          "company_name (text/string)",
+          "address (text/string)",
+          "status (text/string)",
+          "similarity (double precision/number)",
+          "project_name (text/string)"
+        ]);
+        
         // Perform vector search
         console.log("Executing vector search with RPC call to 'search_projects_by_vector'");
-        
-        // Log the SQL function signature and expected return types
-        console.log("SQL Function: search_projects_by_vector(search_embedding vector, match_threshold double precision, match_count integer, p_company_id uuid)");
-        console.log("Expected return columns: id, crm_id, summary, next_step, company_id, company_name, address, status, similarity, project_name");
         
         const { data: vectorResults, error: vectorError } = await context.supabase.rpc(
           'search_projects_by_vector',
@@ -169,6 +210,15 @@ export const identifyProject: Tool = {
         if (vectorError) {
           console.error("Error in vector search:", vectorError);
           console.error("Full error details:", JSON.stringify(vectorError));
+          
+          // Debug: Capture detailed information about the error
+          console.log("DEBUG - Vector search error analysis:", {
+            error_code: vectorError.code,
+            error_message: vectorError.message,
+            error_details: vectorError.details,
+            error_hint: vectorError.hint
+          });
+          
           // Fall back to traditional search if vector search fails
           console.log("Vector search failed, falling back to traditional search");
           return await performTraditionalSearch(query, company_id, context);
@@ -179,6 +229,7 @@ export const identifyProject: Tool = {
           // Debug each result from vector search
           vectorResults.forEach((result: any, index: number) => {
             console.log(`Vector result #${index + 1}:`, JSON.stringify(result));
+            console.log(`Vector result #${index + 1} types:`, Object.entries(result).map(([key, value]) => `${key}: ${typeof value}`));
           });
           
           // Get complete project data for each result to ensure we have all the fields we need
@@ -207,6 +258,7 @@ export const identifyProject: Tool = {
             console.log(`Retrieved ${fullProjects.length} full project details`);
             fullProjects.forEach((project: any, index: number) => {
               console.log(`Full project #${index + 1}:`, JSON.stringify(project));
+              console.log(`Full project #${index + 1} types:`, Object.entries(project).map(([key, value]) => `${key}: ${typeof value}`));
             });
             
             // Merge the similarity scores with the full project data
@@ -214,24 +266,40 @@ export const identifyProject: Tool = {
               const vectorResult = vectorResults.find((v: any) => v.id === project.id);
               console.log(`Mapping project ${project.id} with similarity ${vectorResult?.similarity || 0}`);
               
-              return {
+              // Debug the mapping process
+              console.log("DEBUG - Mapping project data:", {
+                project_id: project.id,
+                project_id_type: typeof project.id,
+                vector_result_id: vectorResult?.id,
+                vector_result_id_type: vectorResult ? typeof vectorResult.id : 'undefined',
+                similarity_value: vectorResult?.similarity,
+                similarity_type: vectorResult ? typeof vectorResult.similarity : 'undefined'
+              });
+              
+              const mappedProject = {
                 id: project.id,
-                crm_id: project.crm_id,
-                summary: project.summary,
-                next_step: project.next_step,
-                address: project.Address,
-                project_name: project.project_name,
-                status: project.Project_status,
+                crm_id: project.crm_id || '',
+                summary: project.summary || '',
+                next_step: project.next_step || '',
+                address: project.Address || '',
+                project_name: project.project_name || '',
+                status: project.Project_status || '',
                 company_id: project.company_id,
-                company_name: project.companies?.name,
+                company_name: project.companies?.name || '',
                 similarity: vectorResult?.similarity || 0
               };
+              
+              console.log("DEBUG - Mapped project result:", mappedProject);
+              console.log("DEBUG - Mapped project types:", Object.entries(mappedProject).map(([key, value]) => `${key}: ${typeof value}`));
+              
+              return mappedProject;
             });
             
             // Sort by similarity, highest first
             projectsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
             
-            console.log("Final processed results:", JSON.stringify(projectsWithSimilarity));
+            console.log("DEBUG - Final processed results:", JSON.stringify(projectsWithSimilarity));
+            console.log("DEBUG - Final result types:", Object.entries(projectsWithSimilarity[0]).map(([key, value]) => `${key}: ${typeof value}`));
             
             return {
               status: "success",
@@ -253,8 +321,11 @@ export const identifyProject: Tool = {
           
           const mappedResults = vectorResults.map((p: any) => {
             // Create a clean object with explicit type mapping
+            console.log("DEBUG - Vector result raw data:", p);
+            
+            // Add explicit type conversion for each field
             const mappedResult = {
-              id: String(p.id),
+              id: String(p.id || ''),
               crm_id: String(p.crm_id || ''),
               summary: String(p.summary || ''),
               next_step: String(p.next_step || ''),
@@ -266,7 +337,8 @@ export const identifyProject: Tool = {
               similarity: Number(p.similarity || 0)
             };
             
-            console.log(`Mapped vector result:`, JSON.stringify(mappedResult));
+            console.log(`DEBUG - Mapped vector result:`, JSON.stringify(mappedResult));
+            console.log(`DEBUG - Mapped vector types:`, Object.entries(mappedResult).map(([key, value]) => `${key}: ${typeof value}`));
             return mappedResult;
           });
           
@@ -285,12 +357,23 @@ export const identifyProject: Tool = {
         
       } catch (embeddingError) {
         console.error("Error generating embedding or performing vector search:", embeddingError);
+        console.log("DEBUG - Embedding error details:", {
+          error_message: embeddingError.message,
+          error_name: embeddingError.name,
+          error_stack: embeddingError.stack
+        });
+        
         // Fall back to traditional search if there's an error with vector search
         console.log("Error in vector search process, falling back to traditional search");
         return await performTraditionalSearch(query, company_id, context);
       }
     } catch (error) {
       console.error("Error executing identify_project tool:", error);
+      console.log("DEBUG - Top level execution error:", {
+        error_message: error.message,
+        error_name: error.name,
+        error_stack: error.stack
+      });
       return {
         status: "error",
         error: error.message || "An unexpected error occurred"
@@ -368,6 +451,11 @@ async function performTraditionalSearch(query: string, company_id: string | unde
   
   if (error) {
     console.error("Error searching for projects:", error);
+    console.log("DEBUG - Traditional search error:", {
+      error_code: error.code,
+      error_message: error.message,
+      error_details: error.details
+    });
     return {
       status: "error",
       error: `Database error: ${error.message}`
@@ -388,23 +476,25 @@ async function performTraditionalSearch(query: string, company_id: string | unde
   // Debug each project
   projects.forEach((p: any, index: number) => {
     console.log(`Traditional search result #${index + 1}:`, JSON.stringify(p));
+    console.log(`Traditional search result #${index + 1} types:`, Object.entries(p).map(([key, value]) => `${key}: ${typeof value}`));
   });
   
   // Ensure the returned object has all necessary fields with proper types
   const processedResults = projects.map((p: any) => {
     const result = {
-      id: p.id,
-      crm_id: p.crm_id,
-      summary: p.summary,
-      next_step: p.next_step,
-      address: p.Address,
-      project_name: p.project_name,
-      status: p.Project_status,
-      company_id: p.company_id,
-      company_name: p.companies?.name
+      id: String(p.id || ''),
+      crm_id: String(p.crm_id || ''),
+      summary: String(p.summary || ''),
+      next_step: String(p.next_step || ''),
+      address: String(p.Address || ''),
+      project_name: String(p.project_name || ''),
+      status: String(p.Project_status || ''),
+      company_id: String(p.company_id || ''),
+      company_name: String(p.companies?.name || '')
     };
     
-    console.log(`Processed traditional result:`, JSON.stringify(result));
+    console.log(`DEBUG - Processed traditional result:`, JSON.stringify(result));
+    console.log(`DEBUG - Processed traditional types:`, Object.entries(result).map(([key, value]) => `${key}: ${typeof value}`));
     return result;
   });
   

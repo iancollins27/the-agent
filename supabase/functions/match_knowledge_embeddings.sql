@@ -1,5 +1,4 @@
 
-
 CREATE OR REPLACE FUNCTION public.search_projects_by_vector(search_embedding vector, match_threshold double precision DEFAULT 0.2, match_count integer DEFAULT 5, p_company_id uuid DEFAULT NULL::uuid)
  RETURNS TABLE(id uuid, crm_id text, summary text, next_step text, company_id uuid, company_name text, address text, status text, similarity double precision, project_name text)
  LANGUAGE plpgsql
@@ -29,4 +28,3 @@ BEGIN
   LIMIT match_count;
 END;
 $function$;
-
