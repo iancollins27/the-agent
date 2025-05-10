@@ -4,6 +4,7 @@ import { corsHeaders } from "./utils/cors.ts";
 import { getChatSystemPrompt } from "./mcp-system-prompts.ts";
 import { getToolNames, filterTools, getToolDefinitions, getFormattedToolDefinitions } from "./tools/toolRegistry.ts";
 import { replaceVariables } from "./utils/stringUtils.ts";
+import { executeToolCall } from "./tools/toolExecutor.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 
@@ -141,19 +142,8 @@ serve(async (req) => {
         console.log(`Executing tool ${name} with args: ${argsJson}`);
         
         try {
-          // Import and execute the tool
-          const toolModule = await import(`./tools/${name}/index.ts`);
-          const toolFunction = toolModule[name];
-          
-          if (!toolFunction) {
-            throw new Error(`Tool function ${name} not found`);
-          }
-          
-          const toolResult = await toolFunction.execute(args, {
-            supabase: null, // This should be replaced with a proper supabase client
-            userProfile: null,
-            companyId: payload.projectData?.company_id 
-          });
+          // Use the toolExecutor instead of direct imports to handle the name mapping
+          const toolResult = await executeToolCall(null, name, args, null, payload.projectData?.company_id);
           
           // Add the tool response to messages
           messages.push({
