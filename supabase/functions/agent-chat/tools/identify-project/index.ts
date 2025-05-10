@@ -39,6 +39,15 @@ export const identifyProject: Tool = {
       
       console.log(`Executing identify_project tool: query="${query}"`);
 
+      // Check if we have a supabase client
+      if (!context.supabase) {
+        return {
+          status: "error",
+          error: "Supabase client is not available",
+          message: "Cannot perform project search without database connection"
+        };
+      }
+
       // First try exact match by ID or CRM ID
       const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       
@@ -243,6 +252,15 @@ export const identifyProject: Tool = {
  */
 async function performTraditionalSearch(query: string, company_id: string | undefined, context: any): Promise<ToolResult> {
   console.log(`Performing traditional text search for: ${query}`);
+  
+  // Check if we have a supabase client
+  if (!context || !context.supabase) {
+    return {
+      status: "error",
+      error: "Supabase client is not available",
+      message: "Cannot perform traditional search without database connection"
+    };
+  }
   
   // Break query into words, drop very common / non-informative tokens.
   const stopWords = new Set(['county', 'project', 'the', 'a', 'an', 'in', 'at', 'of']);

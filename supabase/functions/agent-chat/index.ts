@@ -5,8 +5,11 @@ import { getChatSystemPrompt } from "./mcp-system-prompts.ts";
 import { getToolNames, filterTools, getToolDefinitions, getFormattedToolDefinitions } from "./tools/toolRegistry.ts";
 import { replaceVariables } from "./utils/stringUtils.ts";
 import { executeToolCall } from "./tools/toolExecutor.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
 interface ChatRequest {
   messages: Array<{
@@ -38,6 +41,9 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
     // Special case: If getToolDefinitions flag is set, return the available tool definitions
     if (payload.getToolDefinitions) {
       console.log("Tool definitions requested");
@@ -143,7 +149,7 @@ serve(async (req) => {
         
         try {
           // Use the toolExecutor instead of direct imports to handle the name mapping
-          const toolResult = await executeToolCall(null, name, args, null, payload.projectData?.company_id);
+          const toolResult = await executeToolCall(supabase, name, args, null, payload.projectData?.company_id);
           
           // Add the tool response to messages
           messages.push({
