@@ -154,24 +154,30 @@ export type Database = {
       }
       chatbot_config: {
         Row: {
+          available_tools: string[] | null
           created_at: string
           id: string
+          mcp_tool_definitions: string | null
           model: string
           search_project_data: boolean
           system_prompt: string
           temperature: number
         }
         Insert: {
+          available_tools?: string[] | null
           created_at?: string
           id?: string
+          mcp_tool_definitions?: string | null
           model?: string
           search_project_data?: boolean
           system_prompt: string
           temperature?: number
         }
         Update: {
+          available_tools?: string[] | null
           created_at?: string
           id?: string
+          mcp_tool_definitions?: string | null
           model?: string
           search_project_data?: boolean
           system_prompt?: string

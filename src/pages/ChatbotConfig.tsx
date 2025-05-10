@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import ChatInterface from '@/components/Chat/ChatInterface';
 import ToolDefinitionsPanel from '@/components/admin/MCP/ToolDefinitionsPanel';
 import MCPInfoAlert from '@/components/admin/test-runner/MCPInfoAlert';
+import ChatbotPromptVariablesReference from '@/components/chatbot/ChatbotPromptVariablesReference';
 
 type ModelOption = 'gpt-4o-mini' | 'gpt-4o';
 
@@ -38,6 +38,7 @@ const ChatbotConfig = () => {
   const [mcpToolDefinitions, setMcpToolDefinitions] = useState('');
   const [availableTools, setAvailableTools] = useState<string[]>(['create_action_record', 'knowledge_base_lookup']);
   const { toast } = useToast();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     fetchCurrentSystemPrompt();
@@ -136,6 +137,28 @@ If no scheduling information is found, suggest contacting the project manager fo
     ], null, 2);
   };
 
+  const handleInsertVariable = (variable: string) => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      
+      // Create the variable placeholder with handlebars syntax
+      const variableText = `{{${variable}}}`;
+      
+      // Insert the variable at the cursor position
+      const newValue = orchestratorPrompt.substring(0, start) + variableText + orchestratorPrompt.substring(end);
+      setOrchestratorPrompt(newValue);
+      
+      // Set the cursor position after the inserted variable
+      setTimeout(() => {
+        textarea.selectionStart = start + variableText.length;
+        textarea.selectionEnd = start + variableText.length;
+        textarea.focus();
+      }, 0);
+    }
+  };
+
   const saveConfiguration = async () => {
     setIsSaving(true);
     try {
@@ -192,6 +215,25 @@ If no scheduling information is found, suggest contacting the project manager fo
     });
   };
 
+  // Example orchestrator prompt for the user
+  const examplePrompt = `You are an intelligent project assistant that helps manage project workflows.
+  
+You have access to the following tools: {{available_tools}}. Use these tools to help answer user questions.
+
+IMPORTANT CONTEXT HANDLING:
+- When a user mentions a project by ID, CRM ID, address or description, use the knowledge_base_lookup tool to find relevant information.
+- Focus on answering the user's specific question directly using the context you have.
+- If the user asks about project details like schedules, timelines, or specific milestones, use the project data in your context: {{project_data}}
+
+The current date is {{current_date}}.
+
+RESPONSE FORMAT:
+- Keep responses concise and focused on the specific questions asked.
+- When a question is about a particular aspect of the project, focus your answer on that aspect only.
+- Don't restate all project information unless specifically requested by the user.
+
+You MUST help users update project data when they ask. If users ask to update fields like installation dates or other project details, offer to help with the update.`;
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <header className="mb-8">
@@ -216,19 +258,32 @@ If no scheduling information is found, suggest contacting the project manager fo
                 This prompt will be sent at the beginning of every conversation.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <ChatbotPromptVariablesReference 
+                isEditing={!isLoading} 
+                onInsertVariable={handleInsertVariable}
+              />
+              
               {isLoading ? (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : (
                 <Textarea 
+                  ref={textareaRef}
                   value={orchestratorPrompt}
                   onChange={(e) => setOrchestratorPrompt(e.target.value)}
                   className="min-h-[300px] font-mono text-sm"
                   placeholder="Enter orchestrator prompt..."
                 />
               )}
+              
+              <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-md text-sm">
+                <h3 className="font-medium mb-1">Example Prompt Format</h3>
+                <pre className="whitespace-pre-wrap text-xs overflow-auto max-h-48 bg-slate-100 dark:bg-slate-900 p-3 rounded">
+                  {examplePrompt}
+                </pre>
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button onClick={saveConfiguration} disabled={isSaving}>

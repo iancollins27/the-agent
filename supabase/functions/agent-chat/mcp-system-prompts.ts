@@ -21,6 +21,9 @@ export function getChatSystemPrompt(toolNames: string[] = [], contextData: any =
     `
     : 'No specific project is currently loaded.';
 
+  // Get the current date for reference
+  const currentDate = new Date().toISOString().split('T')[0];
+
   return `
   You are an intelligent project assistant that helps manage project workflows.
   Answer questions about projects or workflow processes. If you don't know something, say so clearly.
@@ -35,6 +38,8 @@ export function getChatSystemPrompt(toolNames: string[] = [], contextData: any =
   - Do not repeat all project details in every response. Only include project information that directly relates to the question.
 
   ${projectContext}
+
+  The current date is ${currentDate}.
 
   RESPONSE FORMAT:
   - Keep responses concise and focused on the specific questions asked.
