@@ -51,8 +51,11 @@ serve(async (req) => {
     const toolDefinitions = payload.availableTools && payload.availableTools.length > 0 
       ? filterTools(payload.availableTools) 
       : [];
+
+    console.log(`Available tools for this request: ${JSON.stringify(payload.availableTools || [])}`);
+    console.log(`Filtered tool definitions: ${JSON.stringify(toolDefinitions.map(t => t.function.name))}`);
     
-    // Format tools for variable replacement
+    // Format tools for variable replacement in prompt
     const formattedToolsInfo = toolDefinitions.length > 0 
       ? toolDefinitions.map(tool => `${tool.function.name} (${tool.function.description})`).join(", ")
       : "No tools available";
@@ -88,23 +91,26 @@ serve(async (req) => {
       ? payload.messages.map(msg => msg.role === "system" ? systemMessage : msg)
       : [systemMessage, ...payload.messages];
 
-    // Get appropriate tools for the chat model
-    const toolDefForModel = payload.availableTools && payload.availableTools.length > 0 
-      ? filterTools(payload.availableTools) 
-      : [];
-
     // Basic request to OpenAI
+    console.log("Sending OpenAI request with tools:", JSON.stringify(toolDefinitions.map(t => t.function.name)));
+
+    const openAIRequestBody: any = {
+      model: "gpt-4o",
+      messages,
+    };
+
+    // Only add tools if there are any available
+    if (toolDefinitions.length > 0) {
+      openAIRequestBody.tools = toolDefinitions;
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages,
-        tools: toolDefForModel.length > 0 ? toolDefForModel : undefined,
-      }),
+      body: JSON.stringify(openAIRequestBody),
     });
 
     if (!response.ok) {

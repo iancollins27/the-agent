@@ -95,15 +95,15 @@ export function filterTools(enabledTools: string[]): Array<{
   // Log which tools we're looking for
   console.log(`Filtering for tools: ${enabledTools.join(', ')}`);
   
-  // Return only tools that are enabled
-  const filtered = Object.values(tools)
-    .filter(tool => enabledTools.includes(tool.name))
-    .map(tool => ({
+  // Return only tools that are enabled and exist in our registry
+  const filtered = enabledTools
+    .filter(toolName => tools[toolName]) // Make sure the tool exists
+    .map(toolName => ({
       type: "function",
       function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.schema
+        name: tools[toolName].name,
+        description: tools[toolName].description,
+        parameters: tools[toolName].schema
       }
     }));
   
