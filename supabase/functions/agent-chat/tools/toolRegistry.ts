@@ -25,13 +25,35 @@ export function getToolNames(): string[] {
   return Object.keys(tools);
 }
 
+/**
+ * Returns the complete tool definitions for all registered tools
+ */
 export function getToolDefinitions(): Array<{
+  name: string;
+  description: string;
+  parameters: {
+    type: string; 
+    properties: Record<string, any>;
+    required: string[];
+  };
+}> {
+  return Object.values(tools).map(tool => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.schema
+  }));
+}
+
+/**
+ * Returns the formatted tool definitions for OpenAI API
+ */
+export function getFormattedToolDefinitions(): Array<{
   type: string;
   function: {
     name: string;
     description: string;
     parameters: {
-      type: string;
+      type: string; 
       properties: Record<string, any>;
       required: string[];
     };

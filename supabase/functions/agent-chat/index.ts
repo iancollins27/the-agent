@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "./utils/cors.ts";
 import { getChatSystemPrompt } from "./mcp-system-prompts.ts";
-import { getToolNames, filterTools } from "./tools/toolRegistry.ts";
+import { getToolNames, filterTools, getToolDefinitions, getFormattedToolDefinitions } from "./tools/toolRegistry.ts";
 import { replaceVariables } from "./utils/stringUtils.ts";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
@@ -16,6 +16,7 @@ interface ChatRequest {
   projectData?: any;
   customPrompt?: string;
   availableTools?: string[];
+  getToolDefinitions?: boolean; // Special flag to request tool definitions
 }
 
 serve(async (req) => {
@@ -36,11 +37,31 @@ serve(async (req) => {
   }
 
   try {
+    // Special case: If getToolDefinitions flag is set, return the available tool definitions
+    if (payload.getToolDefinitions) {
+      console.log("Tool definitions requested");
+      const toolDefinitions = getToolDefinitions();
+      return new Response(
+        JSON.stringify({ toolDefinitions }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Get available tools based on the request
+    const toolDefinitions = payload.availableTools && payload.availableTools.length > 0 
+      ? filterTools(payload.availableTools) 
+      : [];
+    
+    // Format tools for variable replacement
+    const formattedToolsInfo = toolDefinitions.length > 0 
+      ? toolDefinitions.map(tool => `${tool.function.name} (${tool.function.description})`).join(", ")
+      : "No tools available";
+    
     // Setup context data for variable replacement
     const contextData = {
       projectData: payload.projectData || {},
       current_date: new Date().toISOString().split('T')[0],
-      available_tools: payload.availableTools?.join(", ") || "No tools available",
+      available_tools: formattedToolsInfo,
       user_question: payload.messages[payload.messages.length - 1]?.content || ""
     };
 
@@ -68,7 +89,7 @@ serve(async (req) => {
       : [systemMessage, ...payload.messages];
 
     // Get appropriate tools for the chat model
-    const toolDefinitions = payload.availableTools && payload.availableTools.length > 0 
+    const toolDefForModel = payload.availableTools && payload.availableTools.length > 0 
       ? filterTools(payload.availableTools) 
       : [];
 
@@ -82,7 +103,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "gpt-4o",
         messages,
-        tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+        tools: toolDefForModel.length > 0 ? toolDefForModel : undefined,
       }),
     });
 

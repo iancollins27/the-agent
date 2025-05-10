@@ -7,13 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Info } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import ChatInterface from '@/components/Chat/ChatInterface';
 import ToolDefinitionsPanel from '@/components/admin/MCP/ToolDefinitionsPanel';
 import MCPInfoAlert from '@/components/admin/test-runner/MCPInfoAlert';
 import ChatbotPromptVariablesReference from '@/components/chatbot/ChatbotPromptVariablesReference';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type ModelOption = 'gpt-4o-mini' | 'gpt-4o';
 
@@ -28,6 +29,16 @@ interface ChatbotConfig {
   created_at: string;
 }
 
+interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters: {
+    type: string;
+    properties: Record<string, any>;
+    required: string[];
+  };
+}
+
 const ChatbotConfig = () => {
   const [orchestratorPrompt, setOrchestratorPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,12 +48,14 @@ const ChatbotConfig = () => {
   const [searchProjectData, setSearchProjectData] = useState(true);
   const [testMessage, setTestMessage] = useState('');
   const [mcpToolDefinitions, setMcpToolDefinitions] = useState('');
-  const [availableTools, setAvailableTools] = useState<string[]>(['create_action_record', 'knowledge_base_lookup']);
+  const [availableTools, setAvailableTools] = useState<string[]>([]);
+  const [loadingTools, setLoadingTools] = useState(false);
   const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     fetchCurrentSystemPrompt();
+    fetchAvailableTools();
   }, []);
 
   const fetchCurrentSystemPrompt = async () => {
@@ -72,9 +85,6 @@ If no scheduling information is found, suggest contacting the project manager fo
         
         if (config.mcp_tool_definitions) {
           setMcpToolDefinitions(config.mcp_tool_definitions);
-        } else {
-          // Set default tool definitions if none exist
-          setMcpToolDefinitions(getDefaultToolDefinitions());
         }
         
         if (config.available_tools && Array.isArray(config.available_tools)) {
@@ -85,6 +95,68 @@ If no scheduling information is found, suggest contacting the project manager fo
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchAvailableTools = async () => {
+    setLoadingTools(true);
+    try {
+      // Call the agent-chat edge function with a special flag to get tool definitions
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        'https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/agent-chat',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            messages: [{ role: 'system', content: 'tool_list_request' }],
+            getToolDefinitions: true
+          }),
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch tool definitions');
+      }
+      
+      const data = await response.json();
+      
+      if (data.toolDefinitions) {
+        setMcpToolDefinitions(JSON.stringify(data.toolDefinitions, null, 2));
+        
+        // Extract tool names
+        const toolNames = data.toolDefinitions.map((tool: ToolDefinition) => tool.name);
+        setAvailableTools(toolNames);
+      } else {
+        // If we can't get tool definitions, set default ones
+        const defaultTools = getDefaultToolDefinitions();
+        setMcpToolDefinitions(defaultTools);
+        
+        try {
+          const parsed = JSON.parse(defaultTools);
+          setAvailableTools(parsed.map((tool: ToolDefinition) => tool.name));
+        } catch (e) {
+          console.error('Error parsing default tool definitions', e);
+          setAvailableTools(['create_action_record', 'knowledge_base_lookup']);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tool definitions:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch tool definitions. Using default tools instead.",
+      });
+      
+      // Set defaults if we can't fetch
+      const defaultTools = getDefaultToolDefinitions();
+      setMcpToolDefinitions(defaultTools);
+      setAvailableTools(['create_action_record', 'knowledge_base_lookup']);
+    } finally {
+      setLoadingTools(false);
     }
   };
 
@@ -134,6 +206,25 @@ If no scheduling information is found, suggest contacting the project manager fo
           },
           "required": ["query"]
         }
+      },
+      {
+        "name": "identify_project",
+        "description": "Identifies a project based on provided information like ID, name, or address",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "identifier": {
+              "type": "string",
+              "description": "Project ID, CRM ID, name or address to search for"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["id", "crm_id", "name", "address", "any"],
+              "description": "Type of identifier provided"
+            }
+          },
+          "required": ["identifier"]
+        }
       }
     ], null, 2);
   };
@@ -163,14 +254,29 @@ If no scheduling information is found, suggest contacting the project manager fo
   const saveConfiguration = async () => {
     setIsSaving(true);
     try {
+      // Extract tool names from the updated definitions
+      let toolNames: string[] = [];
+      try {
+        const toolDefs = JSON.parse(mcpToolDefinitions);
+        toolNames = toolDefs.map((tool: any) => tool.name);
+      } catch (error) {
+        console.error('Error parsing tool definitions:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "The tool definitions contain invalid JSON. Please fix before saving.",
+        });
+        setIsSaving(false);
+        return;
+      }
+      
       const configData = {
         system_prompt: orchestratorPrompt,
         model: selectedModel,
         temperature: temperature,
         search_project_data: searchProjectData,
-        // Remove the enable_mcp field which doesn't exist
         mcp_tool_definitions: mcpToolDefinitions,
-        available_tools: availableTools
+        available_tools: toolNames
       };
       
       const { error } = await supabase
@@ -392,12 +498,27 @@ You MUST help users update project data when they ask. If users ask to update fi
             </CardHeader>
             <CardContent className="space-y-6">
               <MCPInfoAlert />
-
-              <ToolDefinitionsPanel 
-                rawDefinitions={mcpToolDefinitions}
-                onSave={handleToolDefinitionsSave}
-                isSaving={isSaving}
-              />
+              
+              {loadingTools ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2">Loading tool definitions...</span>
+                </div>
+              ) : (
+                <ToolDefinitionsPanel 
+                  rawDefinitions={mcpToolDefinitions}
+                  onSave={handleToolDefinitionsSave}
+                  isSaving={isSaving}
+                />
+              )}
+              
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  The available tools in the UI and in the chatbot system are now synchronized. 
+                  When you save configuration, the tools will be available in the chat interface.
+                </AlertDescription>
+              </Alert>
             </CardContent>
             <CardFooter className="flex justify-end">
               <Button onClick={saveConfiguration} disabled={isSaving}>
