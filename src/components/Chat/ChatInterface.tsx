@@ -14,6 +14,7 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  tool_calls?: any[];
 }
 
 interface ChatInterfaceProps {
@@ -80,8 +81,11 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
         .limit(1)
         .single();
         
-      // Format messages for the API call
-      const messagesToSend = updatedMessages.map(({ role, content }) => ({ role, content }));
+      // Format messages for the API call, ensuring content is always a string
+      const messagesToSend = updatedMessages.map(({ role, content }) => ({ 
+        role, 
+        content: content || '' // Ensure content is never null
+      }));
       
       // Get current session for authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -111,12 +115,23 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       
       const data = await response.json();
       
-      // Process the AI message
+      // Process the AI response
+      const assistantMessage = data.choices[0].message;
+      const content = assistantMessage.content || ""; // Use empty string if content is null
+      
+      // Check for tool calls and add a note to the message if they're present
+      const hasTool = assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
+      const displayContent = hasTool && !content 
+        ? "I'm looking up some information for you..."
+        : content;
+        
+      // Create the AI message object
       const aiMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
-        content: data.choices[0].message.content,
+        content: displayContent,
         timestamp: new Date().toISOString(),
+        tool_calls: assistantMessage.tool_calls,
       };
       
       // Add the AI message to the messages array
