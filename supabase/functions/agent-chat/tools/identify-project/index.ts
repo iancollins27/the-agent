@@ -60,7 +60,6 @@ export const identifyProject: Tool = {
             crm_id, 
             summary, 
             next_step,
-            project_track,
             company_id,
             companies(name),
             Address,
@@ -83,7 +82,6 @@ export const identifyProject: Tool = {
               address: exactMatches.Address,
               project_name: exactMatches.project_name,
               status: exactMatches.Project_status,
-              project_track: exactMatches.project_track,
               company_id: exactMatches.company_id,
               company_name: exactMatches.companies?.name
             }],
@@ -104,7 +102,6 @@ export const identifyProject: Tool = {
             crm_id, 
             summary, 
             next_step,
-            project_track,
             company_id,
             companies(name),
             Address,
@@ -127,9 +124,8 @@ export const identifyProject: Tool = {
               address: crmMatches.Address,
               project_name: crmMatches.project_name,
               status: crmMatches.Project_status,
-              project_track: crmMatches.project_track,
               company_id: crmMatches.company_id,
-              company: crmMatches.companies?.name
+              company_name: crmMatches.companies?.name
             }],
             found: true,
             count: 1,
@@ -173,7 +169,6 @@ export const identifyProject: Tool = {
               crm_id, 
               summary, 
               next_step,
-              project_track,
               company_id,
               companies(name),
               Address,
@@ -196,7 +191,6 @@ export const identifyProject: Tool = {
                 address: project.Address,
                 project_name: project.project_name,
                 status: project.Project_status,
-                project_track: project.project_track,
                 company_id: project.company_id,
                 company_name: project.companies?.name,
                 similarity: vectorResult?.similarity || 0
@@ -215,7 +209,7 @@ export const identifyProject: Tool = {
             };
           }
           
-          // Ensure all fields are properly typed in the return object
+          // Return vector search results directly if we couldn't get full project details
           return {
             status: "success",
             projects: vectorResults.map((p: VectorSearchResult) => ({
@@ -226,7 +220,6 @@ export const identifyProject: Tool = {
               address: p.address,
               project_name: p.project_name,
               status: p.status,
-              project_track: p.project_track,
               company_id: p.company_id,
               company_name: p.company_name,
               similarity: p.similarity
@@ -286,7 +279,6 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       crm_id, 
       summary, 
       next_step,
-      project_track,
       company_id,
       companies(name),
       Address,
@@ -343,7 +335,6 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       address: p.Address,
       project_name: p.project_name,
       status: p.Project_status,
-      project_track: p.project_track,
       company_id: p.company_id,
       company_name: p.companies?.name
     })),
