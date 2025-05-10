@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -167,8 +168,7 @@ If no scheduling information is found, suggest contacting the project manager fo
         model: selectedModel,
         temperature: temperature,
         search_project_data: searchProjectData,
-        // MCP is always enabled
-        enable_mcp: true,
+        // Remove the enable_mcp field which doesn't exist
         mcp_tool_definitions: mcpToolDefinitions,
         available_tools: availableTools
       };
