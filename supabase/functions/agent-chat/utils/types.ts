@@ -9,7 +9,7 @@ export interface VectorSearchResult {
   crm_id: string;
   summary: string;
   next_step: string;
-  project_track: string;
+  project_track: string | null; // Can be UUID as string or null
   company_id: string;
   company_name: string;
   address: string;
