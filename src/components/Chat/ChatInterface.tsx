@@ -1,207 +1,199 @@
-
-import React, { useState } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import React, { useState, useEffect, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
-import { Message, ActionRecord } from "./types";
-import MessageList from "./MessageList";
-import MessageInput from "./MessageInput";
-import ActionConfirmDialog from "./ActionConfirmation/ActionConfirmDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
-type ChatInterfaceProps = {
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+
+interface ChatInterfaceProps {
   projectId?: string;
-  className?: string;
   presetMessage?: string;
-};
+}
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ projectId, className, presetMessage }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState(presetMessage || '');
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingAction, setPendingAction] = useState<ActionRecord | null>(null);
-  const [actionDialogOpen, setActionDialogOpen] = useState(false);
-  const [partialMessage, setPartialMessage] = useState<string>("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handleSendMessage = async (input: string) => {
-    const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
+  useEffect(() => {
+    if (presetMessage) {
+      setInput(presetMessage);
+    }
+  }, [presetMessage]);
+
+  useEffect(() => {
+    // Scroll to bottom on message change
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const sendMessage = async (messageText: string) => {
+    if (!messageText.trim()) return;
+    
     setIsLoading(true);
     
-    // Reset streaming state
-    setIsStreaming(false);
-    setPartialMessage("");
-
     try {
-      const messageHistory = [...messages, userMessage].map(({ role, content }) => ({ role, content }));
+      // Create a new message for the user input
+      const userMessage = {
+        id: uuidv4(),
+        role: 'user',
+        content: messageText,
+        timestamp: new Date().toISOString(),
+      };
       
-      // For now, streaming is disabled until fully implemented
-      const streaming = false;
+      // Update the messages array with the new user message
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
       
-      const { data, error } = await supabase.functions.invoke('agent-chat', {
-        body: { 
-          messages: messageHistory, 
-          projectId,
-          conversationId,  // Send the conversation ID if we have one
-          streaming
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // Store the conversation ID for subsequent messages
-      if (data.conversationId) {
-        setConversationId(data.conversationId);
-      }
-
-      setMessages(prev => [
-        ...prev, 
-        { role: 'assistant', content: data.reply }
-      ]);
-
-      // Check if an action record was created
-      if (data.actionRecordId) {
-        console.log('Action record created:', data.actionRecordId);
-        
-        const { data: actionRecordData, error: actionError } = await supabase
-          .from('action_records')
-          .select(`
-            *,
-            recipient:contacts!recipient_id(id, full_name),
-            sender:contacts!sender_ID(id, full_name)
-          `)
-          .eq('id', data.actionRecordId)
+      // Get project data if we have a project ID
+      let projectData = null;
+      if (projectId) {
+        const { data: project } = await supabase
+          .from('projects')
+          .select('*, companies(*)')
+          .eq('id', projectId)
           .single();
           
-        if (actionError) {
-          console.error('Error fetching action record:', actionError);
-        } else if (actionRecordData) {
-          console.log('Fetched action record:', actionRecordData);
-          
-          // Convert the database record to our ActionRecord type with proper type safety
-          const payload = typeof actionRecordData.action_payload === 'object' 
-            ? actionRecordData.action_payload as Record<string, any>
-            : {};
-            
-          const actionRecord: ActionRecord = {
-            id: actionRecordData.id,
-            action_type: actionRecordData.action_type,
-            message: actionRecordData.message,
-            status: actionRecordData.status,
-            requires_approval: actionRecordData.requires_approval,
-            created_at: actionRecordData.created_at,
-            executed_at: actionRecordData.executed_at,
-            project_id: actionRecordData.project_id,
-            recipient_id: actionRecordData.recipient_id,
-            sender_ID: actionRecordData.sender_ID,
-            approver_id: actionRecordData.approver_id,
-            action_payload: {
-              description: payload.description || '',
-              field: payload.field || '',
-              value: payload.value || '',
-              recipient: payload.recipient || '',
-              sender: payload.sender || '',
-              message_content: payload.message_content || '',
-              notion_token: payload.notion_token || '',
-              notion_database_id: payload.notion_database_id || '',
-              notion_page_id: payload.notion_page_id || '',
-              days_until_check: payload.days_until_check || 0,
-              check_reason: payload.check_reason || '',
-              date: payload.date || ''
-            },
-            execution_result: actionRecordData.execution_result,
-            recipient: actionRecordData.recipient,
-            recipient_name: actionRecordData.recipient?.full_name || 
-              (typeof payload === 'object' ? payload.recipient : ''),
-            sender: actionRecordData.sender,
-            sender_name: actionRecordData.sender?.full_name || 
-              (typeof payload === 'object' ? payload.sender : '')
-          };
-          
-          setPendingAction(actionRecord);
-          setActionDialogOpen(true);
-        }
+        projectData = project;
       }
+      
+      // Get chatbot configuration
+      const { data: chatbotConfig } = await supabase
+        .from('chatbot_config')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      // Format messages for the API call
+      const messagesToSend = updatedMessages.map(({ role, content }) => ({ role, content }));
+      
+      // Send the request to our agent-chat edge function
+      const response = await fetch(
+        'https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/agent-chat',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${supabase.auth.session()?.access_token}`,
+          },
+          body: JSON.stringify({
+            messages: messagesToSend,
+            projectId,
+            projectData,
+            customPrompt: chatbotConfig?.system_prompt,
+            availableTools: chatbotConfig?.available_tools || []
+          }),
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Process the AI message
+      const aiMessage = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: data.choices[0].message.content,
+        timestamp: new Date().toISOString(),
+      };
+      
+      // Add the AI message to the messages array
+      setMessages([...updatedMessages, aiMessage]);
+      
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
-        title: "Error",
-        description: "Failed to get a response from the assistant",
-        variant: "destructive",
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to get a response. Please try again.',
       });
     } finally {
       setIsLoading(false);
-      setIsStreaming(false);
     }
   };
 
-  const handleActionResolved = () => {
-    setPendingAction(null);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage(input);
+      setInput('');
+    }
   };
-
-  // This will be used when we implement streaming
-  const handleStreamingResponse = (chunk: string) => {
-    setIsStreaming(true);
-    setPartialMessage(prev => prev + chunk);
-  };
-
-  // Add a function to clear the conversation (reset context)
-  const handleClearConversation = () => {
-    setMessages([]);
-    setConversationId(null);
-    toast({
-      title: "Conversation cleared",
-      description: "Started a new conversation",
-    });
-  };
-
-  // Combine messages with any partial (streaming) message
-  const displayMessages = [...messages];
-  if (isStreaming && partialMessage) {
-    displayMessages.push({
-      role: 'assistant',
-      content: partialMessage
-    });
-  }
 
   return (
-    <Card className={`flex flex-col h-[600px] ${className}`}>
-      <CardHeader className="px-4 py-3 border-b shrink-0 flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Project Assistant</CardTitle>
-        {messages.length > 0 && (
-          <button 
-            className="text-sm text-gray-400 hover:text-gray-600"
-            onClick={handleClearConversation}
-          >
-            Clear conversation
-          </button>
+    <div className="flex flex-col h-full">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4">
+        {messages.map((message) => (
+          <div key={message.id} className={`mb-4 flex ${message.role === 'assistant' ? 'items-start' : 'items-end justify-end'}`}>
+            {message.role === 'assistant' && (
+              <Avatar className="mr-3 h-8 w-8">
+                <AvatarImage src="/icons/workflow-logo.png" alt="AI Assistant" />
+                <AvatarFallback>AI</AvatarFallback>
+              </Avatar>
+            )}
+            <div className={`rounded-lg p-3 text-sm w-fit max-w-[80%] ${message.role === 'assistant' ? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100' : 'bg-primary text-primary-foreground'}`}>
+              {message.content}
+            </div>
+            {message.role === 'user' && (
+              <Avatar className="ml-3 h-8 w-8">
+                <AvatarImage src="https://github.com/shadcn.png" alt="User Avatar" />
+                <AvatarFallback>SC</AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        ))}
+        {isLoading && (
+          <div className="mb-4 flex items-start">
+            <Avatar className="mr-3 h-8 w-8">
+              <AvatarImage src="/icons/workflow-logo.png" alt="AI Assistant" />
+              <AvatarFallback>AI</AvatarFallback>
+            </Avatar>
+            <div className="rounded-lg p-3 text-sm w-fit max-w-[80%] bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Thinking...
+            </div>
+          </div>
         )}
-      </CardHeader>
-      
-      <CardContent className="flex-1 overflow-hidden p-0">
-        <div className="h-full overflow-y-auto">
-          <MessageList messages={displayMessages} />
+      </div>
+      <div className="p-4 border-t dark:border-gray-700">
+        <div className="flex items-center space-x-2">
+          <Input
+            ref={inputRef}
+            type="text"
+            placeholder="Type your message..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            className="flex-1"
+          />
+          <Button onClick={() => {
+            sendMessage(input);
+            setInput('');
+          }} disabled={isLoading}>
+            Send
+          </Button>
         </div>
-      </CardContent>
-      
-      <CardFooter className="p-4 border-t shrink-0">
-        <MessageInput 
-          onSendMessage={handleSendMessage} 
-          isLoading={isLoading} 
-          presetMessage={presetMessage}
-        />
-      </CardFooter>
-
-      <ActionConfirmDialog
-        action={pendingAction}
-        isOpen={actionDialogOpen}
-        onClose={() => setActionDialogOpen(false)}
-        onActionResolved={handleActionResolved}
-      />
-    </Card>
+      </div>
+    </div>
   );
 };
 
