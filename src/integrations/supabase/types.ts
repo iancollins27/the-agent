@@ -1260,6 +1260,7 @@ export type Database = {
           address: string
           status: string
           similarity: number
+          project_name: string
         }[]
       }
       sparsevec_out: {
