@@ -90,7 +90,7 @@ export const identifyProject: Tool = {
               address: exactMatches.Address || '',
               project_name: exactMatches.project_name || '',
               status: exactMatches.Project_status || '',
-              company_id: exactMatches.company_id,
+              company_id: exactMatches.company_id || null,
               company_name: exactMatches.companies?.name || ''
             }],
             found: true,
@@ -140,7 +140,7 @@ export const identifyProject: Tool = {
               address: crmMatches.Address || '',
               project_name: crmMatches.project_name || '',
               status: crmMatches.Project_status || '',
-              company_id: crmMatches.company_id,
+              company_id: crmMatches.company_id || null,
               company_name: crmMatches.companies?.name || ''
             }],
             found: true,
@@ -160,13 +160,20 @@ export const identifyProject: Tool = {
         
         // Call our vector search edge function
         console.log("Calling search-projects-by-vector edge function");
+        console.log("Vector search parameters:", {
+          searchEmbedding: "embedding array", 
+          matchThreshold: 0.2,
+          matchCount: 20,
+          companyId: company_id || null
+        });
+        
         const { data: vectorSearchResults, error: vectorFunctionError } = await context.supabase.functions.invoke(
           'search-projects-by-vector',
           {
             body: {
               searchEmbedding: queryEmbedding,
               matchThreshold: 0.2,
-              matchCount: 5,
+              matchCount: 20,
               companyId: company_id || null
             }
           }
@@ -182,14 +189,21 @@ export const identifyProject: Tool = {
           throw new Error("No results returned from vector search function");
         }
         
-        console.log("Vector search edge function results:", JSON.stringify(vectorSearchResults).substring(0, 200));
+        console.log("Vector search edge function results:", JSON.stringify(vectorSearchResults).substring(0, 300) + "...");
+        console.log("Vector search status:", vectorSearchResults.status);
+        console.log("Vector search found:", vectorSearchResults.found);
+        console.log("Vector search count:", vectorSearchResults.count);
+        console.log("Vector search total projects:", vectorSearchResults.totalProjects);
         
         if (vectorSearchResults.status === "success" && vectorSearchResults.projects && vectorSearchResults.projects.length > 0) {
-          console.log(`Found ${vectorSearchResults.projects.length} projects via vector search`);
+          console.log(`Found ${vectorSearchResults.projects.length} projects via vector search from total of ${vectorSearchResults.totalProjects || 'unknown'} projects with vectors`);
           
           // Debug the structure of the results
           vectorSearchResults.projects.forEach((result, i) => {
-            console.log(`Result #${i+1} structure:`, Object.entries(result).map(([k, v]) => `${k}: ${typeof v}`));
+            if (i < 5) {
+              console.log(`Result #${i+1} structure:`, Object.entries(result).map(([k, v]) => `${k}: ${typeof v}`));
+              console.log(`Result #${i+1} content preview:`, JSON.stringify(result).substring(0, 100));
+            }
           });
           
           return {
@@ -197,7 +211,8 @@ export const identifyProject: Tool = {
             projects: vectorSearchResults.projects,
             found: true,
             count: vectorSearchResults.projects.length,
-            message: `Found ${vectorSearchResults.projects.length} project(s) matching "${query}" using semantic search`
+            totalProjects: vectorSearchResults.totalProjects,
+            message: `Found ${vectorSearchResults.projects.length} project(s) matching "${query}" using semantic search (from ${vectorSearchResults.totalProjects} total projects with vectors)`
           };
         }
         
@@ -297,7 +312,7 @@ async function performTraditionalSearch(query: string, company_id: string | unde
 
   // Execute the query
   console.log("Executing traditional search query");
-  const { data: projects, error } = await projectsQuery.limit(5);
+  const { data: projects, error } = await projectsQuery.limit(20);
   
   if (error) {
     console.error("Error searching for projects:", error);
@@ -325,8 +340,10 @@ async function performTraditionalSearch(query: string, company_id: string | unde
   
   // Debug each project
   projects.forEach((p: any, index: number) => {
-    console.log(`Traditional search result #${index + 1}:`, JSON.stringify(p));
-    console.log(`Traditional search result #${index + 1} types:`, Object.entries(p).map(([key, value]) => `${key}: ${typeof value}`));
+    if (index < 5) {
+      console.log(`Traditional search result #${index + 1}:`, JSON.stringify(p).substring(0, 200));
+      console.log(`Traditional search result #${index + 1} types:`, Object.entries(p).map(([key, value]) => `${key}: ${typeof value}`));
+    }
   });
   
   // Ensure the returned object has all necessary fields with proper types
@@ -339,12 +356,15 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       address: String(p.Address || ''),
       project_name: String(p.project_name || ''),
       status: String(p.Project_status || ''),
-      company_id: String(p.company_id || ''),
+      company_id: p.company_id ? String(p.company_id) : null,
       company_name: String(p.companies?.name || '')
     };
     
-    console.log(`DEBUG - Processed traditional result:`, JSON.stringify(result));
-    console.log(`DEBUG - Processed traditional types:`, Object.entries(result).map(([key, value]) => `${key}: ${typeof value}`));
+    if (index < 3) {
+      console.log(`DEBUG - Processed traditional result #${index+1}:`, JSON.stringify(result).substring(0, 200));
+      console.log(`DEBUG - Processed traditional types #${index+1}:`, Object.entries(result).map(([key, value]) => `${key}: ${typeof value}`));
+    }
+    
     return result;
   });
   

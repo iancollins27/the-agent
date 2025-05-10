@@ -22,7 +22,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
     
     // Get request body
-    const { searchEmbedding, matchThreshold = 0.2, matchCount = 5, companyId = null } = await req.json();
+    const { searchEmbedding, matchThreshold = 0.2, matchCount = 20, companyId = null } = await req.json();
     
     if (!searchEmbedding) {
       return new Response(
@@ -38,6 +38,18 @@ serve(async (req) => {
       embeddingSize: Array.isArray(searchEmbedding) ? searchEmbedding.length : 'Not an array'
     });
 
+    // Count total projects with search vectors
+    const { count: totalProjectsWithVectors, error: countError } = await supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: false })
+      .not('search_vector', 'is', null);
+      
+    if (countError) {
+      console.error("Error counting projects with vectors:", countError);
+    } else {
+      console.log(`Total projects with search vectors in database: ${totalProjectsWithVectors}`);
+    }
+
     // Build the query
     let query = supabase
       .from('projects')
@@ -50,7 +62,8 @@ serve(async (req) => {
         companies(name),
         "Address",
         "Project_status",
-        project_name
+        project_name,
+        search_vector
       `)
       .not('search_vector', 'is', null);
     
@@ -80,6 +93,21 @@ serve(async (req) => {
     }
 
     console.log(`Found ${projects.length} projects with search vectors`);
+    console.log(`Project IDs: ${projects.map(p => p.id).join(', ').substring(0, 100)}...`);
+    
+    // Check how many projects actually have usable vectors
+    let validVectorCount = 0;
+    projects.forEach((project, i) => {
+      if (i < 5) {
+        console.log(`Project ${i+1} (${project.id}) search_vector type: ${typeof project.search_vector}`);
+        if (project.search_vector) {
+          console.log(`Project ${i+1} search_vector preview: ${typeof project.search_vector === 'string' ? 
+            project.search_vector.substring(0, 50) : 'non-string type'}`);
+          validVectorCount++;
+        }
+      }
+    });
+    console.log(`Projects with valid vectors: ${validVectorCount} of ${projects.length}`);
 
     // Function to calculate cosine similarity between vectors
     const calculateCosineSimilarity = (vec1, vec2) => {
@@ -115,32 +143,33 @@ serve(async (req) => {
     
     for (const project of projects) {
       try {
-        // Fetch the search_vector for this project
-        const { data: vectorData, error: vectorError } = await supabase
-          .from('projects')
-          .select('search_vector')
-          .eq('id', project.id)
-          .single();
+        // Parse the search_vector if it's a string (PostgreSQL vector format)
+        let projectVector = project.search_vector;
         
-        if (vectorError) {
-          console.error(`Error fetching vector for project ${project.id}:`, vectorError);
-          continue;
-        }
-        
-        if (!vectorData || !vectorData.search_vector) {
-          console.log(`No search vector found for project ${project.id}`);
-          continue;
-        }
-        
-        // Convert PostgreSQL vector format to JS array if needed
-        let projectVector = vectorData.search_vector;
-        if (typeof projectVector === 'string' && projectVector.startsWith('[') && projectVector.endsWith(']')) {
+        if (typeof projectVector === 'string') {
           try {
-            projectVector = JSON.parse(projectVector);
+            // Handle PostgreSQL vector format: '[0.1,0.2,0.3]'
+            if (projectVector.startsWith('[') && projectVector.endsWith(']')) {
+              projectVector = JSON.parse(projectVector);
+            } 
+            // Handle other potential formats
+            else {
+              console.log(`Unusual vector format for project ${project.id}, trying to parse...`);
+              // Try to extract numbers from the string
+              projectVector = projectVector
+                .replace(/[^0-9,.\-]/g, '')
+                .split(',')
+                .map(num => parseFloat(num));
+            }
           } catch (e) {
             console.error(`Failed to parse vector for project ${project.id}:`, e);
             continue;
           }
+        }
+        
+        if (!Array.isArray(projectVector)) {
+          console.error(`Project ${project.id} has invalid vector format: ${typeof projectVector}`);
+          continue;
         }
         
         // Calculate similarity
@@ -187,7 +216,8 @@ serve(async (req) => {
         projects: finalResults,
         found: finalResults.length > 0,
         count: finalResults.length,
-        message: `Found ${finalResults.length} project(s) using vector search`
+        totalProjects: projects.length,
+        message: `Found ${finalResults.length} project(s) using vector search out of ${projects.length} projects with vectors`
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
