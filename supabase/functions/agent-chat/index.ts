@@ -89,7 +89,7 @@ serve(async (req) => {
 
     // Replace system message if it exists, otherwise add it
     const hasSystemMessage = payload.messages.some(msg => msg.role === "system");
-    const messages = hasSystemMessage 
+    let messages = hasSystemMessage 
       ? payload.messages.map(msg => msg.role === "system" ? systemMessage : msg)
       : [systemMessage, ...payload.messages];
 
@@ -102,26 +102,95 @@ serve(async (req) => {
       tools: toolDefinitions // Always set the tools property, even if it's an empty array
     };
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(openAIRequestBody),
-    });
+    let assistantMessage;
+    
+    // Loop until we get a response with no tool calls
+    while (true) {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(openAIRequestBody),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`OpenAI API error: ${JSON.stringify(error)}`);
+      }
+
+      const data = await response.json();
+      assistantMessage = data.choices[0].message;
+      
+      // If there are no tool calls, we're done
+      if (!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0) {
+        break;
+      }
+      
+      console.log(`Processing ${assistantMessage.tool_calls.length} tool calls`);
+      
+      // Add the assistant message with tool calls to the conversation
+      messages.push(assistantMessage);
+      
+      // Process each tool call
+      for (const toolCall of assistantMessage.tool_calls) {
+        const { name, arguments: argsJson } = toolCall.function;
+        const args = JSON.parse(argsJson);
+        
+        console.log(`Executing tool ${name} with args: ${argsJson}`);
+        
+        try {
+          // Import and execute the tool
+          const toolModule = await import(`./tools/${name}/index.ts`);
+          const toolFunction = toolModule[name];
+          
+          if (!toolFunction) {
+            throw new Error(`Tool function ${name} not found`);
+          }
+          
+          const toolResult = await toolFunction.execute(args, {
+            supabase: null, // This should be replaced with a proper supabase client
+            userProfile: null,
+            companyId: payload.projectData?.company_id 
+          });
+          
+          // Add the tool response to messages
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolResult)
+          });
+          
+          console.log(`Tool ${name} execution completed`);
+        } catch (toolError) {
+          console.error(`Error executing tool ${name}:`, toolError);
+          
+          // Add error response to messages
+          messages.push({
+            role: "tool",
+            tool_call_id: toolCall.id,
+            content: JSON.stringify({
+              status: "error",
+              error: toolError.message || "Unknown error",
+              message: `Error executing tool ${name}: ${toolError.message || "Unknown error"}`
+            })
+          });
+        }
+      }
+      
+      // Update OpenAI request body with new messages
+      openAIRequestBody.messages = messages;
     }
 
-    const data = await response.json();
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify({ 
+      choices: [{ message: assistantMessage }]
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error) {
+    console.error("Error in agent-chat function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }

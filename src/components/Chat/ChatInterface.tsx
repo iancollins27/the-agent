@@ -29,6 +29,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [placeholderId, setPlaceholderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (presetMessage) {
@@ -90,6 +91,18 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       // Get current session for authentication
       const { data: { session } } = await supabase.auth.getSession();
       
+      // Create a placeholder message for the AI response
+      const aiPlaceholderId = uuidv4();
+      const aiPlaceholder: ChatMessage = {
+        id: aiPlaceholderId,
+        role: 'assistant',
+        content: "I'm thinking...",
+        timestamp: new Date().toISOString(),
+      };
+      
+      setMessages([...updatedMessages, aiPlaceholder]);
+      setPlaceholderId(aiPlaceholderId);
+      
       // Send the request to our agent-chat edge function
       const response = await fetch(
         'https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/agent-chat',
@@ -124,18 +137,15 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       const displayContent = hasTool && !content 
         ? "I'm looking up some information for you..."
         : content;
-        
-      // Create the AI message object
-      const aiMessage: ChatMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: displayContent,
-        timestamp: new Date().toISOString(),
-        tool_calls: assistantMessage.tool_calls,
-      };
       
-      // Add the AI message to the messages array
-      setMessages([...updatedMessages, aiMessage]);
+      // Update the placeholder message with the final content
+      setMessages(prev => prev.map(m => 
+        m.id === aiPlaceholderId ? {
+          ...m,
+          content: displayContent,
+          tool_calls: assistantMessage.tool_calls,
+        } : m
+      ));
       
     } catch (error) {
       console.error('Error sending message:', error);
@@ -144,6 +154,12 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
         title: 'Error',
         description: 'Failed to get a response. Please try again.',
       });
+      
+      // Remove the placeholder message if there was an error
+      if (placeholderId) {
+        setMessages(prev => prev.filter(m => m.id !== placeholderId));
+        setPlaceholderId(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +195,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
             )}
           </div>
         ))}
-        {isLoading && (
+        {isLoading && !placeholderId && (
           <div className="mb-4 flex items-start">
             <Avatar className="mr-3 h-8 w-8">
               <AvatarImage src="/icons/workflow-logo.png" alt="AI Assistant" />
