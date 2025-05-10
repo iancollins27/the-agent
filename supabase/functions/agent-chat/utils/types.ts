@@ -5,11 +5,11 @@ export interface OpenAIEmbeddingParams {
 }
 
 export interface VectorSearchResult {
-  id: uuid;
+  id: string;
   crm_id: string;
   summary: string;
   next_step: string;
-  company_id: uuid;
+  company_id: string;
   company_name: string;
   address: string;
   status: string;
