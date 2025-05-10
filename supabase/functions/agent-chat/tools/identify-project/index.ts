@@ -72,6 +72,7 @@ export const identifyProject: Tool = {
         if (exactError) {
           console.error("Error in exact ID search:", exactError);
         } else if (exactMatches) {
+          console.log("Exact match found by ID, data:", JSON.stringify(exactMatches));
           return {
             status: "success",
             projects: [{
@@ -114,6 +115,7 @@ export const identifyProject: Tool = {
         if (crmError) {
           console.error("Error in CRM ID search:", crmError);
         } else if (crmMatches) {
+          console.log("Exact match found by CRM ID, data:", JSON.stringify(crmMatches));
           return {
             status: "success",
             projects: [{
@@ -140,9 +142,20 @@ export const identifyProject: Tool = {
       try {
         // Generate embedding for the query
         const queryEmbedding = await generateOpenAIEmbedding(query);
+        console.log("Generated embedding for query, first 5 values:", queryEmbedding.slice(0, 5));
+        
         const formattedEmbedding = formatEmbeddingForDB(queryEmbedding);
         
+        // Debug: Log the SQL query parameters before execution
+        console.log(`Vector search params: threshold=0.2, count=5, company_id=${company_id || 'null'}`);
+        
         // Perform vector search
+        console.log("Executing vector search with RPC call to 'search_projects_by_vector'");
+        
+        // Log the SQL function signature and expected return types
+        console.log("SQL Function: search_projects_by_vector(search_embedding vector, match_threshold double precision, match_count integer, p_company_id uuid)");
+        console.log("Expected return columns: id, crm_id, summary, next_step, company_id, company_name, address, status, similarity, project_name");
+        
         const { data: vectorResults, error: vectorError } = await context.supabase.rpc(
           'search_projects_by_vector',
           {
@@ -155,13 +168,23 @@ export const identifyProject: Tool = {
         
         if (vectorError) {
           console.error("Error in vector search:", vectorError);
+          console.error("Full error details:", JSON.stringify(vectorError));
           // Fall back to traditional search if vector search fails
+          console.log("Vector search failed, falling back to traditional search");
           return await performTraditionalSearch(query, company_id, context);
         }
         
+        console.log("Vector search results received:", vectorResults ? vectorResults.length : 0);
         if (vectorResults && vectorResults.length > 0) {
+          // Debug each result from vector search
+          vectorResults.forEach((result: any, index: number) => {
+            console.log(`Vector result #${index + 1}:`, JSON.stringify(result));
+          });
+          
           // Get complete project data for each result to ensure we have all the fields we need
-          const projectIds = vectorResults.map((p: VectorSearchResult) => p.id);
+          const projectIds = vectorResults.map((p: any) => p.id);
+          console.log("Fetching full project details for IDs:", projectIds);
+          
           const { data: fullProjects, error: projectsError } = await context.supabase
             .from('projects')
             .select(`
@@ -180,9 +203,17 @@ export const identifyProject: Tool = {
           if (projectsError) {
             console.error("Error getting full project details:", projectsError);
           } else if (fullProjects && fullProjects.length > 0) {
+            // Debug full project details
+            console.log(`Retrieved ${fullProjects.length} full project details`);
+            fullProjects.forEach((project: any, index: number) => {
+              console.log(`Full project #${index + 1}:`, JSON.stringify(project));
+            });
+            
             // Merge the similarity scores with the full project data
             const projectsWithSimilarity = fullProjects.map(project => {
-              const vectorResult = vectorResults.find((v: VectorSearchResult) => v.id === project.id);
+              const vectorResult = vectorResults.find((v: any) => v.id === project.id);
+              console.log(`Mapping project ${project.id} with similarity ${vectorResult?.similarity || 0}`);
+              
               return {
                 id: project.id,
                 crm_id: project.crm_id,
@@ -200,6 +231,8 @@ export const identifyProject: Tool = {
             // Sort by similarity, highest first
             projectsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
             
+            console.log("Final processed results:", JSON.stringify(projectsWithSimilarity));
+            
             return {
               status: "success",
               projects: projectsWithSimilarity,
@@ -210,23 +243,39 @@ export const identifyProject: Tool = {
           }
           
           // Return vector search results directly if we couldn't get full project details
+          console.log("Using direct vector results as fallback");
+          
+          // Debug the actual structure of each vector result
+          vectorResults.forEach((result: any, index: number) => {
+            console.log(`Vector result #${index + 1} keys:`, Object.keys(result));
+            console.log(`Vector result #${index + 1} types:`, Object.entries(result).map(([k, v]) => `${k}: ${typeof v}`));
+          });
+          
+          const mappedResults = vectorResults.map((p: any) => {
+            // Create a clean object with explicit type mapping
+            const mappedResult = {
+              id: String(p.id),
+              crm_id: String(p.crm_id || ''),
+              summary: String(p.summary || ''),
+              next_step: String(p.next_step || ''),
+              address: String(p.address || ''),
+              project_name: String(p.project_name || ''),
+              status: String(p.status || ''),
+              company_id: String(p.company_id || ''),
+              company_name: String(p.company_name || ''),
+              similarity: Number(p.similarity || 0)
+            };
+            
+            console.log(`Mapped vector result:`, JSON.stringify(mappedResult));
+            return mappedResult;
+          });
+          
           return {
             status: "success",
-            projects: vectorResults.map((p: VectorSearchResult) => ({
-              id: p.id,
-              crm_id: p.crm_id,
-              summary: p.summary,
-              next_step: p.next_step,
-              address: p.address,
-              project_name: p.project_name,
-              status: p.status,
-              company_id: p.company_id,
-              company_name: p.company_name,
-              similarity: p.similarity
-            })),
+            projects: mappedResults,
             found: true,
-            count: vectorResults.length,
-            message: `Found ${vectorResults.length} project(s) matching "${query}" using semantic search`
+            count: mappedResults.length,
+            message: `Found ${mappedResults.length} project(s) matching "${query}" using semantic search`
           };
         }
         
@@ -237,6 +286,7 @@ export const identifyProject: Tool = {
       } catch (embeddingError) {
         console.error("Error generating embedding or performing vector search:", embeddingError);
         // Fall back to traditional search if there's an error with vector search
+        console.log("Error in vector search process, falling back to traditional search");
         return await performTraditionalSearch(query, company_id, context);
       }
     } catch (error) {
@@ -272,6 +322,8 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     .split(/\s+/)
     .filter(t => t.length > 3 && !stopWords.has(t));
 
+  console.log("Search terms after filtering:", searchTerms);
+
   let projectsQuery = context.supabase
     .from('projects')
     .select(`
@@ -288,23 +340,30 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     
   // Apply company filter if provided
   if (company_id) {
+    console.log(`Filtering by company_id: ${company_id}`);
     projectsQuery = projectsQuery.eq('company_id', company_id);
   }
     
   // Fix: Instead of using comma-separated OR conditions which can break with addresses,
   // we'll use multiple .or() filters chained together
+  console.log(`Adding OR condition: Address.ilike.%${query}%`);
   projectsQuery = projectsQuery.or(`Address.ilike.%${query}%`);
   
   // Add additional OR conditions
+  console.log(`Adding OR condition: summary.ilike.%${query}%`);
   projectsQuery = projectsQuery.or(`summary.ilike.%${query}%`);
+  
+  console.log(`Adding OR condition: project_name.ilike.%${query}%`);
   projectsQuery = projectsQuery.or(`project_name.ilike.%${query}%`);
   
   // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal
   if (!/^\d+$/.test(query.trim())) {
+    console.log(`Adding OR condition: crm_id.ilike.%${query}%`);
     projectsQuery = projectsQuery.or(`crm_id.ilike.%${query}%`);
   }
 
   // Execute the query
+  console.log("Executing traditional search query");
   const { data: projects, error } = await projectsQuery.limit(5);
   
   if (error) {
@@ -315,6 +374,8 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     };
   }
   
+  console.log(`Traditional search results: ${projects ? projects.length : 0} projects found`);
+  
   if (!projects || projects.length === 0) {
     return {
       status: "success",
@@ -324,10 +385,14 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     };
   }
   
+  // Debug each project
+  projects.forEach((p: any, index: number) => {
+    console.log(`Traditional search result #${index + 1}:`, JSON.stringify(p));
+  });
+  
   // Ensure the returned object has all necessary fields with proper types
-  return {
-    status: "success",
-    projects: projects.map(p => ({
+  const processedResults = projects.map((p: any) => {
+    const result = {
       id: p.id,
       crm_id: p.crm_id,
       summary: p.summary,
@@ -337,9 +402,17 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       status: p.Project_status,
       company_id: p.company_id,
       company_name: p.companies?.name
-    })),
+    };
+    
+    console.log(`Processed traditional result:`, JSON.stringify(result));
+    return result;
+  });
+  
+  return {
+    status: "success",
+    projects: processedResults,
     found: true,
-    count: projects.length,
-    message: `Found ${projects.length} project(s) matching "${query}" using traditional search`
+    count: processedResults.length,
+    message: `Found ${processedResults.length} project(s) matching "${query}" using traditional search`
   };
 }
