@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
     
     try {
       // Create a new message for the user input
-      const userMessage = {
+      const userMessage: ChatMessage = {
         id: uuidv4(),
         role: 'user',
         content: messageText,
@@ -82,6 +83,9 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       // Format messages for the API call
       const messagesToSend = updatedMessages.map(({ role, content }) => ({ role, content }));
       
+      // Get current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
       // Send the request to our agent-chat edge function
       const response = await fetch(
         'https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/agent-chat',
@@ -89,7 +93,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${supabase.auth.session()?.access_token}`,
+            Authorization: `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
             messages: messagesToSend,
@@ -108,7 +112,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       const data = await response.json();
       
       // Process the AI message
-      const aiMessage = {
+      const aiMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
         content: data.choices[0].message.content,
