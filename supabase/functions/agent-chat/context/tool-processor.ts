@@ -55,36 +55,26 @@ export async function processToolCalls(
         
         // Check for multiple matches
         if (toolResult.projects.length > 1) {
-          // Find how many projects exceed the similarity threshold
-          const goodMatches = toolResult.projects.filter((p: any) => 
-            p.similarity && p.similarity >= SIMILARITY_THRESHOLD
-          );
+          // Always treat multiple matches as requiring clarification,
+          // regardless of similarity scores
+          const projectOptions = toolResult.projects.map((p: any, index: number) => {
+            const details = [
+              `#${index + 1}:`,
+              p.address ? `Address: ${p.address}` : null,
+              p.project_name ? `Name: ${p.project_name}` : null,
+              p.crm_id ? `CRM ID: ${p.crm_id}` : null,
+              p.status ? `Status: ${p.status}` : null
+            ].filter(Boolean).join(' ');
+            
+            return details;
+          }).join('\n');
           
-          // If we have only one good match by similarity, use that
-          if (goodMatches.length === 1) {
-            projectData = goodMatches[0];
-            console.log('Found one high-similarity project match:', projectData);
-          } else {
-            // Multiple matches - format response for user to choose
-            const projectOptions = toolResult.projects.map((p: any, index: number) => {
-              const details = [
-                `#${index + 1}:`,
-                p.address ? `Address: ${p.address}` : null,
-                p.project_name ? `Name: ${p.project_name}` : null,
-                p.crm_id ? `CRM ID: ${p.crm_id}` : null,
-                p.status ? `Status: ${p.status}` : null
-              ].filter(Boolean).join(' ');
-              
-              return details;
-            }).join('\n');
-            
-            // Let's customize the tool result to indicate multiple matches were found
-            toolResult.multipleMatches = true;
-            toolResult.message = `Found ${toolResult.projects.length} projects matching your query. Please specify which one you're referring to:\n\n${projectOptions}`;
-            
-            // Don't set projectData yet, as we need user clarification
-            console.log('Multiple project matches found, awaiting user clarification');
-          }
+          // Let's customize the tool result to indicate multiple matches were found
+          toolResult.multipleMatches = true;
+          toolResult.message = `Found ${toolResult.projects.length} projects matching your query. Please specify which one you're referring to:\n\n${projectOptions}`;
+          
+          // Don't set projectData yet, as we need user clarification
+          console.log('Multiple project matches found, awaiting user clarification');
         } else {
           // Just one project found, use it
           projectData = toolResult.projects[0];
