@@ -50,174 +50,71 @@ serve(async (req) => {
       console.log(`Total projects with search vectors in database: ${totalProjectsWithVectors}`);
     }
 
-    // Build the query
-    let query = supabase
-      .from('projects')
-      .select(`
-        id,
-        crm_id,
-        summary,
-        next_step,
-        company_id,
-        companies(name),
-        "Address",
-        "Project_status",
-        project_name,
-        search_vector
-      `)
-      .not('search_vector', 'is', null);
-    
-    // Add company filter if provided
-    if (companyId) {
-      console.log(`Filtering by company_id: ${companyId}`);
-      query = query.eq('company_id', companyId);
-    }
-    
-    // Execute the query to get projects with search vectors
-    const { data: projects, error } = await query.limit(matchCount);
+    // Directly call PostgreSQL's vector search using the RPC function
+    const { data: projectsWithScores, error } = await supabase.rpc(
+      'search_projects_by_vector',
+      {
+        search_embedding: searchEmbedding,
+        match_threshold: matchThreshold,
+        match_count: matchCount,
+        p_company_id: companyId
+      }
+    );
     
     if (error) {
-      console.error("Error fetching projects:", error);
+      console.error("Error executing vector search:", error);
       return new Response(
         JSON.stringify({ error: `Database error: ${error.message}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!projects || projects.length === 0) {
-      console.log("No projects found with search vectors");
+    if (!projectsWithScores || projectsWithScores.length === 0) {
+      console.log("No projects found with vector similarity above threshold");
       return new Response(
-        JSON.stringify({ projects: [], found: false, message: "No projects found with search vectors" }),
+        JSON.stringify({ 
+          projects: [], 
+          found: false, 
+          message: "No projects found with sufficient similarity" 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Found ${projects.length} projects with search vectors`);
-    console.log(`Project IDs: ${projects.map(p => p.id).join(', ').substring(0, 100)}...`);
+    console.log(`Found ${projectsWithScores.length} projects with vector similarity`);
     
-    // Check how many projects actually have usable vectors
-    let validVectorCount = 0;
-    projects.forEach((project, i) => {
-      if (i < 5) {
-        console.log(`Project ${i+1} (${project.id}) search_vector type: ${typeof project.search_vector}`);
-        if (project.search_vector) {
-          console.log(`Project ${i+1} search_vector preview: ${typeof project.search_vector === 'string' ? 
-            project.search_vector.substring(0, 50) : 'non-string type'}`);
-          validVectorCount++;
-        }
-      }
-    });
-    console.log(`Projects with valid vectors: ${validVectorCount} of ${projects.length}`);
-
-    // Function to calculate cosine similarity between vectors
-    const calculateCosineSimilarity = (vec1, vec2) => {
-      if (!Array.isArray(vec1) || !Array.isArray(vec2) || vec1.length !== vec2.length) {
-        console.error("Invalid vectors for similarity calculation", { 
-          vec1Length: Array.isArray(vec1) ? vec1.length : typeof vec1,
-          vec2Length: Array.isArray(vec2) ? vec2.length : typeof vec2
-        });
-        return 0;
-      }
-      
-      let dotProduct = 0;
-      let mag1 = 0;
-      let mag2 = 0;
-      
-      for (let i = 0; i < vec1.length; i++) {
-        dotProduct += vec1[i] * vec2[i];
-        mag1 += vec1[i] * vec1[i];
-        mag2 += vec2[i] * vec2[i];
-      }
-      
-      mag1 = Math.sqrt(mag1);
-      mag2 = Math.sqrt(mag2);
-      
-      if (mag1 === 0 || mag2 === 0) return 0;
-      
-      const similarity = dotProduct / (mag1 * mag2);
-      return similarity;
-    };
-
-    // Calculate similarity scores for each project
-    const projectsWithScores = [];
+    // Format the results to match the expected structure
+    const formattedResults = projectsWithScores.map(project => ({
+      id: project.id,
+      crm_id: project.crm_id || '',
+      summary: project.summary || '',
+      next_step: project.next_step || '',
+      company_id: project.company_id,
+      company_name: project.company_name || '',
+      address: project.address || '',
+      status: project.status || '',
+      project_name: project.project_name || '',
+      similarity: project.similarity
+    }));
     
-    for (const project of projects) {
-      try {
-        // Parse the search_vector if it's a string (PostgreSQL vector format)
-        let projectVector = project.search_vector;
-        
-        if (typeof projectVector === 'string') {
-          try {
-            // Handle PostgreSQL vector format: '[0.1,0.2,0.3]'
-            if (projectVector.startsWith('[') && projectVector.endsWith(']')) {
-              projectVector = JSON.parse(projectVector);
-            } 
-            // Handle other potential formats
-            else {
-              console.log(`Unusual vector format for project ${project.id}, trying to parse...`);
-              // Try to extract numbers from the string
-              projectVector = projectVector
-                .replace(/[^0-9,.\-]/g, '')
-                .split(',')
-                .map(num => parseFloat(num));
-            }
-          } catch (e) {
-            console.error(`Failed to parse vector for project ${project.id}:`, e);
-            continue;
-          }
-        }
-        
-        if (!Array.isArray(projectVector)) {
-          console.error(`Project ${project.id} has invalid vector format: ${typeof projectVector}`);
-          continue;
-        }
-        
-        // Calculate similarity
-        const similarity = calculateCosineSimilarity(searchEmbedding, projectVector);
-        console.log(`Project ${project.id} similarity score: ${similarity}`);
-        
-        // Only include projects above the threshold
-        if (similarity >= matchThreshold) {
-          projectsWithScores.push({
-            id: project.id,
-            crm_id: project.crm_id || '',
-            summary: project.summary || '',
-            next_step: project.next_step || '',
-            company_id: project.company_id,
-            company_name: project.companies?.name || '',
-            address: project.Address || '',
-            status: project.Project_status || '',
-            project_name: project.project_name || '',
-            similarity: similarity
-          });
-        }
-      } catch (projectError) {
-        console.error(`Error processing project ${project.id}:`, projectError);
-      }
-    }
-    
-    // Sort by similarity (highest first)
-    projectsWithScores.sort((a, b) => b.similarity - a.similarity);
-    
-    // Limit results
-    const finalResults = projectsWithScores.slice(0, matchCount);
-    
-    console.log(`Returning ${finalResults.length} projects with similarity scores`);
-    
-    // Log the structure of the first result for debugging
-    if (finalResults.length > 0) {
+    // Log a sample of the first result
+    if (formattedResults.length > 0) {
       console.log("Sample result structure:", 
-        Object.entries(finalResults[0]).map(([key, value]) => `${key}: ${typeof value}`));
+        Object.entries(formattedResults[0]).map(([key, value]) => `${key}: ${typeof value}`));
+      
+      // Log some similarity scores for debugging
+      formattedResults.slice(0, 5).forEach((project, idx) => {
+        console.log(`Project ${idx+1} (${project.id}) similarity score: ${project.similarity}`);
+      });
     }
     
     return new Response(
       JSON.stringify({
         status: "success",
-        projects: finalResults,
-        found: finalResults.length > 0,
-        count: finalResults.length,
-        totalProjects: projects.length,
-        message: `Found ${finalResults.length} project(s) using vector search out of ${projects.length} projects with vectors`
+        projects: formattedResults,
+        found: formattedResults.length > 0,
+        count: formattedResults.length,
+        message: `Found ${formattedResults.length} project(s) using vector search`
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

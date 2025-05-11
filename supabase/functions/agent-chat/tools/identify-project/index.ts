@@ -1,11 +1,10 @@
-
 /**
  * Tool to identify projects based on user input (ID, CRM ID, or description)
  * Enhanced with semantic vector search via edge function
  */
 
 import { Tool, ToolResult } from '../types.ts';
-import { generateOpenAIEmbedding, formatEmbeddingForDB } from '../../utils/embeddingUtils.ts';
+import { generateOpenAIEmbedding } from '../../utils/embeddingUtils.ts';
 import { VectorSearchResult } from '../../utils/types.ts';
 
 export const identifyProject: Tool = {
@@ -73,12 +72,6 @@ export const identifyProject: Tool = {
           console.error("Error in exact ID search:", exactError);
         } else if (exactMatches) {
           console.log("Exact match found by ID, data:", JSON.stringify(exactMatches));
-          console.log("DEBUG - ID match types:", {
-            id_type: typeof exactMatches.id,
-            id_value: exactMatches.id,
-            company_id_type: typeof exactMatches.company_id,
-            company_id_value: exactMatches.company_id
-          });
           
           return {
             status: "success",
@@ -123,12 +116,6 @@ export const identifyProject: Tool = {
           console.error("Error in CRM ID search:", crmError);
         } else if (crmMatches) {
           console.log("Exact match found by CRM ID, data:", JSON.stringify(crmMatches));
-          console.log("DEBUG - CRM match types:", {
-            id_type: typeof crmMatches.id,
-            id_value: crmMatches.id,
-            company_id_type: typeof crmMatches.company_id,
-            company_id_value: crmMatches.company_id
-          });
           
           return {
             status: "success",
@@ -161,7 +148,7 @@ export const identifyProject: Tool = {
         // Call our vector search edge function
         console.log("Calling search-projects-by-vector edge function");
         console.log("Vector search parameters:", {
-          searchEmbedding: "embedding array", 
+          searchEmbedding: "embedding array", // don't log the full array
           matchThreshold: 0.2,
           matchCount: 20,
           companyId: company_id || null
@@ -193,10 +180,9 @@ export const identifyProject: Tool = {
         console.log("Vector search status:", vectorSearchResults.status);
         console.log("Vector search found:", vectorSearchResults.found);
         console.log("Vector search count:", vectorSearchResults.count);
-        console.log("Vector search total projects:", vectorSearchResults.totalProjects);
         
         if (vectorSearchResults.status === "success" && vectorSearchResults.projects && vectorSearchResults.projects.length > 0) {
-          console.log(`Found ${vectorSearchResults.projects.length} projects via vector search from total of ${vectorSearchResults.totalProjects || 'unknown'} projects with vectors`);
+          console.log(`Found ${vectorSearchResults.projects.length} projects via vector search`);
           
           // Debug the structure of the results
           vectorSearchResults.projects.forEach((result, i) => {
@@ -211,8 +197,7 @@ export const identifyProject: Tool = {
             projects: vectorSearchResults.projects,
             found: true,
             count: vectorSearchResults.projects.length,
-            totalProjects: vectorSearchResults.totalProjects,
-            message: `Found ${vectorSearchResults.projects.length} project(s) matching "${query}" using semantic search (from ${vectorSearchResults.totalProjects} total projects with vectors)`
+            message: `Found ${vectorSearchResults.projects.length} project(s) matching "${query}" using semantic search`
           };
         }
         
