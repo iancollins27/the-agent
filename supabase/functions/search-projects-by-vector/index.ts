@@ -51,7 +51,7 @@ serve(async (req) => {
     }
 
     // Call the SQL function using RPC
-    const { data: projectsWithScores, error } = await supabase.rpc(
+    const { data: addressesWithScores, error } = await supabase.rpc(
       'search_projects_by_vector',
       {
         search_embedding: searchEmbedding,
@@ -69,7 +69,7 @@ serve(async (req) => {
       );
     }
 
-    if (!projectsWithScores || projectsWithScores.length === 0) {
+    if (!addressesWithScores || addressesWithScores.length === 0) {
       console.log("No projects found with vector similarity above threshold");
       return new Response(
         JSON.stringify({ 
@@ -81,27 +81,18 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Found ${projectsWithScores.length} projects with vector similarity`);
+    console.log(`Found ${addressesWithScores.length} projects with vector similarity`);
     
     // Log the raw structure of the first result to debug type issues
-    if (projectsWithScores.length > 0) {
+    if (addressesWithScores.length > 0) {
       console.log("Sample raw result from database:", 
-        Object.entries(projectsWithScores[0]).map(([key, value]) => `${key}: ${typeof value} (${value})`));
+        Object.entries(addressesWithScores[0]).map(([key, value]) => `${key}: ${typeof value} (${value})`));
     }
     
-    // Format the results to match the expected structure - ensuring all values are correctly typed
-    const formattedResults = projectsWithScores.map(project => ({
-      id: project.id,
-      crm_id: project.crm_id || '',
-      summary: project.summary || '',
-      next_step: project.next_step || '',
-      company_id: project.company_id,
-      company_name: project.company_name || '',
-      address: project.address || '',
-      status: project.status || '',
-      project_name: project.project_name || '',
-      project_track: project.project_track,
-      similarity: project.similarity
+    // Format the results - just address and similarity now
+    const formattedResults = addressesWithScores.map(item => ({
+      address: item.address || '',
+      similarity: item.similarity
     }));
     
     // Log a sample of the first result
@@ -110,8 +101,8 @@ serve(async (req) => {
         Object.entries(formattedResults[0]).map(([key, value]) => `${key}: ${typeof value}`));
       
       // Log some similarity scores for debugging
-      formattedResults.slice(0, 5).forEach((project, idx) => {
-        console.log(`Project ${idx+1} (${project.id}) similarity score: ${project.similarity}`);
+      formattedResults.slice(0, 5).forEach((item, idx) => {
+        console.log(`Project ${idx+1} (${item.address}) similarity score: ${item.similarity}`);
       });
     }
     

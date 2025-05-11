@@ -189,19 +189,66 @@ export const identifyProject: Tool = {
         if (vectorSearchResults.status === "success" && vectorSearchResults.projects && vectorSearchResults.projects.length > 0) {
           console.log(`Found ${vectorSearchResults.projects.length} projects via vector search`);
           
-          // Log the first few results to help with troubleshooting
-          vectorSearchResults.projects.slice(0, 3).forEach((result, i) => {
-            console.log(`Result #${i+1} structure:`, Object.keys(result).join(", "));
-            console.log(`Result #${i+1} types:`, Object.entries(result).map(([k, v]) => `${k}: ${typeof v}`).join(", "));
-            console.log(`Result #${i+1} preview:`, JSON.stringify(result).substring(0, 100) + "...");
-          });
+          // Now we need to fetch the full project details for these addresses
+          if (vectorSearchResults.projects.length > 0) {
+            // Extract the addresses from the vector search results
+            const addresses = vectorSearchResults.projects.map(p => p.address).filter(a => a);
+            
+            if (addresses.length > 0) {
+              // Fetch full project details for these addresses
+              const { data: projectDetails, error: projectsError } = await context.supabase
+                .from('projects')
+                .select(`
+                  id, 
+                  crm_id, 
+                  summary, 
+                  next_step,
+                  company_id,
+                  companies(name),
+                  Address,
+                  project_name,
+                  project_track,
+                  Project_status
+                `)
+                .in('Address', addresses);
+                
+              if (projectsError) {
+                console.error("Error fetching project details by address:", projectsError);
+              } else if (projectDetails && projectDetails.length > 0) {
+                console.log(`Found ${projectDetails.length} projects by address`);
+                
+                // Map the project details to the return format
+                const projects = projectDetails.map(p => ({
+                  id: p.id,
+                  crm_id: p.crm_id || '',
+                  summary: p.summary || '',
+                  next_step: p.next_step || '',
+                  address: p.Address || '',
+                  project_name: p.project_name || '',
+                  status: p.Project_status || '',
+                  company_id: p.company_id || null,
+                  company_name: p.companies?.name || '',
+                  project_track: p.project_track || null
+                }));
+                
+                return {
+                  status: "success",
+                  projects: projects,
+                  found: true,
+                  count: projects.length,
+                  message: `Found ${projects.length} project(s) matching "${query}" using semantic search`
+                };
+              }
+            }
+          }
           
+          // If we couldn't get full project details, just return the addresses
           return {
             status: "success",
             projects: vectorSearchResults.projects,
             found: true,
             count: vectorSearchResults.projects.length,
-            message: `Found ${vectorSearchResults.projects.length} project(s) matching "${query}" using semantic search`
+            message: `Found ${vectorSearchResults.projects.length} project addresses matching "${query}" using semantic search`
           };
         }
         
