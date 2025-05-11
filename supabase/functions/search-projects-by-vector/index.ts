@@ -50,7 +50,7 @@ serve(async (req) => {
       console.log(`Total projects with search vectors in database: ${totalProjectsWithVectors}`);
     }
 
-    // Directly call PostgreSQL's vector search using the RPC function
+    // Call the SQL function using RPC
     const { data: projectsWithScores, error } = await supabase.rpc(
       'search_projects_by_vector',
       {
@@ -64,7 +64,7 @@ serve(async (req) => {
     if (error) {
       console.error("Error executing vector search:", error);
       return new Response(
-        JSON.stringify({ error: `Database error: ${error.message}` }),
+        JSON.stringify({ error: `Database error: ${error.message}`, details: error }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -83,7 +83,13 @@ serve(async (req) => {
 
     console.log(`Found ${projectsWithScores.length} projects with vector similarity`);
     
-    // Format the results to match the expected structure
+    // Log the raw structure of the first result to debug type issues
+    if (projectsWithScores.length > 0) {
+      console.log("Sample raw result from database:", 
+        Object.entries(projectsWithScores[0]).map(([key, value]) => `${key}: ${typeof value} (${value})`));
+    }
+    
+    // Format the results to match the expected structure - ensuring all values are correctly typed
     const formattedResults = projectsWithScores.map(project => ({
       id: project.id,
       crm_id: project.crm_id || '',
@@ -94,12 +100,13 @@ serve(async (req) => {
       address: project.address || '',
       status: project.status || '',
       project_name: project.project_name || '',
+      project_track: project.project_track,
       similarity: project.similarity
     }));
     
     // Log a sample of the first result
     if (formattedResults.length > 0) {
-      console.log("Sample result structure:", 
+      console.log("Sample formatted result structure:", 
         Object.entries(formattedResults[0]).map(([key, value]) => `${key}: ${typeof value}`));
       
       // Log some similarity scores for debugging
@@ -121,7 +128,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in search-projects-by-vector function:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "An unexpected error occurred" }),
+      JSON.stringify({ error: error.message || "An unexpected error occurred", stack: error.stack }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -15,6 +15,7 @@ export interface VectorSearchResult {
   status: string;
   similarity: number;
   project_name: string;
+  project_track: string; // This matches the UUID returned from the database but as a string
 }
 
 // Add a type definition for UUID to make debugging clearer

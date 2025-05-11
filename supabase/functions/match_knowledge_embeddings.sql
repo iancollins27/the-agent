@@ -1,4 +1,5 @@
 
+
 -- This file is kept for reference only. The actual function is defined in the database directly.
 
 CREATE OR REPLACE FUNCTION search_projects_by_vector(
@@ -17,7 +18,8 @@ RETURNS TABLE(
   address text, 
   status text, 
   similarity double precision,
-  project_name text
+  project_name text,
+  project_track uuid
 )
 LANGUAGE plpgsql
 AS $$
@@ -33,7 +35,8 @@ BEGIN
     p."Address" as address,
     p."Project_status" as status,
     1 - (p.search_vector <=> search_embedding) AS similarity,
-    p.project_name
+    p.project_name,
+    p.project_track
   FROM
     projects p
   LEFT JOIN
@@ -41,8 +44,10 @@ BEGIN
   WHERE
     p.search_vector IS NOT NULL
     AND (p_company_id IS NULL OR p.company_id = p_company_id)
+    AND (1 - (p.search_vector <=> search_embedding)) > match_threshold
   ORDER BY
     p.search_vector <=> search_embedding
   LIMIT match_count;
 END;
 $$;
+

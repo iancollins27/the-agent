@@ -1,3 +1,4 @@
+
 /**
  * Tool to identify projects based on user input (ID, CRM ID, or description)
  * Enhanced with semantic vector search via edge function
@@ -63,6 +64,7 @@ export const identifyProject: Tool = {
             companies(name),
             Address,
             project_name,
+            project_track,
             Project_status
           `)
           .eq('id', query)
@@ -84,7 +86,8 @@ export const identifyProject: Tool = {
               project_name: exactMatches.project_name || '',
               status: exactMatches.Project_status || '',
               company_id: exactMatches.company_id || null,
-              company_name: exactMatches.companies?.name || ''
+              company_name: exactMatches.companies?.name || '',
+              project_track: exactMatches.project_track || null
             }],
             found: true,
             count: 1,
@@ -107,6 +110,7 @@ export const identifyProject: Tool = {
             companies(name),
             Address,
             project_name,
+            project_track,
             Project_status
           `)
           .eq('crm_id', query)
@@ -128,7 +132,8 @@ export const identifyProject: Tool = {
               project_name: crmMatches.project_name || '',
               status: crmMatches.Project_status || '',
               company_id: crmMatches.company_id || null,
-              company_name: crmMatches.companies?.name || ''
+              company_name: crmMatches.companies?.name || '',
+              project_track: crmMatches.project_track || null
             }],
             found: true,
             count: 1,
@@ -184,12 +189,11 @@ export const identifyProject: Tool = {
         if (vectorSearchResults.status === "success" && vectorSearchResults.projects && vectorSearchResults.projects.length > 0) {
           console.log(`Found ${vectorSearchResults.projects.length} projects via vector search`);
           
-          // Debug the structure of the results
-          vectorSearchResults.projects.forEach((result, i) => {
-            if (i < 5) {
-              console.log(`Result #${i+1} structure:`, Object.entries(result).map(([k, v]) => `${k}: ${typeof v}`));
-              console.log(`Result #${i+1} content preview:`, JSON.stringify(result).substring(0, 100));
-            }
+          // Log the first few results to help with troubleshooting
+          vectorSearchResults.projects.slice(0, 3).forEach((result, i) => {
+            console.log(`Result #${i+1} structure:`, Object.keys(result).join(", "));
+            console.log(`Result #${i+1} types:`, Object.entries(result).map(([k, v]) => `${k}: ${typeof v}`).join(", "));
+            console.log(`Result #${i+1} preview:`, JSON.stringify(result).substring(0, 100) + "...");
           });
           
           return {
@@ -268,6 +272,7 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       companies(name),
       Address,
       project_name,
+      project_track,
       Project_status
     `);
     
@@ -323,17 +328,14 @@ async function performTraditionalSearch(query: string, company_id: string | unde
     };
   }
   
-  // Debug each project
-  projects.forEach((p: any, index: number) => {
-    if (index < 5) {
+  // Process and format the results
+  const processedResults = projects.map((p: any, index: number) => {
+    if (index < 3) {
       console.log(`Traditional search result #${index + 1}:`, JSON.stringify(p).substring(0, 200));
       console.log(`Traditional search result #${index + 1} types:`, Object.entries(p).map(([key, value]) => `${key}: ${typeof value}`));
     }
-  });
-  
-  // Ensure the returned object has all necessary fields with proper types
-  const processedResults = projects.map((p: any) => {
-    const result = {
+    
+    return {
       id: String(p.id || ''),
       crm_id: String(p.crm_id || ''),
       summary: String(p.summary || ''),
@@ -342,15 +344,9 @@ async function performTraditionalSearch(query: string, company_id: string | unde
       project_name: String(p.project_name || ''),
       status: String(p.Project_status || ''),
       company_id: p.company_id ? String(p.company_id) : null,
-      company_name: String(p.companies?.name || '')
+      company_name: String(p.companies?.name || ''),
+      project_track: p.project_track ? String(p.project_track) : null
     };
-    
-    if (index < 3) {
-      console.log(`DEBUG - Processed traditional result #${index+1}:`, JSON.stringify(result).substring(0, 200));
-      console.log(`DEBUG - Processed traditional types #${index+1}:`, Object.entries(result).map(([key, value]) => `${key}: ${typeof value}`));
-    }
-    
-    return result;
   });
   
   return {
