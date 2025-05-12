@@ -19,7 +19,6 @@ type PromptRunDetailsProps = {
     review?: string;
   }) => void;
   onPromptRerun?: () => void;
-  showReviewField?: boolean;
 };
 
 const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({ 
@@ -28,8 +27,7 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
   onOpenChange,
   onRatingChange,
   onFeedbackChange,
-  onPromptRerun,
-  showReviewField = true // Default to showing review field
+  onPromptRerun
 }) => {
   const {
     feedbackDescription,
@@ -61,7 +59,7 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
       onFeedbackChange(promptRun.id, {
         description: feedbackDescription || null,
         tags: tags.length > 0 ? tags : null,
-        review: showReviewField ? feedbackReview || null : null
+        review: feedbackReview || null
       });
     }
   };
@@ -92,7 +90,6 @@ const PromptRunDetails: React.FC<PromptRunDetailsProps> = ({
               setFeedbackReview={setFeedbackReview}
               handleSaveFeedback={handleSaveFeedbackClick}
               onRatingChange={onRatingChange}
-              showReviewField={showReviewField}
             />
           </TabsContent>
           

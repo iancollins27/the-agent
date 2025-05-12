@@ -17,7 +17,6 @@ interface DetailsTabProps {
   setFeedbackReview?: (value: string) => void;
   handleSaveFeedback: () => void;
   onRatingChange: (promptRunId: string, rating: number | null) => void;
-  showReviewField?: boolean;
 }
 
 const DetailsTab: React.FC<DetailsTabProps> = ({ 
@@ -29,8 +28,7 @@ const DetailsTab: React.FC<DetailsTabProps> = ({
   setFeedbackTags,
   setFeedbackReview = () => {},
   handleSaveFeedback,
-  onRatingChange,
-  showReviewField = true // Default to showing the review field
+  onRatingChange
 }) => {
   return (
     <div className="space-y-6">
@@ -75,21 +73,19 @@ const DetailsTab: React.FC<DetailsTabProps> = ({
             />
           </div>
 
-          {/* Feedback Review Field - conditionally rendered */}
-          {showReviewField && (
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-medium">Feedback Review</span>
-              </div>
-              <Textarea
-                value={feedbackReview}
-                onChange={(e) => setFeedbackReview(e.target.value)}
-                placeholder="Write a review of this feedback"
-                className="w-full"
-                rows={3}
-              />
+          {/* Feedback Review Field */}
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-medium">Feedback Review</span>
             </div>
-          )}
+            <Textarea
+              value={feedbackReview}
+              onChange={(e) => setFeedbackReview(e.target.value)}
+              placeholder="Write a review of this feedback"
+              className="w-full"
+              rows={3}
+            />
+          </div>
           
           <div className="flex justify-end">
             <Button onClick={handleSaveFeedback}>

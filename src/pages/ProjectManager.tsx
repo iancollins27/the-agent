@@ -83,7 +83,6 @@ const ProjectManager: React.FC = () => {
           onRatingChange={handleRatingChange}
           onFeedbackChange={handleFeedbackChange}
           onPromptRerun={handlePromptRerun}
-          showReviewField={false} // Don't show the review field in the Project Manager view
         />
       </div>
     </div>
