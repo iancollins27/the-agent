@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,7 +15,6 @@ import MermaidDiagrams from "./pages/MermaidDiagrams";
 import ProjectManager from "./pages/ProjectManager";
 import ExecutionView from "./components/admin/execution-view/ExecutionView";
 import UpdateProjectEmbeddings from "./pages/UpdateProjectEmbeddings";
-import { BrowserRouter } from "react-router-dom";
 import ToolsAdmin from "./pages/ToolsAdmin";
 
 const queryClient = new QueryClient();
@@ -35,75 +35,79 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="App">
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <AdminConsole />
-              </ProtectedRoute>
-            }
-          />
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRoute>
-                <AdminConsole />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/admin/executions/:executionId" 
-            element={
-              <ProtectedRoute>
-                <AdminConsole />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="" element={<ExecutionView />} />
-          </Route>
-          <Route 
-            path="/chat" 
-            element={
-              <ProtectedRoute>
-                <AgentChat />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/chatbot-config" 
-            element={
-              <ProtectedRoute>
-                <ChatbotConfig />
-              </ProtectedRoute>
-            } 
-          />
-          <Route path="/company-settings" element={<CompanySettings />} />
-          <Route
-            path="/system-diagrams"
-            element={
-              <ProtectedRoute>
-                <MermaidDiagrams />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/project-manager"
-            element={
-              <ProtectedRoute>
-                <ProjectManager />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/update-project-embeddings" element={<UpdateProjectEmbeddings />} />
-          <Route path="/admin/tools" element={<ToolsAdmin />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="App">
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <AdminConsole />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminConsole />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/executions/:executionId" 
+              element={
+                <ProtectedRoute>
+                  <AdminConsole />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="" element={<ExecutionView />} />
+            </Route>
+            <Route 
+              path="/chat" 
+              element={
+                <ProtectedRoute>
+                  <AgentChat />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/chatbot-config" 
+              element={
+                <ProtectedRoute>
+                  <ChatbotConfig />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/company-settings" element={<CompanySettings />} />
+            <Route
+              path="/system-diagrams"
+              element={
+                <ProtectedRoute>
+                  <MermaidDiagrams />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/project-manager"
+              element={
+                <ProtectedRoute>
+                  <ProjectManager />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/update-project-embeddings" element={<UpdateProjectEmbeddings />} />
+            <Route path="/admin/tools" element={<ToolsAdmin />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+          <Sonner />
+        </div>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 

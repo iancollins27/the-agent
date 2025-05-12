@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle } from "lucide-react";
-import ActionConfirmation from "./ActionConfirmation/index"; // Update import to use the correct component
+import ActionConfirmation from "./ActionConfirmation/ActionConfirmDialog"; // Import the correct component
 import { ActionRecord } from "./types";
 
 interface ChatMessage {
