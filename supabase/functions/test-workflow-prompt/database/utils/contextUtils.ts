@@ -14,6 +14,8 @@ export async function prepareContextData(
   projectId: string
 ) {
   try {
+    console.log(`Preparing context data for project: ${projectId}`);
+    
     // Fetch project data first
     const { data: projectData, error: projectError } = await supabase
       .from('projects')
@@ -41,9 +43,16 @@ export async function prepareContextData(
       throw new Error("Project not found");
     }
     
-    // Fetch project contacts
+    // Fetch project contacts with improved logging
+    console.log(`Fetching contacts for project ${projectId} using getProjectContacts`);
     const contacts = await getProjectContacts(supabase, projectId);
+    console.log(`Retrieved ${contacts?.length || 0} contacts for project ${projectId}`);
+    
     const formattedContacts = formatContactsForContext(contacts);
+    console.log(`Formatted contacts result: ${formattedContacts ? 'Success' : 'Empty or failed'}`);
+    if (formattedContacts === "No contacts available for this project.") {
+      console.log("No contacts were found for this project.");
+    }
     
     // Get milestone instructions if this is a next step
     let milestoneInstructions = "";
@@ -73,9 +82,12 @@ export async function prepareContextData(
       property_address: projectData.Address || '',
       project_id: projectId,
       contacts: contacts,
+      track_id: projectData.project_track || null,
       formattedContacts: formattedContacts,
       project_contacts: formattedContacts || 'No contacts available for this project.' // Ensure this variable is properly set
     };
+    
+    console.log(`Context data prepared with project_contacts: ${!!contextData.project_contacts}`);
     
     return { projectData, contextData };
   } catch (error) {

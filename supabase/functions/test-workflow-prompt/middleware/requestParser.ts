@@ -1,67 +1,66 @@
 
 import { corsHeaders } from '../utils/cors.ts';
+import { prepareContextData } from '../database/utils/contextUtils.ts';
 
 /**
- * Middleware to parse the request body and validate required fields
+ * Parse and validate the request body
  */
-export async function parseRequestBody(req: Request): Promise<{ body: any, error: null } | { body: null, error: Response }> {
+export async function parseRequestBody(req: Request): Promise<{
+  body?: any;
+  error?: Response;
+}> {
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return {
+      error: new Response(JSON.stringify({ error: 'Method not allowed' }), {
+        status: 405,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    };
+  }
+
   try {
     const body = await req.json();
+    const requiredFields = ['promptType'];
     
-    // Log request details
-    console.log('Processing request through request parser middleware');
+    // Validate required fields
+    for (const field of requiredFields) {
+      if (!body[field]) {
+        return {
+          error: new Response(JSON.stringify({ error: `Missing required field: ${field}` }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        };
+      }
+    }
     
-    // Basic validation
-    if (!body) {
-      return {
-        body: null,
-        error: new Response(
-          JSON.stringify({ error: 'Request body is required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
-      };
+    // Add enhanced context data if projectId is provided
+    if (body.projectId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.38.4');
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      const { contextData } = await prepareContextData(supabase, body.projectId);
+      
+      // Merge the prepared context data with any existing contextData in the request
+      body.contextData = { ...(body.contextData || {}), ...contextData };
+      
+      console.log(`Enhanced context data with project-specific information for project ${body.projectId}`);
+      console.log(`Context data now includes project_contacts: ${!!body.contextData.project_contacts}`);
     }
 
-    // Extract and validate essential parameters
-    const {
-      promptType,
-      promptText,
-      projectId,
-    } = body;
-    
-    if (!promptType) {
-      return {
-        body: null,
-        error: new Response(
-          JSON.stringify({ error: 'promptType is required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
-      };
-    }
-
-    // For non-MCP requests, promptText is required
-    if (!promptText && promptType !== 'mcp_orchestrator' && body.useMCP !== true) {
-      return {
-        body: null,
-        error: new Response(
-          JSON.stringify({ error: 'promptText is required for non-MCP requests' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
-      };
-    }
-    
-    // Log validation passed
-    console.log(`Request validation passed for prompt type: ${promptType}`);
-    
-    return { body, error: null };
+    console.log(`Request validation passed for prompt type: ${body.promptType}`);
+    return { body };
   } catch (error) {
-    console.error('Failed to parse request body:', error);
-    return { 
-      body: null, 
-      error: new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      ) 
+    console.error('Error parsing request body:', error);
+    return {
+      error: new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     };
   }
 }
