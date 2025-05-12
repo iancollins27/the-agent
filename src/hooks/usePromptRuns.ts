@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { PromptRun } from '../components/admin/types';
 import { usePromptFeedback } from './usePromptFeedback';
@@ -110,23 +109,50 @@ export const usePromptRuns = ({
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
+        // Get all action records for these prompt runs
         const { data: actionData, error: actionError } = await supabase
           .from('action_records')
-          .select('prompt_run_id, action_type')
+          .select('prompt_run_id, action_type, status')
           .in('prompt_run_id', promptRunIds);
 
         if (!actionError && actionData) {
-          const filteredActionRunIds = new Set(
-            actionData
-              .filter(action => 
-                action.action_type === 'set_future_reminder' || 
-                action.action_type === 'NO_ACTION'
-              )
-              .map(action => action.prompt_run_id)
-          );
-
-          formattedData = formattedData.filter(
-            run => !filteredActionRunIds.has(run.id)
+          // Create a set of prompt run IDs that have at least one non-reminder pending action
+          const promptRunsWithPendingActions = new Set<string>();
+          
+          // Group actions by prompt run ID
+          const actionsByPromptRun = new Map<string, { hasOnlyReminders: boolean, hasAnyAction: boolean }>();
+          
+          // Initialize the map for each prompt run
+          promptRunIds.forEach(runId => {
+            actionsByPromptRun.set(runId, { hasOnlyReminders: true, hasAnyAction: false });
+          });
+          
+          // Process each action record
+          actionData.forEach(action => {
+            if (!action.prompt_run_id) return;
+            
+            const runInfo = actionsByPromptRun.get(action.prompt_run_id);
+            if (!runInfo) return;
+            
+            // Mark that this prompt run has at least one action
+            runInfo.hasAnyAction = true;
+            
+            // If this is not a reminder/NO_ACTION and it's pending, add to the set of prompt runs to keep
+            if (action.status === 'pending' && 
+                action.action_type !== 'set_future_reminder' && 
+                action.action_type !== 'NO_ACTION') {
+              promptRunsWithPendingActions.add(action.prompt_run_id);
+              // Also mark that this run doesn't have only reminders
+              runInfo.hasOnlyReminders = false;
+            }
+          });
+          
+          // Filter to keep prompt runs that either:
+          // 1. Have at least one non-reminder pending action, or
+          // 2. Don't have any actions at all
+          formattedData = formattedData.filter(run => 
+            promptRunsWithPendingActions.has(run.id) || 
+            !actionsByPromptRun.get(run.id)?.hasAnyAction
           );
         }
       }
