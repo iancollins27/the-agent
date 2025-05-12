@@ -76,8 +76,15 @@ export async function processToolCalls(
           // Don't set projectData yet, as we need user clarification
           console.log('Multiple project matches found, awaiting user clarification');
         } else {
-          // Just one project found, use it
+          // Just one project found, use it and include contacts data
           projectData = toolResult.projects[0];
+          
+          // Include contacts data if available
+          if (toolResult.contacts && toolResult.contacts.length > 0) {
+            projectData.contacts = toolResult.contacts;
+            console.log(`Found ${toolResult.contacts.length} contacts for the project`);
+          }
+          
           console.log('Found project data:', projectData);
         }
       }
@@ -111,7 +118,15 @@ export async function processToolCalls(
           toolResult?.status === 'success' && 
           !toolResult?.multipleMatches &&
           projectData) {
-        context.addSystemMessage(`Project ${projectData.id} information is now in your context. You do not need to identify it again for follow-up questions. Focus on answering the user's questions directly using this context.`);
+        // Add system message with project information and contacts
+        let contactsInfo = '';
+        if (projectData.contacts && projectData.contacts.length > 0) {
+          contactsInfo = `\n\nProject Contacts:\n` + projectData.contacts.map((contact: any) => {
+            return `- ${contact.full_name} (${contact.role}): ID:${contact.id}, ${contact.email || ''} ${contact.phone_number || ''}`
+          }).join('\n');
+        }
+        
+        context.addSystemMessage(`Project ${projectData.id} information is now in your context. You do not need to identify it again for follow-up questions.${contactsInfo}`);
       }
     } 
     catch (toolError) {

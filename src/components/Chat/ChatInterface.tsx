@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle } from "lucide-react";
-import ActionConfirmation from "./ActionConfirmation/ActionConfirmDialog"; // Import the correct component
+import ActionConfirmation from "./ActionConfirmation/ActionConfirmDialog"; 
 import { ActionRecord } from "./types";
 
 interface ChatMessage {
@@ -28,6 +28,8 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState(presetMessage || '');
   const [isLoading, setIsLoading] = useState(false);
+  const [identifiedProject, setIdentifiedProject] = useState<any>(null);
+  const [projectContacts, setProjectContacts] = useState<any[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -57,7 +59,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
   }, [projectId]);
 
   const fetchPendingActions = async () => {
-    if (!projectId) return;
+    if (!projectId && !identifiedProject?.id) return;
     
     try {
       const { data, error } = await supabase
@@ -67,7 +69,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
           recipient:contacts!recipient_id(id, full_name),
           sender:contacts!sender_ID(id, full_name)
         `)
-        .eq('project_id', projectId)
+        .eq('project_id', projectId || identifiedProject?.id)
         .eq('status', 'pending')
         .eq('requires_approval', true)
         .order('created_at', { ascending: false });
@@ -130,6 +132,8 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
           .single();
           
         projectData = project;
+      } else if (identifiedProject) {
+        projectData = identifiedProject;
       }
       
       // Get chatbot configuration
@@ -172,7 +176,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
           },
           body: JSON.stringify({
             messages: messagesToSend,
-            projectId,
+            projectId: projectId || identifiedProject?.id,
             projectData,
             customPrompt: chatbotConfig?.system_prompt,
             availableTools: chatbotConfig?.available_tools || ['identify_project', 'create_action_record']
@@ -205,14 +209,46 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
         } : m
       ));
       
-      // Check if any tool call was the create_action_record tool
-      const hasActionRecord = hasTool && assistantMessage.tool_calls.some(
-        (call: any) => call.function.name === 'create_action_record'
-      );
-      
-      // If an action was created, refresh the pending actions list
-      if (hasActionRecord) {
-        await fetchPendingActions();
+      // Check if any tool call was the identify_project tool that would affect our state
+      if (hasTool) {
+        for (const toolCall of assistantMessage.tool_calls) {
+          if (toolCall.function.name === 'identify_project') {
+            try {
+              // Parse the tool response to see if we have project data
+              const toolResponses = data.choices[0].message.tool_responses || [];
+              const identifyResponse = toolResponses.find((r: any) => 
+                r.tool_call_id === toolCall.id && r.content
+              );
+              
+              if (identifyResponse) {
+                const parsedResponse = JSON.parse(identifyResponse.content);
+                
+                if (parsedResponse.status === 'success' && 
+                    parsedResponse.projects && 
+                    parsedResponse.projects.length === 1) {
+                  
+                  // Store the identified project
+                  setIdentifiedProject(parsedResponse.projects[0]);
+                  
+                  // Store contacts if available
+                  if (parsedResponse.contacts && parsedResponse.contacts.length > 0) {
+                    setProjectContacts(parsedResponse.contacts);
+                  }
+                  
+                  console.log('Project identified:', parsedResponse.projects[0]);
+                  if (parsedResponse.contacts) {
+                    console.log('Contacts loaded:', parsedResponse.contacts);
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('Error processing identify_project response:', e);
+            }
+          } else if (toolCall.function.name === 'create_action_record') {
+            // Refresh pending actions after a new action record is created
+            await fetchPendingActions();
+          }
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -283,6 +319,22 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
             <div className="rounded-lg p-3 text-sm w-fit max-w-[80%] bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Thinking...
+            </div>
+          </div>
+        )}
+        
+        {(identifiedProject || projectId) && projectContacts.length > 0 && (
+          <div className="mb-4 px-2 py-1 bg-blue-50 border border-blue-200 rounded-md">
+            <div className="flex items-center gap-2 mb-1 text-blue-800">
+              <span className="font-medium text-xs">Project Contacts</span>
+            </div>
+            <div className="text-xs text-blue-700 space-y-1">
+              {projectContacts.slice(0, 4).map(contact => (
+                <div key={contact.id} className="flex justify-between items-center">
+                  <span>{contact.full_name} ({contact.role})</span>
+                  <span className="text-blue-500">{contact.id}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}

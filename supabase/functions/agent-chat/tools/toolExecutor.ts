@@ -3,7 +3,6 @@
  * Execute tool calls
  */
 
-import { getTool } from './toolRegistry.ts';
 import { ToolContext } from './types.ts';
 
 export async function executeToolCall(
@@ -24,33 +23,33 @@ export async function executeToolCall(
     // Import the tool dynamically based on the mapped name
     const toolModule = await import(`./${mappedToolName}/index.ts`);
     
-    // Looking at the identify-project/index.ts file structure, the tool function
-    // is likely exported as a named export inside an object, not as the direct function
-    if (toolModule.identifyProject && toolName === 'identify_project') {
-      // Create tool context
-      const context: ToolContext = {
-        supabase,
-        userProfile,
-        companyId
-      };
-      
-      // Execute the tool
+    // Create tool context
+    const context: ToolContext = {
+      supabase,
+      userProfile,
+      companyId
+    };
+    
+    // Different tools might have their export structured differently
+    // Handle identify_project special case
+    if (toolName === 'identify_project' && toolModule.identifyProject) {
       const result = await toolModule.identifyProject.execute(args, context);
       console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
       return result;
     }
     
-    // For other tools, try the direct export match
-    if (toolModule[toolName]) {
-      // Create tool context
-      const context: ToolContext = {
-        supabase,
-        userProfile,
-        companyId
-      };
-      
-      // Execute the tool
-      const result = await toolModule[toolName].execute(args, context);
+    // Handle create_action_record special case
+    if (toolName === 'create_action_record' && toolModule.createActionRecord) {
+      const result = await toolModule.createActionRecord.execute(args, context);
+      console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
+      return result;
+    }
+    
+    // For other tools, try the direct export match using the original name or converted name
+    const toolFunction = toolModule[toolName] || toolModule[mappedToolName.replace(/-/g, '_')];
+    
+    if (toolFunction && toolFunction.execute) {
+      const result = await toolFunction.execute(args, context);
       console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
       return result;
     }

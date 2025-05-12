@@ -49,9 +49,12 @@ export const identifyProject: Tool = {
           .limit(1);
           
         if (projectById && projectById.length > 0) {
+          // Fetch contacts for this project
+          const projectContacts = await fetchProjectContacts(context.supabase, projectById[0].id);
           return {
             status: "success",
-            projects: projectById
+            projects: projectById,
+            contacts: projectContacts
           };
         }
       }
@@ -65,9 +68,12 @@ export const identifyProject: Tool = {
           .limit(1);
           
         if (projectByCrmId && projectByCrmId.length > 0) {
+          // Fetch contacts for this project
+          const projectContacts = await fetchProjectContacts(context.supabase, projectByCrmId[0].id);
           return {
             status: "success",
-            projects: projectByCrmId
+            projects: projectByCrmId,
+            contacts: projectContacts
           };
         }
       }
@@ -85,9 +91,12 @@ export const identifyProject: Tool = {
           
           // If we have at least one project, return immediately
           if (projects.length > 0 && type === "name") {
+            // Fetch contacts for the first project
+            const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
             return {
               status: "success",
-              projects: projects.slice(0, 3)  // Ensure only 3 results max
+              projects: projects.slice(0, 3),  // Ensure only 3 results max
+              contacts: projectContacts
             };
           }
         }
@@ -110,9 +119,12 @@ export const identifyProject: Tool = {
           
           // If we have at least one project, and we're specifically looking for address, return
           if (projects.length > 0 && type === "address") {
+            // Fetch contacts for the first project
+            const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
             return {
               status: "success",
-              projects: projects.slice(0, 3)  // Ensure only 3 results max
+              projects: projects.slice(0, 3),  // Ensure only 3 results max
+              contacts: projectContacts
             };
           }
         }
@@ -121,9 +133,12 @@ export const identifyProject: Tool = {
       // If we have some projects from the above searches and we're in "any" mode, return them
       if (projects.length > 0) {
         console.log(`Found ${projects.length} projects by ${type !== "any" ? type : "name/address"}`);
+        // Fetch contacts for the first project
+        const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
         return {
           status: "success",
-          projects: projects.slice(0, 3)  // Ensure only 3 results max
+          projects: projects.slice(0, 3),  // Ensure only 3 results max
+          contacts: projectContacts
         };
       }
       
@@ -187,14 +202,25 @@ export const identifyProject: Tool = {
           if (projects.length > 3) {
             projects = projects.slice(0, 3);
           }
+          
+          // Fetch contacts for the first project
+          const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+          return {
+            status: "success",
+            projects: projects,
+            contacts: projectContacts
+          };
         }
       }
       
       // Return the final result
       if (projects.length > 0) {
+        // Fetch contacts for the first project
+        const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
         return {
           status: "success",
-          projects: projects
+          projects: projects,
+          contacts: projectContacts
         };
       }
       
@@ -248,5 +274,51 @@ async function generateEmbedding(text: string, context: any): Promise<number[] |
   } catch (error) {
     console.error(`Error generating embedding: ${error.message}`);
     return null;
+  }
+}
+
+/**
+ * Fetch contacts for a specific project
+ */
+async function fetchProjectContacts(supabase: any, projectId: string) {
+  try {
+    console.log(`Fetching contacts for project: ${projectId}`);
+    
+    // Query project_contacts to get the contact_ids for this project
+    const { data: projectContacts, error: projectContactsError } = await supabase
+      .from('project_contacts')
+      .select('contact_id')
+      .eq('project_id', projectId);
+    
+    if (projectContactsError) {
+      console.error("Error fetching project_contacts:", projectContactsError);
+      return [];
+    }
+    
+    if (!projectContacts || projectContacts.length === 0) {
+      console.log("No contacts found for this project");
+      return [];
+    }
+    
+    // Get all the contact IDs for this project
+    const contactIds = projectContacts.map(pc => pc.contact_id);
+    
+    // Query the contacts table to get the full contact information
+    const { data: contacts, error: contactsError } = await supabase
+      .from('contacts')
+      .select('id, full_name, role, email, phone_number')
+      .in('id', contactIds);
+    
+    if (contactsError) {
+      console.error("Error fetching contact details:", contactsError);
+      return [];
+    }
+    
+    console.log(`Successfully retrieved ${contacts?.length || 0} contacts for project ${projectId}`);
+    
+    return contacts || [];
+  } catch (error) {
+    console.error(`Error in fetchProjectContacts: ${error}`);
+    return [];
   }
 }
