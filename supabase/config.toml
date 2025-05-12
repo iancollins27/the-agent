@@ -119,3 +119,6 @@ port = 54350
 # List your edge functions here
 [functions.search-projects-by-vector]
 verify_jwt = true
+
+[functions.agent-chat]
+verify_jwt = false

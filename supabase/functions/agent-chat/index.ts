@@ -9,7 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 interface ChatRequest {
   messages: Array<{
@@ -41,8 +41,9 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Initialize Supabase client with service role key for admin access
+    // This allows bypassing RLS policies when creating action records
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     // Special case: If getToolDefinitions flag is set, return the available tool definitions
     if (payload.getToolDefinitions) {
@@ -149,6 +150,7 @@ serve(async (req) => {
         
         try {
           // Use the toolExecutor instead of direct imports to handle the name mapping
+          // Pass null for userProfile since we're using the service role key
           const toolResult = await executeToolCall(supabase, name, args, null, payload.projectData?.company_id);
           
           // Add the tool response to messages
