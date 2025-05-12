@@ -113,7 +113,7 @@ const ToolsAdmin = () => {
       } catch (chatError) {
         console.error("Error fetching chat tools:", chatError);
         toast({
-          variant: "warning",
+          variant: "destructive",
           title: "Chat tools could not be loaded",
           description: "Using default configuration instead."
         });
@@ -137,7 +137,7 @@ const ToolsAdmin = () => {
       } catch (workflowError) {
         console.error("Error fetching workflow tools:", workflowError);
         toast({
-          variant: "warning",
+          variant: "destructive",
           title: "Workflow tools could not be loaded",
           description: "Using default configuration instead."
         });

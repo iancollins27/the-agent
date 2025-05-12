@@ -33,7 +33,8 @@ export function getMCPOrchestratorPrompt(
       '{{track_roles}}': contextData.track_roles || '',
       '{{next_step}}': contextData.next_step || '',
       '{{summary}}': contextData.summary || '[No project summary provided]',
-      '{{project_id}}': contextData.project_id || 'unknown', // Ensure project_id is available in the prompt
+      '{{project_id}}': contextData.project_id || 'unknown',
+      '{{project_contacts}}': contextData.formattedContacts || '[No contacts available]',
     };
     
     // Replace each variable
@@ -57,6 +58,9 @@ Next Step: ${contextData.next_step || ''}
 Current Date: ${contextData.current_date || new Date().toISOString().split('T')[0]}
 Property Address: ${contextData.property_address || '[No property address provided]'}
 
+Project Contacts:
+${contextData.formattedContacts || 'No contacts available for this project.'}
+
 Available Tools:
 ${toolNames.join(', ')}
 
@@ -75,6 +79,12 @@ Follow these steps:
    - Any other relevant context
 3. If action is needed, use the appropriate tool (data_fetch, create_action_record, knowledge_base_lookup)
 4. Be specific in your reasoning and provide clear explanations
+
+IMPORTANT CONTACT HANDLING:
+When creating message actions:
+- Reference the contacts by their ID using the 'sender_ID' and 'recipient_id' parameters
+- Always include the message content in the 'message' parameter
+- Remember to include appropriate details about what the message is about and why it's needed
 
 When using the data_fetch tool, make sure to use the project_id provided above.
 

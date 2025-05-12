@@ -15,17 +15,47 @@ async function createActionRecord(
   params: any
 ): Promise<ToolResult> {
   try {
+    console.log("Create action record called with params:", JSON.stringify(params, null, 2));
+    
+    // Extract message content from various possible sources
+    const messageContent = params.message || params.message_text || 
+                          (params.action_payload && 
+                           (params.action_payload.message || params.action_payload.message_text || params.action_payload.message_content)) || 
+                          null;
+    
+    // Extract recipient ID directly or from action_payload
+    const recipientId = params.recipient_id || 
+                        (params.action_payload && params.action_payload.recipient_id) || 
+                        null;
+                        
+    // Extract sender ID directly or from action_payload
+    const senderId = params.sender_ID || params.sender_id || 
+                    (params.action_payload && (params.action_payload.sender_ID || params.action_payload.sender_id)) || 
+                    null;
+    
     // Prepare the action record data
     const actionData = {
       prompt_run_id: promptRunId,
       project_id: projectId,
       action_type: params.action_type || 'message',
-      message: params.message || null,
-      recipient_id: params.recipient_id || null,
+      message: messageContent,
+      recipient_id: recipientId,
+      sender_ID: senderId,
       requires_approval: params.requires_approval ?? true,
-      action_payload: params.action_payload || {},
+      action_payload: {
+        ...params,
+        recipient_id: recipientId,
+        sender_ID: senderId,
+        message_content: messageContent
+      },
       status: (params.requires_approval ?? true) ? 'pending' : 'approved'
     };
+
+    console.log("Action data to be inserted:", JSON.stringify({
+      ...actionData,
+      // Don't log potentially large or sensitive fields
+      action_payload: "...(payload content)"
+    }));
 
     // Insert the action record
     const { data, error } = await supabase
@@ -42,6 +72,7 @@ async function createActionRecord(
       };
     }
 
+    console.log("Action record created successfully:", data.id);
     return {
       status: "success",
       action_record_id: data.id,

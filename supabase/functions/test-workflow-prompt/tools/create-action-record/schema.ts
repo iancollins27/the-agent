@@ -33,13 +33,25 @@ export const createActionRecordSchema = {
       type: "string",
       description: "For message actions, who is sending the message (e.g. BidList Project Manager)"
     },
+    sender_ID: {
+      type: "string",
+      description: "UUID of the sender contact (preferred over sender name)"
+    },
     recipient: {
       type: "string",
       description: "For message actions, who should receive the message (e.g. Homeowner, Solar Rep, Roofer)"
     },
-    message_text: {
+    recipient_id: {
+      type: "string",
+      description: "UUID of the recipient contact (preferred over recipient name)"
+    },
+    message: {
       type: "string",
       description: "For message actions, the content of the message"
+    },
+    message_text: {
+      type: "string",
+      description: "Alternative field for message content (for backward compatibility)"
     },
     description: {
       type: "string",
