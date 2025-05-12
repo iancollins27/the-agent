@@ -34,7 +34,8 @@ export function getMCPOrchestratorPrompt(
       '{{next_step}}': contextData.next_step || '',
       '{{summary}}': contextData.summary || '[No project summary provided]',
       '{{project_id}}': contextData.project_id || 'unknown',
-      '{{project_contacts}}': contextData.formattedContacts || '[No contacts available]',
+      '{{project_contacts}}': contextData.project_contacts || 'No contacts available for this project.',
+      '{{is_reminder_check}}': contextData.is_reminder_check ? 'true' : 'false',
     };
     
     // Replace each variable
@@ -59,7 +60,7 @@ Current Date: ${contextData.current_date || new Date().toISOString().split('T')[
 Property Address: ${contextData.property_address || '[No property address provided]'}
 
 Project Contacts:
-${contextData.formattedContacts || 'No contacts available for this project.'}
+${contextData.project_contacts || 'No contacts available for this project.'}
 
 Available Tools:
 ${toolNames.join(', ')}

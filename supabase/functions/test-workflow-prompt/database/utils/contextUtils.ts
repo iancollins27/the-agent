@@ -73,7 +73,8 @@ export async function prepareContextData(
       property_address: projectData.Address || '',
       project_id: projectId,
       contacts: contacts,
-      formattedContacts: formattedContacts
+      formattedContacts: formattedContacts,
+      project_contacts: formattedContacts || 'No contacts available for this project.' // Ensure this variable is properly set
     };
     
     return { projectData, contextData };

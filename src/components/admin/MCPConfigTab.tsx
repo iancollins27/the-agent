@@ -1,413 +1,231 @@
+
 import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { InfoIcon, Loader2, Check, X } from "lucide-react";
-import Tool from '../icons/Tool';
-import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import ToolDefinitionsPanel from './MCP/ToolDefinitionsPanel';
+import { Loader2, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import PromptEditor from "./PromptEditor";
+import { WorkflowPrompt } from "@/types/workflow";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import ToolDefinitionsPanel from "./MCP/ToolDefinitionsPanel";
+import MCPContactsList from "./MCPContactsList";
 
-/**
- * MCP Configuration Tab for controlling the MCP (Model Context Protocol) settings
- */
-const MCPConfigTab: React.FC = () => {
-  const [orchestratorText, setOrchestratorText] = useState<string>('');
-  const [toolDefinitions, setToolDefinitions] = useState<string>('');
-  const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({
-    create_action_record: true,
-    knowledge_base_lookup: false,
-    data_fetch: true
-  });
-  const { toast } = useToast();
+const MCPConfigTab = () => {
   const queryClient = useQueryClient();
+  const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectContacts, setProjectContacts] = useState<any[] | null>(null);
 
-  // Fetch the MCP orchestrator prompt from the database
-  const { data: mcpPrompt, isLoading: promptLoading } = useQuery({
+  // Fetch the MCP orchestrator prompt
+  const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
     queryKey: ['mcp-orchestrator-prompt'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workflow_prompts')
         .select('*')
         .eq('type', 'mcp_orchestrator')
-        .maybeSingle();
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error('Error fetching MCP orchestrator prompt:', error);
         throw error;
       }
       
-      return data;
+      return data as WorkflowPrompt[];
     }
   });
 
-  // Update the orchestrator text state when the prompt data is loaded
+  // Fetch test project for contacts
   useEffect(() => {
-    if (mcpPrompt?.prompt_text) {
-      setOrchestratorText(mcpPrompt.prompt_text);
-    }
-  }, [mcpPrompt]);
-
-  // Update the MCP orchestrator prompt in the database
-  const updateOrchestratorMutation = useMutation({
-    mutationFn: async (promptText: string) => {
-      if (!mcpPrompt?.id) {
-        throw new Error('No MCP orchestrator prompt found to update');
+    const fetchTestProject = async () => {
+      // Get the most recent project used in a prompt run
+      const { data: recentRun, error: recentRunError } = await supabase
+        .from('prompt_runs')
+        .select('project_id')
+        .order('created_at', { ascending: false })
+        .not('project_id', 'is', null)
+        .limit(1);
+        
+      if (recentRunError) {
+        console.error('Error fetching recent prompt run:', recentRunError);
+        return;
       }
       
+      if (recentRun && recentRun.length > 0 && recentRun[0].project_id) {
+        setProjectId(recentRun[0].project_id);
+        fetchProjectContacts(recentRun[0].project_id);
+      }
+    };
+    
+    fetchTestProject();
+  }, []);
+
+  // Fetch project contacts for the demo
+  const fetchProjectContacts = async (projectId: string) => {
+    try {
+      const { data: contactIds, error: contactIdsError } = await supabase
+        .from('project_contacts')
+        .select('contact_id')
+        .eq('project_id', projectId);
+
+      if (contactIdsError) {
+        console.error('Error fetching project contact IDs:', contactIdsError);
+        return;
+      }
+
+      if (contactIds && contactIds.length > 0) {
+        const ids = contactIds.map(item => item.contact_id);
+        
+        const { data: contacts, error: contactsError } = await supabase
+          .from('contacts')
+          .select('*')
+          .in('id', ids);
+
+        if (contactsError) {
+          console.error('Error fetching contacts:', contactsError);
+          return;
+        }
+        
+        setProjectContacts(contacts);
+      } else {
+        setProjectContacts([]);
+      }
+    } catch (error) {
+      console.error('Error in fetchProjectContacts:', error);
+    }
+  };
+
+  const updatePromptMutation = useMutation({
+    mutationFn: async (prompt: WorkflowPrompt) => {
       const { error } = await supabase
         .from('workflow_prompts')
-        .update({ 
-          prompt_text: promptText,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', mcpPrompt.id);
+        .update({ prompt_text: prompt.prompt_text })
+        .eq('id', prompt.id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mcp-orchestrator-prompt'] });
-      queryClient.invalidateQueries({ queryKey: ['workflow-prompts'] });
-      toast({
-        title: "MCP Orchestrator Updated",
-        description: "The MCP orchestrator prompt has been successfully updated.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to update MCP orchestrator: ${error.message}`,
-      });
+      setEditingPrompt(null);
     }
   });
 
-  // Handler for saving the orchestrator prompt
-  const handleSaveOrchestrator = () => {
-    updateOrchestratorMutation.mutate(orchestratorText);
-  };
+  const createPromptMutation = useMutation({
+    mutationFn: async () => {
+      const defaultPrompt = `You are an AI orchestrator using the Model Context Protocol. Your job is to analyze the project and determine what actions need to be taken.
 
-  // Fetch tool definitions from the edge function
-  useEffect(() => {
-    // For now, we'll use our static tool definitions
-    // In a real implementation, we would fetch this data from an endpoint
-    // that connects to the tool registry
-    setToolDefinitions(`[
-  {
-    "name": "create_action_record",
-    "description": "Creates a specific action for team members to execute based on the project's needs.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "action_type": {
-          "type": "string",
-          "enum": ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query"],
-          "description": "The type of action to be taken"
-        },
-        "description": {
-          "type": "string",
-          "description": "Detailed description of what needs to be done"
-        },
-        "recipient": {
-          "type": "string",
-          "description": "Who should receive this action"
-        },
-        "message_text": {
-          "type": "string",
-          "description": "For message actions, the content of the message"
-        },
-        "sender": {
-          "type": "string",
-          "description": "For message actions, who is sending the message"
-        }
-      },
-      "required": ["action_type"]
+Project Summary:
+{{summary}}
+
+Project Track: {{track_name}}
+Track Roles: {{track_roles}}
+Track Base Prompt: {{track_base_prompt}}
+Current Date: {{current_date}}
+Next Step: {{next_step}}
+Property Address: {{property_address}}
+Is Reminder Check: {{is_reminder_check}}
+
+Project Contacts:
+{{project_contacts}}
+
+Available Tools:
+{{available_tools}}
+
+Follow these steps:
+1. Analyze the current state of the project based on the summary and context
+2. Determine if any action is needed using the detect_action tool
+3. If an action is needed, specify what type of action using the appropriate tool
+4. If knowledge is needed, use the knowledge_base_lookup tool
+5. Be specific in your reasoning and explanations
+
+Remember:
+- Think step by step
+- Be specific about what actions are needed
+- Provide clear reasoning for your decisions`;
+
+      const { data, error } = await supabase
+        .from('workflow_prompts')
+        .insert({
+          type: 'mcp_orchestrator',
+          prompt_text: defaultPrompt
+        })
+        .select();
+      
+      if (error) throw error;
+      return data[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mcp-orchestrator-prompt'] });
     }
-  },
-  {
-    "name": "knowledge_base_lookup",
-    "description": "Searches the knowledge base for relevant information about the project",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "query": {
-          "type": "string",
-          "description": "The search query to find relevant information"
-        },
-        "limit": {
-          "type": "integer",
-          "description": "Maximum number of results to return"
-        }
-      },
-      "required": ["query"]
-    }
-  },
-  {
-    "name": "data_fetch",
-    "description": "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "project_id": {
-          "type": "string", 
-          "description": "UUID of the project to fetch data for"
-        },
-        "include_raw": {
-          "type": "boolean",
-          "description": "Whether to include raw provider data in the response (defaults to false)"
-        }
-      },
-      "required": ["project_id"]
-    }
+  });
+
+  if (promptsError) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>Error loading MCP configuration: {promptsError.message}</AlertDescription>
+      </Alert>
+    );
   }
-]`);
-  }, []);
 
-  // Handler for saving tool definitions
-  const handleSaveToolDefinitions = (updatedDefinitions: string) => {
-    setToolDefinitions(updatedDefinitions);
-    toast({
-      title: "Tool Definitions Updated",
-      description: "The MCP tool definitions have been successfully updated.",
-    });
-  };
+  if (isLoadingPrompts) {
+    return (
+      <div className="flex justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  // Handler for toggling tool enablement
-  const handleToggleTool = (toolName: string, enabled: boolean) => {
-    setEnabledTools(prev => ({
-      ...prev,
-      [toolName]: enabled
-    }));
-    
-    toast({
-      title: enabled ? "Tool Enabled" : "Tool Disabled",
-      description: `The ${toolName} tool has been ${enabled ? 'enabled' : 'disabled'}.`,
-    });
-  };
+  const mcpPrompt = prompts && prompts.length > 0 ? prompts[0] : null;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">MCP Configuration</h2>
-          <p className="text-muted-foreground">Configure the Model Context Protocol settings</p>
-        </div>
-      </div>
-
-      <Alert>
-        <Tool className="h-4 w-4" />
-        <AlertTitle>About MCP</AlertTitle>
-        <AlertDescription>
-          The Model Context Protocol (MCP) enables sophisticated tool calling and orchestration patterns for AI models.
-          Configure the system prompts and tool definitions used by the AI when making decisions.
-        </AlertDescription>
-      </Alert>
-
-      <Tabs defaultValue="orchestrator" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="orchestrator">Orchestrator Prompt</TabsTrigger>
-          <TabsTrigger value="tools">Tool Definitions</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="orchestrator" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>MCP Orchestrator System Prompt</CardTitle>
-              <CardDescription>
-                This system prompt guides the AI in using tools and making decisions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {promptLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Loading prompt...</span>
-                </div>
-              ) : (
-                <>
-                  <Textarea
-                    className="min-h-[300px] font-mono"
-                    value={orchestratorText}
-                    onChange={(e) => setOrchestratorText(e.target.value)}
-                  />
-
-                  <div className="flex justify-end mt-4">
-                    <Button 
-                      onClick={handleSaveOrchestrator}
-                      disabled={updateOrchestratorMutation.isPending}
-                    >
-                      {updateOrchestratorMutation.isPending ? (
-                        <>
-                          <Loader2 size={16} className="mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : "Save Changes"}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tools" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Tools</CardTitle>
-              <CardDescription>
-                Enable or disable tools available to the MCP orchestrator
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-4">
-                  <ToolConfigCard
-                    name="create_action_record"
-                    title="Create Action Record"
-                    description="Creates specific action records based on the orchestrator's decisions"
-                    enabled={enabledTools.create_action_record}
-                    onToggle={(enabled) => handleToggleTool('create_action_record', enabled)}
-                    required={true}
-                  />
-
-                  <ToolConfigCard
-                    name="knowledge_base_lookup"
-                    title="Knowledge Base Lookup"
-                    description="Searches the knowledge base for relevant information"
-                    enabled={enabledTools.knowledge_base_lookup}
-                    onToggle={(enabled) => handleToggleTool('knowledge_base_lookup', enabled)}
-                    required={false}
-                    disabled={true}
-                    disabledReason="Currently disabled in the system"
-                  />
-
-                  <ToolConfigCard
-                    name="data_fetch"
-                    title="Data Fetch"
-                    description="Fetches data from integrated CRM systems"
-                    enabled={enabledTools.data_fetch}
-                    onToggle={(enabled) => handleToggleTool('data_fetch', enabled)}
-                    required={false}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <ToolDefinitionsPanel 
-            rawDefinitions={toolDefinitions}
-            onSave={handleSaveToolDefinitions}
-            isSaving={false}
-          />
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>MCP Settings</CardTitle>
-              <CardDescription>
-                Configure how the MCP system operates
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="font-medium">Default AI Provider</label>
-                  <select className="w-full mt-1 border rounded p-2">
-                    <option value="openai">OpenAI</option>
-                    <option value="claude">Claude</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-medium">Default AI Model</label>
-                  <select className="w-full mt-1 border rounded p-2">
-                    <option value="gpt-4o">GPT-4o</option>
-                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="claude-3-5-haiku">Claude 3.5 Haiku</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-4">
-                <Button>Save Settings</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
-
-interface ToolConfigCardProps {
-  name: string;
-  title: string;
-  description: string;
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
-  required?: boolean;
-  disabled?: boolean;
-  disabledReason?: string;
-}
-
-const ToolConfigCard: React.FC<ToolConfigCardProps> = ({ 
-  name, 
-  title, 
-  description, 
-  enabled, 
-  onToggle,
-  required = false,
-  disabled = false,
-  disabledReason
-}) => {
-  return (
-    <Card className={`overflow-hidden ${disabled ? 'opacity-60' : ''}`}>
-      <CardContent className="p-0">
-        <div className="flex items-start p-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-lg font-medium">{title}</h3>
-              {required && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                  Required
-                </span>
-              )}
-              {disabled && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                  Disabled
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">{description}</p>
-            {disabledReason && (
-              <p className="text-xs text-amber-600 mt-1">{disabledReason}</p>
-            )}
-          </div>
-          <div className="ml-4 flex items-center space-x-2">
-            <Switch
-              id={`toggle-${name}`}
-              checked={enabled}
-              onCheckedChange={onToggle}
-              disabled={required || disabled}
+      <Card>
+        <CardHeader>
+          <CardTitle>Model Context Protocol Configuration</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground">
+            Configure the Model Context Protocol (MCP) orchestrator prompt and tool definitions.
+          </p>
+          
+          {/* Add the new collapsible contacts list component */}
+          {projectId && (
+            <MCPContactsList 
+              contacts={projectContacts} 
+              isLoading={projectId !== null && projectContacts === null}
             />
-            <Label htmlFor={`toggle-${name}`} className="sr-only">
-              Enable {title}
-            </Label>
-            {enabled ? (
-              <Check className="h-4 w-4 text-green-500" />
-            ) : (
-              <X className="h-4 w-4 text-gray-400" />
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          )}
+
+          {!mcpPrompt ? (
+            <div className="flex flex-col items-center justify-center p-6 border rounded-md">
+              <p className="mb-4 text-muted-foreground">No MCP orchestrator prompt configured.</p>
+              <Button 
+                onClick={() => createPromptMutation.mutate()}
+                disabled={createPromptMutation.isPending}
+              >
+                {createPromptMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                ) : (
+                  'Create Default MCP Prompt'
+                )}
+              </Button>
+            </div>
+          ) : (
+            <PromptEditor
+              prompt={mcpPrompt}
+              currentEditingId={editingPrompt?.id || null}
+              onEdit={setEditingPrompt}
+              onCancel={() => setEditingPrompt(null)}
+              updatePromptMutation={updatePromptMutation}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <ToolDefinitionsPanel />
+    </div>
   );
 };
 

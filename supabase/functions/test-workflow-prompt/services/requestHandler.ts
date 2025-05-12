@@ -5,6 +5,7 @@ import { replaceVariables } from "../utils.ts";
 import { handleAIResponse } from "./aiResponseHandler.ts";
 import { getMilestoneInstructions } from "../database/milestone.ts";
 import { getLatestWorkflowPrompt } from "../database/workflow-prompts.ts";
+import { getProjectContacts, formatContactsForContext } from "../database/contacts.ts";
 
 export async function handleRequest(supabase: any, requestBody: any) {
   const { 
@@ -29,6 +30,21 @@ export async function handleRequest(supabase: any, requestBody: any) {
   // Ensure default values for variables that might be missing
   contextData.is_reminder_check = contextData.is_reminder_check || false;
   contextData.available_tools = contextData.available_tools || [];
+  
+  // If we have a project ID, fetch contacts for it
+  if (projectId) {
+    try {
+      const contacts = await getProjectContacts(supabase, projectId);
+      const formattedContacts = formatContactsForContext(contacts);
+      contextData.contacts = contacts;
+      contextData.formattedContacts = formattedContacts;
+      contextData.project_contacts = formattedContacts;
+      console.log(`Fetched ${contacts.length} contacts for project ${projectId}`);
+    } catch (contactError) {
+      console.error("Error fetching project contacts:", contactError);
+      contextData.project_contacts = "Error retrieving project contacts.";
+    }
+  }
   
   // For MCP orchestrator prompts, always get the latest prompt from database
   let finalPromptText = promptText;
