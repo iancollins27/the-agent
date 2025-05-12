@@ -1,139 +1,67 @@
-
-export type WorkflowType = 'summary_generation' | 'summary_update' | 'action_detection' | 
-  'action_execution' | 'action_detection_execution' | 'multi_project_analysis' | 
-  'multi_project_message_generation' | 'mcp_orchestrator';
-
-export type WorkflowPrompt = {
-  id: string;
-  type: WorkflowType;
-  prompt_text: string;
-};
-
-export type Project = {
-  id: string;
-  summary: string | null;
-  project_track: string | null;
-  track_name?: string | null;
-  next_step?: string | null;  // Added this field to match the database schema
-  next_check_date?: string | null; // Date when the project should be checked again
-};
-
-export type TestResult = {
-  projectId: string;
-  results: PromptResult[];
-};
-
-export interface PromptResult {
-  type: WorkflowType;
-  output: string;
-  finalPrompt: string;
-  promptRunId?: string;
-  actionRecordId?: string;
-  reminderSet?: boolean;
-  nextCheckDateInfo?: {
-    currentValue: string | null;
-    newValue: string | null;
-  };
-  originalPrompt?: string;
-}
-
-export type CommunicationType = 'CALL' | 'SMS' | 'EMAIL';
-export type CommunicationDirection = 'inbound' | 'outbound';
-
-export interface NormalizedCommunication {
-  type: CommunicationType;
-  subtype: string;
-  participants: Array<{
-    type: 'phone' | 'email';
-    value: string;
-    role?: 'caller' | 'recipient' | 'sender' | 'receiver';
-  }>;
-  timestamp: string;
-  direction: CommunicationDirection;
-  duration?: number; // in seconds
-  content?: string; // message body or transcript
-  recording_url?: string;
-  project_id?: string;
-}
+export type WorkflowType =
+  | 'summary_generation'
+  | 'summary_update'
+  | 'action_detection_execution'
+  | 'multi_project_analysis'
+  | 'multi_project_message_generation'
+  | 'mcp_orchestrator';
 
 export const workflowTitles: Record<WorkflowType, string> = {
-  summary_generation: "Summary Generation",
-  summary_update: "Summary Update",
-  action_detection: "Action Detection",
-  action_execution: "Action Execution",
-  action_detection_execution: "Action Detection & Execution",
-  multi_project_analysis: "Multi-Project Analysis",
-  multi_project_message_generation: "Multi-Project Message Generation",
-  mcp_orchestrator: "MCP Orchestrator"
+  summary_generation: 'Summary Generation',
+  summary_update: 'Summary Update',
+  action_detection_execution: 'Action Detection & Execution',
+  multi_project_analysis: 'Multi-Project Analysis',
+  multi_project_message_generation: 'Multi-Project Message Generation',
+  mcp_orchestrator: 'MCP Orchestrator'
 };
 
-export const availableVariables = {
+export interface WorkflowPrompt {
+  id: string;
+  created_at: string;
+  type: WorkflowType;
+  prompt_text: string;
+}
+
+type VariableDefinition = {
+  name: string;
+  description: string;
+};
+
+export const availableVariables: Record<WorkflowType, VariableDefinition[]> = {
   summary_generation: [
-    { name: "track_name", description: "The name of the project track" },
-    { name: "track_roles", description: "Roles defined for the project track" },
-    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
-    { name: "new_data", description: "The data received from CRM" },
-    { name: "current_date", description: "Today's date" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
+    { name: "project_data", description: "Data fetched from the CRM system" },
+    { name: "initial_summary", description: "Auto-generated summary from project data" }
   ],
   summary_update: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
-    { name: "track_roles", description: "Roles defined for the project track" },
-    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
-    { name: "new_data", description: "The data received from CRM" },
-    { name: "current_date", description: "Today's date" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
-  ],
-  action_detection: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
-    { name: "track_roles", description: "Roles defined for the project track" },
-    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
-    { name: "current_date", description: "Today's date" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
-  ],
-  action_execution: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
-    { name: "track_roles", description: "Roles defined for the project track" },
-    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
-    { name: "action_description", description: "The description of the action to be executed" },
-    { name: "current_date", description: "Today's date" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" }
+    { name: "project_data", description: "Data fetched from the CRM system" },
+    { name: "current_summary", description: "Current project summary" },
+    { name: "new_data", description: "New data for update" }
   ],
   action_detection_execution: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
-    { name: "track_roles", description: "Roles defined for the project track" },
-    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
-    { name: "current_date", description: "Today's date" },
-    { name: "next_step", description: "The current next step in the project" },
-    { name: "milestone_instructions", description: "Instructions from the corresponding project track milestone" },
-    { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" },
-    { name: "property_address", description: "The property address for the project" }
+    { name: "project_data", description: "Data fetched from the CRM system" },
+    { name: "summary", description: "Project summary" },
+    { name: "milestone_data", description: "Details about the current milestone" }
   ],
   multi_project_analysis: [
-    { name: "communication_type", description: "Type of communication (SMS, CALL, etc.)" },
-    { name: "communication_content", description: "Content of the communication" },
-    { name: "communication_participants", description: "Participants in the communication" },
-    { name: "projects_data", description: "List of projects to analyze against" },
-    { name: "current_date", description: "Today's date" }
+    { name: "projects", description: "Array of project data" },
+    { name: "contact_id", description: "ID of the contact to analyze" }
   ],
   multi_project_message_generation: [
-    { name: "rooferName", description: "The name of the roofer" },
-    { name: "projectData", description: "Array of projects and their details" },
-    { name: "current_date", description: "Today's date" }
+    { name: "projectData", description: "Combined project data and statuses" },
+    { name: "rooferName", description: "Name of the roofer to address in message" }
   ],
   mcp_orchestrator: [
-    { name: "summary", description: "The current project summary" },
-    { name: "track_name", description: "The name of the project track" },
+    { name: "summary", description: "Project summary" },
+    { name: "project_id", description: "Unique identifier for the project" },
+    { name: "track_name", description: "Name of the project track" },
     { name: "track_roles", description: "Roles defined for the project track" },
-    { name: "track_base_prompt", description: "Base prompt defined for the project track" },
-    { name: "current_date", description: "Today's date" },
-    { name: "next_step", description: "The current next step in the project" },
-    { name: "property_address", description: "The property address for the project" },
-    { name: "is_reminder_check", description: "Whether this check is from a scheduled reminder" },
-    { name: "available_tools", description: "List of tools available to the orchestrator" }
+    { name: "track_base_prompt", description: "Base prompt defined in the project track" },
+    { name: "milestone_instructions", description: "Instructions for the current milestone" },
+    { name: "current_date", description: "Today's date in ISO format (YYYY-MM-DD)" },
+    { name: "next_step", description: "Description of the next step in the project" },
+    { name: "property_address", description: "Address of the property" },
+    { name: "is_reminder_check", description: "Whether this run is a reminder check" },
+    { name: "available_tools", description: "List of available tools" },
+    { name: "project_contacts", description: "List of contacts associated with the project" }
   ]
-};
+} as const;
