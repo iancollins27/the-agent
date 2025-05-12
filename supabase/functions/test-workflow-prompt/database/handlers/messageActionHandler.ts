@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { findContactId } from "../utils/contactUtils.ts";
 
@@ -10,6 +11,14 @@ export async function handleMessageAction(
   projectId: string,
   actionData: any
 ) {
+  console.log("handleMessageAction called with data:", JSON.stringify({
+    action_type: actionData.action_type,
+    recipient: actionData.recipient,
+    recipient_id: actionData.recipient_id,
+    sender: actionData.sender,
+    sender_ID: actionData.sender_ID || actionData.sender_id
+  }));
+  
   // Extract message content from all possible locations with detailed logging
   let messageContent = null;
   
@@ -59,14 +68,18 @@ export async function handleMessageAction(
     
     console.log("Looking up recipient ID for:", recipient);
     
-    // Find contact ID for recipient
-    recipientId = await findContactId(supabase, recipient, projectId);
-    console.log(`Recipient ID resolution: ${recipient} -> ${recipientId || 'Not found'}`);
+    try {
+      // Find contact ID for recipient
+      recipientId = await findContactId(supabase, recipient, projectId);
+      console.log(`Recipient ID resolution: ${recipient} -> ${recipientId || 'Not found'}`);
+    } catch (err) {
+      console.error("Error finding recipient ID:", err);
+    }
   } else {
     console.log("Using provided recipient ID:", recipientId);
   }
   
-  // Extract sender ID directly if provided
+  // Extract sender ID directly if provided - check all possible field names
   let senderId = actionData.sender_ID || actionData.sender_id || 
                 (actionData.action_payload && (actionData.action_payload.sender_ID || actionData.action_payload.sender_id)) || 
                 null;
@@ -80,16 +93,20 @@ export async function handleMessageAction(
     
     console.log("Looking up sender ID for:", sender);
     
-    // Find contact ID for sender
-    senderId = await findContactId(supabase, sender, projectId);
-    console.log(`Sender ID resolution: ${sender} -> ${senderId || 'Not found'}`);
+    try {
+      // Find contact ID for sender
+      senderId = await findContactId(supabase, sender, projectId);
+      console.log(`Sender ID resolution: ${sender} -> ${senderId || 'Not found'}`);
+    } catch (err) {
+      console.error("Error finding sender ID:", err);
+    }
   } else {
     console.log("Using provided sender ID:", senderId);
   }
   
-  // Extract or create description (we'll keep this minimal as per request)
-  const description = null; // Remove the description as requested
-  
+  // Log IDs before database operation
+  console.log("Final IDs for database insert - recipient_id:", recipientId, "sender_ID:", senderId);
+
   // Prepare the action payload
   const actionPayload = {
     recipient: actionData.recipient || (actionData.action_payload && actionData.action_payload.recipient),
@@ -99,7 +116,7 @@ export async function handleMessageAction(
     sender_ID: senderId
   };
   
-  console.log("Creating message action with payload:", actionPayload);
+  console.log("Creating message action with payload:", JSON.stringify(actionPayload));
   
   try {
     const { data, error } = await supabase

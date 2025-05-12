@@ -2,129 +2,112 @@
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 /**
- * Find a contact by name, role, or partial match
+ * Find a contact ID based on name, role, or partial match
+ * @param supabase Supabase client
+ * @param nameOrRole Name or role identifier
+ * @param projectId Project ID
+ * @returns Contact ID if found, null otherwise
  */
 export async function findContactId(
   supabase: SupabaseClient,
-  contactName: string,
+  nameOrRole: string,
   projectId: string
 ): Promise<string | null> {
-  if (!contactName || contactName.trim().length < 3) {
+  if (!nameOrRole || !projectId) {
+    console.log("Missing name/role or project ID in findContactId");
     return null;
   }
-
-  // Normalize contact role names for matching
-  const normalizeRoleName = (role: string): string => {
-    const roleMapping: Record<string, string> = {
-      'homeowner': 'HO',
-      'home owner': 'HO',
-      'ho': 'HO',
-      'customer': 'HO',
-      'client': 'HO',
-      'roofer': 'Roofer',
-      'roofing contractor': 'Roofer',
-      'solar': 'Solar',
-      'solar sales': 'Solar',
-      'solar rep': 'Solar',
-      'project manager': 'BidList Project Manager',
-      'bidlist pm': 'BidList Project Manager',
-      'manager': 'BidList Project Manager'
-    };
-    
-    const normalizedRole = role.toLowerCase().trim();
-    return roleMapping[normalizedRole] || role;
-  };
-
-  console.log(`Looking for contact "${contactName}" (normalized role: "${normalizeRoleName(contactName)}")`);
-
+  
   try {
-    // Check project_contacts first to get contacts associated with this project
-    const { data: projectContacts, error: projectContactsError } = await supabase
+    console.log(`findContactId: Searching for contact "${nameOrRole}" in project ${projectId}`);
+    
+    // First try to find an exact match
+    const exactMatchQuery = await supabase
       .from('project_contacts')
-      .select('contact_id')
+      .select(`
+        contact_id,
+        contacts:contact_id (
+          id, 
+          full_name,
+          role
+        )
+      `)
       .eq('project_id', projectId);
+      
+    console.log(`findContactId: Found ${exactMatchQuery.data?.length || 0} project contacts`);
     
-    if (projectContactsError) {
-      console.error("Error fetching project contacts:", projectContactsError);
-    } else if (projectContacts && projectContacts.length > 0) {
-      // If we have project contacts, look for a match among them
-      const contactIds = projectContacts.map(pc => pc.contact_id);
+    if (exactMatchQuery.data) {
+      // Name exact match
+      const nameExactMatch = exactMatchQuery.data.find(
+        row => row.contacts?.full_name?.toLowerCase() === nameOrRole.toLowerCase()
+      );
+      if (nameExactMatch) {
+        console.log(`findContactId: Found exact name match: ${nameExactMatch.contacts.full_name}`);
+        return nameExactMatch.contact_id;
+      }
       
-      const { data: contacts, error: contactsError } = await supabase
-        .from('contacts')
-        .select('id, full_name, role')
-        .in('id', contactIds);
+      // Role exact match
+      const roleExactMatch = exactMatchQuery.data.find(
+        row => row.contacts?.role?.toLowerCase() === nameOrRole.toLowerCase()
+      );
+      if (roleExactMatch) {
+        console.log(`findContactId: Found exact role match: ${roleExactMatch.contacts.role}`);
+        return roleExactMatch.contact_id;
+      }
       
-      if (contactsError) {
-        console.error("Error fetching contacts by IDs:", contactsError);
-      } else if (contacts && contacts.length > 0) {
-        console.log(`Found ${contacts.length} contacts for this project`);
-        
-        // Try exact match on full name
-        const exactMatch = contacts.find(c => 
-          c.full_name.toLowerCase() === contactName.toLowerCase());
-        
-        if (exactMatch) {
-          console.log(`Found exact name match: ${exactMatch.full_name} (${exactMatch.id})`);
-          return exactMatch.id;
+      // Common roles mapping (case-insensitive check)
+      const roleMapping: Record<string, string[]> = {
+        "homeowner": ["HO", "Homeowner", "Customer", "Client"],
+        "roofer": ["Roofer", "Roofing Contractor", "Roofing Company"],
+        "project manager": ["PM", "Project Manager", "BidList Project Manager"],
+        "solar": ["Solar", "Solar Rep", "Solar Ops", "Solar Representative"]
+      };
+      
+      // Find by role category
+      for (const [category, aliases] of Object.entries(roleMapping)) {
+        if (aliases.some(alias => alias.toLowerCase() === nameOrRole.toLowerCase()) || 
+            category.toLowerCase() === nameOrRole.toLowerCase()) {
+          // Find contacts with matching role category
+          const matchingContact = exactMatchQuery.data.find(row => {
+            const contactRole = row.contacts?.role?.toLowerCase();
+            return contactRole && (
+              aliases.some(alias => alias.toLowerCase() === contactRole) ||
+              contactRole.includes(category.toLowerCase())
+            );
+          });
+          
+          if (matchingContact) {
+            console.log(`findContactId: Found role category match: ${matchingContact.contacts.full_name} (${matchingContact.contacts.role})`);
+            return matchingContact.contact_id;
+          }
         }
-        
-        // Check if contactName is a role and try to match by role
-        const normalizedSearchRole = normalizeRoleName(contactName);
-        const roleMatch = contacts.find(c => {
-          const normalizedContactRole = normalizeRoleName(c.role);
-          return normalizedContactRole === normalizedSearchRole;
-        });
-        
-        if (roleMatch) {
-          console.log(`Found role match: ${roleMatch.full_name} with role ${roleMatch.role} (${roleMatch.id})`);
-          return roleMatch.id;
-        }
-        
-        // Try partial match on full name
-        const partialMatch = contacts.find(c => 
-          c.full_name.toLowerCase().includes(contactName.toLowerCase()) || 
-          contactName.toLowerCase().includes(c.full_name.toLowerCase()));
-        
-        if (partialMatch) {
-          console.log(`Found partial name match: ${partialMatch.full_name} (${partialMatch.id})`);
-          return partialMatch.id;
-        }
+      }
+      
+      // Partial name match as fallback
+      const partialNameMatch = exactMatchQuery.data.find(
+        row => row.contacts?.full_name?.toLowerCase().includes(nameOrRole.toLowerCase()) ||
+              nameOrRole.toLowerCase().includes(row.contacts?.full_name?.toLowerCase() || '')
+      );
+      if (partialNameMatch) {
+        console.log(`findContactId: Found partial name match: ${partialNameMatch.contacts.full_name}`);
+        return partialNameMatch.contact_id;
+      }
+      
+      // Partial role match as last resort
+      const partialRoleMatch = exactMatchQuery.data.find(
+        row => row.contacts?.role?.toLowerCase().includes(nameOrRole.toLowerCase()) ||
+              nameOrRole.toLowerCase().includes(row.contacts?.role?.toLowerCase() || '')
+      );
+      if (partialRoleMatch) {
+        console.log(`findContactId: Found partial role match: ${partialRoleMatch.contacts.role}`);
+        return partialRoleMatch.contact_id;
       }
     }
     
-    // If no match found in project contacts, try a broader search with role matching
-    if (contactName.toLowerCase() === 'homeowner' || contactName.toLowerCase() === 'ho') {
-      const { data: hoContacts, error: hoError } = await supabase
-        .from('contacts')
-        .select('id, full_name, role')
-        .eq('role', 'HO')
-        .limit(1);
-      
-      if (!hoError && hoContacts && hoContacts.length > 0) {
-        console.log(`Found homeowner by role: ${hoContacts[0].full_name} (${hoContacts[0].id})`);
-        return hoContacts[0].id;
-      }
-    }
-    
-    // Try all contacts as a fallback with name matching
-    const { data: allContacts, error: allContactsError } = await supabase
-      .from('contacts')
-      .select('id, full_name, role')
-      .ilike('full_name', `%${contactName}%`)
-      .limit(1);
-    
-    if (allContactsError) {
-      console.error("Error searching all contacts:", allContactsError);
-    } else if (allContacts && allContacts.length > 0) {
-      console.log(`Found contact match for "${contactName}": ${allContacts[0].full_name}`);
-      return allContacts[0].id;
-    }
-    
-    console.log(`No contact found for name: "${contactName}"`);
+    console.log(`findContactId: No match found for "${nameOrRole}" in project ${projectId}`);
     return null;
   } catch (error) {
-    console.error("Error finding contact:", error);
+    console.error(`findContactId: Error finding contact ID for "${nameOrRole}":`, error);
     return null;
   }
 }
