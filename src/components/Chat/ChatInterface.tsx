@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from "@/components/ui/button";
@@ -228,7 +227,10 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
                     parsedResponse.projects.length === 1) {
                   
                   // Store the identified project
-                  setIdentifiedProject(parsedResponse.projects[0]);
+                  setIdentifiedProject({
+                    ...parsedResponse.projects[0],
+                    id: parsedResponse.project_id || parsedResponse.projects[0].id // Make sure we have the project ID
+                  });
                   
                   // Store contacts if available
                   if (parsedResponse.contacts && parsedResponse.contacts.length > 0) {
@@ -236,7 +238,10 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
                     console.log('Contacts loaded:', parsedResponse.contacts);
                   }
                   
-                  console.log('Project identified:', parsedResponse.projects[0]);
+                  console.log('Project identified:', {
+                    ...parsedResponse.projects[0],
+                    id: parsedResponse.project_id || parsedResponse.projects[0].id
+                  });
                 }
               }
             } catch (e) {

@@ -84,6 +84,11 @@ export async function processToolCalls(
             projectData.company_id = toolResult.company_id;
           }
           
+          // Include explicit project ID if available
+          if (toolResult.project_id) {
+            projectData.id = toolResult.project_id;
+          }
+          
           // Include contacts data if available
           if (toolResult.contacts && toolResult.contacts.length > 0) {
             projectData.contacts = toolResult.contacts;

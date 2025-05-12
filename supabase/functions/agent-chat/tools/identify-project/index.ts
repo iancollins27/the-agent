@@ -1,4 +1,3 @@
-
 /**
  * Tool to identify a project based on provided information
  */
@@ -61,7 +60,8 @@ export const identifyProject: Tool = {
             status: "success",
             projects: projectById,
             contacts: projectContacts,
-            company_id: companyId
+            company_id: companyId,
+            project_id: projectById[0].id  // Explicitly include project_id in the result
           };
         }
       }
@@ -85,7 +85,8 @@ export const identifyProject: Tool = {
             status: "success",
             projects: projectByCrmId,
             contacts: projectContacts,
-            company_id: companyId
+            company_id: companyId,
+            project_id: projectByCrmId[0].id  // Explicitly include project_id in the result
           };
         }
       }
@@ -111,7 +112,8 @@ export const identifyProject: Tool = {
               status: "success",
               projects: projects.slice(0, 3),  // Ensure only 3 results max
               contacts: projectContacts,
-              company_id: companyId
+              company_id: companyId,
+              project_id: projects[0].id  // Explicitly include project_id in the result
             };
           }
         }
@@ -142,7 +144,8 @@ export const identifyProject: Tool = {
               status: "success",
               projects: projects.slice(0, 3),  // Ensure only 3 results max
               contacts: projectContacts,
-              company_id: companyId
+              company_id: companyId,
+              project_id: projects[0].id  // Explicitly include project_id in the result
             };
           }
         }
@@ -159,7 +162,8 @@ export const identifyProject: Tool = {
           status: "success",
           projects: projects.slice(0, 3),  // Ensure only 3 results max
           contacts: projectContacts,
-          company_id: companyId
+          company_id: companyId,
+          project_id: projects[0].id  // Explicitly include project_id in the result
         };
       }
       
@@ -232,7 +236,8 @@ export const identifyProject: Tool = {
             status: "success",
             projects: projects,
             contacts: projectContacts,
-            company_id: companyId
+            company_id: companyId,
+            project_id: projects[0].id  // Explicitly include project_id in the result
           };
         }
       }
@@ -247,7 +252,8 @@ export const identifyProject: Tool = {
           status: "success",
           projects: projects,
           contacts: projectContacts,
-          company_id: companyId
+          company_id: companyId,
+          project_id: projects[0].id  // Explicitly include project_id in the result
         };
       }
       
