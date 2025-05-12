@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,43 +49,161 @@ const ToolsAdmin = () => {
   const fetchTools = async () => {
     setIsLoading(true);
     try {
-      // Fetch tool definitions from the agent-chat function
-      const { data: chatTools, error: chatError } = await supabase.functions.invoke('agent-chat', {
-        body: { getToolDefinitions: true }
-      });
-
-      if (chatError) throw chatError;
-
-      // Fetch tool definitions from the test-workflow-prompt function
-      const { data: workflowTools, error: workflowError } = await supabase.functions.invoke('test-workflow-prompt', {
-        body: { getToolDefinitions: true }
-      });
-
-      if (workflowError) throw workflowError;
-
-      // Process and combine tools with categories
-      const processedTools = [
-        ...(chatTools?.toolDefinitions || []).map((tool: any) => ({
-          ...tool,
+      // Create default tool definitions to show even if API calls fail
+      const defaultTools: ToolDefinition[] = [
+        {
+          name: 'create_action_record',
+          description: 'Creates a specific action for team members to execute based on the project\'s needs.',
+          parameters: {
+            type: 'object',
+            properties: {
+              action_type: {
+                type: 'string',
+                enum: ['message', 'data_update', 'set_future_reminder', 'human_in_loop', 'knowledge_query'],
+                description: 'The type of action to be taken'
+              },
+              description: {
+                type: 'string',
+                description: 'Detailed description of what needs to be done'
+              }
+            },
+            required: ['action_type']
+          },
           enabled: true,
           category: 'chat'
-        })),
-        ...(workflowTools?.toolDefinitions || []).map((tool: any) => ({
-          ...tool,
+        },
+        {
+          name: 'knowledge_base_lookup',
+          description: 'Searches the knowledge base for relevant information about the project',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The search query to find relevant information'
+              },
+              limit: {
+                type: 'integer', 
+                description: 'Maximum number of results to return'
+              }
+            },
+            required: ['query']
+          },
           enabled: true,
           category: 'workflow'
-        }))
+        }
       ];
 
-      setTools(processedTools);
+      let chatTools = [];
+      let workflowTools = [];
+
+      try {
+        // Fetch tool definitions from the agent-chat function
+        const chatResponse = await supabase.functions.invoke('agent-chat', {
+          body: { getToolDefinitions: true }
+        });
+        
+        if (chatResponse && chatResponse.data && chatResponse.data.toolDefinitions) {
+          chatTools = chatResponse.data.toolDefinitions.map((tool: any) => ({
+            ...tool,
+            enabled: true,
+            category: 'chat'
+          }));
+        }
+      } catch (chatError) {
+        console.error("Error fetching chat tools:", chatError);
+        toast({
+          variant: "warning",
+          title: "Chat tools could not be loaded",
+          description: "Using default configuration instead."
+        });
+        // Use default tools for chat category
+        chatTools = defaultTools.filter(t => t.category === 'chat');
+      }
+
+      try {
+        // Fetch tool definitions from the test-workflow-prompt function
+        const workflowResponse = await supabase.functions.invoke('test-workflow-prompt', {
+          body: { getToolDefinitions: true }
+        });
+        
+        if (workflowResponse && workflowResponse.data && workflowResponse.data.toolDefinitions) {
+          workflowTools = workflowResponse.data.toolDefinitions.map((tool: any) => ({
+            ...tool,
+            enabled: true,
+            category: 'workflow'
+          }));
+        }
+      } catch (workflowError) {
+        console.error("Error fetching workflow tools:", workflowError);
+        toast({
+          variant: "warning",
+          title: "Workflow tools could not be loaded",
+          description: "Using default configuration instead."
+        });
+        // Use default tools for workflow category
+        workflowTools = defaultTools.filter(t => t.category === 'workflow');
+      }
+
+      // Combine tools from both sources
+      const processedTools = [...chatTools, ...workflowTools];
+      
+      // If we have no tools at all, use the default set
+      if (processedTools.length === 0) {
+        setTools(defaultTools);
+      } else {
+        setTools(processedTools);
+      }
     } catch (error) {
-      console.error('Error fetching tools:', error);
+      console.error('Error in tools fetching process:', error);
       toast({
         variant: "destructive",
         title: "Failed to fetch tools",
-        description: "There was an error fetching tool definitions."
+        description: "There was an error loading tool definitions. Using default configuration instead."
       });
-      setTools([]);
+      
+      // Fallback to default tools
+      const defaultTools: ToolDefinition[] = [
+        {
+          name: 'create_action_record',
+          description: 'Creates a specific action for team members to execute based on the project\'s needs.',
+          parameters: {
+            type: 'object',
+            properties: {
+              action_type: {
+                type: 'string',
+                enum: ['message', 'data_update', 'set_future_reminder', 'human_in_loop', 'knowledge_query'],
+                description: 'The type of action to be taken'
+              },
+              description: {
+                type: 'string',
+                description: 'Detailed description of what needs to be done'
+              }
+            },
+            required: ['action_type']
+          },
+          enabled: true,
+          category: 'chat'
+        },
+        {
+          name: 'knowledge_base_lookup',
+          description: 'Searches the knowledge base for relevant information about the project',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The search query to find relevant information'
+              }
+            },
+            required: ['query']
+          },
+          enabled: false,
+          category: 'workflow'
+        }
+      ];
+      
+      setTools(defaultTools);
     } finally {
       setIsLoading(false);
     }

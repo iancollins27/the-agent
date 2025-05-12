@@ -17,7 +17,14 @@ import ExecutionView from "./components/admin/execution-view/ExecutionView";
 import UpdateProjectEmbeddings from "./pages/UpdateProjectEmbeddings";
 import ToolsAdmin from "./pages/ToolsAdmin";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      retryDelay: 1000,
+    },
+  },
+});
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -100,7 +107,14 @@ function App() {
               }
             />
             <Route path="/update-project-embeddings" element={<UpdateProjectEmbeddings />} />
-            <Route path="/admin/tools" element={<ToolsAdmin />} />
+            <Route 
+              path="/admin/tools" 
+              element={
+                <ProtectedRoute>
+                  <ToolsAdmin />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster />
