@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Search, Tool, Wrench } from "lucide-react";
+import { Loader2, Plus, Search, Wrench } from "lucide-react";
 
 // Type definitions
 interface ToolDefinition {
@@ -153,7 +152,7 @@ const ToolsAdmin = () => {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <Tool className="h-5 w-5" />
+                    <Wrench className="h-5 w-5" />
                     {categories.find(c => c.id === activeCategory)?.name || 'Tools'}
                   </CardTitle>
                   <div className="relative">
