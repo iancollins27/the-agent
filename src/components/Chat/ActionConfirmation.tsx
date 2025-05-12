@@ -7,12 +7,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { ActionRecord } from "./types";
 
 type ActionConfirmationProps = {
-  action: ActionRecord;
+  action: ActionRecord | null;
+  isOpen: boolean;
+  onClose: () => void;
   onActionResolved: () => void;
 };
 
-const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActionResolved }) => {
+const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, isOpen, onClose, onActionResolved }) => {
   const { toast } = useToast();
+
+  // If no action or not open, don't render anything
+  if (!action || !isOpen) return null;
 
   const handleActionResponse = async (approve: boolean) => {
     try {
@@ -123,6 +128,7 @@ const ActionConfirmation: React.FC<ActionConfirmationProps> = ({ action, onActio
       
       // Notify parent component that action has been handled
       onActionResolved();
+      onClose();
     } catch (error) {
       console.error('Error handling action response:', error);
       toast({
