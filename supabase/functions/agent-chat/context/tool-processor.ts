@@ -39,7 +39,7 @@ export async function processToolCalls(
     processedToolCallIds.add(call.id); // Mark as processed
   
     try {
-      // Execute the tool
+      // Execute the tool with context including companyId
       const toolResult = await executeToolCall(
         supabase,
         call.name,

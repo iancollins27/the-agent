@@ -1,4 +1,3 @@
-
 /**
  * Create action record tool for agent-chat
  */
@@ -246,10 +245,6 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
       }
     }
 
-    if (!resolvedCompanyId) {
-      console.log('No company ID available and could not resolve it. Proceeding without company_id.');
-    }
-
     // Handle contact information
     let recipientId = args.recipient_id || null;
     let senderId = args.sender_ID || null;
@@ -294,11 +289,9 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
       created_by: userId,
     };
 
-    // Only include company_id if we have a value
-    if (resolvedCompanyId) {
-      actionData.company_id = resolvedCompanyId;
-    }
-
+    // Do NOT include company_id field at all even if we have it
+    // The action_records table doesn't have this column
+    
     console.log("Creating action record with data:", actionData);
 
     // Insert the action record
