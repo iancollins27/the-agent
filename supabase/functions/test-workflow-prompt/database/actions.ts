@@ -1,9 +1,11 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import { Database } from "../types.ts";
+
+// Use the available types file from the tools directory instead of non-existent types.ts file
+import { ToolContext } from "../tools/types.ts";
 
 // Initialize the Supabase client
-const supabase = createClient<Database>(
+const supabase = createClient(
   Deno.env.get("SUPABASE_URL") as string,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string
 );
