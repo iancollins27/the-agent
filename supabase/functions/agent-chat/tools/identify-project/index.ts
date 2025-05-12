@@ -1,26 +1,24 @@
 
 /**
- * Tool to identify projects based on user input (ID, CRM ID, or description)
- * Enhanced with semantic vector search via edge function
+ * Tool to identify a project based on provided information
  */
 
 import { Tool, ToolResult } from '../types.ts';
-import { generateOpenAIEmbedding } from '../../utils/embeddingUtils.ts';
-import { VectorSearchResult } from '../../utils/types.ts';
 
 export const identifyProject: Tool = {
   name: "identify_project",
-  description: "Identifies projects based on ID, CRM ID, or semantic search of description. Use this to find relevant projects when the user mentions a project or asks about a specific project.",
+  description: "Identifies a project based on provided information like ID, name, or address. Use this when the user mentions a specific project or address.",
   schema: {
     type: "object",
     properties: {
       query: {
         type: "string",
-        description: "The search query (project ID, CRM ID, or descriptive text)"
+        description: "The project identifier, address, or description to search for"
       },
-      company_id: {
+      type: {
         type: "string",
-        description: "Optional company ID to filter search to specific company"
+        enum: ["id", "crm_id", "name", "address", "any"],
+        description: "Type of query (defaults to 'any')"
       }
     },
     required: ["query"]
@@ -28,253 +26,187 @@ export const identifyProject: Tool = {
   
   async execute(args: any, context: any): Promise<ToolResult> {
     try {
-      const { query, company_id } = args;
+      const { query, type = "any" } = args;
       
       if (!query) {
         return {
           status: "error",
-          error: "Query is required for project identification"
+          error: "Query is required to identify a project"
         };
       }
       
       console.log(`Executing identify_project tool: query="${query}"`);
-
-      // Check if we have a supabase client
-      if (!context.supabase) {
+      
+      let projects = [];
+      
+      // First try exact matches
+      if (type === "id" || type === "any") {
+        // Try UUID format match
+        const { data: projectById } = await context.supabase
+          .from('projects')
+          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .eq('id', query)
+          .limit(1);
+          
+        if (projectById && projectById.length > 0) {
+          return {
+            status: "success",
+            projects: projectById
+          };
+        }
+      }
+      
+      if (type === "crm_id" || type === "any") {
+        // Try CRM ID match
+        const { data: projectByCrmId } = await context.supabase
+          .from('projects')
+          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .eq('crm_id', query)
+          .limit(1);
+          
+        if (projectByCrmId && projectByCrmId.length > 0) {
+          return {
+            status: "success",
+            projects: projectByCrmId
+          };
+        }
+      }
+      
+      if (type === "name" || type === "any") {
+        // Try project name match
+        const { data: projectByName } = await context.supabase
+          .from('projects')
+          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .ilike('project_name', `%${query}%`)
+          .limit(3);  // Limit to 3 results
+          
+        if (projectByName && projectByName.length > 0) {
+          projects = [...projectByName];
+          
+          // If we have at least one project, return immediately
+          if (projects.length > 0 && type === "name") {
+            return {
+              status: "success",
+              projects: projects.slice(0, 3)  // Ensure only 3 results max
+            };
+          }
+        }
+      }
+      
+      if (type === "address" || type === "any") {
+        // Try address match
+        const { data: projectByAddress } = await context.supabase
+          .from('projects')
+          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .ilike('Address', `%${query}%`)
+          .limit(3);  // Limit to 3 results
+          
+        if (projectByAddress && projectByAddress.length > 0) {
+          // Filter out any duplicates that might already be in the projects array
+          const newProjects = projectByAddress.filter(
+            p1 => !projects.some(p2 => p2.id === p1.id)
+          );
+          projects = [...projects, ...newProjects];
+          
+          // If we have at least one project, and we're specifically looking for address, return
+          if (projects.length > 0 && type === "address") {
+            return {
+              status: "success",
+              projects: projects.slice(0, 3)  // Ensure only 3 results max
+            };
+          }
+        }
+      }
+      
+      // If we have some projects from the above searches and we're in "any" mode, return them
+      if (projects.length > 0) {
+        console.log(`Found ${projects.length} projects by ${type !== "any" ? type : "name/address"}`);
         return {
-          status: "error",
-          error: "Supabase client is not available",
-          message: "Cannot perform project search without database connection"
+          status: "success",
+          projects: projects.slice(0, 3)  // Ensure only 3 results max
         };
       }
-
-      // First try exact match by ID or CRM ID
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       
-      if (uuidPattern.test(query)) {
-        console.log(`Query appears to be a UUID, searching by ID`);
-        const { data: exactMatches, error: exactError } = await context.supabase
-          .from('projects')
-          .select(`
-            id, 
-            crm_id, 
-            summary, 
-            next_step,
-            company_id,
-            companies(name),
-            Address,
-            project_name,
-            project_track,
-            Project_status
-          `)
-          .eq('id', query)
-          .maybeSingle();
-          
-        if (exactError) {
-          console.error("Error in exact ID search:", exactError);
-        } else if (exactMatches) {
-          console.log("Exact match found by ID, data:", JSON.stringify(exactMatches));
-          
-          return {
-            status: "success",
-            projects: [{
-              id: exactMatches.id,
-              crm_id: exactMatches.crm_id || '',
-              summary: exactMatches.summary || '',
-              next_step: exactMatches.next_step || '',
-              address: exactMatches.Address || '',
-              project_name: exactMatches.project_name || '',
-              status: exactMatches.Project_status || '',
-              company_id: exactMatches.company_id || null,
-              company_name: exactMatches.companies?.name || '',
-              project_track: exactMatches.project_track || null
-            }],
-            found: true,
-            count: 1,
-            message: `Found exact project match for ID "${query}"`
-          };
-        }
-      } 
-      
-      // Try exact CRM ID match
-      if (/^\d+$/.test(query)) {
-        console.log(`Query appears to be a number, searching by CRM ID`);
-        const { data: crmMatches, error: crmError } = await context.supabase
-          .from('projects')
-          .select(`
-            id, 
-            crm_id, 
-            summary, 
-            next_step,
-            company_id,
-            companies(name),
-            Address,
-            project_name,
-            project_track,
-            Project_status
-          `)
-          .eq('crm_id', query)
-          .maybeSingle();
-          
-        if (crmError) {
-          console.error("Error in CRM ID search:", crmError);
-        } else if (crmMatches) {
-          console.log("Exact match found by CRM ID, data:", JSON.stringify(crmMatches));
-          
-          return {
-            status: "success",
-            projects: [{
-              id: crmMatches.id,
-              crm_id: crmMatches.crm_id || '',
-              summary: crmMatches.summary || '',
-              next_step: crmMatches.next_step || '',
-              address: crmMatches.Address || '',
-              project_name: crmMatches.project_name || '',
-              status: crmMatches.Project_status || '',
-              company_id: crmMatches.company_id || null,
-              company_name: crmMatches.companies?.name || '',
-              project_track: crmMatches.project_track || null
-            }],
-            found: true,
-            count: 1,
-            message: `Found exact project match for CRM ID "${query}"`
-          };
-        }
-      } 
-      
-      // If no exact matches, perform semantic search using embeddings
+      // If no matches found yet, try a vector search
       console.log(`Performing semantic vector search for: ${query}`);
       
-      try {
-        // Generate embedding for the query
-        const queryEmbedding = await generateOpenAIEmbedding(query);
-        console.log("Generated embedding for query, first 5 values:", queryEmbedding.slice(0, 5));
-        
-        // Call our vector search edge function
-        console.log("Calling search-projects-by-vector edge function");
-        console.log("Vector search parameters:", {
-          searchEmbedding: "embedding array", // don't log the full array
-          matchThreshold: 0.2,
-          matchCount: 20,
-          companyId: company_id || null
-        });
-        
-        const { data: vectorSearchResults, error: vectorFunctionError } = await context.supabase.functions.invoke(
-          'search-projects-by-vector',
-          {
-            body: {
-              searchEmbedding: queryEmbedding,
-              matchThreshold: 0.2,
-              matchCount: 20,
-              companyId: company_id || null
-            }
-          }
-        );
-        
-        if (vectorFunctionError) {
-          console.error("Error calling vector search edge function:", vectorFunctionError);
-          throw new Error(`Vector search function error: ${vectorFunctionError}`);
-        }
-        
-        if (!vectorSearchResults) {
-          console.error("No results returned from vector search function");
-          throw new Error("No results returned from vector search function");
-        }
-        
-        console.log("Vector search edge function results:", JSON.stringify(vectorSearchResults).substring(0, 300) + "...");
-        console.log("Vector search status:", vectorSearchResults.status);
-        console.log("Vector search found:", vectorSearchResults.found);
-        console.log("Vector search count:", vectorSearchResults.count);
-        
-        if (vectorSearchResults.status === "success" && vectorSearchResults.projects && vectorSearchResults.projects.length > 0) {
-          console.log(`Found ${vectorSearchResults.projects.length} projects via vector search`);
-          
-          // Now we need to fetch the full project details for these addresses
-          if (vectorSearchResults.projects.length > 0) {
-            // Extract the addresses from the vector search results
-            const addresses = vectorSearchResults.projects.map(p => p.address).filter(a => a);
-            
-            if (addresses.length > 0) {
-              // Fetch full project details for these addresses
-              const { data: projectDetails, error: projectsError } = await context.supabase
-                .from('projects')
-                .select(`
-                  id, 
-                  crm_id, 
-                  summary, 
-                  next_step,
-                  company_id,
-                  companies(name),
-                  Address,
-                  project_name,
-                  project_track,
-                  Project_status
-                `)
-                .in('Address', addresses);
-                
-              if (projectsError) {
-                console.error("Error fetching project details by address:", projectsError);
-              } else if (projectDetails && projectDetails.length > 0) {
-                console.log(`Found ${projectDetails.length} projects by address`);
-                
-                // Map the project details to the return format
-                const projects = projectDetails.map(p => ({
-                  id: p.id,
-                  crm_id: p.crm_id || '',
-                  summary: p.summary || '',
-                  next_step: p.next_step || '',
-                  address: p.Address || '',
-                  project_name: p.project_name || '',
-                  status: p.Project_status || '',
-                  company_id: p.company_id || null,
-                  company_name: p.companies?.name || '',
-                  project_track: p.project_track || null
-                }));
-                
-                return {
-                  status: "success",
-                  projects: projects,
-                  found: true,
-                  count: projects.length,
-                  message: `Found ${projects.length} project(s) matching "${query}" using semantic search`
-                };
-              }
-            }
-          }
-          
-          // If we couldn't get full project details, just return the addresses
-          return {
-            status: "success",
-            projects: vectorSearchResults.projects,
-            found: true,
-            count: vectorSearchResults.projects.length,
-            message: `Found ${vectorSearchResults.projects.length} project addresses matching "${query}" using semantic search`
-          };
-        }
-        
-        // Fall back to traditional search if vector search returns no results
-        console.log("Vector search returned no results, falling back to traditional search");
-        return await performTraditionalSearch(query, company_id, context);
-        
-      } catch (embeddingError) {
-        console.error("Error in vector search process:", embeddingError);
-        console.log("DEBUG - Embedding error details:", {
-          error_message: embeddingError.message,
-          error_name: embeddingError.name,
-          error_stack: embeddingError.stack
-        });
-        
-        // Fall back to traditional search if there's an error with vector search
-        console.log("Error in vector search process, falling back to traditional search");
-        return await performTraditionalSearch(query, company_id, context);
+      // Get embedding for the query text
+      const embedding = await generateEmbedding(query, context);
+      if (!embedding) {
+        return {
+          status: "error",
+          error: "Failed to generate embedding for search"
+        };
       }
-    } catch (error) {
-      console.error("Error executing identify_project tool:", error);
-      console.log("DEBUG - Top level execution error:", {
-        error_message: error.message,
-        error_name: error.name,
-        error_stack: error.stack
+      
+      // Use the vector search edge function
+      const vectorSearchResponse = await context.supabase.functions.invoke('search-projects-by-vector', {
+        body: {
+          searchEmbedding: embedding,
+          matchThreshold: 0.2,
+          matchCount: 3,  // Limit to 3 results
+          companyId: null // Allow searching across all companies
+        }
       });
+      
+      if (vectorSearchResponse.error) {
+        console.error('Vector search error:', vectorSearchResponse.error);
+        return {
+          status: "error",
+          error: `Vector search failed: ${vectorSearchResponse.error.message}`
+        };
+      }
+      
+      // Log vector search details
+      console.log(`Vector search status: ${vectorSearchResponse.data?.status}`);
+      console.log(`Vector search found: ${vectorSearchResponse.data?.projects?.length > 0}`);
+      console.log(`Vector search count: ${vectorSearchResponse.data?.projects?.length}`);
+      
+      if (vectorSearchResponse.data?.status === 'success' && 
+          vectorSearchResponse.data?.projects?.length > 0) {
+        
+        // Get the full project details for the top matching projects
+        const projectIds = vectorSearchResponse.data.projects
+          .slice(0, 3) // Limit to top 3 matches
+          .map(p => p.id);
+        
+        const { data: vectorProjects } = await context.supabase
+          .from('projects')
+          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .in('id', projectIds);
+        
+        if (vectorProjects && vectorProjects.length > 0) {
+          // Combine with any previously found projects, ensuring no duplicates
+          const existingIds = new Set(projects.map(p => p.id));
+          const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
+          projects = [...projects, ...newProjects];
+          
+          console.log(`Found ${vectorProjects.length} projects via vector search`);
+          
+          // Make sure we have only 3 projects total
+          if (projects.length > 3) {
+            projects = projects.slice(0, 3);
+          }
+        }
+      }
+      
+      // Return the final result
+      if (projects.length > 0) {
+        return {
+          status: "success",
+          projects: projects
+        };
+      }
+      
+      // If still no matches, return empty result
+      return {
+        status: "success",
+        projects: [],
+        message: "No matching projects found"
+      };
+      
+    } catch (error) {
+      console.error("Error in identify_project tool:", error);
       return {
         status: "error",
         error: error.message || "An unexpected error occurred"
@@ -284,123 +216,37 @@ export const identifyProject: Tool = {
 };
 
 /**
- * Fallback method that performs traditional text search using ILIKE
+ * Generates an embedding vector for the given text
  */
-async function performTraditionalSearch(query: string, company_id: string | undefined, context: any): Promise<ToolResult> {
-  console.log(`Performing traditional text search for: ${query}`);
-  
-  // Check if we have a supabase client
-  if (!context || !context.supabase) {
-    return {
-      status: "error",
-      error: "Supabase client is not available",
-      message: "Cannot perform traditional search without database connection"
-    };
-  }
-  
-  // Break query into words, drop very common / non-informative tokens.
-  const stopWords = new Set(['county', 'project', 'the', 'a', 'an', 'in', 'at', 'of']);
-  const searchTerms = query
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-    .filter(t => t.length > 3 && !stopWords.has(t));
-
-  console.log("Search terms after filtering:", searchTerms);
-
-  let projectsQuery = context.supabase
-    .from('projects')
-    .select(`
-      id, 
-      crm_id, 
-      summary, 
-      next_step,
-      company_id,
-      companies(name),
-      Address,
-      project_name,
-      project_track,
-      Project_status
-    `);
-    
-  // Apply company filter if provided
-  if (company_id) {
-    console.log(`Filtering by company_id: ${company_id}`);
-    projectsQuery = projectsQuery.eq('company_id', company_id);
-  }
-    
-  // Fix: Instead of using comma-separated OR conditions which can break with addresses,
-  // we'll use multiple .or() filters chained together
-  console.log(`Adding OR condition: Address.ilike.%${query}%`);
-  projectsQuery = projectsQuery.or(`Address.ilike.%${query}%`);
-  
-  // Add additional OR conditions
-  console.log(`Adding OR condition: summary.ilike.%${query}%`);
-  projectsQuery = projectsQuery.or(`summary.ilike.%${query}%`);
-  
-  console.log(`Adding OR condition: project_name.ilike.%${query}%`);
-  projectsQuery = projectsQuery.or(`project_name.ilike.%${query}%`);
-  
-  // Allow partial numeric / alphanumeric match on CRM ID as a tertiary signal
-  if (!/^\d+$/.test(query.trim())) {
-    console.log(`Adding OR condition: crm_id.ilike.%${query}%`);
-    projectsQuery = projectsQuery.or(`crm_id.ilike.%${query}%`);
-  }
-
-  // Execute the query
-  console.log("Executing traditional search query");
-  const { data: projects, error } = await projectsQuery.limit(20);
-  
-  if (error) {
-    console.error("Error searching for projects:", error);
-    console.log("DEBUG - Traditional search error:", {
-      error_code: error.code,
-      error_message: error.message,
-      error_details: error.details
+async function generateEmbedding(text: string, context: any): Promise<number[] | null> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      })
     });
-    return {
-      status: "error",
-      error: `Database error: ${error.message}`
-    };
-  }
-  
-  console.log(`Traditional search results: ${projects ? projects.length : 0} projects found`);
-  
-  if (!projects || projects.length === 0) {
-    return {
-      status: "success",
-      projects: [],
-      found: false,
-      message: `No projects found matching "${query}"`
-    };
-  }
-  
-  // Process and format the results
-  const processedResults = projects.map((p: any, index: number) => {
-    if (index < 3) {
-      console.log(`Traditional search result #${index + 1}:`, JSON.stringify(p).substring(0, 200));
-      console.log(`Traditional search result #${index + 1} types:`, Object.entries(p).map(([key, value]) => `${key}: ${typeof value}`));
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`OpenAI embeddings API error: ${error}`);
+      return null;
     }
     
-    return {
-      id: String(p.id || ''),
-      crm_id: String(p.crm_id || ''),
-      summary: String(p.summary || ''),
-      next_step: String(p.next_step || ''),
-      address: String(p.Address || ''),
-      project_name: String(p.project_name || ''),
-      status: String(p.Project_status || ''),
-      company_id: p.company_id ? String(p.company_id) : null,
-      company_name: String(p.companies?.name || ''),
-      project_track: p.project_track ? String(p.project_track) : null
-    };
-  });
-  
-  return {
-    status: "success",
-    projects: processedResults,
-    found: true,
-    count: processedResults.length,
-    message: `Found ${processedResults.length} project(s) matching "${query}" using traditional search`
-  };
+    const data = await response.json();
+    const embedding = data.data[0].embedding;
+    
+    // Log just the first few values of the embedding for debugging
+    console.log(`Generated embedding for query, first 5 values: [ ${embedding.slice(0, 5).join(', ')} ]`);
+    
+    return embedding;
+  } catch (error) {
+    console.error(`Error generating embedding: ${error.message}`);
+    return null;
+  }
 }
