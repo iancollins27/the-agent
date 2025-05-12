@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -9,13 +9,11 @@ import { WorkflowPrompt } from "@/types/workflow";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import ToolDefinitionsPanel from "./MCP/ToolDefinitionsPanel";
-import MCPContactsList from "./MCPContactsList";
+import PromptVariablesReference from "./PromptVariablesReference";
 
 const MCPConfigTab = () => {
   const queryClient = useQueryClient();
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [projectContacts, setProjectContacts] = useState<any[] | null>(null);
   const [toolDefinitions, setToolDefinitions] = useState("[]");
 
   // Fetch the MCP orchestrator prompt
@@ -122,66 +120,6 @@ const MCPConfigTab = () => {
     }
   });
 
-  // Fetch test project for contacts
-  useEffect(() => {
-    const fetchTestProject = async () => {
-      // Get the most recent project used in a prompt run
-      const { data: recentRun, error: recentRunError } = await supabase
-        .from('prompt_runs')
-        .select('project_id')
-        .order('created_at', { ascending: false })
-        .not('project_id', 'is', null)
-        .limit(1);
-        
-      if (recentRunError) {
-        console.error('Error fetching recent prompt run:', recentRunError);
-        return;
-      }
-      
-      if (recentRun && recentRun.length > 0 && recentRun[0].project_id) {
-        setProjectId(recentRun[0].project_id);
-        fetchProjectContacts(recentRun[0].project_id);
-      }
-    };
-    
-    fetchTestProject();
-  }, []);
-
-  // Fetch project contacts for the demo
-  const fetchProjectContacts = async (projectId: string) => {
-    try {
-      const { data: contactIds, error: contactIdsError } = await supabase
-        .from('project_contacts')
-        .select('contact_id')
-        .eq('project_id', projectId);
-
-      if (contactIdsError) {
-        console.error('Error fetching project contact IDs:', contactIdsError);
-        return;
-      }
-
-      if (contactIds && contactIds.length > 0) {
-        const ids = contactIds.map(item => item.contact_id);
-        
-        const { data: contacts, error: contactsError } = await supabase
-          .from('contacts')
-          .select('*')
-          .in('id', ids);
-
-        if (contactsError) {
-          console.error('Error fetching contacts:', contactsError);
-          return;
-        }
-        
-        setProjectContacts(contacts);
-      } else {
-        setProjectContacts([]);
-      }
-    } catch (error) {
-      console.error('Error in fetchProjectContacts:', error);
-    }
-  };
-
   const updatePromptMutation = useMutation({
     mutationFn: async (prompt: WorkflowPrompt) => {
       const { error } = await supabase
@@ -282,14 +220,6 @@ Remember:
             Configure the Model Context Protocol (MCP) orchestrator prompt and tool definitions.
           </p>
           
-          {/* Add the new collapsible contacts list component */}
-          {projectId && (
-            <MCPContactsList 
-              contacts={projectContacts} 
-              isLoading={projectId !== null && projectContacts === null}
-            />
-          )}
-
           {!mcpPrompt ? (
             <div className="flex flex-col items-center justify-center p-6 border rounded-md">
               <p className="mb-4 text-muted-foreground">No MCP orchestrator prompt configured.</p>
@@ -305,13 +235,39 @@ Remember:
               </Button>
             </div>
           ) : (
-            <PromptEditor
-              prompt={mcpPrompt}
-              currentEditingId={editingPrompt?.id || null}
-              onEdit={setEditingPrompt}
-              onCancel={() => setEditingPrompt(null)}
-              updatePromptMutation={updatePromptMutation}
-            />
+            <>
+              <PromptEditor
+                prompt={mcpPrompt}
+                currentEditingId={editingPrompt?.id || null}
+                onEdit={setEditingPrompt}
+                onCancel={() => setEditingPrompt(null)}
+                updatePromptMutation={updatePromptMutation}
+              />
+              {editingPrompt && (
+                <PromptVariablesReference
+                  promptType="mcp_orchestrator"
+                  isEditing={!!editingPrompt}
+                  onInsertVariable={(variable) => {
+                    const textarea = document.querySelector('textarea[name="prompt_text"]') as HTMLTextAreaElement;
+                    if (textarea) {
+                      const start = textarea.selectionStart;
+                      const end = textarea.selectionEnd;
+                      const text = textarea.value;
+                      const before = text.substring(0, start);
+                      const after = text.substring(end, text.length);
+                      textarea.value = before + `{{${variable}}}` + after;
+                      textarea.focus();
+                      textarea.selectionStart = start + variable.length + 4;
+                      textarea.selectionEnd = start + variable.length + 4;
+                      
+                      // Update the form state
+                      const event = new Event('input', { bubbles: true });
+                      textarea.dispatchEvent(event);
+                    }
+                  }}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>
