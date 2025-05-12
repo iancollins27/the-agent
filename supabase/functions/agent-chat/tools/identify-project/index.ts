@@ -38,23 +38,30 @@ export const identifyProject: Tool = {
       console.log(`Executing identify_project tool: query="${query}"`);
       
       let projects = [];
+      let projectContacts = [];
+      let companyId = null;
       
       // First try exact matches
       if (type === "id" || type === "any") {
         // Try UUID format match
         const { data: projectById } = await context.supabase
           .from('projects')
-          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
           .eq('id', query)
           .limit(1);
           
         if (projectById && projectById.length > 0) {
+          projects = projectById;
+          companyId = projectById[0].company_id;
+          
           // Fetch contacts for this project
-          const projectContacts = await fetchProjectContacts(context.supabase, projectById[0].id);
+          projectContacts = await fetchProjectContacts(context.supabase, projectById[0].id);
+          
           return {
             status: "success",
             projects: projectById,
-            contacts: projectContacts
+            contacts: projectContacts,
+            company_id: companyId
           };
         }
       }
@@ -63,17 +70,22 @@ export const identifyProject: Tool = {
         // Try CRM ID match
         const { data: projectByCrmId } = await context.supabase
           .from('projects')
-          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
           .eq('crm_id', query)
           .limit(1);
           
         if (projectByCrmId && projectByCrmId.length > 0) {
+          projects = projectByCrmId;
+          companyId = projectByCrmId[0].company_id;
+          
           // Fetch contacts for this project
-          const projectContacts = await fetchProjectContacts(context.supabase, projectByCrmId[0].id);
+          projectContacts = await fetchProjectContacts(context.supabase, projectByCrmId[0].id);
+          
           return {
             status: "success",
             projects: projectByCrmId,
-            contacts: projectContacts
+            contacts: projectContacts,
+            company_id: companyId
           };
         }
       }
@@ -82,21 +94,24 @@ export const identifyProject: Tool = {
         // Try project name match
         const { data: projectByName } = await context.supabase
           .from('projects')
-          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
           .ilike('project_name', `%${query}%`)
           .limit(3);  // Limit to 3 results
           
         if (projectByName && projectByName.length > 0) {
           projects = [...projectByName];
+          companyId = projectByName[0].company_id;
           
           // If we have at least one project, return immediately
           if (projects.length > 0 && type === "name") {
             // Fetch contacts for the first project
-            const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+            projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+            
             return {
               status: "success",
               projects: projects.slice(0, 3),  // Ensure only 3 results max
-              contacts: projectContacts
+              contacts: projectContacts,
+              company_id: companyId
             };
           }
         }
@@ -106,7 +121,7 @@ export const identifyProject: Tool = {
         // Try address match
         const { data: projectByAddress } = await context.supabase
           .from('projects')
-          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
           .ilike('Address', `%${query}%`)
           .limit(3);  // Limit to 3 results
           
@@ -116,15 +131,18 @@ export const identifyProject: Tool = {
             p1 => !projects.some(p2 => p2.id === p1.id)
           );
           projects = [...projects, ...newProjects];
+          companyId = projectByAddress[0].company_id;
           
           // If we have at least one project, and we're specifically looking for address, return
           if (projects.length > 0 && type === "address") {
             // Fetch contacts for the first project
-            const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+            projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+            
             return {
               status: "success",
               projects: projects.slice(0, 3),  // Ensure only 3 results max
-              contacts: projectContacts
+              contacts: projectContacts,
+              company_id: companyId
             };
           }
         }
@@ -134,11 +152,14 @@ export const identifyProject: Tool = {
       if (projects.length > 0) {
         console.log(`Found ${projects.length} projects by ${type !== "any" ? type : "name/address"}`);
         // Fetch contacts for the first project
-        const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+        projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+        companyId = projects[0].company_id;
+        
         return {
           status: "success",
           projects: projects.slice(0, 3),  // Ensure only 3 results max
-          contacts: projectContacts
+          contacts: projectContacts,
+          company_id: companyId
         };
       }
       
@@ -187,7 +208,7 @@ export const identifyProject: Tool = {
         
         const { data: vectorProjects } = await context.supabase
           .from('projects')
-          .select('id, crm_id, project_name, summary, next_step, Address, Project_status')
+          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
           .in('id', projectIds);
         
         if (vectorProjects && vectorProjects.length > 0) {
@@ -195,6 +216,7 @@ export const identifyProject: Tool = {
           const existingIds = new Set(projects.map(p => p.id));
           const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
           projects = [...projects, ...newProjects];
+          companyId = vectorProjects[0].company_id;
           
           console.log(`Found ${vectorProjects.length} projects via vector search`);
           
@@ -204,11 +226,13 @@ export const identifyProject: Tool = {
           }
           
           // Fetch contacts for the first project
-          const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+          projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+          
           return {
             status: "success",
             projects: projects,
-            contacts: projectContacts
+            contacts: projectContacts,
+            company_id: companyId
           };
         }
       }
@@ -216,11 +240,14 @@ export const identifyProject: Tool = {
       // Return the final result
       if (projects.length > 0) {
         // Fetch contacts for the first project
-        const projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+        projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+        companyId = projects[0].company_id;
+        
         return {
           status: "success",
           projects: projects,
-          contacts: projectContacts
+          contacts: projectContacts,
+          company_id: companyId
         };
       }
       
@@ -228,6 +255,7 @@ export const identifyProject: Tool = {
       return {
         status: "success",
         projects: [],
+        contacts: [],
         message: "No matching projects found"
       };
       
@@ -315,6 +343,9 @@ async function fetchProjectContacts(supabase: any, projectId: string) {
     }
     
     console.log(`Successfully retrieved ${contacts?.length || 0} contacts for project ${projectId}`);
+    contacts?.forEach((contact, index) => {
+      console.log(`Contact ${index+1}: ${contact.full_name}, Role: ${contact.role}, ID: ${contact.id}`);
+    });
     
     return contacts || [];
   } catch (error) {

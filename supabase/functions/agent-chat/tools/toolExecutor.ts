@@ -31,22 +31,13 @@ export async function executeToolCall(
     };
     
     // Different tools might have their export structured differently
-    // Handle identify_project special case
-    if (toolName === 'identify_project' && toolModule.identifyProject) {
-      const result = await toolModule.identifyProject.execute(args, context);
-      console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
-      return result;
-    }
+    const toolExports = {
+      identify_project: toolModule.identifyProject,
+      create_action_record: toolModule.createActionRecord
+    };
     
-    // Handle create_action_record special case
-    if (toolName === 'create_action_record' && toolModule.createActionRecord) {
-      const result = await toolModule.createActionRecord.execute(args, context);
-      console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
-      return result;
-    }
-    
-    // For other tools, try the direct export match using the original name or converted name
-    const toolFunction = toolModule[toolName] || toolModule[mappedToolName.replace(/-/g, '_')];
+    // Get the correct tool function
+    const toolFunction = toolExports[toolName];
     
     if (toolFunction && toolFunction.execute) {
       const result = await toolFunction.execute(args, context);

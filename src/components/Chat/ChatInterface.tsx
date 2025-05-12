@@ -233,12 +233,10 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
                   // Store contacts if available
                   if (parsedResponse.contacts && parsedResponse.contacts.length > 0) {
                     setProjectContacts(parsedResponse.contacts);
+                    console.log('Contacts loaded:', parsedResponse.contacts);
                   }
                   
                   console.log('Project identified:', parsedResponse.projects[0]);
-                  if (parsedResponse.contacts) {
-                    console.log('Contacts loaded:', parsedResponse.contacts);
-                  }
                 }
               }
             } catch (e) {

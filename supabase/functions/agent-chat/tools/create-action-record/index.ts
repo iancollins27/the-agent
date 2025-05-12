@@ -194,6 +194,18 @@ async function findContactByNameOrRole(supabase: any, nameOrRole: string, projec
       console.log(`Found partial role match: ${partialRoleMatch.role} (${partialRoleMatch.full_name})`);
       return partialRoleMatch.id;
     }
+
+    // 6. Try to match by email if the search term looks like an email
+    if (searchTerm.includes('@')) {
+      const emailMatch = contacts.find(
+        contact => contact.email && contact.email.toLowerCase() === searchTerm
+      );
+      
+      if (emailMatch) {
+        console.log(`Found email match: ${emailMatch.email} (${emailMatch.full_name})`);
+        return emailMatch.id;
+      }
+    }
     
     console.log(`No match found for "${nameOrRole}"`);
     return null;
@@ -214,7 +226,30 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
     const projectId = args.project_id;
     
     console.log(`Creating action record with args:`, JSON.stringify(args));
-    
+
+    // If we don't have a company ID, try to get it from the project
+    let resolvedCompanyId = companyId;
+    if (!resolvedCompanyId && projectId) {
+      try {
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('company_id')
+          .eq('id', projectId)
+          .single();
+
+        if (projectData && !projectError) {
+          resolvedCompanyId = projectData.company_id;
+          console.log(`Resolved company ID from project: ${resolvedCompanyId}`);
+        }
+      } catch (err) {
+        console.error(`Error resolving company ID from project: ${err.message}`);
+      }
+    }
+
+    if (!resolvedCompanyId) {
+      console.log('No company ID available and could not resolve it. Proceeding without company_id.');
+    }
+
     // Handle contact information
     let recipientId = args.recipient_id || null;
     let senderId = args.sender_ID || null;
@@ -247,7 +282,7 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
     }
 
     // Prepare the action record data
-    const actionData = {
+    const actionData: Record<string, any> = {
       action_type: args.action_type,
       message: args.message || null,
       recipient_id: recipientId,
@@ -256,9 +291,13 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
       action_payload: actionPayload,
       status: (args.requires_approval ?? true) ? 'pending' : 'approved',
       project_id: projectId,
-      company_id: companyId,
       created_by: userId,
     };
+
+    // Only include company_id if we have a value
+    if (resolvedCompanyId) {
+      actionData.company_id = resolvedCompanyId;
+    }
 
     console.log("Creating action record with data:", actionData);
 

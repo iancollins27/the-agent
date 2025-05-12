@@ -79,6 +79,11 @@ export async function processToolCalls(
           // Just one project found, use it and include contacts data
           projectData = toolResult.projects[0];
           
+          // Include any company ID that was found
+          if (toolResult.company_id) {
+            projectData.company_id = toolResult.company_id;
+          }
+          
           // Include contacts data if available
           if (toolResult.contacts && toolResult.contacts.length > 0) {
             projectData.contacts = toolResult.contacts;
