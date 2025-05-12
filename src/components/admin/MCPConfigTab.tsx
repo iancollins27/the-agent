@@ -16,6 +16,7 @@ const MCPConfigTab = () => {
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectContacts, setProjectContacts] = useState<any[] | null>(null);
+  const [toolDefinitions, setToolDefinitions] = useState("[]");
 
   // Fetch the MCP orchestrator prompt
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
@@ -33,6 +34,91 @@ const MCPConfigTab = () => {
       }
       
       return data as WorkflowPrompt[];
+    }
+  });
+
+  // Fetch tool definitions
+  const { isLoading: isLoadingTools } = useQuery({
+    queryKey: ['mcp-tool-definitions'],
+    queryFn: async () => {
+      try {
+        // This would typically fetch from an API or database
+        // For now, we'll use a default set of tool definitions
+        const defaultTools = [
+          {
+            type: "function",
+            name: "create_action_record",
+            description: "Create an action record in the system",
+            parameters: {
+              type: "object",
+              properties: {
+                action_type: {
+                  type: "string",
+                  enum: ["message", "reminder", "update", "notification"],
+                  description: "Type of action to create"
+                },
+                decision: {
+                  type: "string",
+                  enum: ["ACTION_NEEDED", "NO_ACTION", "DEFER"],
+                  description: "Decision about the action"
+                },
+                priority: {
+                  type: "string",
+                  enum: ["low", "medium", "high"],
+                  description: "Priority level for the action"
+                },
+                message: {
+                  type: "string",
+                  description: "Message content for the action"
+                },
+                sender: {
+                  type: "string",
+                  description: "Who is sending the message or creating the action"
+                },
+                recipient: {
+                  type: "string",
+                  description: "Who is receiving the message or action"
+                },
+                description: {
+                  type: "string",
+                  description: "Brief description of what this action does"
+                },
+                reason: {
+                  type: "string",
+                  description: "Why this action is needed"
+                }
+              },
+              required: ["action_type", "decision"]
+            }
+          },
+          {
+            type: "function",
+            name: "knowledge_base_lookup",
+            description: "Search the knowledge base for information",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "The search query"
+                },
+                limit: {
+                  type: "number",
+                  description: "Maximum number of results to return"
+                }
+              },
+              required: ["query"]
+            }
+          }
+        ];
+        
+        const toolsJson = JSON.stringify(defaultTools, null, 2);
+        setToolDefinitions(toolsJson);
+        return defaultTools;
+      } catch (error) {
+        console.error('Error fetching tool definitions:', error);
+        throw error;
+      }
     }
   });
 
@@ -160,6 +246,12 @@ Remember:
     }
   });
 
+  const handleSaveToolDefinitions = (definitions: string) => {
+    setToolDefinitions(definitions);
+    // In a real implementation, you'd save this to the database
+    console.log('Tool definitions saved:', definitions);
+  };
+
   if (promptsError) {
     return (
       <Alert variant="destructive">
@@ -224,7 +316,11 @@ Remember:
         </CardContent>
       </Card>
 
-      <ToolDefinitionsPanel />
+      <ToolDefinitionsPanel 
+        rawDefinitions={toolDefinitions}
+        onSave={handleSaveToolDefinitions}
+        isSaving={false}
+      />
     </div>
   );
 };
