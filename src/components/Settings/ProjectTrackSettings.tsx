@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import ProjectTrackMilestones from './ProjectTrackMilestones';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2, Plus } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Loader2, Plus, ChevronRight } from 'lucide-react';
 
 interface ProjectTrack {
   id: string;
@@ -28,6 +28,7 @@ const ProjectTrackSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("tracks");
+  const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
 
   useEffect(() => {
     if (companySettings?.id) {
@@ -51,6 +52,7 @@ const ProjectTrackSettings = () => {
       setProjectTracks(data || []);
       if (data && data.length > 0) {
         setSelectedTrack(data[0]);
+        setExpandedTrackId(data[0].id);
       }
     } catch (error) {
       console.error('Error loading project tracks:', error);
@@ -172,6 +174,11 @@ const ProjectTrackSettings = () => {
     }
   };
 
+  const handleTrackSelect = (track: ProjectTrack) => {
+    setSelectedTrack(track);
+    setExpandedTrackId(track.id);
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -182,123 +189,105 @@ const ProjectTrackSettings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="tracks">Tracks</TabsTrigger>
-              <TabsTrigger value="milestones">Milestones</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="tracks" className="space-y-4 mt-4">
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium">Track Management</h3>
+                <Button size="sm" variant="outline" onClick={handleCreateNewTrack}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Track
+                </Button>
+              </div>
+              
+              {projectTracks.length === 0 ? (
+                <div className="text-center py-8 border rounded-md">
+                  <p className="text-gray-500">No tracks found. Create your first track.</p>
                 </div>
               ) : (
-                <>
-                  <div className="flex gap-4">
-                    <div className="w-1/3 space-y-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-sm font-medium">Track List</h3>
-                        <Button size="sm" variant="outline" onClick={handleCreateNewTrack}>
-                          <Plus className="h-4 w-4 mr-1" /> Add
-                        </Button>
-                      </div>
-                      <div className="border rounded-md overflow-hidden">
-                        <ul className="divide-y">
-                          {projectTracks.map(track => (
-                            <li 
-                              key={track.id} 
-                              className={`px-4 py-2 hover:bg-gray-50 cursor-pointer ${
-                                selectedTrack?.id === track.id ? 'bg-gray-100 dark:bg-gray-800' : ''
-                              }`}
-                              onClick={() => setSelectedTrack(track)}
-                            >
-                              {track.name}
-                            </li>
-                          ))}
-                          {projectTracks.length === 0 && (
-                            <li className="px-4 py-2 text-gray-500">
-                              No tracks found. Create your first track.
-                            </li>
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-                    
-                    <div className="w-2/3 border rounded-md p-4">
-                      {selectedTrack ? (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="trackName">Track Name</Label>
-                            <Input 
-                              id="trackName"
-                              value={selectedTrack.name} 
-                              onChange={(e) => handleTrackChange('name', e.target.value)} 
-                            />
+                <Accordion 
+                  type="single" 
+                  collapsible 
+                  value={expandedTrackId || ''} 
+                  onValueChange={(value) => setExpandedTrackId(value)}
+                  className="w-full"
+                >
+                  {projectTracks.map(track => (
+                    <AccordionItem key={track.id} value={track.id} className="border rounded-md mb-4 overflow-hidden">
+                      <AccordionTrigger 
+                        className="px-4 py-3 hover:bg-gray-50 font-medium" 
+                        onClick={() => handleTrackSelect(track)}
+                      >
+                        {track.name}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-6 p-4">
+                          <div className="space-y-6">
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor={`trackName-${track.id}`}>Track Name</Label>
+                                <Input 
+                                  id={`trackName-${track.id}`}
+                                  value={selectedTrack?.id === track.id ? selectedTrack.name : track.name} 
+                                  onChange={(e) => selectedTrack?.id === track.id && handleTrackChange('name', e.target.value)} 
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`trackRoles-${track.id}`}>Track Roles</Label>
+                                <Textarea 
+                                  id={`trackRoles-${track.id}`}
+                                  value={selectedTrack?.id === track.id ? selectedTrack.Roles || '' : track.Roles || ''} 
+                                  onChange={(e) => selectedTrack?.id === track.id && handleTrackChange('Roles', e.target.value)}
+                                  placeholder="Define project roles for this track..."
+                                  rows={4}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor={`trackPrompt-${track.id}`}>Base Prompt</Label>
+                                <Textarea 
+                                  id={`trackPrompt-${track.id}`}
+                                  value={selectedTrack?.id === track.id ? selectedTrack['track base prompt'] || '' : track['track base prompt'] || ''} 
+                                  onChange={(e) => selectedTrack?.id === track.id && handleTrackChange('track base prompt', e.target.value)}
+                                  placeholder="Define the base prompt for this track..."
+                                  rows={6}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-between pt-2">
+                              <Button 
+                                variant="destructive" 
+                                onClick={handleDeleteTrack}
+                                disabled={isSaving || projectTracks.length <= 1}
+                              >
+                                Delete Track
+                              </Button>
+                              <Button 
+                                onClick={handleSaveTrack}
+                                disabled={isSaving}
+                              >
+                                {isSaving ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                                  </>
+                                ) : 'Save Changes'}
+                              </Button>
+                            </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="trackRoles">Track Roles</Label>
-                            <Textarea 
-                              id="trackRoles"
-                              value={selectedTrack.Roles || ''} 
-                              onChange={(e) => handleTrackChange('Roles', e.target.value)}
-                              placeholder="Define project roles for this track..."
-                              rows={4}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="trackPrompt">Base Prompt</Label>
-                            <Textarea 
-                              id="trackPrompt"
-                              value={selectedTrack['track base prompt'] || ''} 
-                              onChange={(e) => handleTrackChange('track base prompt', e.target.value)}
-                              placeholder="Define the base prompt for this track..."
-                              rows={6}
-                            />
-                          </div>
-                          <div className="flex justify-between pt-2">
-                            <Button 
-                              variant="destructive" 
-                              onClick={handleDeleteTrack}
-                              disabled={isSaving || projectTracks.length <= 1}
-                            >
-                              Delete Track
-                            </Button>
-                            <Button 
-                              onClick={handleSaveTrack}
-                              disabled={isSaving}
-                            >
-                              {isSaving ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                                </>
-                              ) : 'Save Changes'}
-                            </Button>
+                          
+                          <div className="mt-8 pt-6 border-t">
+                            <ProjectTrackMilestones trackId={track.id} trackName={track.name} />
                           </div>
                         </div>
-                      ) : (
-                        <div className="text-center py-8 text-gray-500">
-                          No track selected or no tracks available.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
               )}
-            </TabsContent>
-            
-            <TabsContent value="milestones" className="mt-4">
-              {selectedTrack ? (
-                <ProjectTrackMilestones trackId={selectedTrack.id} trackName={selectedTrack.name} />
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  {projectTracks.length === 0 
-                    ? "No tracks available. Please create a track first." 
-                    : "Please select a track to manage its milestones."}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
