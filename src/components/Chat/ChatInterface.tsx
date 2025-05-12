@@ -7,7 +7,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import ActionConfirmation from "./ActionConfirmation";
+import { ActionRecord } from "./types";
 
 interface ChatMessage {
   id: string;
@@ -30,6 +32,9 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [placeholderId, setPlaceholderId] = useState<string | null>(null);
+  const [pendingActions, setPendingActions] = useState<ActionRecord[]>([]);
+  const [currentAction, setCurrentAction] = useState<ActionRecord | null>(null);
+  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
 
   useEffect(() => {
     if (presetMessage) {
@@ -43,6 +48,59 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    // Fetch pending actions when project ID changes or on initial load
+    if (projectId) {
+      fetchPendingActions();
+    }
+  }, [projectId]);
+
+  const fetchPendingActions = async () => {
+    if (!projectId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('action_records')
+        .select(`
+          *,
+          recipient:contacts!recipient_id(id, full_name),
+          sender:contacts!sender_ID(id, full_name)
+        `)
+        .eq('project_id', projectId)
+        .eq('status', 'pending')
+        .eq('requires_approval', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching pending actions:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        // Process the data to match ActionRecord type
+        const processedData = data.map((record: any) => {
+          const actionPayload = typeof record.action_payload === 'object' && record.action_payload !== null 
+            ? record.action_payload 
+            : {};
+            
+          return {
+            ...record,
+            recipient_name: record.recipient?.full_name || 
+              (actionPayload && 'recipient' in actionPayload ? 
+                actionPayload.recipient as string : null),
+            sender_name: record.sender?.full_name || 
+              (actionPayload && 'sender' in actionPayload ? 
+                actionPayload.sender as string : null)
+          };
+        });
+        
+        setPendingActions(processedData as ActionRecord[]);
+      }
+    } catch (error) {
+      console.error("Error fetching pending actions:", error);
+    }
+  };
 
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim()) return;
@@ -117,7 +175,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
             projectId,
             projectData,
             customPrompt: chatbotConfig?.system_prompt,
-            availableTools: chatbotConfig?.available_tools || []
+            availableTools: chatbotConfig?.available_tools || ['identify_project', 'create_action_record']
           }),
         }
       );
@@ -147,6 +205,15 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
         } : m
       ));
       
+      // Check if any tool call was the create_action_record tool
+      const hasActionRecord = hasTool && assistantMessage.tool_calls.some(
+        (call: any) => call.function.name === 'create_action_record'
+      );
+      
+      // If an action was created, refresh the pending actions list
+      if (hasActionRecord) {
+        await fetchPendingActions();
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -171,6 +238,18 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
       sendMessage(input);
       setInput('');
     }
+  };
+
+  const handleActionClick = (action: ActionRecord) => {
+    setCurrentAction(action);
+    setIsActionDialogOpen(true);
+  };
+
+  const handleActionResolved = () => {
+    // Remove the resolved action from the pending actions list
+    setPendingActions(prev => prev.filter(a => a.id !== currentAction?.id));
+    setCurrentAction(null);
+    setIsActionDialogOpen(false);
   };
 
   return (
@@ -207,7 +286,40 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
             </div>
           </div>
         )}
+        
+        {pendingActions.length > 0 && (
+          <div className="mb-4 px-2 py-1 bg-amber-50 border border-amber-200 rounded-md">
+            <div className="flex items-center gap-2 mb-2 text-amber-800">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">Pending Actions</span>
+            </div>
+            {pendingActions.slice(0, 3).map(action => (
+              <div key={action.id} className="mb-2 last:mb-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-between py-1 px-3 h-auto text-xs border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                  onClick={() => handleActionClick(action)}
+                >
+                  <span>
+                    {action.action_type === 'message' ? 'Message to send' : 
+                     action.action_type === 'data_update' ? 'Data update' :
+                     action.action_type === 'set_future_reminder' ? 'Reminder to set' :
+                     action.action_type.replace(/_/g, ' ')}
+                  </span>
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs">Review</span>
+                </Button>
+              </div>
+            ))}
+            {pendingActions.length > 3 && (
+              <div className="text-xs text-center text-amber-700 mt-1">
+                +{pendingActions.length - 3} more actions need review
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      
       <div className="p-4 border-t dark:border-gray-700">
         <div className="flex items-center space-x-2">
           <Input
@@ -228,6 +340,14 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
           </Button>
         </div>
       </div>
+      
+      {/* Action confirmation dialog */}
+      <ActionConfirmation
+        action={currentAction}
+        isOpen={isActionDialogOpen}
+        onClose={() => setIsActionDialogOpen(false)}
+        onActionResolved={handleActionResolved}
+      />
     </div>
   );
 };

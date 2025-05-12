@@ -9,33 +9,26 @@ interface NotionActionProps {
 
 const NotionAction: React.FC<NotionActionProps> = ({ databaseId, pageId, description }) => {
   return (
-    <>
-      <p className="text-sm text-muted-foreground mb-1">
-        <span className="font-medium">Integration Type:</span> Notion
-      </p>
+    <div className="space-y-2">
       {databaseId && (
-        <p className="text-sm text-muted-foreground mb-1">
-          <span className="font-medium">Database ID:</span> {databaseId}
-        </p>
+        <div>
+          <div className="text-xs text-muted-foreground">Database ID</div>
+          <div className="font-medium">{databaseId}</div>
+        </div>
       )}
       {pageId && (
-        <p className="text-sm text-muted-foreground mb-1">
-          <span className="font-medium">Page ID:</span> {pageId}
-        </p>
+        <div>
+          <div className="text-xs text-muted-foreground">Page ID</div>
+          <div className="font-medium">{pageId}</div>
+        </div>
       )}
-      <div className="mt-2 p-3 bg-muted rounded-md">
-        <p className="text-sm font-medium mb-1">Note:</p>
-        <p className="text-sm">
-          This will integrate with Notion and create vector embeddings for search functionality. 
-          The API token will be securely stored.
-        </p>
-      </div>
       {description && (
-        <p className="text-sm mt-2 p-3 bg-muted rounded-md">
-          {description}
-        </p>
+        <div>
+          <div className="text-xs text-muted-foreground">Description</div>
+          <div className="bg-muted p-2 rounded-md text-sm">{description}</div>
+        </div>
       )}
-    </>
+    </div>
   );
 };
 

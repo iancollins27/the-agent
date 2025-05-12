@@ -5,9 +5,11 @@
 
 import { Tool } from './types.ts';
 import { identifyProject } from './identify-project/index.ts';
+import { createActionRecord } from './create-action-record/index.ts';
 
 const tools: Record<string, Tool> = {
-  identify_project: identifyProject
+  identify_project: identifyProject,
+  create_action_record: createActionRecord
   // data_fetch is now removed from the registry
 };
 

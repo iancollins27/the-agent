@@ -9,10 +9,11 @@ import PromptRunsTab from "../components/admin/PromptRunsTab";
 import FeedbackTab from "../components/admin/FeedbackTab";
 import MCPConfigTab from "../components/admin/MCPConfigTab";
 import { ObservabilityTab } from "../components/admin/observability/ObservabilityTab";
-import { Routes, Route, Outlet, NavLink, useLocation } from "react-router-dom";
+import { Routes, Route, Outlet, NavLink, useLocation, Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import ExecutionsList from "../components/admin/execution-view/ExecutionsList";
 import ExecutionView from "../components/admin/execution-view/ExecutionView";
+import { Wrench } from "lucide-react";
 
 const AdminConsole: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState("prompt-runs");
@@ -83,7 +84,7 @@ const AdminConsole: React.FC = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Admin Console</h1>
           
-          {location.pathname.includes('/admin/executions/') && (
+          {location.pathname.includes('/admin/executions/') ? (
             <NavLink 
               to="/admin"
               onClick={() => setActiveTab("executions")}
@@ -94,6 +95,13 @@ const AdminConsole: React.FC = () => {
             >
               Back to Executions List
             </NavLink>
+          ) : (
+            <Link 
+              to="/admin/tools"
+              className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-md"
+            >
+              <Wrench className="mr-1 h-4 w-4" /> Tools Management
+            </Link>
           )}
         </div>
         
