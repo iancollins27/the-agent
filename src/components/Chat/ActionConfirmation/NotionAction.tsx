@@ -1,8 +1,9 @@
 
 import React from 'react';
+import { FileText } from "lucide-react";
 
 interface NotionActionProps {
-  databaseId?: string;
+  databaseId: string;
   pageId?: string;
   description?: string;
 }
@@ -10,24 +11,25 @@ interface NotionActionProps {
 const NotionAction: React.FC<NotionActionProps> = ({ databaseId, pageId, description }) => {
   return (
     <div className="space-y-2">
-      {databaseId && (
-        <div>
-          <div className="text-xs text-muted-foreground">Database ID</div>
-          <div className="font-medium">{databaseId}</div>
-        </div>
-      )}
-      {pageId && (
-        <div>
-          <div className="text-xs text-muted-foreground">Page ID</div>
-          <div className="font-medium">{pageId}</div>
-        </div>
-      )}
       {description && (
-        <div>
-          <div className="text-xs text-muted-foreground">Description</div>
-          <div className="bg-muted p-2 rounded-md text-sm">{description}</div>
-        </div>
+        <p className="text-sm p-3 bg-muted rounded-md">{description}</p>
       )}
+      <div className="flex items-center gap-2 text-sm text-purple-700 p-2 bg-purple-50 rounded-md">
+        <FileText className="h-4 w-4" />
+        <span>
+          {pageId ? "Update Notion page" : "Create Notion page"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="font-medium">Database ID:</div>
+        <div className="truncate">{databaseId}</div>
+        {pageId && (
+          <>
+            <div className="font-medium">Page ID:</div>
+            <div className="truncate">{pageId}</div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
