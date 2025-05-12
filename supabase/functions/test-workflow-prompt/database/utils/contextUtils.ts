@@ -14,9 +14,10 @@ export async function prepareContextData(
   projectId: string
 ) {
   try {
-    console.log(`Preparing context data for project: ${projectId}`);
+    console.log(`[DEBUG] ContextUtils: Preparing context data for project: ${projectId}`);
     
     // Fetch project data first
+    console.log(`[DEBUG] ContextUtils: Fetching project data from database`);
     const { data: projectData, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -34,24 +35,33 @@ export async function prepareContextData(
       .single();
     
     if (projectError) {
-      console.error("Error fetching project:", projectError);
+      console.error("[DEBUG] ContextUtils: Error fetching project:", projectError);
       throw projectError;
     }
     
     if (!projectData) {
-      console.error("No project data found for ID:", projectId);
+      console.error("[DEBUG] ContextUtils: No project data found for ID:", projectId);
       throw new Error("Project not found");
     }
     
     // Fetch project contacts with improved logging
-    console.log(`Fetching contacts for project ${projectId} using getProjectContacts`);
+    console.log(`[DEBUG] ContextUtils: Starting getProjectContacts for project ${projectId}`);
     const contacts = await getProjectContacts(supabase, projectId);
-    console.log(`Retrieved ${contacts?.length || 0} contacts for project ${projectId}`);
+    console.log(`[DEBUG] ContextUtils: Retrieved ${contacts?.length || 0} contacts`);
+    
+    if (contacts && contacts.length > 0) {
+      console.log(`[DEBUG] ContextUtils: First contact: ${JSON.stringify(contacts[0])}`);
+    } else {
+      console.log(`[DEBUG] ContextUtils: No contacts returned by getProjectContacts`);
+    }
     
     const formattedContacts = formatContactsForContext(contacts);
-    console.log(`Formatted contacts result: ${formattedContacts ? 'Success' : 'Empty or failed'}`);
-    if (formattedContacts === "No contacts available for this project.") {
-      console.log("No contacts were found for this project.");
+    console.log(`[DEBUG] ContextUtils: formatContactsForContext result: ${formattedContacts ? 'Success' : 'Empty or failed'}`);
+    
+    if (formattedContacts && formattedContacts !== "No contacts available for this project.") {
+      console.log(`[DEBUG] ContextUtils: Formatted contacts first 100 chars: ${formattedContacts.substring(0, 100)}...`);
+    } else {
+      console.log(`[DEBUG] ContextUtils: No formatted contacts available or default message returned`);
     }
     
     // Get milestone instructions if this is a next step
@@ -84,14 +94,15 @@ export async function prepareContextData(
       contacts: contacts,
       track_id: projectData.project_track || null,
       formattedContacts: formattedContacts,
-      project_contacts: formattedContacts || 'No contacts available for this project.' // Ensure this variable is properly set
+      project_contacts: formattedContacts || 'No contacts available for this project.' 
     };
     
-    console.log(`Context data prepared with project_contacts: ${!!contextData.project_contacts}`);
+    console.log(`[DEBUG] ContextUtils: Final contextData.project_contacts exists: ${!!contextData.project_contacts}`);
+    console.log(`[DEBUG] ContextUtils: Final contextData keys: ${Object.keys(contextData).join(', ')}`);
     
     return { projectData, contextData };
   } catch (error) {
-    console.error("Error preparing context data:", error);
+    console.error("[DEBUG] ContextUtils: Error preparing context data:", error);
     throw error;
   }
 }

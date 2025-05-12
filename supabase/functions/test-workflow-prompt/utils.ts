@@ -79,16 +79,24 @@ The Project Manager`;
  * @returns The template with all variables replaced with their values
  */
 export function replaceVariables(template: string, contextData: any): string {
-  console.log("Starting replaceVariables with contextData keys:", Object.keys(contextData || {}));
+  console.log("[DEBUG] Utils: Starting replaceVariables with contextData keys:", Object.keys(contextData || {}));
   
   if (!template) {
-    console.warn("Empty template provided to replaceVariables");
+    console.warn("[DEBUG] Utils: Empty template provided to replaceVariables");
     return "";
   }
   
   if (!contextData || Object.keys(contextData).length === 0) {
-    console.warn("No context data provided for variable replacement, returning template as is");
+    console.warn("[DEBUG] Utils: No context data provided for variable replacement, returning template as is");
     return template;
+  }
+  
+  // Important check for project_contacts
+  if (contextData.project_contacts) {
+    console.log(`[DEBUG] Utils: project_contacts exists in context data, length: ${contextData.project_contacts.length}`);
+    console.log(`[DEBUG] Utils: project_contacts preview: ${contextData.project_contacts.substring(0, 100)}...`);
+  } else {
+    console.error(`[DEBUG] Utils: project_contacts is missing from context data!`);
   }
   
   let result = template;
@@ -121,7 +129,7 @@ export function replaceVariables(template: string, contextData: any): string {
   
   // Log all variables that will be replaced
   if (variables.length > 0) {
-    console.log("Variables to replace:", variables.join(", "));
+    console.log("[DEBUG] Utils: Variables to replace:", variables.join(", "));
   }
   
   // Replace all variables in the template
@@ -136,20 +144,20 @@ export function replaceVariables(template: string, contextData: any): string {
     // Format the value based on its type
     let formattedValue: string;
     if (value === undefined || value === null) {
-      console.warn(`Variable ${variableName} not found in context data`);
+      console.error(`[DEBUG] Utils: Variable ${variableName} not found in context data`);
       formattedValue = `[${variableName} not provided]`;
     } else if (typeof value === 'object') {
       try {
         formattedValue = JSON.stringify(value, null, 2);
       } catch (err) {
-        console.error(`Error stringifying object value for ${variableName}:`, err);
+        console.error(`[DEBUG] Utils: Error stringifying object value for ${variableName}:`, err);
         formattedValue = `[Error formatting ${variableName}]`;
       }
     } else {
       formattedValue = String(value);
     }
     
-    console.log(`Replacing {{${variableName}}} with: ${typeof value === 'object' ? '[object]' : formattedValue.substring(0, 50) + (formattedValue.length > 50 ? '...' : '')}`);
+    console.log(`[DEBUG] Utils: Replacing {{${variableName}}} with: ${typeof value === 'object' ? '[object]' : formattedValue.substring(0, 50) + (formattedValue.length > 50 ? '...' : '')}`);
     
     // Update the result, replacing just this occurrence
     // Need to use replace with a string, not regex, to avoid special char issues
@@ -157,7 +165,7 @@ export function replaceVariables(template: string, contextData: any): string {
   }
   
   // Log the first 200 chars of the result for debugging
-  console.log("Finished variable replacement, result starts with:", 
+  console.log("[DEBUG] Utils: Finished variable replacement, result starts with:", 
     result.substring(0, 200) + (result.length > 200 ? "..." : ""));
   
   return result;
