@@ -115,7 +115,7 @@ const FeedbackTab = () => {
               <TableHead>Rating</TableHead>
               <TableHead>Feedback Description</TableHead>
               <TableHead>Feedback Tags</TableHead>
-              <TableHead>Reviewed</TableHead>
+              <TableHead>Feedback Reviewed</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
