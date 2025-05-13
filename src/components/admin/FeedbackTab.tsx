@@ -54,11 +54,14 @@ const FeedbackTab = () => {
     
     setIsSaving(true);
     try {
+      // Set reviewed status based on whether there's content in the feedback_review field
+      const hasReviewContent = feedbackReview.trim().length > 0;
+
       const { error } = await supabase
         .from('prompt_runs')
         .update({ 
           feedback_review: feedbackReview,
-          reviewed: true // Set reviewed flag to true when saving a review
+          reviewed: hasReviewContent // Only set to true if there's actual content
         })
         .eq('id', selectedRun.id);
 
@@ -70,19 +73,21 @@ const FeedbackTab = () => {
       setPromptRuns(prev => 
         prev.map(run => 
           run.id === selectedRun.id 
-            ? { ...run, feedback_review: feedbackReview, reviewed: true } 
+            ? { ...run, feedback_review: feedbackReview, reviewed: hasReviewContent } 
             : run
         )
       );
       
       // Update selected run
       setSelectedRun(prev => 
-        prev ? { ...prev, feedback_review: feedbackReview, reviewed: true } : null
+        prev ? { ...prev, feedback_review: feedbackReview, reviewed: hasReviewContent } : null
       );
 
       toast({
-        title: "Feedback review saved",
-        description: "Your feedback review has been saved successfully."
+        title: hasReviewContent ? "Feedback review saved" : "Feedback review cleared",
+        description: hasReviewContent 
+          ? "Your feedback review has been saved successfully." 
+          : "The feedback review has been cleared."
       });
     } catch (error) {
       console.error('Error saving feedback review:', error);
@@ -94,6 +99,11 @@ const FeedbackTab = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Function to check if a prompt run has been reviewed based on content
+  const isReviewed = (run: PromptRun) => {
+    return run.feedback_review && run.feedback_review.trim().length > 0;
   };
 
   if (loading) {
@@ -140,7 +150,10 @@ const FeedbackTab = () => {
                   {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}
                 </TableCell>
                 <TableCell className="text-center">
-                  {run.reviewed ? <CheckSquare className="h-5 w-5 text-green-500" /> : <Square className="h-5 w-5 text-gray-300" />}
+                  {isReviewed(run) ? 
+                    <CheckSquare className="h-5 w-5 text-green-500" /> : 
+                    <Square className="h-5 w-5 text-gray-300" />
+                  }
                 </TableCell>
                 <TableCell>{formatDate(run.created_at)}</TableCell>
                 <TableCell>
@@ -231,11 +244,11 @@ const FeedbackTab = () => {
                           <div className="flex items-center space-x-2">
                             <Checkbox 
                               id="reviewed" 
-                              checked={selectedRun.reviewed || false}
+                              checked={isReviewed(selectedRun)}
                               disabled
                             />
                             <label htmlFor="reviewed" className="text-sm text-muted-foreground">
-                              {selectedRun.reviewed ? 'Reviewed' : 'Not reviewed'}
+                              {isReviewed(selectedRun) ? 'Reviewed' : 'Not reviewed'}
                             </label>
                           </div>
                         </div>

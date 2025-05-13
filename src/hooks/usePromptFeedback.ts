@@ -55,8 +55,8 @@ export const usePromptFeedback = (
       
       if (feedback.review !== undefined) {
         updateData.feedback_review = feedback.review;
-        // Set reviewed flag to true when providing a review
-        updateData.reviewed = feedback.review ? true : null;
+        // Set reviewed flag based on whether there's content in the review
+        updateData.reviewed = feedback.review && feedback.review.trim().length > 0;
       }
       
       const { error } = await supabase
@@ -76,7 +76,10 @@ export const usePromptFeedback = (
                 feedback_description: feedback.description || null, 
                 feedback_tags: feedback.tags || null,
                 feedback_review: feedback.review !== undefined ? feedback.review : run.feedback_review,
-                reviewed: feedback.review ? true : run.reviewed
+                // Update the reviewed status based on review content
+                reviewed: feedback.review !== undefined ? 
+                  (feedback.review && feedback.review.trim().length > 0) : 
+                  run.reviewed
               } 
             : run
         )

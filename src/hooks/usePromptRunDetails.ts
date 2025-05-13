@@ -40,6 +40,9 @@ export const usePromptRunDetails = ({
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
       
+      // Set review and update reviewed status based on content
+      const hasReviewContent = feedbackReview.trim().length > 0;
+      
       onFeedbackChange(promptRun.id, {
         description: feedbackDescription || null,
         tags: tags.length > 0 ? tags : null,
