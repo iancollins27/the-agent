@@ -33,7 +33,8 @@ export async function executeToolCall(
     // Different tools might have their export structured differently
     const toolExports = {
       identify_project: toolModule.identifyProject,
-      create_action_record: toolModule.createActionRecord
+      create_action_record: toolModule.createActionRecord,
+      read_crm_data: toolModule.readCrmData
     };
     
     // Get the correct tool function

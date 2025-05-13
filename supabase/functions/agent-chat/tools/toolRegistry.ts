@@ -6,10 +6,12 @@
 import { Tool } from './types.ts';
 import { identifyProject } from './identify-project/index.ts';
 import { createActionRecord } from './create-action-record/index.ts';
+import { readCrmData } from './read-crm-data/index.ts';
 
 const tools: Record<string, Tool> = {
   identify_project: identifyProject,
-  create_action_record: createActionRecord
+  create_action_record: createActionRecord,
+  read_crm_data: readCrmData
   // data_fetch is now removed from the registry
 };
 

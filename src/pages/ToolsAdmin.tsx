@@ -73,6 +73,37 @@ const ToolsAdmin = () => {
           category: 'chat'
         },
         {
+          name: 'read_crm_data',
+          description: 'Retrieves data from the CRM system based on specific parameters like entity type, ID, or search criteria',
+          parameters: {
+            type: 'object',
+            properties: {
+              entity_type: {
+                type: 'string',
+                enum: ['project', 'contact', 'company', 'note', 'task', 'communication'],
+                description: 'The type of entity to retrieve from CRM'
+              },
+              entity_id: {
+                type: 'string',
+                description: 'ID of the specific entity to retrieve (optional)'
+              },
+              search_criteria: {
+                type: 'object',
+                description: 'Search criteria to filter entities (optional)',
+                properties: {
+                  name: {
+                    type: 'string',
+                    description: 'Name to search for'
+                  }
+                }
+              }
+            },
+            required: ['entity_type']
+          },
+          enabled: true,
+          category: 'chat'
+        },
+        {
           name: 'knowledge_base_lookup',
           description: 'Searches the knowledge base for relevant information about the project',
           parameters: {
@@ -181,6 +212,23 @@ const ToolsAdmin = () => {
               }
             },
             required: ['action_type']
+          },
+          enabled: true,
+          category: 'chat'
+        },
+        {
+          name: 'read_crm_data',
+          description: 'Retrieves data from the CRM system based on specific parameters like entity type, ID, or search criteria',
+          parameters: {
+            type: 'object',
+            properties: {
+              entity_type: {
+                type: 'string',
+                enum: ['project', 'contact', 'company', 'note', 'task', 'communication'],
+                description: 'The type of entity to retrieve from CRM'
+              }
+            },
+            required: ['entity_type']
           },
           enabled: true,
           category: 'chat'

@@ -7,11 +7,13 @@ import { Tool } from './types.ts';
 import { createActionRecord } from './create-action-record/index.ts';
 import { knowledgeBaseLookup } from './knowledge-base-lookup/index.ts';
 import { dataFetch } from './data-fetch/index.ts';
+import { readCrmData } from './read-crm-data/index.ts';
 
 const tools: Record<string, Tool> = {
   create_action_record: createActionRecord,
   knowledge_base_lookup: knowledgeBaseLookup,
   data_fetch: dataFetch,
+  read_crm_data: readCrmData
   // Additional tools can be registered here
 };
 
