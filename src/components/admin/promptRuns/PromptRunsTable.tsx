@@ -30,8 +30,6 @@ export const formatRelativeTime = (date: string): string => {
   } else if (diffHours < 24) {
     return `${diffHours}h ago`;
   } else {
-    return `${diffHours}h ago`;
-  } else {
     return `${diffDays}d ago`;
   }
 };
