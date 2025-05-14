@@ -1,59 +1,38 @@
 
 import { useState, useEffect } from 'react';
 
-type StoredFilterValues = {
-  hideReviewed: boolean;
-  excludeReminderActions: boolean;
-  timeFilter: string;
-  statusFilter: string | null;
-  onlyMyProjects: boolean;
-  projectManagerFilter: string | null;
-  groupByRoofer: boolean;
-  sortRooferAlphabetically: boolean;
-  onlyPendingActions: boolean;
-};
+type FilterValues = Record<string, any>;
 
-export const useFilterPersistence = (defaultValues: StoredFilterValues) => {
-  const [values, setValues] = useState<StoredFilterValues>({
-    hideReviewed: true,
-    excludeReminderActions: true,
-    timeFilter: defaultValues.timeFilter,
-    statusFilter: defaultValues.statusFilter,
-    onlyMyProjects: true,
-    projectManagerFilter: null,
-    groupByRoofer: true,
-    sortRooferAlphabetically: true, // Always true, but keeping for backward compatibility
-    onlyPendingActions: true
-  });
+export const useFilterPersistence = <T extends FilterValues>(key: string, defaultValues: T) => {
+  const [values, setValues] = useState<T>(defaultValues);
 
   useEffect(() => {
     try {
-      const savedFilters = localStorage.getItem('projectManagerFilters');
+      const savedFilters = localStorage.getItem(key);
       if (savedFilters) {
         const parsedFilters = JSON.parse(savedFilters);
-        setValues(parsedFilters);
+        setValues(prevValues => ({ ...prevValues, ...parsedFilters }));
       }
     } catch (error) {
-      console.error('Error loading saved filters:', error);
+      console.error(`Error loading saved filters for ${key}:`, error);
     }
-  }, []);
+  }, [key]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('projectManagerFilters', JSON.stringify(values));
+      localStorage.setItem(key, JSON.stringify(values));
     } catch (error) {
-      console.error('Error saving filters:', error);
+      console.error(`Error saving filters for ${key}:`, error);
     }
-  }, [values]);
+  }, [values, key]);
+
+  const updateFilter = <K extends keyof T>(key: K, value: T[K]) => {
+    setValues(prev => ({ ...prev, [key]: value }));
+  };
 
   return {
     filters: values,
     setFilters: setValues,
-    updateFilter: <K extends keyof StoredFilterValues>(
-      key: K,
-      value: StoredFilterValues[K]
-    ) => {
-      setValues(prev => ({ ...prev, [key]: value }));
-    }
+    updateFilter
   };
 };

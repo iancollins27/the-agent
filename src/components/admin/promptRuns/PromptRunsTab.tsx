@@ -19,6 +19,14 @@ import { useTimeFilter } from '@/hooks/useTimeFilter';
 import { usePromptRunData } from './usePromptRunData';
 import { useFilterPersistence } from '@/hooks/useFilterPersistence';
 
+// Define the filter structure
+interface PromptRunFiltersState {
+  reviewed: boolean;
+  rating: number | null;
+  hasError: boolean;
+  search: string;
+}
+
 const PromptRunsTab = () => {
   const navigate = useNavigate();
   const { projectId } = useParams();
@@ -27,8 +35,8 @@ const PromptRunsTab = () => {
   // Get time filter state
   const { timeFilter, setTimeFilter } = useTimeFilter();
   
-  // Set up persisted filter state
-  const { filters, updateFilter } = useFilterPersistence('promptRunsFilters', {
+  // Set up persisted filter state with proper typing
+  const { filters, updateFilter } = useFilterPersistence<PromptRunFiltersState>('promptRunsFilters', {
     reviewed: false,
     rating: null,
     hasError: false,
@@ -45,10 +53,10 @@ const PromptRunsTab = () => {
     projectId, 
     timeFilter, 
     filters: {
-      reviewed: filters.reviewed as boolean,
-      rating: filters.rating as number | null,
-      hasError: filters.hasError as boolean,
-      search: filters.search as string
+      reviewed: filters.reviewed,
+      rating: filters.rating,
+      hasError: filters.hasError,
+      search: filters.search
     },
     activeTab
   });
@@ -88,7 +96,7 @@ const PromptRunsTab = () => {
   
   // Handle filter changes
   const setFilter = (key: string, value: any) => {
-    updateFilter(key as keyof typeof filters, value);
+    updateFilter(key as keyof PromptRunFiltersState, value);
   };
   
   return (
@@ -109,12 +117,10 @@ const PromptRunsTab = () => {
             onChange={setTimeFilter}
           />
           <PromptRunFilters 
-            filters={{
-              reviewed: filters.reviewed as boolean,
-              rating: filters.rating as number | null, 
-              hasError: filters.hasError as boolean, 
-              search: filters.search as string
-            }}
+            reviewed={filters.reviewed}
+            rating={filters.rating} 
+            hasError={filters.hasError} 
+            search={filters.search}
             setFilter={setFilter}
           />
         </div>
@@ -142,10 +148,10 @@ const PromptRunsTab = () => {
         ) : (
           <EmptyPromptRunsState 
             filters={{
-              reviewed: filters.reviewed as boolean,
-              rating: filters.rating as number | null, 
-              hasError: filters.hasError as boolean, 
-              search: filters.search as string
+              reviewed: filters.reviewed,
+              rating: filters.rating, 
+              hasError: filters.hasError, 
+              search: filters.search
             }}
             timeFilter={timeFilter}
             onResetFilters={() => {

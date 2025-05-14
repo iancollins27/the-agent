@@ -45,83 +45,89 @@ export const usePromptRunData = ({
   const promptRunsQuery = useQuery({
     queryKey: ['promptRuns', projectId, timeFilterDate, filters, activeTab],
     queryFn: async () => {
-      let query = supabase
-        .from('prompt_runs')
-        .select(`
-          id,
-          created_at,
-          project_id,
-          status,
-          error,
-          error_message,
-          reviewed,
-          projects(
+      try {
+        let query = supabase
+          .from('prompt_runs')
+          .select(`
             id,
-            project_name,
-            Address,
-            crm_id,
-            crm_url
-          ),
-          workflow_prompts(
-            id,
-            type
-          )
-        `)
-        .order('created_at', { ascending: false });
+            created_at,
+            project_id,
+            status,
+            error_message,
+            reviewed,
+            projects(
+              id,
+              project_name,
+              Address,
+              crm_id,
+              crm_url
+            ),
+            workflow_prompt_id,
+            prompt_input,
+            prompt_output
+          `)
+          .order('created_at', { ascending: false });
 
-      // Apply project filter if provided
-      if (projectId) {
-        query = query.eq('project_id', projectId);
-      }
+        // Apply project filter if provided
+        if (projectId) {
+          query = query.eq('project_id', projectId);
+        }
 
-      // Apply time filter if provided
-      if (timeFilterDate) {
-        query = query.gte('created_at', timeFilterDate);
-      }
+        // Apply time filter if provided
+        if (timeFilterDate) {
+          query = query.gte('created_at', timeFilterDate);
+        }
 
-      // Apply reviewed filter
-      if (filters.reviewed) {
-        query = query.eq('reviewed', true);
-      }
+        // Apply reviewed filter
+        if (filters.reviewed) {
+          query = query.eq('reviewed', true);
+        }
 
-      // Apply error filter
-      if (filters.hasError) {
-        query = query.not('error_message', 'is', null);
-      }
-      
-      // Apply tab filter
-      if (activeTab === 'success') {
-        query = query.is('error_message', null);
-      } else if (activeTab === 'error') {
-        query = query.not('error_message', 'is', null);
-      }
-
-      // Execute query
-      const { data, error } = await query;
-
-      if (error) {
-        throw new Error(`Error fetching prompt runs: ${error.message}`);
-      }
-
-      // Process the data
-      return data.map(run => {
-        const project = run.projects;
-        const workflowPrompt = run.workflow_prompts;
+        // Apply error filter
+        if (filters.hasError) {
+          query = query.not('error_message', 'is', null);
+        }
         
-        return {
-          id: run.id,
-          created_at: run.created_at,
-          project_id: run.project_id,
-          project_name: project ? project.project_name : null,
-          project_address: project ? project.Address : null,
-          workflow_prompt_type: workflowPrompt ? workflowPrompt.type : null,
-          workflow_type: workflowPrompt ? workflowPrompt.type : null,
-          error: !!run.error_message,
-          error_message: run.error_message,
-          reviewed: run.reviewed,
-          project_crm_url: project ? project.crm_url : null
-        };
-      });
+        // Apply tab filter
+        if (activeTab === 'success') {
+          query = query.is('error_message', null);
+        } else if (activeTab === 'error') {
+          query = query.not('error_message', 'is', null);
+        }
+
+        // Execute query
+        const { data, error } = await query;
+
+        if (error) {
+          throw new Error(`Error fetching prompt runs: ${error.message}`);
+        }
+
+        if (!data) {
+          return [];
+        }
+
+        // Process the data
+        return data.map(run => {
+          const project = run.projects || {};
+          
+          return {
+            id: run.id,
+            created_at: run.created_at,
+            project_id: run.project_id,
+            project_name: project.project_name,
+            project_address: project.Address,
+            workflow_prompt_type: null, // Not available in the current schema
+            workflow_type: null, // Not available in the current schema
+            error: !!run.error_message,
+            error_message: run.error_message,
+            reviewed: run.reviewed,
+            project_crm_url: project.crm_url
+          };
+        });
+      } catch (error) {
+        console.error('Error in usePromptRunData:', error);
+        throw error;
+      }
     }
   });
 

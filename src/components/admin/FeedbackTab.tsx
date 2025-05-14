@@ -16,9 +16,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from '@tanstack/react-query';
 
+interface FeedbackRun {
+  id: string;
+  created_at: string;
+  feedback_description: string;
+  feedback_rating: number | null;
+  feedback_review: string | null;
+  feedback_tags?: string[];
+  project_address: string | null;
+  project_manager: string | null;
+  project_crm_url: string | null;
+  prompt_input: string | null;
+  prompt_output: string | null;
+  error_message: string | null;
+  reviewed: boolean;
+}
+
 const FeedbackTab = () => {
-  const [feedbackRuns, setFeedbackRuns] = useState<PromptRun[]>([]);
-  const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
+  const [feedbackRuns, setFeedbackRuns] = useState<FeedbackRun[]>([]);
+  const [selectedRun, setSelectedRun] = useState<FeedbackRun | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feedbackReview, setFeedbackReview] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -52,11 +68,20 @@ const FeedbackTab = () => {
       const formattedRuns = data.map(run => {
         const project = run.projects || {};
         return {
-          ...run,
-          project_address: project.Address,
+          id: run.id,
+          created_at: run.created_at,
+          feedback_description: run.feedback_description,
+          feedback_rating: run.feedback_rating,
+          feedback_review: run.feedback_review,
+          feedback_tags: run.feedback_tags,
+          project_address: project.Address || 'No address',
           project_manager: run.project_manager || 'No manager assigned',
-          project_crm_url: project.crm_url
-        } as PromptRun;
+          project_crm_url: project.crm_url || null,
+          prompt_input: run.prompt_input,
+          prompt_output: run.prompt_output,
+          error_message: run.error_message,
+          reviewed: run.reviewed || false
+        };
       });
       setFeedbackRuns(formattedRuns);
     }
@@ -73,7 +98,7 @@ const FeedbackTab = () => {
     }
   };
 
-  const handleRowClick = (run: PromptRun) => {
+  const handleRowClick = (run: FeedbackRun) => {
     setSelectedRun(run);
     setFeedbackReview(run.feedback_review || '');
     setIsModalOpen(true);
@@ -140,8 +165,8 @@ const FeedbackTab = () => {
   };
 
   // Function to check if a prompt run has been reviewed based on content
-  const isReviewed = (run: PromptRun) => {
-    return run.feedback_review && run.feedback_review.trim().length > 0;
+  const isReviewed = (run: FeedbackRun) => {
+    return run.reviewed || (run.feedback_review && run.feedback_review.trim().length > 0);
   };
 
   if (isLoading) {
