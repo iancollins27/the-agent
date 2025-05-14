@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PromptRun } from '../types';
+import { formatRelativeTime } from '@/utils/api/prompt-runs/formatPromptRunData';
 
 export interface UsePromptRunDataProps {
   projectId?: string;
@@ -14,13 +15,6 @@ export interface UsePromptRunDataProps {
     hasError: boolean;
     search: string;
   };
-}
-
-// Define a type for project data
-interface ProjectData {
-  id?: string;
-  Address?: string;
-  project_name?: string;
 }
 
 export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: UsePromptRunDataProps) => {
@@ -74,6 +68,7 @@ export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: 
             Address,
             project_name
           ),
+          workflow_prompts:workflow_prompt_id (id, type),
           tool_logs:tool_logs(count)
         `);
       
@@ -138,33 +133,38 @@ export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: 
       try {
         // Process the data
         const processedData = queryData.map(run => {
-          // Handle the project object safely with nullish coalescing
-          const project = (run.project || {}) as ProjectData;
+          // Handle the project object safely
+          const project = run.project || {};
+          const workflowType = run.workflow_prompts?.type || null;
           
           return {
             id: run.id,
             created_at: run.created_at,
             status: run.status || 'unknown',
-            project_id: run.project_id,
-            project_name: project.project_name,
-            project_address: project.Address,
-            workflow_prompt_type: run.workflow_prompt_type,
-            workflow_type: null, // This might need to be derived from workflow_prompt_type
-            error: !!run.error_message,
-            error_message: run.error_message,
-            reviewed: run.reviewed || false,
-            project_crm_url: null, // No crm_url field in project
-            toolLogsCount: run.tool_logs?.length || 0,
             ai_provider: run.ai_provider || 'unknown',
             ai_model: run.ai_model || 'unknown',
             prompt_input: run.prompt_input || '',
             prompt_output: run.prompt_output || '',
+            error_message: run.error_message,
             feedback_rating: run.feedback_rating,
             feedback_description: run.feedback_description,
             feedback_tags: run.feedback_tags,
             feedback_review: run.feedback_review,
             completed_at: run.completed_at,
-            workflow_prompt_id: run.workflow_prompt_id
+            reviewed: run.reviewed || false,
+            project_id: run.project_id,
+            workflow_prompt_id: run.workflow_prompt_id,
+            workflow_prompt_type: workflowType,
+            project_name: project.project_name,
+            project_address: project.Address,
+            project_next_step: null, // Not available in current data structure
+            project_crm_url: null, // Will be added later if available
+            project_roofer_contact: null, // Will be added separately
+            project_manager: null, // Will be added separately
+            relative_time: formatRelativeTime(run.created_at),
+            workflow_type: workflowType,
+            error: !!run.error_message,
+            toolLogsCount: run.tool_logs?.length || 0
           } as PromptRun;
         });
         

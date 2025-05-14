@@ -183,37 +183,42 @@ export const usePromptRuns = ({
       }
 
       // Convert the formattedData into properly typed PromptRun objects
-      const typedPromptRuns: PromptRun[] = formattedData.map(run => ({
-        id: run.id,
-        created_at: run.created_at,
-        status: run.status || 'unknown',
-        ai_provider: run.ai_provider || 'unknown',
-        ai_model: run.ai_model || 'unknown',
-        prompt_input: run.prompt_input || '',
-        prompt_output: run.prompt_output,
-        error_message: run.error_message,
-        feedback_rating: run.feedback_rating,
-        feedback_description: run.feedback_description,
-        feedback_tags: run.feedback_tags,
-        feedback_review: run.feedback_review,
-        completed_at: run.completed_at,
-        reviewed: run.reviewed || false,
-        project_id: run.project_id,
-        workflow_prompt_id: run.workflow_prompt_id,
-        workflow_prompt_type: run.workflow_prompt_type,
-        project_name: run.project_name,
-        project_address: run.project_address,
-        project_next_step: run.project_next_step,
-        project_crm_url: run.project_crm_url,
-        project_roofer_contact: run.project_roofer_contact,
-        project_manager: run.project_manager,
-        relative_time: run.relative_time || '',
-        workflow_type: run.workflow_type,
-        error: !!run.error_message,
-        toolLogsCount: run.toolLogsCount
-      }));
+      const typedPromptRuns: PromptRun[] = formattedData.map(run => {
+        // Explicitly create a PromptRun object with the correct types
+        return {
+          id: run.id,
+          created_at: run.created_at,
+          status: run.status,
+          ai_provider: run.ai_provider,
+          ai_model: run.ai_model,
+          prompt_input: run.prompt_input,
+          prompt_output: run.prompt_output,
+          error_message: run.error_message,
+          feedback_rating: run.feedback_rating,
+          feedback_description: run.feedback_description,
+          feedback_tags: run.feedback_tags,
+          feedback_review: run.feedback_review,
+          completed_at: run.completed_at,
+          reviewed: run.reviewed || false,
+          project_id: run.project_id,
+          workflow_prompt_id: run.workflow_prompt_id,
+          workflow_prompt_type: run.workflow_prompt_type,
+          project_name: run.project_name,
+          project_address: run.project_address,
+          project_next_step: run.project_next_step,
+          project_crm_url: run.project_crm_url,
+          project_roofer_contact: run.project_roofer_contact || null,
+          project_manager: run.project_manager,
+          relative_time: run.relative_time || '',
+          workflow_type: run.workflow_type,
+          error: !!run.error_message,
+          toolLogsCount: run.toolLogsCount || 0
+        };
+      });
 
       setPromptRuns(typedPromptRuns);
+    } catch (error) {
+      console.error('Error fetching prompt runs:', error);
     } finally {
       setLoading(false);
     }

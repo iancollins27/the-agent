@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -32,7 +33,6 @@ interface FeedbackRun {
   reviewed: boolean;
 }
 
-// Define a more specific type for project data
 interface ProjectData {
   id?: string;
   Address?: string;
@@ -214,7 +214,10 @@ const FeedbackTab = () => {
                 </TableCell>
                 <TableCell>{run.feedback_description}</TableCell>
                 <TableCell>
-                  {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}
+                  {run.feedback_tags && run.feedback_tags.length > 0 ? 
+                    run.feedback_tags.join(', ') : 
+                    'No tags'
+                  }
                 </TableCell>
                 <TableCell className="text-center">
                   {run.reviewed ? 
