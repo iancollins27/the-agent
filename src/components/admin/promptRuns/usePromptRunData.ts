@@ -123,14 +123,14 @@ export const usePromptRunData = ({
             prompt_output: run.prompt_output,
             created_at: run.created_at,
             project_id: run.project_id,
-            project_name: project.project_name || null,
-            project_address: project.Address || null,
+            project_name: project?.project_name || null,
+            project_address: project?.Address || null,
             workflow_prompt_type: null, // Not available in the current schema
             workflow_type: null, // Not available in the current schema
             error: !!run.error_message,
             error_message: run.error_message,
             reviewed: run.reviewed || false,
-            project_crm_url: project.crm_url || null
+            project_crm_url: project?.crm_url || null
           };
         });
       } catch (error) {

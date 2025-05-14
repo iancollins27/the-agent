@@ -79,10 +79,10 @@ const FeedbackTab = () => {
           feedback_rating: run.feedback_rating,
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
-          project_address: project.Address || 'No address',
+          project_address: project?.Address || 'No address',
           // Project manager is not reliably available in the current data structure
           project_manager: 'No manager assigned',
-          project_crm_url: project.crm_url || null,
+          project_crm_url: project?.crm_url || null,
           prompt_input: run.prompt_input,
           prompt_output: run.prompt_output,
           error_message: run.error_message,
