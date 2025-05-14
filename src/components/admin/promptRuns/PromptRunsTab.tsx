@@ -28,7 +28,7 @@ const PromptRunsTab = () => {
   const { timeFilter, setTimeFilter } = useTimeFilter();
   
   // Set up persisted filter state
-  const { filters, setFilter } = useFilterPersistence('promptRunsFilters', {
+  const { filters, updateFilter } = useFilterPersistence('promptRunsFilters', {
     reviewed: false,
     rating: null,
     hasError: false,
@@ -44,7 +44,12 @@ const PromptRunsTab = () => {
   } = usePromptRunData({ 
     projectId, 
     timeFilter, 
-    filters,
+    filters: {
+      reviewed: filters.reviewed as boolean,
+      rating: filters.rating as number | null,
+      hasError: filters.hasError as boolean,
+      search: filters.search as string
+    },
     activeTab
   });
   
@@ -81,6 +86,11 @@ const PromptRunsTab = () => {
     setActiveTab(value);
   };
   
+  // Handle filter changes
+  const setFilter = (key: string, value: any) => {
+    updateFilter(key as keyof typeof filters, value);
+  };
+  
   return (
     <div className="w-full">
       {/* Header with project info if viewing a single project */}
@@ -99,7 +109,12 @@ const PromptRunsTab = () => {
             onChange={setTimeFilter}
           />
           <PromptRunFilters 
-            filters={filters}
+            filters={{
+              reviewed: filters.reviewed as boolean,
+              rating: filters.rating as number | null, 
+              hasError: filters.hasError as boolean, 
+              search: filters.search as string
+            }}
             setFilter={setFilter}
           />
         </div>
@@ -126,13 +141,18 @@ const PromptRunsTab = () => {
           <PromptRunsTable data={data} refresh={refresh} />
         ) : (
           <EmptyPromptRunsState 
-            filters={filters}
+            filters={{
+              reviewed: filters.reviewed as boolean,
+              rating: filters.rating as number | null, 
+              hasError: filters.hasError as boolean, 
+              search: filters.search as string
+            }}
             timeFilter={timeFilter}
             onResetFilters={() => {
-              setFilter('rating', null);
-              setFilter('reviewed', false);
-              setFilter('hasError', false);
-              setFilter('search', '');
+              updateFilter('rating', null);
+              updateFilter('reviewed', false);
+              updateFilter('hasError', false);
+              updateFilter('search', '');
               setTimeFilter('24h');
             }}
           />

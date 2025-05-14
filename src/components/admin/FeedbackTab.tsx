@@ -1,7 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { usePromptRunData } from './promptRuns/usePromptRunData';
 import { Card } from "@/components/ui/card";
 import { format, parseISO, isValid } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -15,17 +14,53 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery } from '@tanstack/react-query';
 
 const FeedbackTab = () => {
-  const { promptRuns, loading, setPromptRuns } = usePromptRunData('COMPLETED');
+  const [feedbackRuns, setFeedbackRuns] = useState<PromptRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [feedbackReview, setFeedbackReview] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  // Filter prompt runs to only show those with feedback
-  const feedbackRuns = promptRuns.filter(run => run.feedback_description);
+  // Use React Query to fetch prompt runs with feedback
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['feedbackRuns'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('prompt_runs')
+        .select(`
+          *,
+          projects:project_id (
+            Address,
+            project_name,
+            crm_url
+          )
+        `)
+        .not('feedback_description', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Process the data when it's available
+  useEffect(() => {
+    if (data) {
+      const formattedRuns = data.map(run => {
+        const project = run.projects || {};
+        return {
+          ...run,
+          project_address: project.Address,
+          project_manager: run.project_manager || 'No manager assigned',
+          project_crm_url: project.crm_url
+        } as PromptRun;
+      });
+      setFeedbackRuns(formattedRuns);
+    }
+  }, [data]);
 
   // Format date function
   const formatDate = (dateString: string) => {
@@ -45,7 +80,7 @@ const FeedbackTab = () => {
   };
   
   const handleOpenCRM = (e: React.MouseEvent, url: string) => {
-    e.stopPropagation(); // Stop event propagation to prevent row click
+    e.stopPropagation();
     window.open(url, '_blank');
   };
 
@@ -61,7 +96,7 @@ const FeedbackTab = () => {
         .from('prompt_runs')
         .update({ 
           feedback_review: feedbackReview,
-          reviewed: hasReviewContent // Only set to true if there's actual content
+          reviewed: hasReviewContent
         })
         .eq('id', selectedRun.id);
 
@@ -70,7 +105,7 @@ const FeedbackTab = () => {
       }
 
       // Update local state
-      setPromptRuns(prev => 
+      setFeedbackRuns(prev => 
         prev.map(run => 
           run.id === selectedRun.id 
             ? { ...run, feedback_review: feedbackReview, reviewed: hasReviewContent } 
@@ -89,6 +124,9 @@ const FeedbackTab = () => {
           ? "Your feedback review has been saved successfully." 
           : "The feedback review has been cleared."
       });
+      
+      // Refetch the data
+      refetch();
     } catch (error) {
       console.error('Error saving feedback review:', error);
       toast({
@@ -106,7 +144,7 @@ const FeedbackTab = () => {
     return run.feedback_review && run.feedback_review.trim().length > 0;
   };
 
-  if (loading) {
+  if (isLoading) {
     return <div>Loading feedback...</div>;
   }
 

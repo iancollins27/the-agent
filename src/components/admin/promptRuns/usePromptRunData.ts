@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-interface UsePromptRunDataProps {
+export interface UsePromptRunDataProps {
   projectId?: string;
   timeFilter: string;
   filters: {
@@ -30,10 +30,10 @@ export const usePromptRunData = ({
     if (timeFilter === 'last_hour') {
       const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
       setTimeFilterDate(oneHourAgo.toISOString());
-    } else if (timeFilter === 'last_24_hours') {
+    } else if (timeFilter === 'last_24_hours' || timeFilter === '24h') {
       const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
       setTimeFilterDate(oneDayAgo.toISOString());
-    } else if (timeFilter === 'last_7_days') {
+    } else if (timeFilter === 'last_7_days' || timeFilter === '7d') {
       const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
       setTimeFilterDate(oneWeekAgo.toISOString());
     } else {
@@ -51,9 +51,9 @@ export const usePromptRunData = ({
           id,
           created_at,
           project_id,
-          workflow_prompt_type,
-          workflow_type,
+          status,
           error,
+          error_message,
           reviewed,
           projects(
             id,
@@ -61,6 +61,10 @@ export const usePromptRunData = ({
             Address,
             crm_id,
             crm_url
+          ),
+          workflow_prompts(
+            id,
+            type
           )
         `)
         .order('created_at', { ascending: false });
@@ -82,14 +86,14 @@ export const usePromptRunData = ({
 
       // Apply error filter
       if (filters.hasError) {
-        query = query.not('error', 'is', null);
+        query = query.not('error_message', 'is', null);
       }
       
       // Apply tab filter
       if (activeTab === 'success') {
-        query = query.is('error', null);
+        query = query.is('error_message', null);
       } else if (activeTab === 'error') {
-        query = query.not('error', 'is', null);
+        query = query.not('error_message', 'is', null);
       }
 
       // Execute query
@@ -102,15 +106,18 @@ export const usePromptRunData = ({
       // Process the data
       return data.map(run => {
         const project = run.projects;
+        const workflowPrompt = run.workflow_prompts;
+        
         return {
           id: run.id,
           created_at: run.created_at,
           project_id: run.project_id,
           project_name: project ? project.project_name : null,
           project_address: project ? project.Address : null,
-          workflow_prompt_type: run.workflow_prompt_type,
-          workflow_type: run.workflow_type,
-          error: run.error,
+          workflow_prompt_type: workflowPrompt ? workflowPrompt.type : null,
+          workflow_type: workflowPrompt ? workflowPrompt.type : null,
+          error: !!run.error_message,
+          error_message: run.error_message,
           reviewed: run.reviewed,
           project_crm_url: project ? project.crm_url : null
         };

@@ -42,3 +42,26 @@ export const formatPromptRunData = (data: any[]): PromptRun[] => {
     return formattedData;
   });
 };
+
+// Add the formatRelativeTime function that was referenced but missing
+export const formatRelativeTime = (date: string): string => {
+  try {
+    const now = new Date();
+    const promptDate = new Date(date);
+    const diffMs = now.getTime() - promptDate.getTime();
+
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMinutes < 60) {
+      return `${diffMinutes}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else {
+      return `${diffDays}d ago`;
+    }
+  } catch (error) {
+    return 'Unknown time';
+  }
+};
