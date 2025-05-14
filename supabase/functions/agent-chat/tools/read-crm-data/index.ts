@@ -95,6 +95,15 @@ export const readCrmData = {
           };
       }
       
+      // Check if there was an error in the response
+      if (response.error) {
+        return {
+          status: "error",
+          error: response.error,
+          message: `Failed to retrieve ${entity_type} data: ${response.error}`
+        };
+      }
+      
       return {
         status: "success",
         entity_type,
@@ -126,10 +135,22 @@ async function fetchProjects(supabase: any, companyId: string, projectId: string
 }
 
 async function fetchContacts(supabase: any, projectId: string, limit: number = 10) {
+  // First get contacts linked to this project
+  const { data: projectContacts } = await supabase
+    .from("project_contacts")
+    .select("contact_id")
+    .eq("project_id", projectId);
+    
+  if (!projectContacts || projectContacts.length === 0) {
+    return { data: [] };
+  }
+  
+  const contactIds = projectContacts.map(pc => pc.contact_id);
+  
   return await supabase
     .from("contacts")
     .select("id, full_name, email, phone_number, role, contact_type")
-    .eq("id", supabase.rpc("get_project_contacts", { p_project_id: projectId }))
+    .in("id", contactIds)
     .limit(limit);
 }
 

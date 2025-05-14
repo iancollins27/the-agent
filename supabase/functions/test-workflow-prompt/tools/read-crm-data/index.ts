@@ -95,6 +95,15 @@ export const readCrmData = {
           };
       }
       
+      // Check if there was an error in the response
+      if (response.error) {
+        return {
+          status: "error",
+          error: response.error,
+          message: `Failed to retrieve ${entity_type} data: ${response.error}`
+        };
+      }
+      
       return {
         status: "success",
         entity_type,
