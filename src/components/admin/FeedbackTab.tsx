@@ -33,6 +33,13 @@ interface FeedbackRun {
   reviewed: boolean;
 }
 
+interface ProjectData {
+  id?: string;
+  Address?: string;
+  project_name?: string;
+  crm_url?: string;
+}
+
 const FeedbackTab = () => {
   const [feedbackRuns, setFeedbackRuns] = useState<FeedbackRun[]>([]);
   const [selectedRun, setSelectedRun] = useState<FeedbackRun | null>(null);
@@ -70,7 +77,7 @@ const FeedbackTab = () => {
     if (data) {
       const formattedRuns = data.map(run => {
         // Handle project object safely with optional chaining and nullish coalescing
-        const project = run.project || {};
+        const project: ProjectData = run.project || {};
         
         return {
           id: run.id,

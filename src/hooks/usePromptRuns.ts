@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { PromptRun } from '../components/admin/types';
 import { usePromptFeedback } from './usePromptFeedback';
@@ -34,7 +35,7 @@ export const usePromptRuns = ({
     setLoading(true);
     try {
       // First, fetch prompt runs
-      let formattedData: PromptRun[] = await fetchData(statusFilter);
+      let formattedData = await fetchData(statusFilter);
       
       // Filter by project manager if selected
       if (projectManagerFilter && formattedData.length > 0) {
@@ -87,6 +88,7 @@ export const usePromptRuns = ({
         }
       }
 
+      // Find only latest runs if requested
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
         const latestRunsByProject = new Map<string, PromptRun>();
         
@@ -106,6 +108,7 @@ export const usePromptRuns = ({
         );
       }
 
+      // Filter reminder actions
       if (excludeReminderActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
@@ -157,6 +160,7 @@ export const usePromptRuns = ({
         }
       }
 
+      // Filter to only pending actions
       if (onlyPendingActions && formattedData.length > 0) {
         const promptRunIds = formattedData.map(run => run.id);
         
@@ -177,7 +181,38 @@ export const usePromptRuns = ({
         }
       }
 
-      setPromptRuns(formattedData);
+      // Ensure formattedData conforms to PromptRun type
+      const typedPromptRuns: PromptRun[] = formattedData.map(run => ({
+        id: run.id,
+        created_at: run.created_at,
+        status: run.status || 'unknown',
+        ai_provider: run.ai_provider || 'unknown',
+        ai_model: run.ai_model || 'unknown',
+        prompt_input: run.prompt_input || '',
+        prompt_output: run.prompt_output,
+        error_message: run.error_message,
+        feedback_rating: run.feedback_rating,
+        feedback_description: run.feedback_description,
+        feedback_tags: run.feedback_tags,
+        feedback_review: run.feedback_review,
+        completed_at: run.completed_at,
+        reviewed: run.reviewed || false,
+        project_id: run.project_id,
+        workflow_prompt_id: run.workflow_prompt_id,
+        workflow_prompt_type: run.workflow_prompt_type,
+        project_name: run.project_name,
+        project_address: run.project_address,
+        project_next_step: run.project_next_step,
+        project_crm_url: run.project_crm_url,
+        project_roofer_contact: run.project_roofer_contact,
+        project_manager: run.project_manager,
+        relative_time: run.relative_time || '',
+        workflow_type: run.workflow_type,
+        error: !!run.error_message,
+        toolLogsCount: run.toolLogsCount
+      }));
+
+      setPromptRuns(typedPromptRuns);
     } finally {
       setLoading(false);
     }

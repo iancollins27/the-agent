@@ -12,6 +12,7 @@ import PromptRunsTable from './PromptRunsTable';
 import EmptyPromptRunsState from './EmptyPromptRunsState';
 import TimeFilterSelect from '../TimeFilterSelect';
 import PromptRunHeader from './PromptRunHeader';
+import PromptRunFilters from './PromptRunFilters';
 
 // Hooks and utils
 import { useTimeFilter } from '@/hooks/useTimeFilter';
@@ -88,11 +89,6 @@ const PromptRunsTab = () => {
     setActiveTab(value);
   };
   
-  // Helper function to update filters
-  const setFilter = (key: keyof PromptRunFiltersState, value: any) => {
-    updateFilter(key, value);
-  };
-  
   return (
     <div className="w-full">
       {/* Header with project info if viewing a single project */}
@@ -111,10 +107,13 @@ const PromptRunsTab = () => {
             onChange={setTimeFilter}
           />
           
-          {/* Pass individual props instead of filters object */}
-          <div className="bg-red-500 p-6">
-            <div>Filter section needs refactoring - implement PromptRunFilters component with appropriate props</div>
-          </div>
+          <PromptRunFilters
+            setFilter={updateFilter}
+            reviewed={storedFilters.reviewed}
+            rating={storedFilters.rating}
+            hasError={storedFilters.hasError}
+            search={storedFilters.search}
+          />
         </div>
         
         {/* Tabs for execution status */}

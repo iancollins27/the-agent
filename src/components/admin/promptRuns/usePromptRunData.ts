@@ -15,6 +15,15 @@ export interface UsePromptRunDataProps {
   activeTab: string;
 }
 
+// Define a type for project data
+interface ProjectData {
+  id?: string;
+  project_name?: string;
+  Address?: string;
+  crm_id?: string;
+  crm_url?: string;
+}
+
 export const usePromptRunData = ({ 
   projectId, 
   timeFilter, 
@@ -112,7 +121,7 @@ export const usePromptRunData = ({
         // Process the data
         return data.map(run => {
           // Handle the project object safely with nullish coalescing
-          const project = run.project || {};
+          const project: ProjectData = run.project || {};
           
           return {
             id: run.id,
