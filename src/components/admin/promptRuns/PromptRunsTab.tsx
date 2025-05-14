@@ -1,11 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from "@/integrations/supabase/client";
 
 // Component imports
 import PromptRunsTable from './PromptRunsTable';
@@ -74,7 +74,7 @@ const PromptRunsTab = () => {
     enabled: !!projectId
   });
   
-  useEffect(() => {
+  React.useEffect(() => {
     if (error) {
       toast({
         title: "Error Loading Data",

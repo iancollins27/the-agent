@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -37,7 +36,6 @@ interface ProjectData {
   id?: string;
   Address?: string;
   project_name?: string;
-  crm_url?: string;
 }
 
 const FeedbackTab = () => {
@@ -60,8 +58,7 @@ const FeedbackTab = () => {
           project:project_id (
             id,
             Address,
-            project_name,
-            crm_url
+            project_name
           )
         `)
         .not('feedback_description', 'is', null)
@@ -77,7 +74,8 @@ const FeedbackTab = () => {
     if (data) {
       const formattedRuns = data.map(run => {
         // Handle project object safely with optional chaining and nullish coalescing
-        const project: ProjectData = run.project || {};
+        // Make sure to check if project exists and handle it as empty object if not
+        const project = run.project || {};
         
         return {
           id: run.id,
@@ -86,10 +84,10 @@ const FeedbackTab = () => {
           feedback_rating: run.feedback_rating,
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
-          project_address: project?.Address || 'No address',
+          project_address: project.Address || 'No address',
           // Project manager is not reliably available in the current data structure
           project_manager: 'No manager assigned',
-          project_crm_url: project?.crm_url || null,
+          project_crm_url: null, // crm_url doesn't exist, so set to null
           prompt_input: run.prompt_input,
           prompt_output: run.prompt_output,
           error_message: run.error_message,
@@ -219,7 +217,7 @@ const FeedbackTab = () => {
                   {run.feedback_tags ? run.feedback_tags.join(', ') : 'No tags'}
                 </TableCell>
                 <TableCell className="text-center">
-                  {isReviewed(run) ? 
+                  {run.reviewed ? 
                     <CheckSquare className="h-5 w-5 text-green-500" /> : 
                     <Square className="h-5 w-5 text-gray-300" />
                   }

@@ -21,7 +21,7 @@ interface ProjectData {
   project_name?: string;
   Address?: string;
   crm_id?: string;
-  crm_url?: string;
+  // Remove crm_url as it doesn't exist in the database schema
 }
 
 export const usePromptRunData = ({ 
@@ -74,8 +74,7 @@ export const usePromptRunData = ({
               id,
               project_name,
               Address,
-              crm_id,
-              crm_url
+              crm_id
             )
           `)
           .order('created_at', { ascending: false });
@@ -132,14 +131,14 @@ export const usePromptRunData = ({
             prompt_output: run.prompt_output,
             created_at: run.created_at,
             project_id: run.project_id,
-            project_name: project?.project_name || null,
-            project_address: project?.Address || null,
+            project_name: project.project_name || null,
+            project_address: project.Address || null,
             workflow_prompt_type: null, // Not available in the current schema
             workflow_type: null, // Not available in the current schema
             error: !!run.error_message,
             error_message: run.error_message,
             reviewed: run.reviewed || false,
-            project_crm_url: project?.crm_url || null
+            project_crm_url: null // crm_url doesn't exist in the database
           };
         });
       } catch (error) {
