@@ -27,6 +27,28 @@ export async function executeMCPRequest(
     if (!contextData) {
       throw new Error("Context data is required for MCP execution");
     }
+    
+    // Security check: Ensure company ID is provided for multi-tenant security
+    if (!contextData.company_id) {
+      console.error("Security error: Missing company_id in context data for MCP execution");
+      throw new Error("Company context is required for secure MCP execution");
+    }
+    
+    // Validate that the project belongs to the specified company
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('company_id')
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError || !projectData) {
+      throw new Error(`Project verification failed: ${projectError?.message || "Project not found"}`);
+    }
+    
+    if (projectData.company_id !== contextData.company_id) {
+      console.error(`Security error: Project company (${projectData.company_id}) doesn't match user company (${contextData.company_id})`);
+      throw new Error("You don't have permission to access this project as it belongs to a different company");
+    }
 
     // Process the MCP request based on the provider
     let result;
@@ -45,7 +67,7 @@ export async function executeMCPRequest(
         console.error("Error fetching MCP orchestrator prompt:", err);
       }
 
-      // Prepare tool definitions
+      // Prepare tool definitions with multi-tenant context
       let availableTools;
       if (contextData.available_tools && Array.isArray(contextData.available_tools) && contextData.available_tools.length > 0) {
         availableTools = filterTools(contextData.available_tools);

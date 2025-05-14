@@ -11,6 +11,30 @@ import { RerunPromptResult } from './types';
  */
 export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResult> => {
   try {
+    // Security: Verify user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        success: false,
+        error: "Authentication required"
+      };
+    }
+    
+    // Get user's company ID
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+      
+    if (profileError || !userProfile?.company_id) {
+      console.error("Error getting user company:", profileError);
+      return {
+        success: false,
+        error: "Unable to verify company access"
+      };
+    }
+
     // Step 1: Fetch the original prompt run details
     const { data: originalRun, error: fetchError } = await supabase
       .from('prompt_runs')
@@ -19,7 +43,8 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
         prompt_input,
         project_id,
         workflow_prompt_id,
-        workflow_prompts:workflow_prompt_id (id, type)
+        workflow_prompts:workflow_prompt_id (id, type),
+        projects:project_id (company_id)
       `)
       .eq('id', promptRunId)
       .single();
@@ -29,6 +54,14 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       return { 
         success: false, 
         error: `Could not find the original prompt run: ${fetchError?.message || "Not found"}` 
+      };
+    }
+    
+    // Security: Check if project belongs to user's company
+    if (originalRun.projects?.company_id !== userProfile.company_id) {
+      return {
+        success: false,
+        error: "You don't have permission to rerun this prompt as it belongs to a different company"
       };
     }
 
@@ -84,7 +117,8 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
         project_track,
         project_tracks:project_track (name, "track base prompt", Roles),
         companies (name),
-        Address
+        Address,
+        company_id
       `)
       .eq('id', originalRun.project_id)
       .single();
@@ -103,6 +137,14 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
         error: "Project not found"
       };
     }
+    
+    // Security: Double-check company ID
+    if (projectData.company_id !== userProfile.company_id) {
+      return {
+        success: false,
+        error: "You don't have permission to access this project as it belongs to a different company"
+      };
+    }
 
     // Create context data for the prompt
     const contextData = {
@@ -115,7 +157,8 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       current_date: new Date().toISOString().split('T')[0],
       milestone_instructions: '',
       action_description: 'Re-run from dashboard',
-      property_address: projectData.Address || ''  // Use the Address field
+      property_address: projectData.Address || '',  // Use the Address field
+      company_id: userProfile.company_id // Include company ID in context for security
     };
 
     // Use the full URL with the project ID from the environment
@@ -123,18 +166,19 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aWZzeHNyYmx1ZWhvcGFtcXB5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4MzA0NjIsImV4cCI6MjA1NTQwNjQ2Mn0.3MYZOhz5kH71qxniwzHDzVzF3PKCulkvACDc8R1pI6I`
+        'Authorization': `Bearer ${await supabase.auth.getSession().then(res => res.data.session?.access_token)}`
       },
       body: JSON.stringify({
         promptType: promptType,
         promptText: latestPrompt.prompt_text,  // Using the latest prompt text from the template
         projectId: originalRun.project_id,
         workflowPromptId: latestPrompt.id,     // Using the latest prompt ID
-        contextData: contextData,              // Passing the context data
+        contextData: contextData,              // Passing the context data with company ID
         aiProvider: aiConfig?.provider || 'openai',
         aiModel: aiConfig?.model || 'gpt-4o',
         useMCP: false,
         initiatedBy: 're-run button',
+        companyId: userProfile.company_id      // Pass company ID for security validation
       })
     });
 

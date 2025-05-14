@@ -1,6 +1,5 @@
+
 import React, { useState, useMemo } from 'react';
-import PromptRunsTable from '../PromptRunsTable';
-import PromptRunDetails from '../PromptRunDetails';
 import { PromptRun } from '../types';
 import PromptRunHeader from './PromptRunHeader';
 import PromptRunLoader from './PromptRunLoader';
@@ -11,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import TablePagination from '../tables/TablePagination';
+import PromptRunsTable from '../PromptRunsTable';
+import PromptRunDetails from '../PromptRunDetails';
 
 const ITEMS_PER_PAGE = 10;
 
