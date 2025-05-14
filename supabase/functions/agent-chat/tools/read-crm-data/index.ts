@@ -71,8 +71,14 @@ class ZohoConnector {
       const clientSecret = apiCallJson.client_secret;
       
       if (!clientId || !refreshToken || !clientSecret) {
-        throw new Error("Missing OAuth credentials (client ID, client secret, or refresh token)");
+        const missingParams = [];
+        if (!clientId) missingParams.push("clientId");
+        if (!refreshToken) missingParams.push("refreshToken");
+        if (!clientSecret) missingParams.push("clientSecret");
+        throw new Error(`Missing OAuth credentials: ${missingParams.join(", ")}`);
       }
+      
+      console.log(`OAuth parameters - Client ID length: ${clientId.length}, Refresh token length: ${refreshToken.length}, Client secret length: ${clientSecret.length}`);
       
       // Determine the auth URL based on datacenter
       const datacenter = apiCallJson.datacenter || "com";
@@ -97,16 +103,24 @@ class ZohoConnector {
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`OAuth error response status: ${response.status}, body: ${errorText}`);
         throw new Error(`Zoho OAuth error: ${response.status} - ${errorText}`);
       }
       
       const tokenData = await response.json();
+      console.log(`OAuth response received: ${JSON.stringify(tokenData)}`);
+      
+      if (!tokenData.access_token) {
+        console.error(`No access token in response: ${JSON.stringify(tokenData)}`);
+        throw new Error("No access token received from Zoho OAuth");
+      }
+      
       this.accessToken = tokenData.access_token;
       
       // Set token expiry (typically 1 hour for Zoho, minus 5 min buffer)
       this.tokenExpiresAt = now + ((tokenData.expires_in || 3600) - 300) * 1000;
       
-      console.log(`New access token obtained, expires at ${new Date(this.tokenExpiresAt).toISOString()}`);
+      console.log(`New access token obtained (length: ${this.accessToken.length}), expires at ${new Date(this.tokenExpiresAt).toISOString()}`);
       return this.accessToken;
     } catch (error) {
       console.error("Error getting Zoho access token:", error);
@@ -126,6 +140,7 @@ class ZohoConnector {
       });
       
       console.log(`Making Zoho API request to: ${url.toString()}`);
+      console.log(`Using token of length: ${token.length}, first 5 chars: ${token.substring(0, 5)}...`);
       
       // Make request
       const response = await fetch(url.toString(), {
@@ -139,10 +154,14 @@ class ZohoConnector {
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`Zoho API error response status: ${response.status}, body: ${errorText}`);
         throw new Error(`Zoho API error: ${response.status} - ${errorText}`);
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      console.log(`Zoho API response received, sample data: ${JSON.stringify(responseData).substring(0, 100)}...`);
+      
+      return responseData;
     } catch (error) {
       console.error("Error making Zoho request:", error);
       throw error;
@@ -169,6 +188,9 @@ class ZohoConnector {
       if (!appLinkName) {
         throw new Error("Missing app_link_name in configuration");
       }
+      
+      // Log configuration details
+      console.log(`Zoho Creator config - Account: ${accountOwnerName}, App: ${appLinkName}, Report: ${reportLinkName}, Fields config: ${fieldsConfig}`);
       
       // Construct API endpoint
       const endpoint = `https://${baseUrl}/creator/v2.1/data/${accountOwnerName}/${appLinkName}/report/${reportLinkName}/${crmId}`;
@@ -459,6 +481,7 @@ export const readCrmData = {
         .single();
       
       if (projectError || !project) {
+        console.error(`Project lookup error: ${projectError?.message || "Project not found"}`);
         return {
           status: "error",
           error: `Project with CRM ID ${crm_id} not found`,
@@ -489,6 +512,7 @@ export const readCrmData = {
         .single();
         
       if (integrationError || !integration) {
+        console.error(`Integration lookup error: ${integrationError?.message || "No integration found"}`);
         return {
           status: "error",
           error: `No active CRM integration found: ${integrationError?.message || "No integration configured"}`,
@@ -497,6 +521,15 @@ export const readCrmData = {
       }
       
       console.log(`Found integration with provider: ${integration.provider_name}`);
+      console.log(`Integration details: ${JSON.stringify({
+        provider: integration.provider_name,
+        type: integration.provider_type,
+        mode: integration.integration_mode,
+        has_api_key: !!integration.api_key,
+        has_api_secret: !!integration.api_secret,
+        has_account_id: !!integration.account_id,
+        has_call_json: !!integration.api_call_json
+      })}`);
       
       // Initialize Zoho connector
       const connector = new ZohoConnector(supabase, {
@@ -537,6 +570,7 @@ export const readCrmData = {
       
       // Check if there was an error in the response
       if (response.error) {
+        console.error(`Error in response from ${entity_type} fetch: ${response.error}`);
         return {
           status: "error",
           error: response.error,
@@ -544,14 +578,19 @@ export const readCrmData = {
         };
       }
       
+      const resultData = response.data || [];
+      const dataCount = Array.isArray(resultData) ? resultData.length : 1;
+      
+      console.log(`Successfully retrieved ${entity_type} data, count: ${dataCount}`);
+      
       return {
         status: "success",
         entity_type,
         project_id: projectId,
         company_id: companyId,
-        data: response.data || [],
-        count: response.data ? (Array.isArray(response.data) ? response.data.length : 1) : 0,
-        message: `Successfully retrieved ${response.data ? (Array.isArray(response.data) ? response.data.length : 1) : 0} ${entity_type} records for project with CRM ID ${crm_id}`
+        data: resultData,
+        count: dataCount,
+        message: `Successfully retrieved ${dataCount} ${entity_type} records for project with CRM ID ${crm_id}`
       };
     } catch (error) {
       console.error("Error in read_crm_data tool:", error);

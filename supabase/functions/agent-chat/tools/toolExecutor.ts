@@ -21,7 +21,14 @@ export async function executeToolCall(
     console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with args:`, JSON.stringify(args));
     
     // Import the tool dynamically based on the mapped name
-    const toolModule = await import(`./${mappedToolName}/index.ts`);
+    let toolModule;
+    try {
+      toolModule = await import(`./${mappedToolName}/index.ts`);
+      console.log(`Successfully imported tool module: ${mappedToolName}`);
+    } catch (importError) {
+      console.error(`Error importing tool module ${mappedToolName}:`, importError);
+      throw new Error(`Failed to import tool module: ${importError.message}`);
+    }
     
     // Create tool context
     const context: ToolContext = {
@@ -41,21 +48,26 @@ export async function executeToolCall(
     // Get the correct tool function
     const toolFunction = toolExports[toolName];
     
-    if (toolFunction && toolFunction.execute) {
-      const result = await toolFunction.execute(args, context);
-      console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
-      return result;
+    if (!toolFunction) {
+      console.error(`Tool function ${toolName} not found in module. Available exports:`, Object.keys(toolModule));
+      throw new Error(`Tool function ${toolName} not found in module ${mappedToolName}`);
     }
     
-    return {
-      status: "error",
-      error: `Tool function ${toolName} not found in module ${mappedToolName}`
-    };
+    if (!toolFunction.execute) {
+      console.error(`Tool function ${toolName} does not have an execute method. Keys:`, Object.keys(toolFunction));
+      throw new Error(`Tool function ${toolName} does not have an execute method`);
+    }
+    
+    console.log(`Executing tool function ${toolName}.execute with args`);
+    const result = await toolFunction.execute(args, context);
+    console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
+    return result;
   } catch (error) {
     console.error(`Error executing tool ${toolName}:`, error);
     return {
       status: "error",
-      error: error.message || "Unknown error"
+      error: error.message || "Unknown error",
+      details: error.stack || "No stack trace available"
     };
   }
 }
