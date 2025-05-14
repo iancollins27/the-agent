@@ -7,7 +7,7 @@ import { useAuth } from './hooks/useAuth';
 import ProjectManager from './pages/ProjectManager';
 
 // Public routes
-import Dashboard from './components/Dashboard';
+import { Dashboard } from './components/Dashboard';
 import Login from './pages/Login';
 
 // Loading component
