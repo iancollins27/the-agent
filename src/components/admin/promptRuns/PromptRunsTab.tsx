@@ -1,160 +1,143 @@
-import React, { useState, useMemo } from 'react';
-import PromptRunsTable from '../PromptRunsTable';
-import PromptRunDetails from '../PromptRunDetails';
-import { PromptRun } from '../types';
-import PromptRunHeader from './PromptRunHeader';
-import PromptRunLoader from './PromptRunLoader';
+
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+// Component imports
+import PromptRunsTable from './PromptRunsTable';
+import PromptRunFilters from '../PromptRunFilters';
 import EmptyPromptRunsState from './EmptyPromptRunsState';
+import TimeFilterSelect from '../TimeFilterSelect';
+import PromptRunHeader from './PromptRunHeader';
+
+// Hooks and utils
+import { useTimeFilter } from '@/hooks/useTimeFilter';
 import { usePromptRunData } from './usePromptRunData';
-import { usePromptRunActions } from './usePromptRunActions';
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import TablePagination from '../tables/TablePagination';
+import { useFilterPersistence } from '@/hooks/useFilterPersistence';
 
-const ITEMS_PER_PAGE = 10;
-
-const PromptRunsTab: React.FC = () => {
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [reviewFilter, setReviewFilter] = useState("not-reviewed");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchAddress, setSearchAddress] = useState("");
+const PromptRunsTab = () => {
+  const navigate = useNavigate();
+  const { projectId } = useParams();
+  const [activeTab, setActiveTab] = useState('all');
   
-  const { promptRuns, setPromptRuns, loading, fetchPromptRuns } = usePromptRunData(statusFilter);
-  const { handleRatingChange, handleFeedbackChange } = usePromptRunActions(setPromptRuns, setSelectedRun);
-
-  const viewPromptRunDetails = (run: PromptRun) => {
-    setSelectedRun(run);
-    setDetailsOpen(true);
-  };
-
-  const handleRunReviewed = (promptRunId: string) => {
-    setPromptRuns(prev => 
-      prev.map(run => 
-        run.id === promptRunId ? { ...run, reviewed: true } : run
-      )
-    );
-  };
-
-  const handlePromptRerun = (promptRunId?: string) => {
-    setCurrentPage(1);
-    fetchPromptRuns();
-  };
-
-  const filteredPromptRuns = useMemo(() => {
-    let filtered = [...promptRuns];
-    
-    if (reviewFilter === "reviewed") {
-      filtered = filtered.filter(run => run.reviewed === true);
-    } else if (reviewFilter === "not-reviewed") {
-      filtered = filtered.filter(run => run.reviewed !== true);
-    }
-    
-    if (searchAddress.trim()) {
-      const searchTerm = searchAddress.toLowerCase().trim();
-      filtered = filtered.filter(run => 
-        run.project_address && run.project_address.toLowerCase().includes(searchTerm)
-      );
-    }
-    
-    return filtered;
-  }, [promptRuns, reviewFilter, searchAddress]);
-
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [reviewFilter, searchAddress]);
-
-  const paginatedPromptRuns = filteredPromptRuns.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  // Get time filter state
+  const { timeFilter, setTimeFilter } = useTimeFilter();
   
-  const totalPages = Math.ceil(filteredPromptRuns.length / ITEMS_PER_PAGE);
-
+  // Set up persisted filter state
+  const { filters, setFilter } = useFilterPersistence('promptRunsFilters', {
+    reviewed: false,
+    rating: null,
+    hasError: false,
+    search: '',
+  });
+  
+  // Fetch prompt runs data with filters
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    refresh
+  } = usePromptRunData({ 
+    projectId, 
+    timeFilter, 
+    filters,
+    activeTab
+  });
+  
+  // Fetch project data if projectId is available
+  const { data: projectData } = useQuery({
+    queryKey: ['project', projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, project_name, Address')
+        .eq('id', projectId)
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId
+  });
+  
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error Loading Data",
+        description: error.message || "Failed to load prompt runs. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [error]);
+  
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
+  
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="w-full">
+      {/* Header with project info if viewing a single project */}
+      {projectId && projectData && (
         <PromptRunHeader 
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          fetchPromptRuns={fetchPromptRuns}
-          searchAddress={searchAddress}
-          setSearchAddress={setSearchAddress}
+          projectName={projectData.project_name || projectData.Address || 'Unnamed Project'}
+          onBackClick={() => navigate('/admin/prompt-runs')}
         />
-        <div className="flex items-center space-x-4">
-          <Label>Show:</Label>
-          <RadioGroup 
-            value={reviewFilter} 
-            onValueChange={setReviewFilter}
-            className="flex space-x-4"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="all" id="show-all" />
-              <Label htmlFor="show-all">All</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="reviewed" id="show-reviewed" />
-              <Label htmlFor="show-reviewed">Reviewed</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="not-reviewed" id="show-not-reviewed" />
-              <Label htmlFor="show-not-reviewed">Not Reviewed</Label>
-            </div>
-          </RadioGroup>
-        </div>
-      </div>
-
-      {loading ? (
-        <PromptRunLoader />
-      ) : filteredPromptRuns.length === 0 ? (
-        <div className="text-center py-10">
-          {searchAddress.trim() ? (
-            <div className="space-y-2">
-              <p className="text-lg font-medium">No prompt runs found with the address: "{searchAddress}"</p>
-              <p className="text-muted-foreground">Try adjusting your search or clear it to see all results</p>
-              <Button 
-                variant="outline" 
-                onClick={() => setSearchAddress("")}
-                className="mt-2"
-              >
-                Clear search
-              </Button>
-            </div>
-          ) : (
-            <EmptyPromptRunsState />
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <PromptRunsTable 
-            promptRuns={paginatedPromptRuns} 
-            onRatingChange={handleRatingChange} 
-            onViewDetails={viewPromptRunDetails} 
-            onRunReviewed={handleRunReviewed}
-            reviewFilter={reviewFilter}
-            onPromptRerun={handlePromptRerun}
-          />
-          
-          <div className="flex justify-center mt-4">
-            <TablePagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        </div>
       )}
-
-      <PromptRunDetails 
-        promptRun={selectedRun} 
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-        onRatingChange={handleRatingChange}
-        onFeedbackChange={handleFeedbackChange}
-        onPromptRerun={handlePromptRerun}
-      />
+      
+      {/* Filters row */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+          <TimeFilterSelect 
+            value={timeFilter}
+            onChange={setTimeFilter}
+          />
+          <PromptRunFilters 
+            filters={filters}
+            setFilter={setFilter}
+          />
+        </div>
+        
+        {/* Tabs for execution status */}
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full md:w-auto">
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="success">Successful</TabsTrigger>
+            <TabsTrigger value="error">Errors</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      
+      {/* Content */}
+      <TabsContent value={activeTab} className="mt-0">
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, index) => (
+              <Skeleton key={index} className="w-full h-16 rounded-md" />
+            ))}
+          </div>
+        ) : data && data.length > 0 ? (
+          <PromptRunsTable data={data} refresh={refresh} />
+        ) : (
+          <EmptyPromptRunsState 
+            filters={filters}
+            timeFilter={timeFilter}
+            onResetFilters={() => {
+              setFilter('rating', null);
+              setFilter('reviewed', false);
+              setFilter('hasError', false);
+              setFilter('search', '');
+              setTimeFilter('24h');
+            }}
+          />
+        )}
+      </TabsContent>
     </div>
   );
 };
