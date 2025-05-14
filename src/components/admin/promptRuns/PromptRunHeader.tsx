@@ -1,53 +1,31 @@
 
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { ArrowLeft } from 'lucide-react';
 
 interface PromptRunHeaderProps {
-  statusFilter: string | null;
-  setStatusFilter: (value: string | null) => void;
-  fetchPromptRuns: () => void;
-  searchAddress: string;
-  setSearchAddress: (value: string) => void;
+  projectName: string;
+  onBackClick: () => void;
 }
 
 const PromptRunHeader: React.FC<PromptRunHeaderProps> = ({ 
-  statusFilter, 
-  setStatusFilter, 
-  fetchPromptRuns,
-  searchAddress,
-  setSearchAddress
+  projectName,
+  onBackClick
 }) => {
   return (
-    <div className="flex justify-between items-center">
-      <h2 className="text-2xl font-bold">Prompt Runs</h2>
-      <div className="flex space-x-4 items-center">
-        <div className="relative w-64">
-          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search by address"
-            value={searchAddress}
-            onChange={(e) => setSearchAddress(e.target.value)}
-            className="pl-8 w-full"
-          />
-        </div>
-        <Select 
-          value={statusFilter || "all"} 
-          onValueChange={(value) => setStatusFilter(value === "all" ? null : value)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="ERROR">Error</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={fetchPromptRuns}>Refresh</Button>
+    <div className="flex items-center gap-4 mb-6">
+      <Button 
+        variant="outline" 
+        size="icon"
+        onClick={onBackClick}
+        title="Back to all prompt runs"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      
+      <div>
+        <h1 className="text-2xl font-bold">{projectName}</h1>
+        <p className="text-sm text-muted-foreground">Prompt run history</p>
       </div>
     </div>
   );
