@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { PromptRun } from '../types';
 
 export interface UsePromptRunDataProps {
   projectId?: string;
@@ -120,7 +121,7 @@ export const usePromptRunData = ({
         // Process the data
         return data.map(run => {
           // Handle the project object safely with nullish coalescing
-          const project: ProjectData = run.project || {};
+          const project = (run.project || {}) as ProjectData;
           
           return {
             id: run.id,
@@ -139,7 +140,7 @@ export const usePromptRunData = ({
             error_message: run.error_message,
             reviewed: run.reviewed || false,
             project_crm_url: null // crm_url doesn't exist in the database
-          };
+          } as PromptRun;
         });
       } catch (error) {
         console.error('Error in usePromptRunData:', error);

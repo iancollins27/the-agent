@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -32,6 +33,7 @@ interface FeedbackRun {
   reviewed: boolean;
 }
 
+// Define a more specific type for project data
 interface ProjectData {
   id?: string;
   Address?: string;
@@ -74,8 +76,8 @@ const FeedbackTab = () => {
     if (data) {
       const formattedRuns = data.map(run => {
         // Handle project object safely with optional chaining and nullish coalescing
-        // Make sure to check if project exists and handle it as empty object if not
-        const project = run.project || {};
+        // Explicitly type the project object to match ProjectData interface or empty object
+        const project = (run.project || {}) as ProjectData;
         
         return {
           id: run.id,
