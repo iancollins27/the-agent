@@ -43,20 +43,6 @@ export function createMCPContextManager(
       // Add the assistant message to our context
       this.messages.push(message);
       
-      // Security validation: Ensure company context exists
-      if (!companyId || !userProfile) {
-        console.error("Security error: Missing company context in MCP processing");
-        // Add security warning to the context
-        this.addSystemMessage("WARNING: User company context could not be verified. Tool access restricted.");
-        
-        return { 
-          finalAnswer: "I'm sorry, but I cannot access company data without proper authentication. Please ensure you're logged in correctly.", 
-          actionRecordId: null, 
-          projectData: null,
-          processedToolCallIds
-        };
-      }
-      
       // Check if the model wants to use tools
       const toolCalls = message.tool_calls;
       console.log(`Tool calls: ${toolCalls ? toolCalls.length : 0}`);
@@ -73,14 +59,6 @@ export function createMCPContextManager(
         );
         
         projectData = toolResult.projectData;
-        
-        // Additional company validation for project data
-        if (projectData && projectData.company_id && projectData.company_id !== companyId) {
-          console.error("Security error: Project belongs to a different company than the user");
-          this.addSystemMessage("WARNING: You attempted to access a project from a different company. Access denied.");
-          projectData = null;
-        }
-        
         // Update the set of processed tool call IDs with any new ones
         toolResult.processedIds.forEach(id => processedToolCallIds.add(id));
         
@@ -92,23 +70,6 @@ export function createMCPContextManager(
         
         // Process any action requests in the final answer
         if (finalAnswer && projectData?.id) {
-          // Validate project company before processing actions
-          const { data } = await supabase
-            .from('projects')
-            .select('company_id')
-            .eq('id', projectData.id)
-            .single();
-            
-          if (!data || data.company_id !== companyId) {
-            console.error("Security error: Attempted action on project from different company");
-            return { 
-              finalAnswer: "I cannot perform actions on this project due to company access restrictions.", 
-              actionRecordId: null, 
-              projectData: null,
-              processedToolCallIds 
-            };
-          }
-          
           const actionResult = await processActionData(supabase, finalAnswer, projectData);
           finalAnswer = actionResult.finalAnswer;
           actionRecordId = actionResult.actionRecordId;

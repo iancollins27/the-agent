@@ -7,18 +7,166 @@
 
 import { ToolContext } from '../types.ts';
 
-// Add connector class similar to what was in data-fetch
+// Standard response interface for CRM data
+interface CRMResponse {
+  project: {
+    fields: Record<string, any>;  // All basic project fields
+    notes: Array<{
+      id: string;
+      author: string;
+      timestamp: string;
+      content: string;
+      [key: string]: any;
+    }>;
+    contacts: Array<{
+      id: string;
+      name: string;
+      role: string;
+      email: string;
+      phone: string;
+      [key: string]: any;
+    }>;
+    tasks: Array<{
+      id: string;
+      title: string;
+      status: string;
+      dueDate: string | null;
+      assignee: string;
+      [key: string]: any;
+    }>;
+  }
+}
+
 class ZohoConnector {
   private supabase: any;
   private config: any;
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
+  private defaultDatacenter: string = "com";
   
   constructor(supabase: any, config: any) {
     this.supabase = supabase;
     this.config = config;
+    console.log("ZohoConnector initialized with config:", JSON.stringify({
+      provider: config.provider_name,
+      type: config.provider_type,
+      integration_mode: config.integration_mode,
+      has_api_key: !!config.api_key,
+      has_api_secret: !!config.api_secret,
+      has_api_call_json: !!config.api_call_json
+    }));
   }
 
+  /**
+   * Fetches all CRM data for a project in a standardized format
+   */
+  async fetchAllData(projectId: string, crmId: string): Promise<{
+    data: CRMResponse | null;
+    error?: string;
+  }> {
+    console.log(`Fetching all CRM data for project ID ${projectId} with CRM ID ${crmId}`);
+    
+    try {
+      // Start with an empty response structure
+      const response: CRMResponse = {
+        project: {
+          fields: {},
+          notes: [],
+          tasks: [],
+          contacts: []
+        }
+      };
+      
+      // Fetch project fields
+      const projectResult = await this.fetchResource('project', crmId);
+      if (projectResult.error) {
+        console.error(`Error fetching project data: ${projectResult.error}`);
+        return { 
+          data: null, 
+          error: `Failed to fetch project data: ${projectResult.error}`
+        };
+      }
+      
+      // Add project fields to response
+      if (projectResult.data) {
+        response.project.fields = {
+          ...projectResult.data,
+          id: crmId,
+        };
+        delete response.project.fields.zoho_fields;
+        
+        // If there are zoho_fields, add them to the fields object
+        if (projectResult.data.zoho_fields) {
+          response.project.fields = {
+            ...response.project.fields,
+            ...projectResult.data.zoho_fields
+          };
+        }
+      }
+      
+      // Fetch and process all data types in parallel
+      const [notesResult, tasksResult, contactsResult] = await Promise.all([
+        this.fetchResource('note', null, projectId),
+        this.fetchResource('task', null, projectId),
+        this.fetchContacts(projectId)
+      ]);
+      
+      // Add notes to response
+      if (notesResult.data && Array.isArray(notesResult.data)) {
+        response.project.notes = notesResult.data.map(note => ({
+          id: note.id || '',
+          author: note.author || '',
+          timestamp: note.created_at || '',
+          content: note.content || '',
+          ...note.zoho_fields
+        }));
+      } else {
+        console.warn(`No notes found or invalid notes data format`);
+      }
+      
+      // Add tasks to response
+      if (tasksResult.data && Array.isArray(tasksResult.data)) {
+        response.project.tasks = tasksResult.data.map(task => ({
+          id: task.id || '',
+          title: task.title || '',
+          status: task.status || '',
+          dueDate: task.due_date || null,
+          assignee: task.assignee || '',
+          ...task.zoho_fields
+        }));
+      } else {
+        console.warn(`No tasks found or invalid tasks data format`);
+      }
+      
+      // Add contacts to response
+      if (contactsResult.data && Array.isArray(contactsResult.data)) {
+        response.project.contacts = contactsResult.data.map(contact => ({
+          id: contact.id || '',
+          name: contact.full_name || contact.name || '',
+          role: contact.role || '',
+          email: contact.email || '',
+          phone: contact.phone_number || contact.phone || '',
+          ...contact
+        }));
+      } else {
+        console.warn(`No contacts found or invalid contacts data format`);
+      }
+      
+      console.log(`Successfully fetched all CRM data with ${response.project.notes.length} notes, ${response.project.tasks.length} tasks, and ${response.project.contacts.length} contacts`);
+      
+      return { data: response };
+    } catch (error) {
+      console.error("Error fetching all CRM data:", error);
+      return { 
+        data: null, 
+        error: error.message || "Unknown error occurred" 
+      };
+    }
+  }
+  
+  /**
+   * Legacy method to fetch a specific resource type
+   */
   async fetchResource(resourceType: string, resourceId: string | null, projectId?: string): Promise<{
     data: any;
     error?: any;
@@ -43,6 +191,60 @@ class ZohoConnector {
       return {
         data: null,
         error: error.message || "Unknown error occurred"
+      };
+    }
+  }
+  
+  /**
+   * Fetches contacts for a project from our database
+   */
+  private async fetchContacts(projectId: string): Promise<{
+    data: any[];
+    error?: string;
+  }> {
+    try {
+      console.log(`Fetching contacts for project ${projectId}`);
+      
+      // First get contacts linked to this project
+      const { data: projectContacts, error: contactsError } = await this.supabase
+        .from("project_contacts")
+        .select("contact_id")
+        .eq("project_id", projectId);
+        
+      if (contactsError) {
+        return { 
+          data: [],
+          error: `Error fetching project contacts: ${contactsError.message}`
+        };
+      }
+        
+      if (!projectContacts || projectContacts.length === 0) {
+        console.log(`No contacts found for project ${projectId}`);
+        return { data: [] };
+      }
+      
+      const contactIds = projectContacts.map((pc: any) => pc.contact_id);
+      console.log(`Found ${contactIds.length} contact IDs for project`);
+      
+      const { data: contacts, error } = await this.supabase
+        .from("contacts")
+        .select("id, full_name, email, phone_number, role, contact_type")
+        .in("id", contactIds);
+        
+      if (error) {
+        return {
+          data: [],
+          error: `Error fetching contacts: ${error.message}`
+        };
+      }
+      
+      console.log(`Successfully fetched ${contacts.length} contacts for project`);
+      return { data: contacts };
+    } catch (error) {
+      console.error("Error fetching contacts:", error);
+      return {
+        data: [],
+        error: error.message || "Unknown error fetching contacts"
       };
     }
   }
@@ -81,7 +283,7 @@ class ZohoConnector {
       console.log(`OAuth parameters - Client ID length: ${clientId.length}, Refresh token length: ${refreshToken.length}, Client secret length: ${clientSecret.length}`);
       
       // Determine the auth URL based on datacenter
-      const datacenter = apiCallJson.datacenter || "com";
+      const datacenter = apiCallJson.datacenter || this.defaultDatacenter;
       const tokenUrl = `https://accounts.zoho.${datacenter}/oauth/v2/token`;
       
       // Build request for token refresh
@@ -93,13 +295,22 @@ class ZohoConnector {
       
       console.log(`Requesting new access token from ${tokenUrl}`);
       
-      const response = await fetch(tokenUrl, {
+      const requestOptions = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: body.toString()
-      });
+      };
+      
+      console.log(`Token request options:`, JSON.stringify({
+        url: tokenUrl,
+        method: requestOptions.method,
+        headers: requestOptions.headers,
+        bodyLength: requestOptions.body.length
+      }));
+      
+      const response = await fetch(tokenUrl, requestOptions);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -143,14 +354,25 @@ class ZohoConnector {
       console.log(`Using token of length: ${token.length}, first 5 chars: ${token.substring(0, 5)}...`);
       
       // Make request
+      const headers = {
+        'Authorization': `Zoho-oauthtoken ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      console.log(`Request headers:`, JSON.stringify(headers));
+      
       const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: {
-          'Authorization': `Zoho-oauthtoken ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
+        headers: headers
       });
+      
+      // Log response headers for debugging
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      console.log(`Response headers:`, JSON.stringify(responseHeaders));
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -275,7 +497,9 @@ class ZohoConnector {
       }
       
       // Prepare endpoint with project CRM ID
-      const endpoint = tasksConfig.endpoint.replace('{project_crm_id}', project.crm_id);
+      const endpoint = tasksConfig.endpoint.replace('{project_crm_id}', project.crm_id)
+                                          .replace('{account_owner_name}', apiCallJson.account_owner_name || this.config.account_id)
+                                          .replace('{app_name}', apiCallJson.app_link_name);
       
       // Make request
       const response = await this.makeZohoRequest(endpoint, tasksConfig.params || {});
@@ -306,7 +530,7 @@ class ZohoConnector {
     } catch (error) {
       console.error("Error fetching tasks from Zoho:", error);
       return {
-        data: null,
+        data: [],
         error: error.message || "Failed to fetch tasks from CRM"
       };
     }
@@ -343,7 +567,9 @@ class ZohoConnector {
       }
       
       // Prepare endpoint with project CRM ID
-      const endpoint = notesConfig.endpoint.replace('{project_crm_id}', project.crm_id);
+      const endpoint = notesConfig.endpoint.replace('{project_crm_id}', project.crm_id)
+                                          .replace('{account_owner_name}', apiCallJson.account_owner_name || this.config.account_id)
+                                          .replace('{app_name}', apiCallJson.app_link_name);
       
       // Make request
       const response = await this.makeZohoRequest(endpoint, notesConfig.params || {});
@@ -371,7 +597,7 @@ class ZohoConnector {
     } catch (error) {
       console.error("Error fetching notes from Zoho:", error);
       return {
-        data: null,
+        data: [],
         error: error.message || "Failed to fetch notes from CRM"
       };
     }
@@ -404,11 +630,16 @@ class ZohoConnector {
       // Check if communications configuration exists
       const commsConfig = apiCallJson.communications;
       if (!commsConfig || !commsConfig.endpoint) {
-        throw new Error("No communications configuration found in integration settings");
+        return {
+          data: [],
+          error: "No communications configuration found in integration settings"
+        };
       }
       
       // Prepare endpoint with project CRM ID
-      const endpoint = commsConfig.endpoint.replace('{project_crm_id}', project.crm_id);
+      const endpoint = commsConfig.endpoint.replace('{project_crm_id}', project.crm_id)
+                                          .replace('{account_owner_name}', apiCallJson.account_owner_name || this.config.account_id)
+                                          .replace('{app_name}', apiCallJson.app_link_name);
       
       // Make request
       const response = await this.makeZohoRequest(endpoint, commsConfig.params || {});
@@ -435,7 +666,7 @@ class ZohoConnector {
     } catch (error) {
       console.error("Error fetching communications from Zoho:", error);
       return {
-        data: null,
+        data: [],
         error: error.message || "Failed to fetch communications from CRM"
       };
     }
@@ -444,7 +675,7 @@ class ZohoConnector {
 
 export const readCrmData = {
   name: "read_crm_data",
-  description: "Retrieves data from the CRM system for a specific project using its CRM ID",
+  description: "Retrieves comprehensive data from the CRM system for a project including details, notes, tasks, and contacts",
   schema: {
     type: "object",
     properties: {
@@ -454,22 +685,18 @@ export const readCrmData = {
       },
       entity_type: {
         type: "string",
-        enum: ["project", "contact", "company", "note", "task", "communication"],
-        description: "Type of entity to retrieve for this project"
-      },
-      limit: {
-        type: "integer",
-        description: "Maximum number of records to retrieve (default: 10)"
+        enum: ["all", "project", "notes", "tasks", "contacts"],
+        description: "Type of entity to retrieve (default: 'all' which fetches everything)"
       }
     },
-    required: ["crm_id", "entity_type"]
+    required: ["crm_id"]
   },
   
   execute: async (args: any, context: ToolContext) => {
     const { supabase } = context;
     
     try {
-      const { crm_id, entity_type, limit = 10 } = args;
+      const { crm_id, entity_type = "all" } = args;
       
       console.log(`Reading CRM data for entity type ${entity_type} with project CRM ID: ${crm_id}`);
       
@@ -539,33 +766,54 @@ export const readCrmData = {
       
       let response;
       
-      switch (entity_type) {
-        case "project":
-          response = await connector.fetchResource('project', crm_id);
-          break;
-        case "task":
-          response = await connector.fetchResource('task', null, projectId);
-          break;
-        case "note":
-          response = await connector.fetchResource('note', null, projectId);
-          break;
-        case "communication":
-          response = await connector.fetchResource('communication', null, projectId);
-          break;
-        case "contact":
-          // Get contacts for this project from our database
-          response = await fetchContacts(supabase, projectId, limit);
-          break;
-        case "company":
-          // Get company info from our database
-          response = await fetchCompanies(supabase, companyId, limit);
-          break;
-        default:
+      // If requesting all data or entity_type is not specified, fetch everything
+      if (entity_type === "all") {
+        response = await connector.fetchAllData(projectId, crm_id);
+        
+        if (response.error) {
           return {
             status: "error",
-            error: `Unknown entity type: ${entity_type}`,
-            message: `The entity type '${entity_type}' is not supported. Please use one of: project, contact, company, note, task, communication`
+            error: response.error,
+            message: `Failed to retrieve CRM data: ${response.error}`
           };
+        }
+        
+        return {
+          status: "success",
+          project_id: projectId, 
+          company_id: companyId,
+          data: response.data,
+          message: `Successfully retrieved all project data from CRM for project with ID ${projectId}`
+        };
+      } 
+      else {
+        // Handle specific entity type requests using legacy methods
+        switch (entity_type) {
+          case "project":
+            response = await connector.fetchResource('project', crm_id);
+            break;
+          case "notes":
+            response = await connector.fetchResource('note', null, projectId);
+            break;
+          case "tasks":
+            response = await connector.fetchResource('task', null, projectId);
+            break;
+          case "contacts":
+            // Get contacts for this project from our database
+            const { data: contacts, error } = await supabase
+              .from("contacts")
+              .select("*")
+              .in("id", await getContactIds(supabase, projectId));
+              
+            response = { data: contacts, error };
+            break;
+          default:
+            return {
+              status: "error",
+              error: `Unknown entity type: ${entity_type}`,
+              message: `The entity type '${entity_type}' is not supported. Please use one of: all, project, notes, tasks, contacts`
+            };
+        }
       }
       
       // Check if there was an error in the response
@@ -603,56 +851,16 @@ export const readCrmData = {
   }
 };
 
-// Helper functions to fetch different types of entities from the database
-async function fetchContacts(supabase: any, projectId: string, limit: number = 10) {
-  // First get contacts linked to this project
-  const { data: projectContacts, error: contactsError } = await supabase
+// Helper function to get contact IDs for a project
+async function getContactIds(supabase: any, projectId: string): Promise<string[]> {
+  const { data: projectContacts, error } = await supabase
     .from("project_contacts")
     .select("contact_id")
     .eq("project_id", projectId);
     
-  if (contactsError) {
-    return { 
-      data: null,
-      error: `Error fetching project contacts: ${contactsError.message}`
-    };
-  }
-    
-  if (!projectContacts || projectContacts.length === 0) {
-    return { data: [] };
+  if (error || !projectContacts) {
+    return [];
   }
   
-  const contactIds = projectContacts.map((pc: any) => pc.contact_id);
-  
-  const { data: contacts, error } = await supabase
-    .from("contacts")
-    .select("id, full_name, email, phone_number, role, contact_type")
-    .in("id", contactIds)
-    .limit(limit);
-    
-  if (error) {
-    return {
-      data: null,
-      error: `Error fetching contacts: ${error.message}`
-    };
-  }
-  
-  return { data: contacts };
-}
-
-async function fetchCompanies(supabase: any, companyId: string, limit: number = 10) {
-  const { data: companies, error } = await supabase
-    .from("companies")
-    .select("id, name, plan_type, plan_started_at, default_project_track")
-    .eq("id", companyId)
-    .limit(limit);
-    
-  if (error) {
-    return {
-      data: null,
-      error: `Error fetching company: ${error.message}`
-    };
-  }
-  
-  return { data: companies };
+  return projectContacts.map((pc: any) => pc.contact_id);
 }

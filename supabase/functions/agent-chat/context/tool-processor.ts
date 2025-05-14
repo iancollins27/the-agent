@@ -21,13 +21,6 @@ export async function processToolCalls(
 }> {
   let projectData = null;
   
-  // Security validation - ensure company context is available
-  if (!companyId || !userProfile) {
-    console.error("Security error: Missing company context in tool processing");
-    context.addSystemMessage("WARNING: Tool access is restricted due to missing company context");
-    return { projectData: null, processedIds: processedToolCallIds };
-  }
-  
   // Extract tool calls from the message
   const extractedToolCalls = extractToolCallsFromOpenAI(message);
   
@@ -86,34 +79,23 @@ export async function processToolCalls(
           // Just one project found, use it and include contacts data
           projectData = toolResult.projects[0];
           
-          // Security check: Validate that the project belongs to the user's company
-          if (projectData.company_id !== companyId) {
-            console.error(`Security error: Project company (${projectData.company_id}) doesn't match user company (${companyId})`);
-            context.addSystemMessage("WARNING: You don't have access to this project as it belongs to a different company.");
-            projectData = null;
-            
-            // Override tool result
-            toolResult.status = "error";
-            toolResult.error = "Access denied: You don't have permission to access this project";
-          } else {
-            // Include any company ID that was found
-            if (toolResult.company_id) {
-              projectData.company_id = toolResult.company_id;
-            }
-            
-            // Include explicit project ID if available
-            if (toolResult.project_id) {
-              projectData.id = toolResult.project_id;
-            }
-            
-            // Include contacts data if available
-            if (toolResult.contacts && toolResult.contacts.length > 0) {
-              projectData.contacts = toolResult.contacts;
-              console.log(`Found ${toolResult.contacts.length} contacts for the project`);
-            }
-            
-            console.log('Found project data:', projectData);
+          // Include any company ID that was found
+          if (toolResult.company_id) {
+            projectData.company_id = toolResult.company_id;
           }
+          
+          // Include explicit project ID if available
+          if (toolResult.project_id) {
+            projectData.id = toolResult.project_id;
+          }
+          
+          // Include contacts data if available
+          if (toolResult.contacts && toolResult.contacts.length > 0) {
+            projectData.contacts = toolResult.contacts;
+            console.log(`Found ${toolResult.contacts.length} contacts for the project`);
+          }
+          
+          console.log('Found project data:', projectData);
         }
       }
       

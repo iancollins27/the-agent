@@ -641,42 +641,39 @@ export type Database = {
       }
       profiles: {
         Row: {
-          company_id: string | null
           created_at: string | null
           id: string
           permission: Database["public"]["Enums"]["user_permission"]
+          profile_associated_company: string | null
           profile_crm_id: string | null
           profile_fname: string | null
           profile_lname: string | null
-          role: Database["public"]["Enums"]["user_role"]
           updated_at: string | null
         }
         Insert: {
-          company_id?: string | null
           created_at?: string | null
           id: string
           permission?: Database["public"]["Enums"]["user_permission"]
+          profile_associated_company?: string | null
           profile_crm_id?: string | null
           profile_fname?: string | null
           profile_lname?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
         Update: {
-          company_id?: string | null
           created_at?: string | null
           id?: string
           permission?: Database["public"]["Enums"]["user_permission"]
+          profile_associated_company?: string | null
           profile_crm_id?: string | null
           profile_fname?: string | null
           profile_lname?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "profiles_profile_associated_company_fkey"
-            columns: ["company_id"]
+            columns: ["profile_associated_company"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
@@ -1174,10 +1171,6 @@ export type Database = {
           definition: string
         }[]
       }
-      get_user_company_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -1282,14 +1275,6 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
-      user_belongs_to_company: {
-        Args: { company_id: string }
-        Returns: boolean
-      }
-      user_can_access_project: {
-        Args: { project_id: string }
-        Returns: boolean
-      }
       vector_avg: {
         Args: { "": number[] }
         Returns: string
@@ -1326,7 +1311,6 @@ export type Database = {
       project_status: "Archived"
       provider_type_enum: "email" | "phone" | "crm"
       user_permission: "read" | "update_settings"
-      user_role: "owner" | "admin" | "manager" | "user" | "guest"
       workflow_type:
         | "summary_generation"
         | "summary_update"
@@ -1462,7 +1446,6 @@ export const Constants = {
       project_status: ["Archived"],
       provider_type_enum: ["email", "phone", "crm"],
       user_permission: ["read", "update_settings"],
-      user_role: ["owner", "admin", "manager", "user", "guest"],
       workflow_type: [
         "summary_generation",
         "summary_update",

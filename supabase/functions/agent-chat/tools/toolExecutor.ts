@@ -20,15 +20,6 @@ export async function executeToolCall(
   try {
     console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with args:`, JSON.stringify(args));
     
-    // Security check: Verify user's company ID is available
-    if (!userProfile || !companyId) {
-      console.error('Security error: Missing user profile or company ID when executing tool');
-      return {
-        status: "error",
-        error: "Authentication required: Unable to verify user's company"
-      };
-    }
-
     // Import the tool dynamically based on the mapped name
     let toolModule;
     try {
@@ -39,7 +30,7 @@ export async function executeToolCall(
       throw new Error(`Failed to import tool module: ${importError.message}`);
     }
     
-    // Create tool context with tenant isolation
+    // Create tool context
     const context: ToolContext = {
       supabase,
       userProfile,
@@ -67,7 +58,7 @@ export async function executeToolCall(
       throw new Error(`Tool function ${toolName} does not have an execute method`);
     }
     
-    console.log(`Executing tool function ${toolName}.execute with args and companyId: ${companyId}`);
+    console.log(`Executing tool function ${toolName}.execute with args`);
     const result = await toolFunction.execute(args, context);
     console.log(`Tool ${toolName} result:`, JSON.stringify(result).substring(0, 200) + (JSON.stringify(result).length > 200 ? '...' : ''));
     return result;

@@ -1,33 +1,11 @@
 
-import { PromptRun } from "@/components/admin/types";
-
-export interface PromptRunWithRoofer extends PromptRun {
-  roofer_contact?: string;
-  project_roofer_contact?: string;
+// Define a type for our database result with the additional roofer_contact property
+export interface PromptRunWithRoofer extends Record<string, any> {
+  roofer_contact?: string | null;
 }
 
 export interface RerunPromptResult {
   success: boolean;
   newPromptRunId?: string;
   error?: string;
-}
-
-export interface ProjectTestResult {
-  projectId: string;
-  results: TestResult[];
-}
-
-export interface TestResult {
-  type?: string;
-  output?: string;
-  finalPrompt?: string;
-  promptRunId?: string;
-  actionRecordId?: string;
-  reminderSet?: boolean;
-  nextCheckDateInfo?: string;
-  usedMCP?: boolean;
-  humanReviewRequestId?: string;
-  knowledgeResultsCount?: number;
-  error?: string;
-  diagnostics?: any;
 }
