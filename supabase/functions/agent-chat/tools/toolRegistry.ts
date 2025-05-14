@@ -12,7 +12,6 @@ const tools: Record<string, Tool> = {
   identify_project: identifyProject,
   create_action_record: createActionRecord,
   read_crm_data: readCrmData
-  // data_fetch is now removed from the registry
 };
 
 export function getAvailableTools(): Record<string, Tool> {
