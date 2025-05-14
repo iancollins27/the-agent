@@ -36,12 +36,20 @@ const PromptRunsTab = () => {
   const { timeFilter, setTimeFilter } = useTimeFilter();
   
   // Set up persisted filter state with proper typing
-  const { filters, updateFilter } = useFilterPersistence<PromptRunFiltersState>('promptRunsFilters', {
+  const { filters: storedFilters, updateFilter } = useFilterPersistence<PromptRunFiltersState>('promptRunsFilters', {
     reviewed: false,
     rating: null,
     hasError: false,
     search: '',
   });
+  
+  // Properly destructure filters from storage to match our needs
+  const filters = {
+    reviewed: storedFilters.reviewed || false,
+    rating: storedFilters.rating || null,
+    hasError: storedFilters.hasError || false,
+    search: storedFilters.search || '',
+  };
   
   // Fetch prompt runs data with filters
   const { 
@@ -52,12 +60,7 @@ const PromptRunsTab = () => {
   } = usePromptRunData({ 
     projectId, 
     timeFilter, 
-    filters: {
-      reviewed: filters.reviewed,
-      rating: filters.rating,
-      hasError: filters.hasError,
-      search: filters.search
-    },
+    filters,
     activeTab
   });
   
@@ -95,8 +98,8 @@ const PromptRunsTab = () => {
   };
   
   // Handle filter changes
-  const setFilter = (key: string, value: any) => {
-    updateFilter(key as keyof PromptRunFiltersState, value);
+  const setFilter = (key: keyof PromptRunFiltersState, value: any) => {
+    updateFilter(key, value);
   };
   
   return (

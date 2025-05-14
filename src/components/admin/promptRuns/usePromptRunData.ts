@@ -46,6 +46,7 @@ export const usePromptRunData = ({
     queryKey: ['promptRuns', projectId, timeFilterDate, filters, activeTab],
     queryFn: async () => {
       try {
+        // We need to be explicit about the join condition to avoid the multiple relationship error
         let query = supabase
           .from('prompt_runs')
           .select(`
@@ -55,7 +56,7 @@ export const usePromptRunData = ({
             status,
             error_message,
             reviewed,
-            projects(
+            project:project_id (
               id,
               project_name,
               Address,
@@ -108,7 +109,7 @@ export const usePromptRunData = ({
 
         // Process the data
         return data.map(run => {
-          const project = run.projects || {};
+          const project = run.project || {};
           
           return {
             id: run.id,

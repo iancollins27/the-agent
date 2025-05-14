@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +27,7 @@ export const useProjectManagerState = () => {
   
   useEffect(() => {
     rawSetTimeFilter(filters.timeFilter);
-  }, [filters.timeFilter]);
+  }, [filters.timeFilter, rawSetTimeFilter]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -59,13 +58,13 @@ export const useProjectManagerState = () => {
     if (filters.onlyMyProjects) {
       updateFilter('projectManagerFilter', null);
     }
-  }, [filters.onlyMyProjects]);
+  }, [filters.onlyMyProjects, updateFilter]);
 
   useEffect(() => {
     if (filters.projectManagerFilter) {
       updateFilter('onlyMyProjects', false);
     }
-  }, [filters.projectManagerFilter]);
+  }, [filters.projectManagerFilter, updateFilter]);
 
   const { 
     promptRuns, 
@@ -88,30 +87,6 @@ export const useProjectManagerState = () => {
 
   console.log(`ProjectManager hook: Retrieved ${promptRuns.length} prompt runs`);
   console.log(`Using latest runs filter: true`);
-
-  const viewPromptRunDetails = (run: PromptRun) => {
-    setSelectedRun(run);
-    setDetailsOpen(true);
-  };
-
-  const handleRunReviewed = (promptRunId: string) => {
-    setPromptRuns(prev => 
-      prev.map(run => 
-        run.id === promptRunId ? { ...run, reviewed: true } : run
-      )
-    );
-  };
-
-  const handlePromptRerun = () => {
-    fetchPromptRuns();
-  };
-
-  useEffect(() => {
-    if (userProfile) {
-      console.log("Forcing a data refresh on component mount");
-      fetchPromptRuns();
-    }
-  }, [userProfile]);
 
   const processedPromptRuns = useMemo(() => {
     let runs = [...promptRuns];
@@ -167,9 +142,20 @@ export const useProjectManagerState = () => {
     handleRatingChange,
     handleFeedbackChange,
     fetchPromptRuns,
-    viewPromptRunDetails,
-    handleRunReviewed,
-    handlePromptRerun,
+    viewPromptRunDetails: (run: PromptRun) => {
+      setSelectedRun(run);
+      setDetailsOpen(true);
+    },
+    handleRunReviewed: (promptRunId: string) => {
+      setPromptRuns(prev => 
+        prev.map(run => 
+          run.id === promptRunId ? { ...run, reviewed: true } : run
+        )
+      );
+    },
+    handlePromptRerun: () => {
+      fetchPromptRuns();
+    },
     getEmptyStateMessage
   };
 };

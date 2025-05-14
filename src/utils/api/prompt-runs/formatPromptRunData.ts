@@ -1,48 +1,7 @@
-import { PromptRun } from "@/components/admin/types";
-import { formatDistanceToNow } from 'date-fns';
 
-export const formatPromptRunData = (data: any[]): PromptRun[] => {
-  return data.map((item) => {
-    // Extract project details if available
-    const projectData = item.projects || {};
-    const workflowPromptData = item.workflow_prompts || {};
-    
-    // Format the data into our PromptRun shape
-    const formattedData: PromptRun = {
-      id: item.id,
-      created_at: item.created_at,
-      status: item.status,
-      ai_provider: item.ai_provider,
-      ai_model: item.ai_model,
-      prompt_input: item.prompt_input,
-      prompt_output: item.prompt_output,
-      error_message: item.error_message,
-      feedback_rating: item.feedback_rating,
-      feedback_description: item.feedback_description,
-      feedback_tags: item.feedback_tags,
-      completed_at: item.completed_at,
-      reviewed: item.reviewed || false,
-      project_id: item.project_id,
-      workflow_prompt_id: item.workflow_prompt_id,
-      workflow_prompt_type: workflowPromptData?.type || null,
-      
-      // Project related data
-      project_name: projectData.crm_id || null,
-      project_address: projectData.Address || null,
-      project_next_step: projectData.next_step || null,
-      
-      // Calculate relative time for display
-      relative_time: item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : 'Unknown',
-      
-      // Set workflow type
-      workflow_type: workflowPromptData?.type || null
-    };
-    
-    return formattedData;
-  });
-};
+// Update formatPromptRunData.ts to export formatRelativeTime
 
-// Export formatRelativeTime function to be used across components
+// Export formatRelativeTime for use in other components
 export const formatRelativeTime = (date: string): string => {
   const now = new Date();
   const promptDate = new Date(date);
@@ -59,4 +18,29 @@ export const formatRelativeTime = (date: string): string => {
   } else {
     return `${diffDays}d ago`;
   }
+};
+
+export const formatPromptRunData = (data: any[]) => {
+  return data.map(run => {
+    // Extract project data from the join
+    const project = run.projects || {};
+    
+    // Extract workflow prompt data
+    const workflowPrompt = run.workflow_prompts || {};
+    
+    return {
+      id: run.id,
+      created_at: run.created_at,
+      project_id: run.project_id,
+      project_name: project.project_name,
+      project_address: project.Address,
+      workflow_prompt_type: workflowPrompt.type,
+      workflow_type: null, // No workflow_type in schema
+      error: !!run.error_message,
+      error_message: run.error_message,
+      reviewed: run.reviewed,
+      project_crm_url: project.crm_url,
+      relative_time: formatRelativeTime(run.created_at)
+    };
+  });
 };

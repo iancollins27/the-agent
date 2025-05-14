@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -48,7 +47,7 @@ const FeedbackTab = () => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (
+          project:project_id (
             Address,
             project_name,
             crm_url
@@ -66,7 +65,7 @@ const FeedbackTab = () => {
   useEffect(() => {
     if (data) {
       const formattedRuns = data.map(run => {
-        const project = run.projects || {};
+        const project = run.project || {};
         return {
           id: run.id,
           created_at: run.created_at,
