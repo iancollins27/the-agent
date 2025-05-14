@@ -2,89 +2,67 @@
 /**
  * Read CRM Data Tool
  * 
- * This tool allows the AI to read data from the CRM system based on specific criteria
+ * This tool allows the AI to read data from the CRM system based on a project CRM ID
  */
 
 import { ToolContext } from '../types.ts';
 
 export const readCrmData = {
   name: "read_crm_data",
-  description: "Retrieves data from the CRM system based on specific parameters like entity type, ID, or search criteria",
+  description: "Retrieves data from the CRM system for a specific project using its CRM ID",
   schema: {
     type: "object",
     properties: {
+      crm_id: {
+        type: "string",
+        description: "The CRM identifier of the project to retrieve data for"
+      },
       entity_type: {
         type: "string",
         enum: ["project", "contact", "company", "note", "task", "communication"],
-        description: "The type of entity to retrieve from CRM"
-      },
-      entity_id: {
-        type: "string",
-        description: "ID of the specific entity to retrieve (optional, provide either this or search_criteria)"
-      },
-      search_criteria: {
-        type: "object",
-        description: "Search criteria to filter entities (optional, provide either this or entity_id)",
-        properties: {
-          name: {
-            type: "string",
-            description: "Name to search for"
-          },
-          status: {
-            type: "string",
-            description: "Status to filter by"
-          },
-          date_range: {
-            type: "object",
-            properties: {
-              from: {
-                type: "string",
-                description: "Start date in ISO format (YYYY-MM-DD)"
-              },
-              to: {
-                type: "string",
-                description: "End date in ISO format (YYYY-MM-DD)"
-              }
-            }
-          }
-        }
+        description: "Type of entity to retrieve for this project"
       },
       limit: {
         type: "integer",
-        description: "Maximum number of records to retrieve"
+        description: "Maximum number of records to retrieve (default: 10)"
       }
     },
-    required: ["entity_type"]
+    required: ["crm_id", "entity_type"]
   },
   
   execute: async (args: any, context: ToolContext) => {
-    const { supabase, projectId } = context;
+    const { supabase } = context;
     
     try {
-      const { entity_type, entity_id, search_criteria, limit = 10 } = args;
+      const { crm_id, entity_type, limit = 10 } = args;
       
-      console.log(`Reading CRM data for entity type ${entity_type}, project ID: ${projectId || 'not specified'}`);
+      console.log(`Reading CRM data for entity type ${entity_type} with project CRM ID: ${crm_id}`);
       
-      // Get company ID from project if we have a project ID
-      let companyId = null;
-      if (projectId) {
-        const { data: project } = await supabase
-          .from("projects")
-          .select("company_id")
-          .eq("id", projectId)
-          .single();
-          
-        if (project) {
-          companyId = project.company_id;
-        }
+      // First, find the project by CRM ID
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("id, company_id")
+        .eq("crm_id", crm_id)
+        .single();
+      
+      if (projectError || !project) {
+        return {
+          status: "error",
+          error: `Project with CRM ID ${crm_id} not found`,
+          message: `Could not find a project with the provided CRM ID: ${crm_id}`
+        };
       }
       
-      // If no company ID could be determined, we can't continue
+      const projectId = project.id;
+      const companyId = project.company_id;
+      
+      console.log(`Found project with ID: ${projectId}, company ID: ${companyId}`);
+      
       if (!companyId) {
         return {
           status: "error",
-          error: "Company ID couldn't be determined",
-          message: "Please identify a project first to establish company context"
+          error: "Company ID not found for this project",
+          message: "The project exists but has no associated company"
         };
       }
       
@@ -92,22 +70,22 @@ export const readCrmData = {
       
       switch (entity_type) {
         case "project":
-          response = await fetchProjects(supabase, companyId, entity_id, search_criteria, limit);
+          response = await fetchProjects(supabase, companyId, projectId, limit);
           break;
         case "contact":
-          response = await fetchContacts(supabase, companyId, entity_id, search_criteria, limit);
+          response = await fetchContacts(supabase, projectId, limit);
           break;
         case "company":
-          response = await fetchCompanies(supabase, companyId, entity_id, search_criteria, limit);
+          response = await fetchCompanies(supabase, companyId, limit);
           break;
         case "note":
-          response = await fetchNotes(supabase, companyId, entity_id, search_criteria, limit);
+          response = await fetchNotes(supabase, projectId, limit);
           break;
         case "task":
-          response = await fetchTasks(supabase, companyId, entity_id, search_criteria, limit);
+          response = await fetchTasks(supabase, projectId, limit);
           break;
         case "communication":
-          response = await fetchCommunications(supabase, companyId, entity_id, search_criteria, limit);
+          response = await fetchCommunications(supabase, projectId, limit);
           break;
         default:
           return {
@@ -120,9 +98,11 @@ export const readCrmData = {
       return {
         status: "success",
         entity_type,
+        project_id: projectId,
+        company_id: companyId,
         data: response.data || [],
         count: response.data ? response.data.length : 0,
-        message: `Successfully retrieved ${response.data ? response.data.length : 0} ${entity_type} records`
+        message: `Successfully retrieved ${response.data ? response.data.length : 0} ${entity_type} records for project with CRM ID ${crm_id}`
       };
     } catch (error) {
       console.error("Error in read_crm_data tool:", error);
@@ -136,199 +116,63 @@ export const readCrmData = {
 };
 
 // Helper functions to fetch different types of entities
-async function fetchProjects(supabase: any, companyId: string, projectId?: string, searchCriteria?: any, limit: number = 10) {
-  let query = supabase
+async function fetchProjects(supabase: any, companyId: string, projectId: string, limit: number = 10) {
+  return await supabase
     .from("projects")
     .select("id, project_name, Address, crm_id, Project_status, summary, next_step")
-    .eq("company_id", companyId);
-  
-  if (projectId) {
-    query = query.eq("id", projectId);
-  } else if (searchCriteria) {
-    if (searchCriteria.name) {
-      query = query.ilike("project_name", `%${searchCriteria.name}%`);
-    }
-    
-    if (searchCriteria.status) {
-      query = query.eq("Project_status", searchCriteria.status);
-    }
-    
-    // Handle date range if provided
-    if (searchCriteria.date_range) {
-      if (searchCriteria.date_range.from) {
-        query = query.gte("created_at", searchCriteria.date_range.from);
-      }
-      if (searchCriteria.date_range.to) {
-        query = query.lte("created_at", searchCriteria.date_range.to);
-      }
-    }
-  }
-  
-  return await query.limit(limit);
+    .eq("id", projectId)
+    .eq("company_id", companyId)
+    .limit(limit);
 }
 
-async function fetchContacts(supabase: any, companyId: string, contactId?: string, searchCriteria?: any, limit: number = 10) {
-  let query = supabase
+async function fetchContacts(supabase: any, projectId: string, limit: number = 10) {
+  // First get contacts linked to this project
+  const { data: projectContacts } = await supabase
+    .from("project_contacts")
+    .select("contact_id")
+    .eq("project_id", projectId);
+    
+  if (!projectContacts || projectContacts.length === 0) {
+    return { data: [] };
+  }
+  
+  const contactIds = projectContacts.map(pc => pc.contact_id);
+  
+  return await supabase
     .from("contacts")
     .select("id, full_name, email, phone_number, role, contact_type")
-    .eq("company_id", companyId);
-  
-  if (contactId) {
-    query = query.eq("id", contactId);
-  } else if (searchCriteria) {
-    if (searchCriteria.name) {
-      query = query.ilike("full_name", `%${searchCriteria.name}%`);
-    }
-    
-    if (searchCriteria.role) {
-      query = query.eq("role", searchCriteria.role);
-    }
-  }
-  
-  return await query.limit(limit);
+    .in("id", contactIds)
+    .limit(limit);
 }
 
-async function fetchCompanies(supabase: any, companyId: string, specificCompanyId?: string, searchCriteria?: any, limit: number = 10) {
-  let query = supabase
+async function fetchCompanies(supabase: any, companyId: string, limit: number = 10) {
+  return await supabase
     .from("companies")
     .select("id, name, plan_type, plan_started_at, default_project_track")
-  
-  // If requesting a specific company, use that ID; otherwise use the context company ID
-  if (specificCompanyId) {
-    query = query.eq("id", specificCompanyId);
-  } else {
-    query = query.eq("id", companyId);
-  }
-  
-  if (searchCriteria && searchCriteria.name && !specificCompanyId) {
-    // Only apply name filter if not looking for a specific company ID
-    query = query.ilike("name", `%${searchCriteria.name}%`);
-  }
-  
-  return await query.limit(limit);
+    .eq("id", companyId)
+    .limit(limit);
 }
 
-async function fetchNotes(supabase: any, companyId: string, noteId?: string, searchCriteria?: any, limit: number = 10) {
-  let query = supabase
+async function fetchNotes(supabase: any, projectId: string, limit: number = 10) {
+  return await supabase
     .from("project_notes")
-    .select("id, project_id, title, content, created_by, created_at, projects!inner(company_id)")
-    .eq("projects.company_id", companyId);
-  
-  if (noteId) {
-    query = query.eq("id", noteId);
-  } else if (searchCriteria) {
-    if (searchCriteria.project_id) {
-      query = query.eq("project_id", searchCriteria.project_id);
-    }
-    
-    if (searchCriteria.title) {
-      query = query.ilike("title", `%${searchCriteria.title}%`);
-    }
-    
-    // Handle date range if provided
-    if (searchCriteria.date_range) {
-      if (searchCriteria.date_range.from) {
-        query = query.gte("created_at", searchCriteria.date_range.from);
-      }
-      if (searchCriteria.date_range.to) {
-        query = query.lte("created_at", searchCriteria.date_range.to);
-      }
-    }
-  }
-  
-  const result = await query.limit(limit);
-  
-  // Remove the nested projects data for cleaner response
-  const cleanedData = result.data?.map(note => {
-    const { projects, ...noteData } = note;
-    return noteData;
-  });
-  
-  return { ...result, data: cleanedData };
+    .select("id, project_id, title, content, created_by, created_at")
+    .eq("project_id", projectId)
+    .limit(limit);
 }
 
-async function fetchTasks(supabase: any, companyId: string, taskId?: string, searchCriteria?: any, limit: number = 10) {
-  let query = supabase
+async function fetchTasks(supabase: any, projectId: string, limit: number = 10) {
+  return await supabase
     .from("project_tasks")
-    .select("id, project_id, title, description, status, assigned_to, due_date, created_at, projects!inner(company_id)")
-    .eq("projects.company_id", companyId);
-  
-  if (taskId) {
-    query = query.eq("id", taskId);
-  } else if (searchCriteria) {
-    if (searchCriteria.project_id) {
-      query = query.eq("project_id", searchCriteria.project_id);
-    }
-    
-    if (searchCriteria.status) {
-      query = query.eq("status", searchCriteria.status);
-    }
-    
-    if (searchCriteria.assigned_to) {
-      query = query.eq("assigned_to", searchCriteria.assigned_to);
-    }
-    
-    // Handle date range for due_date if provided
-    if (searchCriteria.date_range) {
-      if (searchCriteria.date_range.from) {
-        query = query.gte("due_date", searchCriteria.date_range.from);
-      }
-      if (searchCriteria.date_range.to) {
-        query = query.lte("due_date", searchCriteria.date_range.to);
-      }
-    }
-  }
-  
-  const result = await query.limit(limit);
-  
-  // Remove the nested projects data for cleaner response
-  const cleanedData = result.data?.map(task => {
-    const { projects, ...taskData } = task;
-    return taskData;
-  });
-  
-  return { ...result, data: cleanedData };
+    .select("id, project_id, title, description, status, assigned_to, due_date, created_at")
+    .eq("project_id", projectId)
+    .limit(limit);
 }
 
-async function fetchCommunications(supabase: any, companyId: string, communicationId?: string, searchCriteria?: any, limit: number = 10) {
-  let query = supabase
+async function fetchCommunications(supabase: any, projectId: string, limit: number = 10) {
+  return await supabase
     .from("communications")
-    .select("id, project_id, type, direction, content, sender, recipient, timestamp, metadata, projects!inner(company_id)")
-    .eq("projects.company_id", companyId);
-  
-  if (communicationId) {
-    query = query.eq("id", communicationId);
-  } else if (searchCriteria) {
-    if (searchCriteria.project_id) {
-      query = query.eq("project_id", searchCriteria.project_id);
-    }
-    
-    if (searchCriteria.type) {
-      query = query.eq("type", searchCriteria.type);
-    }
-    
-    if (searchCriteria.direction) {
-      query = query.eq("direction", searchCriteria.direction);
-    }
-    
-    // Handle date range for timestamp if provided
-    if (searchCriteria.date_range) {
-      if (searchCriteria.date_range.from) {
-        query = query.gte("timestamp", searchCriteria.date_range.from);
-      }
-      if (searchCriteria.date_range.to) {
-        query = query.lte("timestamp", searchCriteria.date_range.to);
-      }
-    }
-  }
-  
-  const result = await query.limit(limit);
-  
-  // Remove the nested projects data for cleaner response
-  const cleanedData = result.data?.map(communication => {
-    const { projects, ...commData } = communication;
-    return commData;
-  });
-  
-  return { ...result, data: cleanedData };
+    .select("id, project_id, type, direction, content, sender, recipient, timestamp, metadata")
+    .eq("project_id", projectId)
+    .limit(limit);
 }

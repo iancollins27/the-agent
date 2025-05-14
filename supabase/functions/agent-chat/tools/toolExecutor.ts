@@ -34,7 +34,8 @@ export async function executeToolCall(
     const toolExports = {
       identify_project: toolModule.identifyProject,
       create_action_record: toolModule.createActionRecord,
-      read_crm_data: toolModule.readCrmData
+      read_crm_data: toolModule.readCrmData,
+      knowledge_base_lookup: toolModule.knowledgeBaseLookup
     };
     
     // Get the correct tool function
