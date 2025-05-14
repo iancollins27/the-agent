@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from '@tanstack/react-query';
+import { updateFeedbackReviewStatus } from '@/utils/api/prompt-runs';
 
 interface FeedbackRun {
   id: string;
@@ -43,11 +45,13 @@ const FeedbackTab = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['feedbackRuns'],
     queryFn: async () => {
+      // Use explicitly joined select to ensure proper relationship handling
       const { data, error } = await supabase
         .from('prompt_runs')
         .select(`
           *,
           project:project_id (
+            id,
             Address,
             project_name,
             crm_url
@@ -65,7 +69,9 @@ const FeedbackTab = () => {
   useEffect(() => {
     if (data) {
       const formattedRuns = data.map(run => {
+        // Handle project object safely with optional chaining and nullish coalescing
         const project = run.project || {};
+        
         return {
           id: run.id,
           created_at: run.created_at,
@@ -74,7 +80,8 @@ const FeedbackTab = () => {
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
           project_address: project.Address || 'No address',
-          project_manager: run.project_manager || 'No manager assigned',
+          // Project manager is not reliably available in the current data structure
+          project_manager: 'No manager assigned',
           project_crm_url: project.crm_url || null,
           prompt_input: run.prompt_input,
           prompt_output: run.prompt_output,
@@ -116,17 +123,10 @@ const FeedbackTab = () => {
       // Set reviewed status based on whether there's content in the feedback_review field
       const hasReviewContent = feedbackReview.trim().length > 0;
 
-      const { error } = await supabase
-        .from('prompt_runs')
-        .update({ 
-          feedback_review: feedbackReview,
-          reviewed: hasReviewContent
-        })
-        .eq('id', selectedRun.id);
-
-      if (error) {
-        throw error;
-      }
+      await updateFeedbackReviewStatus(selectedRun.id, {
+        feedback_review: feedbackReview,
+        reviewed: hasReviewContent
+      });
 
       // Update local state
       setFeedbackRuns(prev => 

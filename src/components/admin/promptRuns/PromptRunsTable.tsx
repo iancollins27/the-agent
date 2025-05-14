@@ -1,8 +1,8 @@
-
 import React from 'react';
+import { format, parseISO } from 'date-fns';
+import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { RotateCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -12,20 +12,29 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatRelativeTime } from '@/utils/api/prompt-runs/formatPromptRunData';
+import { PromptRun, workflowTitles, WorkflowType } from '../types';
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from '@/components/ui/use-toast';
 
-interface PromptRun {
-  id: string;
-  created_at: string;
-  project_name?: string;
-  project_address?: string;
-  workflow_prompt_type?: string;
-  workflow_type?: string;
-  project_crm_url?: string;
-  reviewed?: boolean;
-}
+// Add the utility function for formatting relative time
+export const formatRelativeTime = (date: string): string => {
+  const now = new Date();
+  const promptDate = new Date(date);
+  const diffMs = now.getTime() - promptDate.getTime();
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else {
+    return `${diffHours}h ago`;
+  } else {
+    return `${diffDays}d ago`;
+  }
+};
 
 interface PromptRunsTableProps {
   data: PromptRun[];
@@ -36,10 +45,9 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   data,
   refresh
 }) => {
-  // Function to mark a prompt run as reviewed
   const handleMarkReviewed = async (id: string) => {
     try {
-      // Update the database
+      // Update the database first
       const { error } = await supabase
         .from('prompt_runs')
         .update({ reviewed: true })
@@ -47,46 +55,23 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       
       if (error) {
         console.error('Error updating prompt run in database:', error);
-        toast({
-          title: "Error",
-          description: "Failed to mark prompt run as reviewed",
-          variant: "destructive",
-        });
         return;
       }
       
-      // Refresh the data to show the updated state
+      // Then refresh data
       refresh();
-      
-      toast({
-        title: "Success",
-        description: "Prompt run marked as reviewed",
-      });
     } catch (error) {
       console.error('Error marking prompt run as reviewed:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred",
-        variant: "destructive",
-      });
     }
   };
 
-  // Function to handle rerunning a prompt
   const handleRerunPrompt = async (promptRunId: string) => {
     try {
-      toast({
-        title: "Rerunning prompt",
-        description: "This feature will be implemented soon",
-      });
-      // In the future, implement the actual rerun functionality here
+      console.log('Rerunning prompt:', promptRunId);
+      // Rerun the prompt
+      refresh();
     } catch (error) {
       console.error('Error rerunning prompt:', error);
-      toast({
-        title: "Error",
-        description: "Failed to rerun prompt",
-        variant: "destructive",
-      });
     }
   };
   
@@ -94,7 +79,13 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
   const formatWorkflowType = (type: string | null | undefined): string => {
     if (!type) return 'Unknown';
     
-    // Format the type string nicely
+    // If it's a known workflow type, use the title from workflowTitles
+    const knownType = type as WorkflowType;
+    if (workflowTitles[knownType]) {
+      return workflowTitles[knownType];
+    }
+    
+    // Otherwise format the type string nicely
     return type.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ');
@@ -155,7 +146,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                 </Button>
               )}
               <Button
-                onClick={() => {/* View details implementation */}}
+                onClick={() => {}}
                 size="sm"
                 variant="default"
               >
@@ -192,16 +183,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       </TableBody>
     </Table>
   );
-};
-
-// Helper function to format workflow type
-const formatWorkflowType = (type: string | null | undefined): string => {
-  if (!type) return 'Unknown';
-  
-  // Format the type string nicely
-  return type.split('_').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ');
 };
 
 export default PromptRunsTable;

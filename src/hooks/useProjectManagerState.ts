@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +14,8 @@ export const useProjectManagerState = () => {
   const { user } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
   
-  const { filters, updateFilter } = useFilterPersistence({
+  // Initialize filterPersistence correctly with both params
+  const { filters, updateFilter } = useFilterPersistence('projectManagerFilters', {
     hideReviewed: true,
     excludeReminderActions: false,
     timeFilter: TIME_FILTERS.ALL,

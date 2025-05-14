@@ -66,6 +66,9 @@ export interface PromptRun {
   relative_time?: string;
   workflow_type?: string | null;
   
+  // Error flag
+  error?: boolean;
+  
   // Alternate field names that might be used in some components
   prompt_text?: string;
   result?: string;

@@ -46,7 +46,7 @@ export const usePromptRunData = ({
     queryKey: ['promptRuns', projectId, timeFilterDate, filters, activeTab],
     queryFn: async () => {
       try {
-        // We need to be explicit about the join condition to avoid the multiple relationship error
+        // Use explicitly joined select with FK fields specified
         let query = supabase
           .from('prompt_runs')
           .select(`
@@ -56,16 +56,18 @@ export const usePromptRunData = ({
             status,
             error_message,
             reviewed,
+            ai_provider,
+            ai_model,
+            prompt_input,
+            prompt_output,
+            workflow_prompt_id,
             project:project_id (
               id,
               project_name,
               Address,
               crm_id,
               crm_url
-            ),
-            workflow_prompt_id,
-            prompt_input,
-            prompt_output
+            )
           `)
           .order('created_at', { ascending: false });
 
@@ -109,20 +111,26 @@ export const usePromptRunData = ({
 
         // Process the data
         return data.map(run => {
+          // Handle the project object safely with nullish coalescing
           const project = run.project || {};
           
           return {
             id: run.id,
+            status: run.status,
+            ai_provider: run.ai_provider,
+            ai_model: run.ai_model,
+            prompt_input: run.prompt_input,
+            prompt_output: run.prompt_output,
             created_at: run.created_at,
             project_id: run.project_id,
-            project_name: project.project_name,
-            project_address: project.Address,
+            project_name: project.project_name || null,
+            project_address: project.Address || null,
             workflow_prompt_type: null, // Not available in the current schema
             workflow_type: null, // Not available in the current schema
             error: !!run.error_message,
             error_message: run.error_message,
-            reviewed: run.reviewed,
-            project_crm_url: project.crm_url
+            reviewed: run.reviewed || false,
+            project_crm_url: project.crm_url || null
           };
         });
       } catch (error) {
