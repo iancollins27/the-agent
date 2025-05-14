@@ -1,9 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { PromptRun } from '../components/admin/types';
 import { usePromptFeedback } from './usePromptFeedback';
 import { usePromptRunsFetcher } from './promptRuns/usePromptRunsFetcher';
 import { UsePromptRunsProps } from './promptRuns/types';
 import { supabase } from "@/integrations/supabase/client";
+import { PromptRunWithRoofer } from '@/utils/api/prompt-runs/types';
 
 export const usePromptRuns = ({
   userProfile,
@@ -89,7 +91,7 @@ export const usePromptRuns = ({
 
       // Find only latest runs if requested
       if (onlyShowLatestRuns === true && formattedData.length > 0) {
-        const latestRunsByProject = new Map<string, PromptRun>();
+        const latestRunsByProject = new Map<string, PromptRunWithRoofer>();
         
         formattedData.forEach(run => {
           if (!run.project_id) return;
@@ -180,7 +182,7 @@ export const usePromptRuns = ({
         }
       }
 
-      // Ensure formattedData conforms to PromptRun type
+      // Convert the formattedData into properly typed PromptRun objects
       const typedPromptRuns: PromptRun[] = formattedData.map(run => ({
         id: run.id,
         created_at: run.created_at,
