@@ -1,11 +1,9 @@
-
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProjectManagerNav from "../components/ProjectManagerNav";
 import ActionRecordsTab from "../components/admin/ActionRecordsTab";
 import PromptsTab from "../components/admin/PromptsTab";
 import TestingTab from "../components/admin/TestingTab";
-import PromptRunsTab from "../components/admin/PromptRunsTab";
 import FeedbackTab from "../components/admin/FeedbackTab";
 import MCPConfigTab from "../components/admin/MCPConfigTab";
 import { ObservabilityTab } from "../components/admin/observability/ObservabilityTab";
@@ -16,7 +14,7 @@ import ExecutionView from "../components/admin/execution-view/ExecutionView";
 import { Wrench } from "lucide-react";
 
 const AdminConsole: React.FC = () => {
-  const [activeTab, setActiveTab] = React.useState("prompt-runs");
+  const [activeTab, setActiveTab] = React.useState("actions");
   const location = useLocation();
 
   // Function to render the admin content based on routes 
@@ -30,8 +28,7 @@ const AdminConsole: React.FC = () => {
     // Otherwise render the tabbed interface
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(8, 1fr)' }}>
-          <TabsTrigger value="prompt-runs">Prompt Runs</TabsTrigger>
+        <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
@@ -40,10 +37,6 @@ const AdminConsole: React.FC = () => {
           <TabsTrigger value="executions">Executions</TabsTrigger>
           <TabsTrigger value="mcp">MCP</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="prompt-runs">
-          <PromptRunsTab />
-        </TabsContent>
         
         <TabsContent value="actions">
           <ActionRecordsTab />
