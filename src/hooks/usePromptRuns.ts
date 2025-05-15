@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { PromptRunUI } from '../types/prompt-run';
 import { usePromptFeedback } from './usePromptFeedback';
@@ -22,8 +21,7 @@ export const usePromptRuns = ({
   const [loading, setLoading] = useState(true);
   const { handleRatingChange, handleFeedbackChange } = usePromptFeedback((updater) => {
     setPromptRuns(prevRuns => {
-      // Ensure we're updating PromptRunUI[] with another PromptRunUI[]
-      return updater(prevRuns as any) as PromptRunUI[];
+      return updater(prevRuns) as PromptRunUI[];
     });
   });
   const { fetchPromptRuns: fetchData } = usePromptRunsFetcher();

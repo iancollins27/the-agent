@@ -1,5 +1,5 @@
 
 export { default } from './ActionConfirmDialog';
-export * from './types';
+export type * from './types';
 export * from './actionService';
-export { RooferContact } from '@/types/prompt-run';
+export type { RooferContact } from '@/types/prompt-run';
