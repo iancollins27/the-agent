@@ -10,8 +10,8 @@ import { PromptRun } from '@/components/admin/types';
 export const useProjectManagerState = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  const { user } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const { user, userProfile, loading: authLoading } = useAuth();
   const { timeFilter: rawTimeFilter, setTimeFilter: rawSetTimeFilter, getDateFilter } = useTimeFilter(TIME_FILTERS.ALL);
   
   // Initialize filterPersistence correctly with both params
@@ -32,29 +32,15 @@ export const useProjectManagerState = () => {
   }, [filters.timeFilter, rawSetTimeFilter]);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) {
-          console.error('Error fetching user profile:', error);
-        } else {
-          console.log('User profile loaded:', data);
-          setUserProfile(data);
-        }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-      }
-    };
-    
-    fetchUserProfile();
-  }, [user]);
+    // Check if user is authenticated but profile data is missing
+    if (user && !authLoading && !userProfile) {
+      setError("User profile could not be loaded. Please try logging in again.");
+    } else if (user && !authLoading && userProfile && !userProfile.profile_associated_company) {
+      setError("Your profile is not associated with a company. Please contact your administrator.");
+    } else {
+      setError(null);
+    }
+  }, [user, userProfile, authLoading]);
 
   useEffect(() => {
     if (filters.onlyMyProjects) {
@@ -89,7 +75,7 @@ export const useProjectManagerState = () => {
 
   console.log(`ProjectManager hook: Retrieved ${promptRuns.length} prompt runs`);
   console.log(`Using latest runs filter: true`);
-
+  
   const processedPromptRuns = useMemo(() => {
     let runs = [...promptRuns];
 
@@ -140,7 +126,7 @@ export const useProjectManagerState = () => {
     filters,
     updateFilter,
     promptRuns: processedPromptRuns,
-    loading,
+    loading: loading || authLoading,
     handleRatingChange,
     handleFeedbackChange,
     fetchPromptRuns,
@@ -158,6 +144,7 @@ export const useProjectManagerState = () => {
     handlePromptRerun: () => {
       fetchPromptRuns();
     },
-    getEmptyStateMessage
+    getEmptyStateMessage,
+    error
   };
 };
