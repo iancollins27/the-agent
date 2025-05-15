@@ -14,7 +14,7 @@ export const usePromptRunsFetcher = () => {
         .from('prompt_runs')
         .select(`
           *,
-          projects:project_id (crm_id, Address, next_step),
+          projects:project_id (crm_id, Address, next_step, company_id),
           workflow_prompts:workflow_prompt_id (id, type)
         `)
         .order('created_at', { ascending: false });
@@ -30,6 +30,17 @@ export const usePromptRunsFetcher = () => {
       }
 
       if (data && data.length > 0) {
+        // Get unique company IDs to fetch company base URLs
+        const companyIds = new Set<string>();
+        data.forEach(run => {
+          if (run.projects && 'company_id' in run.projects) {
+            companyIds.add(run.projects.company_id);
+          }
+        });
+        
+        // Fetch company base URLs
+        const companyUrlMap = await fetchCompanyBaseUrls(Array.from(companyIds));
+        
         const projectIds = data.map(run => run.project_id).filter(Boolean);
         const uniqueProjectIds = [...new Set(projectIds)];
         
@@ -45,8 +56,12 @@ export const usePromptRunsFetcher = () => {
           
           // Generate a CRM URL if we have project data
           let crmUrl = null;
-          if (projectId && project && 'crm_id' in project) {
-            crmUrl = `/crm/project/${project.crm_id}`;
+          if (projectId && project && 'crm_id' in project && 'company_id' in project) {
+            const companyId = project.company_id;
+            const baseUrl = companyUrlMap.get(companyId) || '';
+            if (baseUrl) {
+              crmUrl = `${baseUrl}${project.crm_id}`;
+            }
           }
           
           return {
@@ -95,6 +110,35 @@ export const usePromptRunsFetcher = () => {
       });
       return [];
     }
+  };
+
+  // Fetch the base URLs for all companies
+  const fetchCompanyBaseUrls = async (companyIds: string[]): Promise<Map<string, string>> => {
+    const companyUrlMap = new Map<string, string>();
+    
+    if (companyIds.length > 0) {
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('id, company_project_base_URL')
+        .in('id', companyIds);
+      
+      if (!companiesError && companiesData) {
+        companiesData.forEach(company => {
+          if (company.company_project_base_URL) {
+            // Ensure the base URL ends with a slash if it doesn't already
+            const baseUrl = company.company_project_base_URL.endsWith('/') 
+              ? company.company_project_base_URL 
+              : `${company.company_project_base_URL}/`;
+            
+            companyUrlMap.set(company.id, baseUrl);
+          }
+        });
+      } else {
+        console.error("Error fetching company base URLs:", companiesError);
+      }
+    }
+    
+    return companyUrlMap;
   };
 
   const fetchRooferContacts = async (projectIds: string[]): Promise<Map<string, string>> => {
