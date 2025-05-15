@@ -58,7 +58,7 @@ const FeedbackTab = () => {
     if (data) {
       const formattedRuns = data.map(run => {
         // Handle project object safely with optional chaining and nullish coalescing
-        const project = (run.project || {});
+        const project = run.project || {};
         
         return {
           id: run.id,
@@ -74,7 +74,7 @@ const FeedbackTab = () => {
           feedback_rating: run.feedback_rating,
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
-          project_address: project.Address || 'No address',
+          project_address: project.Address || 'No address', // Safely access Address
           // Project manager is not reliably available in the current data structure
           project_manager: 'No manager assigned',
           project_crm_url: null, // crm_url doesn't exist, so set to null

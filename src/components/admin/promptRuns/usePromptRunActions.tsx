@@ -2,11 +2,11 @@
 import { useState } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { PromptRun } from '../types';
+import { PromptRunUI } from '@/types/prompt-run';
 
 export const usePromptRunActions = (
-  setPromptRuns: React.Dispatch<React.SetStateAction<PromptRun[]>>,
-  setSelectedRun: React.Dispatch<React.SetStateAction<PromptRun | null>>
+  setPromptRuns: React.Dispatch<React.SetStateAction<PromptRunUI[]>>,
+  setSelectedRun: React.Dispatch<React.SetStateAction<PromptRunUI | null>>
 ) => {
   const { toast } = useToast();
 

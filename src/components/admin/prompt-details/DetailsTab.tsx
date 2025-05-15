@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { PromptRun } from '../types';
+import { PromptRunUI } from '@/types/prompt-run';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import PromptRunRating from '../PromptRunRating';
 import PromptSection from './PromptSection';
 
 interface DetailsTabProps {
-  promptRun: PromptRun;
+  promptRun: PromptRunUI;
   feedbackDescription: string;
   feedbackTags: string;
   feedbackReview?: string;

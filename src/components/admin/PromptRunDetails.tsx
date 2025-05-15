@@ -2,14 +2,14 @@
 import React from 'react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PromptRun } from './types';
+import { PromptRunUI } from '@/types/prompt-run';
 import PromptRunActions from './PromptRunActions';
 import PromptRunHeader from './prompt-details/PromptRunHeader';
 import DetailsTab from './prompt-details/DetailsTab';
 import { usePromptRunDetails } from '@/hooks/usePromptRunDetails';
 
 type PromptRunDetailsProps = {
-  promptRun: PromptRun | null;
+  promptRun: PromptRunUI | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRatingChange: (promptRunId: string, rating: number | null) => void;

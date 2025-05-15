@@ -1,10 +1,10 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { PromptRun } from '../components/admin/types';
+import { PromptRunUI } from '../types/prompt-run';
 
 export const usePromptFeedback = (
-  updatePromptRuns: (updater: (prevRuns: PromptRun[]) => PromptRun[]) => void
+  updatePromptRuns: (updater: (prevRuns: PromptRunUI[]) => PromptRunUI[]) => void
 ) => {
   const { toast } = useToast();
   
