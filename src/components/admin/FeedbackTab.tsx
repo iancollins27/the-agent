@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -74,7 +75,7 @@ const FeedbackTab = () => {
           feedback_rating: run.feedback_rating,
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
-          project_address: project.Address || 'No address', // Safely access Address
+          project_address: project?.Address || 'No address', // Safely access Address
           // Project manager is not reliably available in the current data structure
           project_manager: 'No manager assigned',
           project_crm_url: null, // crm_url doesn't exist, so set to null
@@ -376,8 +377,100 @@ const FeedbackTab = () => {
       </Dialog>
     </>
   );
+
+  // Format date function
+  function formatDate(dateString: string) {
+    try {
+      const date = parseISO(dateString);
+      if (!isValid(date)) return 'Invalid date';
+      return format(date, 'MMM d, yyyy h:mm a');
+    } catch (error) {
+      return 'Invalid date';
+    }
+  }
+
+  // Format relative time
+  function formatRelativeTime(dateString: string): string {
+    const now = new Date();
+    const promptDate = new Date(dateString);
+    const diffMs = now.getTime() - promptDate.getTime();
+  
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+    if (diffMinutes < 60) {
+      return `${diffMinutes}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else {
+      return `${diffDays}d ago`;
+    }
+  }
+
+  function handleRowClick(run: FeedbackRun) {
+    setSelectedRun(run);
+    setFeedbackReview(run.feedback_review || '');
+    setIsModalOpen(true);
+  }
+  
+  function handleOpenCRM(e: React.MouseEvent, url: string) {
+    e.stopPropagation();
+    window.open(url, '_blank');
+  }
+
+  async function handleSaveFeedbackReview() {
+    if (!selectedRun) return;
+    
+    setIsSaving(true);
+    try {
+      // Set reviewed status based on whether there's content in the feedback_review field
+      const hasReviewContent = feedbackReview.trim().length > 0;
+
+      await updateFeedbackReviewStatus(selectedRun.id, {
+        feedback_review: feedbackReview,
+        reviewed: hasReviewContent
+      });
+
+      // Update local state
+      setFeedbackRuns(prev => 
+        prev.map(run => 
+          run.id === selectedRun.id 
+            ? { ...run, feedback_review: feedbackReview, reviewed: hasReviewContent } 
+            : run
+        )
+      );
+      
+      // Update selected run
+      setSelectedRun(prev => 
+        prev ? { ...prev, feedback_review: feedbackReview, reviewed: hasReviewContent } : null
+      );
+
+      toast({
+        title: hasReviewContent ? "Feedback review saved" : "Feedback review cleared",
+        description: hasReviewContent 
+          ? "Your feedback review has been saved successfully." 
+          : "The feedback review has been cleared."
+      });
+      
+      // Refetch the data
+      refetch();
+    } catch (error) {
+      console.error('Error saving feedback review:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save feedback review. Please try again."
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // Function to check if a prompt run has been reviewed based on content
+  function isReviewed(run: FeedbackRun) {
+    return run.reviewed || (run.feedback_review && run.feedback_review.trim().length > 0);
+  }
 };
 
 export default FeedbackTab;
-
-// ✅ Compile goal: no TS2xxx or TS23xx errors after this change

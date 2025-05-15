@@ -76,14 +76,16 @@ const ProjectManager: React.FC = () => {
           onPromptRerun={handlePromptRerun}
         />
 
-        <PromptRunDetails 
-          promptRun={selectedRun} 
-          open={detailsOpen}
-          onOpenChange={setDetailsOpen}
-          onRatingChange={handleRatingChange}
-          onFeedbackChange={handleFeedbackChange}
-          onPromptRerun={handlePromptRerun}
-        />
+        {selectedRun && (
+          <PromptRunDetails 
+            promptRun={selectedRun} 
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+            onRatingChange={handleRatingChange}
+            onFeedbackChange={handleFeedbackChange}
+            onPromptRerun={handlePromptRerun}
+          />
+        )}
       </div>
     </div>
   );
