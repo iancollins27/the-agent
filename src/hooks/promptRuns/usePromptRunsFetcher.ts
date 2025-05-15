@@ -34,7 +34,11 @@ export const usePromptRunsFetcher = () => {
         const companyIds = new Set<string>();
         data.forEach(run => {
           if (run.projects && 'company_id' in run.projects) {
-            companyIds.add(run.projects.company_id);
+            const companyId = run.projects.company_id;
+            // Ensure companyId is a string before adding it to the Set
+            if (typeof companyId === 'string') {
+              companyIds.add(companyId);
+            }
           }
         });
         
@@ -57,7 +61,7 @@ export const usePromptRunsFetcher = () => {
           // Generate a CRM URL if we have project data
           let crmUrl = null;
           if (projectId && project && 'crm_id' in project && 'company_id' in project) {
-            const companyId = project.company_id;
+            const companyId = String(project.company_id); // Convert to string explicitly
             const baseUrl = companyUrlMap.get(companyId) || '';
             if (baseUrl) {
               crmUrl = `${baseUrl}${project.crm_id}`;
