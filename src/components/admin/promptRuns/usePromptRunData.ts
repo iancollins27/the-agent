@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { PromptRun } from '../types';
+import { PromptRunUI } from '@/types/prompt-run';
 import { formatRelativeTime } from '@/utils/api/prompt-runs/formatPromptRunData';
 
 export interface UsePromptRunDataProps {
@@ -18,7 +18,7 @@ export interface UsePromptRunDataProps {
 }
 
 export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: UsePromptRunDataProps) => {
-  const [data, setData] = useState<PromptRun[]>([]);
+  const [data, setData] = useState<PromptRunUI[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -155,8 +155,8 @@ export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: 
             project_id: run.project_id,
             workflow_prompt_id: run.workflow_prompt_id,
             workflow_prompt_type: workflowType,
-            project_name: project.project_name,
-            project_address: project.Address,
+            project_name: project.project_name || null,
+            project_address: project.Address || null,
             project_next_step: null, // Not available in current data structure
             project_crm_url: null, // Will be added later if available
             project_roofer_contact: null, // Will be added separately
@@ -165,7 +165,7 @@ export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: 
             workflow_type: workflowType,
             error: !!run.error_message,
             toolLogsCount: run.tool_logs?.length || 0
-          } as PromptRun;
+          } as PromptRunUI;
         });
         
         setData(processedData);
@@ -184,3 +184,5 @@ export const usePromptRunData = ({ projectId, timeFilter, activeTab, filters }: 
   
   return { data, isLoading, error, refresh };
 };
+
+// ✅ Compile goal: no TS2xxx or TS23xx errors after this change

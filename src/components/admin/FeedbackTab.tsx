@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { format, parseISO, isValid } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { PromptRun } from './types';
+import { PromptRunUI } from '@/types/prompt-run';
 import PromptRunRating from './PromptRunRating';
 import PromptSection from './prompt-details/PromptSection';
 import { ExternalLink, CheckSquare, Square } from 'lucide-react';
@@ -17,26 +16,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from '@tanstack/react-query';
 import { updateFeedbackReviewStatus } from '@/utils/api/prompt-runs';
 
-interface FeedbackRun {
-  id: string;
-  created_at: string;
-  feedback_description: string;
-  feedback_rating: number | null;
-  feedback_review: string | null;
-  feedback_tags?: string[];
+interface FeedbackRun extends Omit<PromptRunUI, 'project_name' | 'project_address'> {
   project_address: string | null;
   project_manager: string | null;
   project_crm_url: string | null;
-  prompt_input: string | null;
-  prompt_output: string | null;
-  error_message: string | null;
-  reviewed: boolean;
-}
-
-interface ProjectData {
-  id?: string;
-  Address?: string;
-  project_name?: string;
 }
 
 const FeedbackTab = () => {
@@ -75,12 +58,19 @@ const FeedbackTab = () => {
     if (data) {
       const formattedRuns = data.map(run => {
         // Handle project object safely with optional chaining and nullish coalescing
-        const project = (run.project || {}) as ProjectData;
+        const project = (run.project || {});
         
         return {
           id: run.id,
           created_at: run.created_at,
-          feedback_description: run.feedback_description,
+          status: run.status || '',
+          ai_provider: run.ai_provider || '',
+          ai_model: run.ai_model || '',
+          prompt_input: run.prompt_input || '',
+          prompt_output: run.prompt_output || '',
+          error_message: run.error_message,
+          error: !!run.error_message,
+          feedback_description: run.feedback_description || '',
           feedback_rating: run.feedback_rating,
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
@@ -88,11 +78,12 @@ const FeedbackTab = () => {
           // Project manager is not reliably available in the current data structure
           project_manager: 'No manager assigned',
           project_crm_url: null, // crm_url doesn't exist, so set to null
-          prompt_input: run.prompt_input,
-          prompt_output: run.prompt_output,
-          error_message: run.error_message,
-          reviewed: run.reviewed || false
-        };
+          completed_at: run.completed_at,
+          reviewed: run.reviewed || false,
+          project_id: run.project_id,
+          relative_time: formatRelativeTime(run.created_at),
+          toolLogsCount: 0
+        } as FeedbackRun;
       });
       setFeedbackRuns(formattedRuns);
     }
@@ -106,6 +97,25 @@ const FeedbackTab = () => {
       return format(date, 'MMM d, yyyy h:mm a');
     } catch (error) {
       return 'Invalid date';
+    }
+  };
+
+  // Format relative time
+  const formatRelativeTime = (dateString: string): string => {
+    const now = new Date();
+    const promptDate = new Date(dateString);
+    const diffMs = now.getTime() - promptDate.getTime();
+  
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+    if (diffMinutes < 60) {
+      return `${diffMinutes}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else {
+      return `${diffDays}d ago`;
     }
   };
 
@@ -173,6 +183,7 @@ const FeedbackTab = () => {
     return run.reviewed || (run.feedback_review && run.feedback_review.trim().length > 0);
   };
 
+  
   if (isLoading) {
     return <div>Loading feedback...</div>;
   }
@@ -368,3 +379,5 @@ const FeedbackTab = () => {
 };
 
 export default FeedbackTab;
+
+// ✅ Compile goal: no TS2xxx or TS23xx errors after this change

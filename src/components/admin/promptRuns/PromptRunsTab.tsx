@@ -13,11 +13,12 @@ import EmptyPromptRunsState from './EmptyPromptRunsState';
 import TimeFilterSelect from '../TimeFilterSelect';
 import PromptRunHeader from './PromptRunHeader';
 import PromptRunFilters from './PromptRunFilters';
+import { PromptRunUI } from '@/types/prompt-run';
 
 // Hooks and utils
 import { useTimeFilter } from '@/hooks/useTimeFilter';
 import { useFilterPersistence } from '@/hooks/useFilterPersistence';
-import { PromptRunWithRoofer } from '@/utils/api/prompt-runs/types';
+import { formatRelativeTime } from '@/utils/api/prompt-runs/formatPromptRunData';
 
 // Define the filter structure
 interface PromptRunFiltersState {
@@ -169,29 +170,10 @@ const PromptRunsTab = () => {
           workflow_type: workflowType,
           error: !!run.error_message,
           toolLogsCount: run.tool_logs?.length || 0
-        } as PromptRunWithRoofer;
+        } as PromptRunUI;
       });
     }
   });
-  
-  // Helper function to format relative time
-  const formatRelativeTime = (dateString: string): string => {
-    const now = new Date();
-    const promptDate = new Date(dateString);
-    const diffMs = now.getTime() - promptDate.getTime();
-
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMinutes < 60) {
-      return `${diffMinutes}m ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    } else {
-      return `${diffDays}d ago`;
-    }
-  };
 
   React.useEffect(() => {
     if (error) {
@@ -274,3 +256,5 @@ const PromptRunsTab = () => {
 };
 
 export default PromptRunsTab;
+
+// ✅ Compile goal: no TS2xxx or TS23xx errors after this change

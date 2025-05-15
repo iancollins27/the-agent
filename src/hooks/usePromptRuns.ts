@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { PromptRun } from '../components/admin/types';
+import { PromptRunUI } from '../types/prompt-run';
 import { usePromptFeedback } from './usePromptFeedback';
 import { usePromptRunsFetcher } from './promptRuns/usePromptRunsFetcher';
 import { UsePromptRunsProps } from './promptRuns/types';
@@ -18,7 +17,7 @@ export const usePromptRuns = ({
   excludeReminderActions = false,
   onlyPendingActions = false
 }: UsePromptRunsProps) => {
-  const [promptRuns, setPromptRuns] = useState<PromptRun[]>([]);
+  const [promptRuns, setPromptRuns] = useState<PromptRunUI[]>([]);
   const [loading, setLoading] = useState(true);
   const { handleRatingChange, handleFeedbackChange } = usePromptFeedback((updater) => {
     setPromptRuns(updater);
@@ -182,9 +181,8 @@ export const usePromptRuns = ({
         }
       }
 
-      // Convert the formattedData into properly typed PromptRun objects
-      const typedPromptRuns: PromptRun[] = formattedData.map(run => {
-        // Explicitly create a PromptRun object with the correct types
+      // Map the data to the UI model
+      const uiPromptRuns: PromptRunUI[] = formattedData.map(run => {
         return {
           id: run.id,
           created_at: run.created_at,
@@ -216,7 +214,7 @@ export const usePromptRuns = ({
         };
       });
 
-      setPromptRuns(typedPromptRuns);
+      setPromptRuns(uiPromptRuns);
     } catch (error) {
       console.error('Error fetching prompt runs:', error);
     } finally {
