@@ -18,13 +18,13 @@ export interface PromptRunWithRoofer extends Record<string, any> {
   project_id?: string;
   workflow_prompt_id?: string;
   workflow_prompt_type?: string | null;
-  project_name?: string;
-  project_address?: string;
-  project_next_step?: string;
-  project_crm_url?: string;
+  project_name?: string | null;
+  project_address?: string | null;
+  project_next_step?: string | null;
+  project_crm_url?: string | null;
   project_roofer_contact?: string | null;
   roofer_contact?: string | null; // Add this as well for compatibility
-  project_manager?: string;
+  project_manager?: string | null;
   relative_time?: string;
   workflow_type?: string | null;
   error?: boolean;
