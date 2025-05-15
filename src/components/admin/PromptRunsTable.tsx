@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { RotateCw } from 'lucide-react';
+import { RotateCw, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -129,11 +129,11 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               </div>
             </TableCell>
             <TableCell>
-              {run.project_name ? (
+              {run.project_address ? (
                 <div className="flex flex-col">
-                  <span className="font-medium">{run.project_name}</span>
+                  <span className="font-medium">{run.project_name || 'Unnamed Project'}</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[300px] break-words">
-                    {run.project_address || 'No address'}
+                    {run.project_address}
                   </span>
                 </div>
               ) : (
@@ -181,6 +181,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                   >
+                    <ExternalLink className="h-4 w-4 mr-1" />
                     Open CRM
                   </Link>
                 </Button>
