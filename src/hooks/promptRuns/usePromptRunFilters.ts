@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { PromptRunWithRoofer } from '@/utils/api/prompt-runs/types';
 
@@ -58,7 +59,7 @@ export const usePromptRunFilters = () => {
       const { data: company, error: companyError } = await supabase
         .from('companies')
         .select('company_project_base_URL')
-        .eq('id', userProfile.profile_associated_company)
+        .eq('id', userProfile.company_id)
         .single();
       
       if (!companyError && company && company.company_project_base_URL) {

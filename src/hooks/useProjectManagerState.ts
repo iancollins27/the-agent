@@ -6,6 +6,7 @@ import { useFilterPersistence } from "@/hooks/useFilterPersistence";
 import { useTimeFilter, TIME_FILTERS } from "@/hooks/useTimeFilter";
 import { usePromptRuns } from '@/hooks/usePromptRuns';
 import { PromptRun } from '@/components/admin/types';
+import { toast } from "@/hooks/use-toast";
 
 export const useProjectManagerState = () => {
   const [selectedRun, setSelectedRun] = useState<PromptRun | null>(null);
@@ -44,9 +45,22 @@ export const useProjectManagerState = () => {
           
         if (error) {
           console.error('Error fetching user profile:', error);
+          toast({
+            title: "Error fetching user profile",
+            description: error.message,
+            variant: "destructive"
+          });
         } else {
           console.log('User profile loaded:', data);
           setUserProfile(data);
+          
+          if (!data.company_id) {
+            toast({
+              title: "Missing company association",
+              description: "Your user profile is not associated with a company. Please contact your administrator.",
+              variant: "destructive"
+            });
+          }
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
@@ -109,7 +123,7 @@ export const useProjectManagerState = () => {
       return "Please log in to view your project data";
     }
     
-    if (!userProfile?.profile_associated_company) {
+    if (!userProfile?.company_id) {
       return "Your user profile is not associated with a company. Contact your administrator.";
     }
     

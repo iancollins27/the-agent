@@ -25,8 +25,8 @@ export const usePromptRunsCore = ({
   const { applyFilters } = usePromptRunFilters();
 
   const fetchPromptRuns = async () => {
-    if (!userProfile?.profile_associated_company) {
-      console.warn('User has no profile_associated_company in profile, cannot fetch projects');
+    if (!userProfile?.company_id) {
+      console.warn('User has no company_id in profile, cannot fetch projects');
       setPromptRuns([]);
       setLoading(false);
       return;
