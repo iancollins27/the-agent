@@ -1,164 +1,182 @@
 
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from 'lucide-react';
+import { format, parseISO, isValid } from 'date-fns';
 import PromptRunRating from '../PromptRunRating';
-import { Badge } from "@/components/ui/badge";
-import { format, parseISO } from 'date-fns';
+import PromptSection from '../prompt-details/PromptSection';
 
 interface FeedbackRun {
   id: string;
   created_at: string;
-  project_address: string | null;
-  project_manager: string | null;
+  status: string;
+  ai_provider: string;
+  ai_model: string;
   prompt_input: string;
   prompt_output: string | null;
+  error_message: string | null;
+  error: boolean;
   feedback_description: string;
   feedback_rating: number | null;
   feedback_review: string | null;
   feedback_tags: string[] | null;
+  project_address: string | null;
+  project_manager: string | null;
+  project_crm_url: string | null;
   reviewed: boolean;
 }
 
 interface FeedbackDetailsDialogProps {
-  run: FeedbackRun;
-  open: boolean;
+  isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaveReview: (review: string) => void;
+  selectedRun: FeedbackRun | null;
+  feedbackReview: string;
+  setFeedbackReview: (value: string) => void;
   isSaving: boolean;
+  handleSaveFeedbackReview: () => void;
+  isReviewed: (run: FeedbackRun) => boolean;
 }
 
-const FeedbackDetailsDialog: React.FC<FeedbackDetailsDialogProps> = ({
-  run,
-  open,
+const FeedbackDetailsDialog: React.FC<FeedbackDetailsDialogProps> = ({ 
+  isOpen,
   onOpenChange,
-  onSaveReview,
-  isSaving
+  selectedRun,
+  feedbackReview,
+  setFeedbackReview,
+  isSaving,
+  handleSaveFeedbackReview,
+  isReviewed
 }) => {
-  const [review, setReview] = useState('');
+  if (!selectedRun) return null;
 
-  useEffect(() => {
-    if (run) {
-      setReview(run.feedback_review || '');
-    }
-  }, [run]);
-
-  const handleSave = () => {
-    onSaveReview(review);
-  };
-
+  // Format date function
   const formatDate = (dateString: string) => {
     try {
-      return format(parseISO(dateString), 'PPpp');
+      const date = parseISO(dateString);
+      if (!isValid(date)) return 'Invalid date';
+      return format(date, 'MMM d, yyyy h:mm a');
     } catch (error) {
       return 'Invalid date';
     }
   };
 
-  if (!run) return null;
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Feedback Details</DialogTitle>
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle>Feedback Details</DialogTitle>
+            <DialogDescription>
+              {selectedRun.project_address ? `Project: ${selectedRun.project_address}` : 'No project address available'}
+              <p className="text-sm text-muted-foreground mt-1">
+                {formatDate(selectedRun.created_at)}
+              </p>
+            </DialogDescription>
+          </div>
+          
+          {selectedRun.project_crm_url && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => window.open(selectedRun.project_crm_url, '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Open CRM
+            </Button>
+          )}
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Project Info */}
+        <div className="space-y-6 mt-4">
+          {/* Evaluation Section */}
           <div className="space-y-2">
-            <h3 className="text-lg font-medium">Project Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="text-lg font-medium">Evaluation</h3>
+            
+            <div className="grid gap-2">
               <div>
-                <span className="text-sm font-medium text-gray-500">Address:</span>
-                <p>{run.project_address || 'N/A'}</p>
+                <span className="text-sm font-medium">Rating:</span>
+                <PromptRunRating 
+                  rating={selectedRun.feedback_rating}
+                  onRatingChange={() => {}}
+                  size="sm"
+                />
               </div>
+              
               <div>
-                <span className="text-sm font-medium text-gray-500">Project Manager:</span>
-                <p>{run.project_manager || 'No manager assigned'}</p>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-gray-500">Date:</span>
-                <p>{formatDate(run.created_at)}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Feedback Info */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium">Feedback Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span className="text-sm font-medium text-gray-500">Rating:</span>
-                <div className="mt-1">
-                  <PromptRunRating rating={run.feedback_rating} size="md" />
-                </div>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-gray-500">Tags:</span>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {run.feedback_tags && run.feedback_tags.length > 0 ? (
-                    run.feedback_tags.map((tag, index) => (
+                <span className="text-sm font-medium">Tags:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedRun.feedback_tags && selectedRun.feedback_tags.length > 0 ? (
+                    selectedRun.feedback_tags.map((tag, index) => (
                       <Badge key={index} variant="outline">{tag}</Badge>
                     ))
                   ) : (
-                    <p className="text-gray-500 italic">No tags</p>
+                    <span className="text-sm text-muted-foreground">No tags</span>
                   )}
                 </div>
               </div>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-500">Description:</span>
-              <p className="mt-1">{run.feedback_description}</p>
+              
+              <div>
+                <span className="text-sm font-medium">Feedback:</span>
+                <p className="text-sm mt-1">{selectedRun.feedback_description || 'No feedback provided'}</p>
+              </div>
+
+              {/* Feedback Review Section */}
+              <div className="pt-2">
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Feedback Review:</span>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="reviewed" 
+                        checked={isReviewed(selectedRun)}
+                        disabled
+                      />
+                      <label htmlFor="reviewed" className="text-sm text-muted-foreground">
+                        {isReviewed(selectedRun) ? 'Reviewed' : 'Not reviewed'}
+                      </label>
+                    </div>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveFeedbackReview}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save Review"}
+                  </Button>
+                </div>
+                <Textarea
+                  value={feedbackReview}
+                  onChange={(e) => setFeedbackReview(e.target.value)}
+                  placeholder="Enter your review of this feedback..."
+                  className="w-full"
+                  rows={3}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Prompt Input and Output */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium">Prompt Information</h3>
-            <div className="space-y-4">
-              <div>
-                <span className="text-sm font-medium text-gray-500">Input:</span>
-                <div className="mt-1 p-4 bg-gray-100 rounded-md whitespace-pre-wrap overflow-x-auto">
-                  {run.prompt_input}
-                </div>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-gray-500">Output:</span>
-                <div className="mt-1 p-4 bg-gray-100 rounded-md whitespace-pre-wrap overflow-x-auto">
-                  {run.prompt_output || 'No output available'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Review Section */}
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium">Review</h3>
-            <Textarea 
-              value={review}
-              onChange={(e) => setReview(e.target.value)}
-              className="min-h-[120px]"
-              placeholder="Add your review or notes about this feedback..."
+          <PromptSection 
+            title="Prompt Input"
+            content={selectedRun.prompt_input || 'No input available'}
+          />
+          
+          <PromptSection 
+            title="Prompt Output"
+            content={selectedRun.prompt_output || 'No output available'}
+          />
+          
+          {selectedRun.error_message && (
+            <PromptSection 
+              title="Error"
+              content={selectedRun.error_message}
+              isError={true}
             />
-          </div>
+          )}
         </div>
-
-        <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Save Review'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

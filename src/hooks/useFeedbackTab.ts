@@ -126,16 +126,16 @@ export const useFeedbackTab = () => {
     window.open(url, '_blank');
   };
 
-  const handleSaveFeedbackReview = async (review: string) => {
+  const handleSaveFeedbackReview = async () => {
     if (!selectedRun) return;
     
     setIsSaving(true);
     try {
       // Set reviewed status based on whether there's content in the feedback_review field
-      const hasReviewContent = review.trim().length > 0;
+      const hasReviewContent = feedbackReview.trim().length > 0;
 
       await updateFeedbackReviewStatus(selectedRun.id, {
-        feedback_review: review,
+        feedback_review: feedbackReview,
         reviewed: hasReviewContent
       });
 
@@ -143,14 +143,14 @@ export const useFeedbackTab = () => {
       setFeedbackRuns(prev => 
         prev.map(run => 
           run.id === selectedRun.id 
-            ? { ...run, feedback_review: review, reviewed: hasReviewContent } 
+            ? { ...run, feedback_review: feedbackReview, reviewed: hasReviewContent } 
             : run
         )
       );
       
       // Update selected run
       setSelectedRun(prev => 
-        prev ? { ...prev, feedback_review: review, reviewed: hasReviewContent } : null
+        prev ? { ...prev, feedback_review: feedbackReview, reviewed: hasReviewContent } : null
       );
 
       toast({
@@ -171,7 +171,6 @@ export const useFeedbackTab = () => {
       });
     } finally {
       setIsSaving(false);
-      setIsModalOpen(false);
     }
   };
 

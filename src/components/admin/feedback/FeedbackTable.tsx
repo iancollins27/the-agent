@@ -26,23 +26,17 @@ interface FeedbackRun {
 
 interface FeedbackTableProps {
   feedbackRuns: FeedbackRun[];
-  loading: boolean;
   onRowClick: (run: FeedbackRun) => void;
   onOpenCRM: (e: React.MouseEvent, url: string) => void;
 }
 
 const FeedbackTable: React.FC<FeedbackTableProps> = ({ 
   feedbackRuns, 
-  loading,
   onRowClick,
   onOpenCRM 
 }) => {
-  if (loading) {
-    return <div className="p-4 text-center">Loading feedback data...</div>;
-  }
-
   if (feedbackRuns.length === 0) {
-    return <div className="p-4 text-center">No feedback found.</div>;
+    return <div>No feedback found.</div>;
   }
 
   return (

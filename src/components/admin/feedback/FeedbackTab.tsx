@@ -1,45 +1,48 @@
 
 import React from 'react';
-import { useToast } from "@/components/ui/use-toast";
-import { useFeedbackTab } from "@/hooks/useFeedbackTab";
 import FeedbackTable from './FeedbackTable';
 import FeedbackDetailsDialog from './FeedbackDetailsDialog';
+import { useFeedbackTab } from '@/hooks/useFeedbackTab';
 
-const FeedbackTab: React.FC = () => {
-  const { toast } = useToast();
+const FeedbackTab = () => {
   const {
     feedbackRuns,
     selectedRun,
     isModalOpen,
+    setIsModalOpen,
+    feedbackReview,
+    setFeedbackReview,
     isSaving,
     isLoading,
-    setIsModalOpen,
-    handleSaveFeedbackReview,
     handleRowClick,
-    handleOpenCRM
+    handleOpenCRM,
+    handleSaveFeedbackReview,
+    isReviewed
   } = useFeedbackTab();
 
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow-sm">
-        <FeedbackTable
-          feedbackRuns={feedbackRuns}
-          loading={isLoading}
-          onRowClick={handleRowClick}
-          onOpenCRM={handleOpenCRM}
-        />
-      </div>
+  if (isLoading) {
+    return <div>Loading feedback...</div>;
+  }
 
-      {selectedRun && (
-        <FeedbackDetailsDialog
-          run={selectedRun}
-          open={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          onSaveReview={handleSaveFeedbackReview}
-          isSaving={isSaving}
-        />
-      )}
-    </div>
+  return (
+    <>
+      <FeedbackTable 
+        feedbackRuns={feedbackRuns}
+        onRowClick={handleRowClick}
+        onOpenCRM={handleOpenCRM}
+      />
+
+      <FeedbackDetailsDialog
+        isOpen={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        selectedRun={selectedRun}
+        feedbackReview={feedbackReview}
+        setFeedbackReview={setFeedbackReview}
+        isSaving={isSaving}
+        handleSaveFeedbackReview={handleSaveFeedbackReview}
+        isReviewed={isReviewed}
+      />
+    </>
   );
 };
 

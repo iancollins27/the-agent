@@ -7,7 +7,6 @@ import ProjectManagerFilters from "../components/project-manager/ProjectManagerF
 import ProjectManagerContent from "../components/project-manager/ProjectManagerContent";
 import { useProjectManagerState } from '@/hooks/useProjectManagerState';
 import { PromptRunUI } from '@/types/prompt-run';
-import { toast } from "@/components/ui/use-toast";
 
 const ProjectManager: React.FC = () => {
   const {
@@ -25,20 +24,8 @@ const ProjectManager: React.FC = () => {
     viewPromptRunDetails,
     handleRunReviewed,
     handlePromptRerun,
-    getEmptyStateMessage,
-    error
+    getEmptyStateMessage
   } = useProjectManagerState();
-
-  // Show error toast if there's an authentication or profile issue
-  React.useEffect(() => {
-    if (error) {
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: error,
-      });
-    }
-  }, [error]);
 
   return (
     <div className="min-h-screen bg-slate-50">
