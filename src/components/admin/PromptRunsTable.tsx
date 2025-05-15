@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { RotateCw, ExternalLink } from 'lucide-react';
@@ -131,8 +130,7 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
             <TableCell>
               {run.project_address ? (
                 <div className="flex flex-col">
-                  <span className="font-medium">{run.project_name || 'Unnamed Project'}</span>
-                  <span className="text-xs text-muted-foreground truncate max-w-[300px] break-words">
+                  <span className="font-medium truncate max-w-[300px]">
                     {run.project_address}
                   </span>
                 </div>

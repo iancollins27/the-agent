@@ -45,8 +45,7 @@ export const usePromptRunsFetcher = () => {
           
           // Generate a CRM URL if we have project data
           let crmUrl = null;
-          if (projectId && project.crm_id) {
-            // You would need to implement this based on your CRM system
+          if (projectId && project && 'crm_id' in project) {
             crmUrl = `/crm/project/${project.crm_id}`;
           }
           
@@ -68,15 +67,15 @@ export const usePromptRunsFetcher = () => {
             project_id: run.project_id,
             workflow_prompt_id: run.workflow_prompt_id,
             workflow_prompt_type: workflowPrompt && 'type' in workflowPrompt ? String(workflowPrompt.type) : null,
-            // Use the specific project data fields
-            project_name: project && 'crm_id' in project ? String(project.crm_id) : null,
+            // Use the address as the primary display and hide CRM ID
+            project_name: null, // Don't show CRM ID
             project_address: project && 'Address' in project ? String(project.Address) : null,
             project_next_step: project && 'next_step' in project ? String(project.next_step) : null,
             project_crm_url: crmUrl,
             project_roofer_contact: rooferContact,
             roofer_contact: rooferContact, // For compatibility
             project_manager: null, // Will be set later if needed
-            workflow_type: run.workflow_prompt_type, // Use workflow_prompt_type as fallback
+            workflow_type: workflowPrompt && 'type' in workflowPrompt ? String(workflowPrompt.type) : null, // Use workflow_prompt.type instead of run.workflow_prompt_type
             error: !!run.error_message,
             relative_time: formatRelativeTime(run.created_at),
             toolLogsCount: 0 // Default value
