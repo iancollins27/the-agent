@@ -23,6 +23,7 @@ export interface PromptRunWithRoofer extends Record<string, any> {
   project_next_step?: string;
   project_crm_url?: string;
   project_roofer_contact?: string | null;
+  roofer_contact?: string | null; // Add this as well for compatibility
   project_manager?: string;
   relative_time?: string;
   workflow_type?: string | null;

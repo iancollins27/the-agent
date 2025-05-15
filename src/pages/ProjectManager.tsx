@@ -6,6 +6,7 @@ import ProjectManagerHeader from "../components/project-manager/ProjectManagerHe
 import ProjectManagerFilters from "../components/project-manager/ProjectManagerFilters";
 import ProjectManagerContent from "../components/project-manager/ProjectManagerContent";
 import { useProjectManagerState } from '@/hooks/useProjectManagerState';
+import { PromptRunUI } from '@/types/prompt-run';
 
 const ProjectManager: React.FC = () => {
   const {
@@ -78,7 +79,7 @@ const ProjectManager: React.FC = () => {
 
         {selectedRun && (
           <PromptRunDetails 
-            promptRun={selectedRun} 
+            promptRun={selectedRun as PromptRunUI} 
             open={detailsOpen}
             onOpenChange={setDetailsOpen}
             onRatingChange={handleRatingChange}

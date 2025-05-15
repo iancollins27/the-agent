@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
@@ -75,7 +74,7 @@ const FeedbackTab = () => {
           feedback_rating: run.feedback_rating,
           feedback_review: run.feedback_review,
           feedback_tags: run.feedback_tags,
-          project_address: project?.Address || 'No address', // Safely access Address
+          project_address: project && 'Address' in project ? project.Address : 'No address',
           // Project manager is not reliably available in the current data structure
           project_manager: 'No manager assigned',
           project_crm_url: null, // crm_url doesn't exist, so set to null
@@ -83,7 +82,13 @@ const FeedbackTab = () => {
           reviewed: run.reviewed || false,
           project_id: run.project_id,
           relative_time: formatRelativeTime(run.created_at),
-          toolLogsCount: 0
+          toolLogsCount: 0,
+          workflow_prompt_id: run.workflow_prompt_id,
+          workflow_prompt_type: null,
+          workflow_type: null,
+          project_name: null,
+          project_next_step: null,
+          project_roofer_contact: null
         } as FeedbackRun;
       });
       setFeedbackRuns(formattedRuns);
@@ -184,7 +189,6 @@ const FeedbackTab = () => {
     return run.reviewed || (run.feedback_review && run.feedback_review.trim().length > 0);
   };
 
-  
   if (isLoading) {
     return <div>Loading feedback...</div>;
   }

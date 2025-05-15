@@ -60,10 +60,10 @@ export const usePromptRunsFetcher = () => {
             reviewed: run.reviewed || false,
             project_id: run.project_id,
             workflow_prompt_id: run.workflow_prompt_id,
-            workflow_prompt_type: workflowPrompt.type,
-            project_name: project.project_name,
-            project_address: project.Address,
-            project_next_step: project.next_step,
+            workflow_prompt_type: workflowPrompt && workflowPrompt.type ? workflowPrompt.type : null,
+            project_name: project && 'project_name' in project ? project.project_name : null,
+            project_address: project && 'Address' in project ? project.Address : null,
+            project_next_step: project && 'next_step' in project ? project.next_step : null,
             project_crm_url: null, // Will be set later if needed
             project_roofer_contact: rooferContact,
             project_manager: null, // Will be set later if needed

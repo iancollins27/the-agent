@@ -13,7 +13,7 @@ export interface PromptRunUI {
   ai_provider: string;
   ai_model: string;
   prompt_input: string;
-  prompt_output?: string;
+  prompt_output?: string | null;
   error_message?: string | null;
   feedback_rating?: number | null;
   feedback_description?: string | null;

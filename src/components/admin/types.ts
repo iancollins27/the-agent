@@ -49,7 +49,7 @@ export interface PromptRun {
   feedback_tags?: string[];
   feedback_review?: string;
   completed_at?: string;
-  reviewed?: boolean;
+  reviewed: boolean;  // Changed from optional to required for PromptRunUI compatibility
   project_id?: string;
   workflow_prompt_id?: string;
   workflow_prompt_type?: string | null;
