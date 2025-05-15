@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PromptRun } from '@/components/admin/types';
@@ -153,7 +154,7 @@ const ExecutionsList: React.FC = () => {
     setCurrentPage(1); // Reset to first page when searching
   };
 
-  // Handle pagination
+  // Handle pagination - revised to properly handle navigation
   const handlePageChange = (page: number) => {
     if (page > 0 && page <= totalPages) {
       setCurrentPage(page);
@@ -354,7 +355,7 @@ const ExecutionsList: React.FC = () => {
                   <PaginationItem>
                     <PaginationPrevious 
                       onClick={() => handlePageChange(currentPage - 1)}
-                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-accent'}
                     />
                   </PaginationItem>
                   
@@ -378,7 +379,7 @@ const ExecutionsList: React.FC = () => {
                   <PaginationItem>
                     <PaginationNext
                       onClick={() => handlePageChange(currentPage + 1)} 
-                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-accent'}
                     />
                   </PaginationItem>
                 </PaginationContent>

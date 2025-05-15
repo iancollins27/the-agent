@@ -28,12 +28,11 @@ const AdminConsole: React.FC = () => {
     // Otherwise render the tabbed interface
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+        <TabsList className="grid w-full sm:w-[800px]" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
-          <TabsTrigger value="observability">Metrics</TabsTrigger>
           <TabsTrigger value="executions">Executions</TabsTrigger>
           <TabsTrigger value="mcp">MCP</TabsTrigger>
         </TabsList>
@@ -52,10 +51,6 @@ const AdminConsole: React.FC = () => {
         
         <TabsContent value="feedback">
           <FeedbackTab />
-        </TabsContent>
-
-        <TabsContent value="observability">
-          <ObservabilityTab />
         </TabsContent>
 
         <TabsContent value="executions">
