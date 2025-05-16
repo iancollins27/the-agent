@@ -11,10 +11,12 @@ export async function processToolCall(
   companyId?: string,
   userProfile?: any
 ) {
-  console.log(`Processing tool call: ${toolName} with companyId: ${companyId || 'none'} and userProfile: ${userProfile ? 'provided' : 'none'}`);
+  // Add more detailed logging to trace where company ID might be lost
+  console.log(`Processing tool call: ${toolName} with args: ${JSON.stringify(args).substring(0, 100)}`);
+  console.log(`Security context - companyId: ${companyId || 'none'}, userProfile: ${userProfile ? JSON.stringify({id: userProfile.id, company_id: userProfile.company_id}) : 'none'}`);
   
   // Simply delegate to the executeToolCall function that uses the tool registry
-  // But now passing company ID and user profile for access control
+  // But ensure company ID and user profile are passed for access control
   return await executeToolCall(
     supabase, 
     toolName, 

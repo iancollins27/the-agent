@@ -27,8 +27,8 @@ export async function processToolCalls(
   // Remove the assistant message that was just added since we'll re-add it properly
   context.messages.pop();
   
-  // Add detailed logging about user and company access context
-  console.log(`Processing ${extractedToolCalls.length} tool calls with user ${userProfile?.id || 'anonymous'} from company ${companyId || 'none'}`);
+  // Enhanced logging for security context
+  console.log(`Processing ${extractedToolCalls.length} tool calls with security context - user: ${userProfile?.id || 'anonymous'}, company: ${companyId || 'none'}`);
 
   // Process each tool call in order
   for (const call of extractedToolCalls) {
@@ -38,13 +38,19 @@ export async function processToolCalls(
       continue;
     }
     
-    console.log(`Processing tool call: ${call.name}, id: ${call.id}, with company access control: ${companyId ? 'enabled' : 'disabled'}`);
+    // Add enhanced security logging
+    console.log(`Processing tool call: ${call.name}, id: ${call.id}, with company ID: ${companyId || 'none'}, user: ${userProfile?.id || 'anonymous'}`);
     processedToolCallIds.add(call.id); // Mark as processed
   
     try {
       // Log detailed information about the arguments
       if (call.name === 'identify_project') {
-        console.log(`identify_project query: "${call.arguments.query}", type: ${call.arguments.type || 'any'}`);
+        console.log(`identify_project query: "${call.arguments.query}", type: ${call.arguments.type || 'any'}, enforcing company filter: ${companyId || 'none'}`);
+        
+        // Explicitly add company_id to arguments if available for identify_project calls
+        if (companyId) {
+          call.arguments.company_id = companyId;
+        }
       }
       
       // Execute the tool with context including companyId
@@ -63,7 +69,8 @@ export async function processToolCalls(
           toolResult?.status === 'success' && 
           toolResult?.projects?.length > 0) {
         
-        // For internal users, verify company access to projects
+        // Security verification is now handled in the edge function
+        // but we'll double-check here as a defense in depth approach
         if (userProfile && companyId) {
           // Filter projects by company ID
           const authorizedProjects = toolResult.projects.filter((p: any) => {

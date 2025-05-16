@@ -102,6 +102,47 @@ async function fetchProjectContacts(projectId: string) {
   }
 }
 
+/**
+ * Verify that the user is authorized to access company data
+ */
+async function verifyUserCompanyAccess(userId: string | null, companyId: string | null): Promise<boolean> {
+  // If we don't have both user ID and company ID, we can't verify
+  if (!userId || !companyId) {
+    console.log(`Cannot verify access: Missing userId (${userId}) or companyId (${companyId})`);
+    return false;
+  }
+  
+  try {
+    console.log(`Verifying user ${userId} belongs to company ${companyId}`);
+    
+    // Check if the user belongs to the specified company
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single();
+      
+    if (error || !profile) {
+      console.error(`User verification failed for ${userId}: ${error?.message || 'User not found'}`);
+      return false;
+    }
+    
+    if (profile.company_id !== companyId) {
+      console.error(`Company mismatch: User ${userId} belongs to company ${profile.company_id}, not ${companyId}`);
+      return false;
+    }
+    
+    console.log(`Successfully verified user ${userId} belongs to company ${companyId}`);
+    return true;
+  } catch (error) {
+    console.error(`Error in verifyUserCompanyAccess: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Main project identification function with enhanced security
+ */
 async function identifyProject(
   query: string,
   type: string = "any",
@@ -116,7 +157,33 @@ async function identifyProject(
       };
     }
     
+    // Enhanced security logging
     console.log(`Executing identify_project: query="${query}", type=${type}, companyId=${companyId || 'none'}, userId=${userId || 'none'}`);
+    
+    // If both user ID and company ID are provided, verify the association
+    if (userId && companyId) {
+      const isAuthorized = await verifyUserCompanyAccess(userId, companyId);
+      if (!isAuthorized) {
+        console.error(`User ${userId} not authorized to access company ${companyId} data`);
+        return {
+          status: "error",
+          error: "Unauthorized access",
+          message: "You are not authorized to access this company's data"
+        };
+      }
+      console.log(`User ${userId} authorized to access company ${companyId} data`);
+    }
+    
+    // Security check: if companyId is not provided and this appears to be a user-initiated request,
+    // we should reject the request to prevent unauthorized access
+    if (!companyId && userId) {
+      console.error(`Security violation: User ${userId} attempted to search across all companies`);
+      return {
+        status: "error",
+        error: "Company ID required",
+        message: "For security reasons, you must provide a company ID when searching for projects"
+      };
+    }
     
     let projects = [];
     let projectContacts = [];
@@ -252,95 +319,97 @@ async function identifyProject(
     }
     
     // If no matches found yet and companyId is provided, try a vector search
-    console.log(`Performing semantic vector search for: ${query}`);
-    
-    // Get embedding for the query text
-    const embedding = await generateEmbedding(query);
-    if (!embedding) {
-      return {
-        status: "error",
-        error: "Failed to generate embedding for search"
-      };
-    }
-    
-    // Build vector search parameters - always include companyId if available
-    const vectorSearchBody: any = {
-      searchEmbedding: embedding,
-      matchThreshold: 0.2,
-      matchCount: 3
-    };
-    
     if (companyId) {
-      vectorSearchBody.companyId = companyId;
-      console.log(`Adding company filter ${companyId} to vector search`);
-    }
-    
-    // Use the vector search edge function
-    const vectorSearchResponse = await supabase.functions.invoke('search-projects-by-vector', {
-      body: vectorSearchBody
-    });
-    
-    if (vectorSearchResponse.error) {
-      console.error('Vector search error:', vectorSearchResponse.error);
-      return {
-        status: "error",
-        error: `Vector search failed: ${vectorSearchResponse.error.message}`
-      };
-    }
-    
-    // Log vector search details
-    console.log(`Vector search status: ${vectorSearchResponse.data?.status}`);
-    console.log(`Vector search found: ${vectorSearchResponse.data?.projects?.length > 0}`);
-    console.log(`Vector search count: ${vectorSearchResponse.data?.projects?.length}`);
-    
-    if (vectorSearchResponse.data?.status === 'success' && 
-        vectorSearchResponse.data?.projects?.length > 0) {
+      console.log(`Performing semantic vector search for: "${query}" within company ${companyId}`);
       
-      // Get the full project details for the top matching projects
-      const projectIds = vectorSearchResponse.data.projects
-        .slice(0, 3) // Limit to top 3 matches
-        .map(p => p.id);
-      
-      // Add company filter if available
-      let projectQuery = supabase
-        .from('projects')
-        .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
-        .in('id', projectIds);
-        
-      if (companyId) {
-        projectQuery = projectQuery.eq('company_id', companyId);
-      }
-      
-      const { data: vectorProjects, error } = await projectQuery;
-      
-      if (error) {
-        console.error(`Error fetching full project details: ${error.message}`);
-      }
-      
-      if (vectorProjects && vectorProjects.length > 0) {
-        // Combine with any previously found projects, ensuring no duplicates
-        const existingIds = new Set(projects.map(p => p.id));
-        const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
-        projects = [...projects, ...newProjects];
-        
-        console.log(`Found ${vectorProjects.length} projects via vector search`);
-        
-        // Make sure we have only 3 projects total
-        if (projects.length > 3) {
-          projects = projects.slice(0, 3);
-        }
-        
-        // Fetch contacts for the first project
-        projectContacts = await fetchProjectContacts(projects[0].id);
-        
+      // Get embedding for the query text
+      const embedding = await generateEmbedding(query);
+      if (!embedding) {
         return {
-          status: "success",
-          projects: projects,
-          contacts: projectContacts,
-          company_id: projects[0].company_id,
-          project_id: projects[0].id
+          status: "error",
+          error: "Failed to generate embedding for search"
         };
       }
+      
+      // Build vector search parameters - always include companyId if available
+      const vectorSearchBody: any = {
+        searchEmbedding: embedding,
+        matchThreshold: 0.2,
+        matchCount: 3,
+        companyId: companyId  // Always include companyId for security
+      };
+      
+      console.log(`Vector search parameters: ${JSON.stringify(vectorSearchBody)}`);
+      
+      // Use the vector search edge function
+      const vectorSearchResponse = await supabase.functions.invoke('search-projects-by-vector', {
+        body: vectorSearchBody
+      });
+      
+      if (vectorSearchResponse.error) {
+        console.error('Vector search error:', vectorSearchResponse.error);
+        return {
+          status: "error",
+          error: `Vector search failed: ${vectorSearchResponse.error.message}`
+        };
+      }
+      
+      // Log vector search details
+      console.log(`Vector search status: ${vectorSearchResponse.data?.status}`);
+      console.log(`Vector search found: ${vectorSearchResponse.data?.projects?.length > 0}`);
+      console.log(`Vector search count: ${vectorSearchResponse.data?.projects?.length}`);
+      
+      if (vectorSearchResponse.data?.status === 'success' && 
+          vectorSearchResponse.data?.projects?.length > 0) {
+        
+        // Get the full project details for the top matching projects
+        const projectIds = vectorSearchResponse.data.projects
+          .slice(0, 3) // Limit to top 3 matches
+          .map(p => p.id);
+        
+        // Add company filter if available
+        let projectQuery = supabase
+          .from('projects')
+          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
+          .in('id', projectIds);
+          
+        if (companyId) {
+          projectQuery = projectQuery.eq('company_id', companyId);
+        }
+        
+        const { data: vectorProjects, error } = await projectQuery;
+        
+        if (error) {
+          console.error(`Error fetching full project details: ${error.message}`);
+        }
+        
+        if (vectorProjects && vectorProjects.length > 0) {
+          // Combine with any previously found projects, ensuring no duplicates
+          const existingIds = new Set(projects.map(p => p.id));
+          const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
+          projects = [...projects, ...newProjects];
+          
+          console.log(`Found ${vectorProjects.length} projects via vector search`);
+          
+          // Make sure we have only 3 projects total
+          if (projects.length > 3) {
+            projects = projects.slice(0, 3);
+          }
+          
+          // Fetch contacts for the first project
+          projectContacts = await fetchProjectContacts(projects[0].id);
+          
+          return {
+            status: "success",
+            projects: projects,
+            contacts: projectContacts,
+            company_id: projects[0].company_id,
+            project_id: projects[0].id
+          };
+        }
+      }
+    } else {
+      console.log(`Vector search skipped - no company ID provided for security context`);
     }
     
     // Return the final result
@@ -362,7 +431,9 @@ async function identifyProject(
       status: "success",
       projects: [],
       contacts: [],
-      message: "No matching projects found"
+      message: companyId ? 
+        `No matching projects found in your company` : 
+        `No matching projects found`
     };
     
   } catch (error) {
@@ -382,7 +453,25 @@ serve(async (req) => {
 
   try {
     // Parse the request body
-    const { query, type = "any", company_id = null, user_id = null } = await req.json();
+    const requestBody = await req.json();
+    const { query, type = "any", company_id = null, user_id = null } = requestBody;
+    
+    // Enhanced security logging
+    console.log(`identify-project called with query: "${query}", type: ${type}`);
+    console.log(`Security context: company_id=${company_id || 'none'}, user_id=${user_id || 'none'}`);
+    
+    // Verify security parameters for user-initiated requests 
+    if (user_id && !company_id) {
+      console.error(`Security violation: User ${user_id} attempted to search without company context`);
+      return new Response(JSON.stringify({ 
+        status: "error", 
+        error: "Missing company ID",
+        message: "For security reasons, company ID is required when searching as a logged-in user"
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
     
     // Execute project identification with company ID filtering
     const result = await identifyProject(query, type, company_id, user_id);

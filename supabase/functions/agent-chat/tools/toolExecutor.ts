@@ -5,7 +5,7 @@
 
 import { ToolContext } from './types.ts';
 
-// Add authorization check function
+// Enhanced authorization check function
 async function authorizeAccess(
   supabase: any,
   toolName: string,
@@ -13,13 +13,28 @@ async function authorizeAccess(
   userProfile: any | null,
   args: any
 ): Promise<boolean> {
-  // If no company ID provided, we can't authorize properly
+  // If no company ID or user profile provided, security check fails
+  // We're changing this logic to be stricter - always require auth for company-specific data
   if (!companyId || !userProfile) {
-    console.log(`Authorization skipped for ${toolName}: No company ID or user profile provided`);
-    return true; // Public access allowed
+    console.log(`Security check failed for ${toolName}: No company ID (${companyId}) or user profile (${userProfile?.id}) provided`);
+    
+    // Only allow non-company specific tools without auth
+    if (toolName !== 'identify_project') {
+      console.log(`Tool ${toolName} allowed without company ID as it's not company-specific`);
+      return true;
+    }
+    
+    console.log(`Tool ${toolName} requires company ID for security - access denied`);
+    return false;
   }
   
   console.log(`Authorizing ${toolName} for user ${userProfile?.id || 'unknown'} from company ${companyId}`);
+  
+  // Verify user profile matches company ID
+  if (userProfile.company_id !== companyId) {
+    console.error(`User company mismatch: User ${userProfile.id} has company ${userProfile.company_id} but claims to be from ${companyId}`);
+    return false;
+  }
   
   // Add tool-specific authorization logic
   if (toolName === 'identify_project' && args.project_id) {
@@ -42,7 +57,7 @@ async function authorizeAccess(
     console.log(`Successfully authorized access to project ${args.project_id}`);
   }
   
-  // User is authorized by default if they have company ID
+  // User is authorized
   return true;
 }
 
@@ -59,7 +74,7 @@ export async function executeToolCall(
   const mappedToolName = toolName.replace(/_/g, '-');
   
   try {
-    console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with company access control: ${companyId ? 'enabled' : 'disabled'}`);
+    console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with security context - companyId: ${companyId || 'none'}, userId: ${userProfile?.id || 'none'}`);
     
     // Authorization check for company-specific data access
     const isAuthorized = await authorizeAccess(supabase, toolName, companyId, userProfile, args);
@@ -72,10 +87,16 @@ export async function executeToolCall(
       };
     }
     
-    // For identify_project tool, if company ID is provided, add it to the args
+    // For identify_project tool, always add company_id to the args if provided
     if (toolName === 'identify_project' && companyId) {
       console.log(`Adding company_id filter ${companyId} to identify_project query`);
       args.company_id = companyId;
+      
+      // For logged-in users, also add user_id for additional context
+      if (userProfile?.id) {
+        args.user_id = userProfile.id;
+        console.log(`Adding user_id ${userProfile.id} to identify_project query for audit purposes`);
+      }
     }
     
     // Import the tool dynamically based on the mapped name
@@ -135,24 +156,30 @@ export async function executeToolCall(
   }
 }
 
-// New function to call the dedicated identify-project edge function
+// Function to call the dedicated identify-project edge function
 async function callIdentifyProjectFunction(
   supabase: any,
   args: any,
   userProfile: any | null,
   companyId: string | null
 ) {
-  console.log(`Calling identify-project edge function with args:`, JSON.stringify(args).substring(0, 100));
+  console.log(`Calling identify-project edge function with args: ${JSON.stringify(args).substring(0, 100)}`);
+  console.log(`Security context for identify-project call: companyId: ${companyId || 'none'}, userId: ${userProfile?.id || 'none'}`);
   
   try {
+    // Prepare request body with security context
+    const requestBody = {
+      query: args.query,
+      type: args.type || 'any',
+      company_id: companyId,  // Always pass company_id if available
+      user_id: userProfile?.id
+    };
+    
+    console.log(`Final identify-project request: ${JSON.stringify(requestBody)}`);
+    
     // Call the identify-project edge function
     const response = await supabase.functions.invoke('identify-project', {
-      body: {
-        query: args.query,
-        type: args.type || 'any',
-        company_id: companyId,
-        user_id: userProfile?.id
-      }
+      body: requestBody
     });
     
     if (response.error) {
