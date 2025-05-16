@@ -40,6 +40,7 @@ async function getUserProfile(supabase: any, userId: string) {
       return null;
     }
     
+    console.log(`Found user profile for ${userId}: company_id=${data.company_id || 'none'}`);
     return data;
   } catch (error) {
     console.error('Exception in getUserProfile:', error);
@@ -73,7 +74,7 @@ serve(async (req) => {
     const userProfile = payload.userId ? 
       await getUserProfile(supabase, payload.userId) : null;
     
-    console.log(`User profile: ${userProfile ? 'found' : 'not provided'}`);
+    console.log(`User profile: ${userProfile ? `found for ${payload.userId}` : 'not provided'}`);
     
     // Extract company ID from user profile or project data
     let companyId = null;

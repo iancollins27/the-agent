@@ -27,6 +27,9 @@ export async function processToolCalls(
   // Remove the assistant message that was just added since we'll re-add it properly
   context.messages.pop();
   
+  // Add detailed logging about user and company access context
+  console.log(`Processing ${extractedToolCalls.length} tool calls with user ${userProfile?.id || 'anonymous'} from company ${companyId || 'none'}`);
+
   // Process each tool call in order
   for (const call of extractedToolCalls) {
     // Skip if we've already processed this tool call ID
@@ -35,10 +38,15 @@ export async function processToolCalls(
       continue;
     }
     
-    console.log(`Processing tool call: ${call.name}, id: ${call.id}`);
+    console.log(`Processing tool call: ${call.name}, id: ${call.id}, with company access control: ${companyId ? 'enabled' : 'disabled'}`);
     processedToolCallIds.add(call.id); // Mark as processed
   
     try {
+      // Log detailed information about the arguments
+      if (call.name === 'identify_project') {
+        console.log(`identify_project query: "${call.arguments.query}", type: ${call.arguments.type || 'any'}`);
+      }
+      
       // Execute the tool with context including companyId
       const toolResult = await executeToolCall(
         supabase,
@@ -47,6 +55,8 @@ export async function processToolCalls(
         userProfile,
         companyId
       );
+      
+      console.log(`Tool ${call.name} completed with status: ${toolResult.status || 'unknown'}`);
       
       // Extract project data if this is an identify_project call
       if (call.name === 'identify_project' && 
@@ -66,12 +76,15 @@ export async function processToolCalls(
             toolResult.error = "No authorized projects found for your company";
             toolResult.message = "You do not have access to any projects matching your query.";
             toolResult.projects = [];
+            
+            console.log(`Security filter: User ${userProfile.id} from company ${companyId} attempted to access unauthorized projects`);
           } else {
             // Update the projects array with only authorized projects
             toolResult.projects = authorizedProjects;
             
             // Update message if some projects were filtered out
             if (authorizedProjects.length < toolResult.projects.length) {
+              console.log(`Security filter: Filtered out ${toolResult.projects.length - authorizedProjects.length} unauthorized projects`);
               toolResult.message = `Found ${authorizedProjects.length} authorized projects matching your query.`;
             }
           }

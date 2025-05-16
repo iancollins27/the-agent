@@ -11,6 +11,8 @@ export async function processToolCall(
   companyId?: string,
   userProfile?: any
 ) {
+  console.log(`Processing tool call: ${toolName} with companyId: ${companyId || 'none'} and userProfile: ${userProfile ? 'provided' : 'none'}`);
+  
   // Simply delegate to the executeToolCall function that uses the tool registry
   // But now passing company ID and user profile for access control
   return await executeToolCall(

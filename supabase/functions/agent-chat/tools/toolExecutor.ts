@@ -5,6 +5,47 @@
 
 import { ToolContext } from './types.ts';
 
+// Add authorization check function
+async function authorizeAccess(
+  supabase: any,
+  toolName: string,
+  companyId: string | null,
+  userProfile: any | null,
+  args: any
+): Promise<boolean> {
+  // If no company ID provided, we can't authorize properly
+  if (!companyId || !userProfile) {
+    console.log(`Authorization skipped for ${toolName}: No company ID or user profile provided`);
+    return true; // Public access allowed
+  }
+  
+  console.log(`Authorizing ${toolName} for user ${userProfile?.id || 'unknown'} from company ${companyId}`);
+  
+  // Add tool-specific authorization logic
+  if (toolName === 'identify_project' && args.project_id) {
+    const { data: projectData, error } = await supabase
+      .from('projects')
+      .select('company_id')
+      .eq('id', args.project_id)
+      .single();
+    
+    if (error || !projectData) {
+      console.error(`Project verification failed for ID ${args.project_id}: ${error?.message || 'Project not found'}`);
+      return false;
+    }
+    
+    if (projectData.company_id !== companyId) {
+      console.error(`User ${userProfile.id} from company ${companyId} attempted to access project ${args.project_id} belonging to company ${projectData.company_id}`);
+      return false;
+    }
+    
+    console.log(`Successfully authorized access to project ${args.project_id}`);
+  }
+  
+  // User is authorized by default if they have company ID
+  return true;
+}
+
 export async function executeToolCall(
   supabase: any, 
   toolName: string, 
@@ -18,52 +59,34 @@ export async function executeToolCall(
   const mappedToolName = toolName.replace(/_/g, '-');
   
   try {
-    console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with args:`, JSON.stringify(args));
+    console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with company access control: ${companyId ? 'enabled' : 'disabled'}`);
     
     // Authorization check for company-specific data access
-    if (companyId && userProfile) {
-      console.log(`Performing authorization check for user with company ${companyId}`);
-      
-      if (userProfile.company_id !== companyId) {
-        console.error(`Authorization failure: User company ID (${userProfile.company_id}) doesn't match request company ID (${companyId})`);
-        return {
-          status: "error",
-          error: "Unauthorized access",
-          details: "User does not have access to the requested company data"
-        };
-      }
-      
-      // For tools that access project data, ensure project belongs to company
-      if (args.project_id) {
-        const { data: projectData, error: projectError } = await supabase
-          .from('projects')
-          .select('company_id')
-          .eq('id', args.project_id)
-          .single();
-        
-        if (projectError || !projectData) {
-          console.error(`Project verification failed: ${projectError?.message || 'Project not found'}`);
-          return {
-            status: "error",
-            error: "Project access denied",
-            details: "Unable to verify project access"
-          };
-        }
-        
-        if (projectData.company_id !== companyId) {
-          console.error(`Project ${args.project_id} doesn't belong to company ${companyId}`);
-          return {
-            status: "error",
-            error: "Unauthorized access",
-            details: "User does not have access to the requested project data"
-          };
-        }
-      }
+    const isAuthorized = await authorizeAccess(supabase, toolName, companyId, userProfile, args);
+    if (!isAuthorized) {
+      console.error(`Authorization failure: User ${userProfile?.id || 'unknown'} from company ${companyId} denied access to ${toolName}`);
+      return {
+        status: "error",
+        error: "Unauthorized access",
+        details: "You do not have access to the requested data"
+      };
+    }
+    
+    // For identify_project tool, if company ID is provided, add it to the args
+    if (toolName === 'identify_project' && companyId) {
+      console.log(`Adding company_id filter ${companyId} to identify_project query`);
+      args.company_id = companyId;
     }
     
     // Import the tool dynamically based on the mapped name
     let toolModule;
     try {
+      // If the tool has been refactored to its own edge function, call it directly
+      if (toolName === 'identify_project') {
+        return await callIdentifyProjectFunction(supabase, args, userProfile, companyId);
+      }
+      
+      // For other tools, continue using the module import approach
       toolModule = await import(`./${mappedToolName}/index.ts`);
       console.log(`Successfully imported tool module: ${mappedToolName}`);
     } catch (importError) {
@@ -80,7 +103,6 @@ export async function executeToolCall(
     
     // Different tools might have their export structured differently
     const toolExports = {
-      identify_project: toolModule.identifyProject,
       create_action_record: toolModule.createActionRecord,
       read_crm_data: toolModule.readCrmData,
       knowledge_base_lookup: toolModule.knowledgeBaseLookup
@@ -109,6 +131,47 @@ export async function executeToolCall(
       status: "error",
       error: error.message || "Unknown error",
       details: error.stack || "No stack trace available"
+    };
+  }
+}
+
+// New function to call the dedicated identify-project edge function
+async function callIdentifyProjectFunction(
+  supabase: any,
+  args: any,
+  userProfile: any | null,
+  companyId: string | null
+) {
+  console.log(`Calling identify-project edge function with args:`, JSON.stringify(args).substring(0, 100));
+  
+  try {
+    // Call the identify-project edge function
+    const response = await supabase.functions.invoke('identify-project', {
+      body: {
+        query: args.query,
+        type: args.type || 'any',
+        company_id: companyId,
+        user_id: userProfile?.id
+      }
+    });
+    
+    if (response.error) {
+      console.error('Error from identify-project function:', response.error);
+      return {
+        status: "error",
+        error: response.error,
+        message: "Failed to identify project"
+      };
+    }
+    
+    console.log(`identify-project function result:`, JSON.stringify(response.data).substring(0, 200));
+    return response.data;
+  } catch (error) {
+    console.error('Exception calling identify-project function:', error);
+    return {
+      status: "error",
+      error: error.message || "Unknown error",
+      message: "Exception while identifying project"
     };
   }
 }
