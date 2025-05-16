@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, RefreshCw, Users } from "lucide-react";
+import { ExternalLink, RefreshCw, Users, Phone, Mail } from "lucide-react";
 import { PromptRun } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -124,18 +124,31 @@ const PromptRunHeader: React.FC<PromptRunHeaderProps> = ({
             <Users className="h-3.5 w-3.5" />
             <span>Project Contacts:</span>
           </div>
-          <div className="flex flex-wrap gap-1 mt-1">
+          <div className="flex flex-wrap gap-2 mt-1">
             {isLoadingContacts ? (
               <span className="text-xs text-muted-foreground">Loading contacts...</span>
             ) : projectContacts.length > 0 ? (
               projectContacts.map((contact) => (
-                <Badge 
+                <div 
                   key={contact.id} 
-                  variant="outline" 
-                  className="text-xs font-normal"
+                  className="border rounded-md p-2 text-xs"
                 >
-                  {contact.full_name} ({contact.role})
-                </Badge>
+                  <div className="font-medium">{contact.full_name} <span className="text-muted-foreground">({contact.role})</span></div>
+                  <div className="flex flex-col gap-1 mt-1">
+                    {contact.email && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <Mail className="h-3 w-3" /> 
+                        <span>{contact.email}</span>
+                      </div>
+                    )}
+                    {contact.phone_number && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <Phone className="h-3 w-3" />
+                        <span>{contact.phone_number}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))
             ) : (
               <span className="text-xs text-muted-foreground">No contacts associated with this project</span>
