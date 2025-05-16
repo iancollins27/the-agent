@@ -20,6 +20,47 @@ export async function executeToolCall(
   try {
     console.log(`Executing tool ${toolName} (mapped to ${mappedToolName}) with args:`, JSON.stringify(args));
     
+    // Authorization check for company-specific data access
+    if (companyId && userProfile) {
+      console.log(`Performing authorization check for user with company ${companyId}`);
+      
+      if (userProfile.company_id !== companyId) {
+        console.error(`Authorization failure: User company ID (${userProfile.company_id}) doesn't match request company ID (${companyId})`);
+        return {
+          status: "error",
+          error: "Unauthorized access",
+          details: "User does not have access to the requested company data"
+        };
+      }
+      
+      // For tools that access project data, ensure project belongs to company
+      if (args.project_id) {
+        const { data: projectData, error: projectError } = await supabase
+          .from('projects')
+          .select('company_id')
+          .eq('id', args.project_id)
+          .single();
+        
+        if (projectError || !projectData) {
+          console.error(`Project verification failed: ${projectError?.message || 'Project not found'}`);
+          return {
+            status: "error",
+            error: "Project access denied",
+            details: "Unable to verify project access"
+          };
+        }
+        
+        if (projectData.company_id !== companyId) {
+          console.error(`Project ${args.project_id} doesn't belong to company ${companyId}`);
+          return {
+            status: "error",
+            error: "Unauthorized access",
+            details: "User does not have access to the requested project data"
+          };
+        }
+      }
+    }
+    
     // Import the tool dynamically based on the mapped name
     let toolModule;
     try {

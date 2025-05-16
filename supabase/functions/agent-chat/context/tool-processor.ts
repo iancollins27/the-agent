@@ -53,6 +53,30 @@ export async function processToolCalls(
           toolResult?.status === 'success' && 
           toolResult?.projects?.length > 0) {
         
+        // For internal users, verify company access to projects
+        if (userProfile && companyId) {
+          // Filter projects by company ID
+          const authorizedProjects = toolResult.projects.filter((p: any) => {
+            return p.company_id === companyId;
+          });
+          
+          if (authorizedProjects.length === 0) {
+            // No authorized projects found
+            toolResult.status = "error";
+            toolResult.error = "No authorized projects found for your company";
+            toolResult.message = "You do not have access to any projects matching your query.";
+            toolResult.projects = [];
+          } else {
+            // Update the projects array with only authorized projects
+            toolResult.projects = authorizedProjects;
+            
+            // Update message if some projects were filtered out
+            if (authorizedProjects.length < toolResult.projects.length) {
+              toolResult.message = `Found ${authorizedProjects.length} authorized projects matching your query.`;
+            }
+          }
+        }
+        
         // Check for multiple matches
         if (toolResult.projects.length > 1) {
           // Always treat multiple matches as requiring clarification,
@@ -75,7 +99,7 @@ export async function processToolCalls(
           
           // Don't set projectData yet, as we need user clarification
           console.log('Multiple project matches found, awaiting user clarification');
-        } else {
+        } else if (toolResult.projects.length === 1) {
           // Just one project found, use it and include contacts data
           projectData = toolResult.projects[0];
           
@@ -173,6 +197,6 @@ export async function processToolCalls(
       });
     }
   }
-
+  
   return { projectData, processedIds: processedToolCallIds };
 }

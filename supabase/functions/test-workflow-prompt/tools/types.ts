@@ -7,6 +7,8 @@ export interface ToolContext {
   supabase: any;
   promptRunId: string;
   projectId: string;
+  companyId?: string; // Added company ID for access control
+  userProfile?: any; // Added user profile for authorization
 }
 
 export interface Tool {

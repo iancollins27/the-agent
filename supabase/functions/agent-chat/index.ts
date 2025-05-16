@@ -21,6 +21,30 @@ interface ChatRequest {
   customPrompt?: string;
   availableTools?: string[];
   getToolDefinitions?: boolean; // Special flag to request tool definitions
+  userId?: string; // Added user ID for authorization
+}
+
+// Helper function to get user profile for authorization
+async function getUserProfile(supabase: any, userId: string) {
+  if (!userId) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Exception in getUserProfile:', error);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -44,6 +68,22 @@ serve(async (req) => {
     // Initialize Supabase client with service role key for admin access
     // This allows bypassing RLS policies when creating action records
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Get user profile if userId is provided
+    const userProfile = payload.userId ? 
+      await getUserProfile(supabase, payload.userId) : null;
+    
+    console.log(`User profile: ${userProfile ? 'found' : 'not provided'}`);
+    
+    // Extract company ID from user profile or project data
+    let companyId = null;
+    if (userProfile && userProfile.company_id) {
+      companyId = userProfile.company_id;
+      console.log(`Using company ID from user profile: ${companyId}`);
+    } else if (payload.projectData && payload.projectData.company_id) {
+      companyId = payload.projectData.company_id;
+      console.log(`Using company ID from project data: ${companyId}`);
+    }
     
     // Special case: If getToolDefinitions flag is set, return the available tool definitions
     if (payload.getToolDefinitions) {
@@ -75,7 +115,9 @@ serve(async (req) => {
       projectData: payload.projectData || {},
       current_date: new Date().toISOString().split('T')[0],
       available_tools: formattedToolsInfo,
-      user_question: payload.messages[payload.messages.length - 1]?.content || ""
+      user_question: payload.messages[payload.messages.length - 1]?.content || "",
+      company_id: companyId, // Add company ID to context data
+      user_name: userProfile ? `${userProfile.profile_fname || ''} ${userProfile.profile_lname || ''}`.trim() : "Anonymous" // Add user name if available
     };
 
     // Get the appropriate system prompt (either custom or default)
@@ -150,8 +192,14 @@ serve(async (req) => {
         
         try {
           // Use the toolExecutor instead of direct imports to handle the name mapping
-          // Pass null for userProfile since we're using the service role key
-          const toolResult = await executeToolCall(supabase, name, args, null, payload.projectData?.company_id);
+          // Pass userProfile and companyId for authorization
+          const toolResult = await executeToolCall(
+            supabase, 
+            name, 
+            args, 
+            userProfile, 
+            companyId
+          );
           
           // Add the tool response to messages
           messages.push({

@@ -7,12 +7,64 @@ import { getTool } from './toolRegistry.ts';
 import { logToolCall } from '../database/tool-logs.ts';
 import { ToolContext } from './types.ts';
 
+// Authorization check function
+async function authorizeToolAccess(
+  supabase: any,
+  toolName: string,
+  companyId: string | undefined,
+  userProfile: any | undefined,
+  projectId: string
+): Promise<boolean> {
+  // No authorization if we don't have company ID (system-initiated execution)
+  if (!companyId) {
+    console.log(`No companyId provided - assuming system execution for tool ${toolName}`);
+    return true;
+  }
+
+  // For user-initiated executions, verify user belongs to company
+  if (userProfile) {
+    const userCompanyId = userProfile.company_id;
+    
+    if (userCompanyId !== companyId) {
+      console.error(`Authorization failure: User company ID (${userCompanyId}) doesn't match provided company ID (${companyId})`);
+      return false;
+    }
+    
+    console.log(`User ${userProfile.id} authorized for company ${companyId}`);
+    
+    // If projectId is provided, verify project belongs to company
+    if (projectId) {
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('company_id')
+        .eq('id', projectId)
+        .single();
+      
+      if (projectError || !projectData) {
+        console.error(`Project verification failed for ${projectId}: ${projectError?.message || 'Project not found'}`);
+        return false;
+      }
+      
+      if (projectData.company_id !== companyId) {
+        console.error(`Project ${projectId} doesn't belong to company ${companyId}`);
+        return false;
+      }
+      
+      console.log(`Project ${projectId} verified for company ${companyId}`);
+    }
+  }
+  
+  return true;
+}
+
 export async function executeToolCall(
   supabase: any, 
   toolName: string, 
   args: any, 
   promptRunId: string, 
-  projectId: string
+  projectId: string,
+  companyId?: string,
+  userProfile?: any
 ) {
   const tool = getTool(toolName);
   if (!tool) {
@@ -23,11 +75,13 @@ export async function executeToolCall(
     };
   }
   
-  // Create tool context
+  // Create tool context with company ID for access control
   const context: ToolContext = {
     supabase,
     promptRunId,
-    projectId
+    projectId,
+    companyId,
+    userProfile
   };
   
   // Generate a consistent tool call ID
@@ -44,6 +98,32 @@ export async function executeToolCall(
     }
     
     console.log(`Executing tool ${toolName} with args: ${argsString.substring(0, 100)}${argsString.length > 100 ? '...' : ''}`);
+    
+    // Perform authorization check before execution
+    if (companyId) {
+      const isAuthorized = await authorizeToolAccess(supabase, toolName, companyId, userProfile, projectId);
+      if (!isAuthorized) {
+        const authError = {
+          status: "error",
+          error: "Unauthorized access",
+          details: "You don't have permission to use this tool with the provided data"
+        };
+        
+        // Log the unauthorized attempt
+        await logToolCall(
+          supabase, 
+          promptRunId, 
+          toolName, 
+          toolCallId, 
+          argsString, 
+          JSON.stringify(authError), 
+          403, 
+          Date.now() - startTime
+        );
+        
+        return authError;
+      }
+    }
     
     // Execute the tool first - don't log until we have results
     const result = await tool.execute(args, context);
