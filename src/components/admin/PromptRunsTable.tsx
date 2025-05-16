@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { RotateCw, ExternalLink } from 'lucide-react';
@@ -81,22 +82,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
       console.error('Error rerunning prompt:', error);
     }
   };
-  
-  // Helper function to format workflow type
-  const formatWorkflowType = (type: string | null | undefined): string => {
-    if (!type) return 'Unknown';
-    
-    // If it's a known workflow type, use the title from workflowTitles
-    const knownType = type as WorkflowType;
-    if (workflowTitles[knownType]) {
-      return workflowTitles[knownType];
-    }
-    
-    // Otherwise format the type string nicely
-    return type.split('_').map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-    ).join(' ');
-  };
 
   return (
     <Table className="border rounded-md">
@@ -107,7 +92,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
         <TableRow>
           <TableHead>Time</TableHead>
           <TableHead>Project</TableHead>
-          <TableHead>Workflow Type</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -137,9 +121,6 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
               ) : (
                 <span className="text-muted-foreground italic">No project</span>
               )}
-            </TableCell>
-            <TableCell>
-              {formatWorkflowType(run.workflow_prompt_type || run.workflow_type)}
             </TableCell>
             <TableCell className="text-right space-x-2">
               {!run.reviewed && (
