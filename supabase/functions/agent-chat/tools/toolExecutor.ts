@@ -13,18 +13,19 @@ async function authorizeAccess(
   userProfile: any | null,
   args: any
 ): Promise<boolean> {
+  // Log detailed authorization info
+  console.log(`Authorization check for tool ${toolName}`);
+  console.log(`Security context - companyId: ${companyId || 'none'}, userProfile: ${userProfile ? `ID: ${userProfile.id}, Company: ${userProfile.company_id}` : 'none'}`);
+  
   // If no company ID or user profile provided, security check fails
-  // We're changing this logic to be stricter - always require auth for company-specific data
-  if (!companyId || !userProfile) {
-    console.log(`Security check failed for ${toolName}: No company ID (${companyId}) or user profile (${userProfile?.id}) provided`);
-    
-    // Only allow non-company specific tools without auth
-    if (toolName !== 'identify_project') {
-      console.log(`Tool ${toolName} allowed without company ID as it's not company-specific`);
-      return true;
-    }
-    
-    console.log(`Tool ${toolName} requires company ID for security - access denied`);
+  // We're enforcing stricter security - require auth for company-specific data
+  if (!companyId) {
+    console.log(`Company ID is required for security but none provided - access denied`);
+    return false;
+  }
+  
+  if (!userProfile) {
+    console.log(`User profile is required for security but none provided - access denied`);
     return false;
   }
   
@@ -58,6 +59,7 @@ async function authorizeAccess(
   }
   
   // User is authorized
+  console.log(`Authorization successful for ${toolName}`);
   return true;
 }
 
@@ -88,8 +90,18 @@ export async function executeToolCall(
     }
     
     // For identify_project tool, always add company_id to the args if provided
-    if (toolName === 'identify_project' && companyId) {
+    if (toolName === 'identify_project') {
       console.log(`Adding company_id filter ${companyId} to identify_project query`);
+      
+      if (!companyId) {
+        return {
+          status: "error",
+          error: "Missing company ID",
+          details: "Company ID is required for security"
+        };
+      }
+      
+      // Always add company_id to arguments for identify_project calls
       args.company_id = companyId;
       
       // For logged-in users, also add user_id for additional context
@@ -97,16 +109,13 @@ export async function executeToolCall(
         args.user_id = userProfile.id;
         console.log(`Adding user_id ${userProfile.id} to identify_project query for audit purposes`);
       }
+      
+      return await callIdentifyProjectFunction(supabase, args, userProfile, companyId);
     }
     
     // Import the tool dynamically based on the mapped name
     let toolModule;
     try {
-      // If the tool has been refactored to its own edge function, call it directly
-      if (toolName === 'identify_project') {
-        return await callIdentifyProjectFunction(supabase, args, userProfile, companyId);
-      }
-      
       // For other tools, continue using the module import approach
       toolModule = await import(`./${mappedToolName}/index.ts`);
       console.log(`Successfully imported tool module: ${mappedToolName}`);
@@ -166,13 +175,22 @@ async function callIdentifyProjectFunction(
   console.log(`Calling identify-project edge function with args: ${JSON.stringify(args).substring(0, 100)}`);
   console.log(`Security context for identify-project call: companyId: ${companyId || 'none'}, userId: ${userProfile?.id || 'none'}`);
   
+  if (!companyId) {
+    console.error(`Cannot call identify-project without company_id - security violation`);
+    return {
+      status: "error",
+      error: "Missing company ID",
+      message: "Company ID is required for security"
+    };
+  }
+  
   try {
     // Prepare request body with security context
     const requestBody = {
       query: args.query,
       type: args.type || 'any',
-      company_id: companyId,  // Always pass company_id if available
-      user_id: userProfile?.id
+      company_id: companyId,  // Always pass company_id for security
+      user_id: userProfile?.id || null
     };
     
     console.log(`Final identify-project request: ${JSON.stringify(requestBody)}`);

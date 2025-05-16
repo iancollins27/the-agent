@@ -21,14 +21,18 @@ interface ChatRequest {
   customPrompt?: string;
   availableTools?: string[];
   getToolDefinitions?: boolean; // Special flag to request tool definitions
-  userId?: string; // Added user ID for authorization
+  userId?: string; // User ID for authorization
 }
 
 // Helper function to get user profile for authorization
 async function getUserProfile(supabase: any, userId: string) {
-  if (!userId) return null;
+  if (!userId) {
+    console.log("No user ID provided to getUserProfile");
+    return null;
+  }
   
   try {
+    console.log(`Looking up profile for user ID: ${userId}`);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -37,6 +41,11 @@ async function getUserProfile(supabase: any, userId: string) {
       
     if (error) {
       console.error('Error fetching user profile:', error);
+      return null;
+    }
+    
+    if (!data) {
+      console.log(`No profile found for user ID: ${userId}`);
       return null;
     }
     
@@ -70,11 +79,14 @@ serve(async (req) => {
     // This allows bypassing RLS policies when creating action records
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
+    // Enhanced logging for debugging
+    console.log(`Request received with userId: ${payload.userId || 'not provided'}`);
+    
     // Get user profile if userId is provided
     const userProfile = payload.userId ? 
       await getUserProfile(supabase, payload.userId) : null;
     
-    console.log(`User profile: ${userProfile ? `found for ${payload.userId}` : 'not provided'}`);
+    console.log(`User profile lookup result: ${userProfile ? `found for ${payload.userId} with company ${userProfile.company_id}` : 'not found or not provided'}`);
     
     // Extract company ID from user profile or project data
     let companyId = null;
@@ -84,6 +96,8 @@ serve(async (req) => {
     } else if (payload.projectData && payload.projectData.company_id) {
       companyId = payload.projectData.company_id;
       console.log(`Using company ID from project data: ${companyId}`);
+    } else {
+      console.log(`No company ID found in user profile or project data`);
     }
     
     // Special case: If getToolDefinitions flag is set, return the available tool definitions
@@ -190,6 +204,7 @@ serve(async (req) => {
         const args = JSON.parse(argsJson);
         
         console.log(`Executing tool ${name} with args: ${argsJson}`);
+        console.log(`Security context for tool execution - user: ${userProfile?.id || 'anonymous'}, company: ${companyId || 'none'}`);
         
         try {
           // Use the toolExecutor instead of direct imports to handle the name mapping

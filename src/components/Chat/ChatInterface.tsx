@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, AlertCircle } from "lucide-react";
 import ActionConfirmation from "./ActionConfirmation"; 
 import { ActionRecord } from "./types";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ChatMessage {
   id: string;
@@ -36,6 +37,7 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
   const [pendingActions, setPendingActions] = useState<ActionRecord[]>([]);
   const [currentAction, setCurrentAction] = useState<ActionRecord | null>(null);
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
+  const { user } = useAuth(); // Get current authenticated user
 
   useEffect(() => {
     if (presetMessage) {
@@ -178,7 +180,8 @@ const ChatInterface = ({ projectId, presetMessage = '' }: ChatInterfaceProps) =>
             projectId: projectId || identifiedProject?.id,
             projectData,
             customPrompt: chatbotConfig?.system_prompt,
-            availableTools: chatbotConfig?.available_tools || ['identify_project', 'create_action_record']
+            availableTools: chatbotConfig?.available_tools || ['identify_project', 'create_action_record'],
+            userId: user?.id // Add user ID to the request
           }),
         }
       );

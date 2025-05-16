@@ -47,9 +47,46 @@ export async function processToolCalls(
       if (call.name === 'identify_project') {
         console.log(`identify_project query: "${call.arguments.query}", type: ${call.arguments.type || 'any'}, enforcing company filter: ${companyId || 'none'}`);
         
-        // Explicitly add company_id to arguments if available for identify_project calls
-        if (companyId) {
-          call.arguments.company_id = companyId;
+        // STRICT SECURITY: Require company ID for identify_project
+        if (!companyId) {
+          console.error(`Security violation: identify_project called without company ID`);
+          const errorResult = {
+            status: "error",
+            error: "Missing company ID",
+            message: "For security reasons, company ID is required for project identification"
+          };
+          
+          // Add tool message to context
+          context.messages.push({
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: call.id,
+                type: 'function',
+                function: {
+                  name: call.name,
+                  arguments: JSON.stringify(call.arguments)
+                }
+              }
+            ]
+          });
+          
+          // Add the error result
+          context.messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            content: JSON.stringify(errorResult)
+          });
+          
+          continue; // Skip to next tool call
+        }
+        
+        // Explicitly add company_id to arguments for identify_project calls
+        call.arguments.company_id = companyId;
+        
+        if (userProfile) {
+          call.arguments.user_id = userProfile.id;
         }
       }
       
@@ -69,9 +106,8 @@ export async function processToolCalls(
           toolResult?.status === 'success' && 
           toolResult?.projects?.length > 0) {
         
-        // Security verification is now handled in the edge function
-        // but we'll double-check here as a defense in depth approach
-        if (userProfile && companyId) {
+        // Double check security as a defense in depth approach
+        if (companyId) {
           // Filter projects by company ID
           const authorizedProjects = toolResult.projects.filter((p: any) => {
             return p.company_id === companyId;
@@ -84,7 +120,7 @@ export async function processToolCalls(
             toolResult.message = "You do not have access to any projects matching your query.";
             toolResult.projects = [];
             
-            console.log(`Security filter: User ${userProfile.id} from company ${companyId} attempted to access unauthorized projects`);
+            console.log(`Security filter: User ${userProfile?.id || 'unknown'} from company ${companyId} attempted to access unauthorized projects`);
           } else {
             // Update the projects array with only authorized projects
             toolResult.projects = authorizedProjects;

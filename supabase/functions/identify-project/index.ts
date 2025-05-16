@@ -1,4 +1,3 @@
-
 /**
  * Edge function for identifying projects with enhanced security and company isolation
  */
@@ -160,8 +159,18 @@ async function identifyProject(
     // Enhanced security logging
     console.log(`Executing identify_project: query="${query}", type=${type}, companyId=${companyId || 'none'}, userId=${userId || 'none'}`);
     
+    // STRICT SECURITY CHECK: Company ID is now REQUIRED
+    if (!companyId) {
+      console.error(`Security violation: No company ID provided for project identification`);
+      return {
+        status: "error",
+        error: "Company ID required",
+        message: "For security reasons, you must provide a company ID when searching for projects"
+      };
+    }
+    
     // If both user ID and company ID are provided, verify the association
-    if (userId && companyId) {
+    if (userId) {
       const isAuthorized = await verifyUserCompanyAccess(userId, companyId);
       if (!isAuthorized) {
         console.error(`User ${userId} not authorized to access company ${companyId} data`);
@@ -172,29 +181,17 @@ async function identifyProject(
         };
       }
       console.log(`User ${userId} authorized to access company ${companyId} data`);
-    }
-    
-    // Security check: if companyId is not provided and this appears to be a user-initiated request,
-    // we should reject the request to prevent unauthorized access
-    if (!companyId && userId) {
-      console.error(`Security violation: User ${userId} attempted to search across all companies`);
-      return {
-        status: "error",
-        error: "Company ID required",
-        message: "For security reasons, you must provide a company ID when searching for projects"
-      };
+    } else {
+      console.log(`No user ID provided, but company ID ${companyId} is present - proceeding with company-level access only`);
     }
     
     let projects = [];
     let projectContacts = [];
     
-    // Build the base query - if companyId is provided, always filter by it
-    let baseQuery = supabase.from('projects').select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status');
-    
-    if (companyId) {
-      console.log(`Applying company filter: ${companyId}`);
-      baseQuery = baseQuery.eq('company_id', companyId);
-    }
+    // Build the base query - ALWAYS filter by company ID for security
+    console.log(`Applying mandatory company filter: ${companyId}`);
+    let baseQuery = supabase.from('projects').select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
+      .eq('company_id', companyId);
     
     // First try exact matches
     if (type === "id" || type === "any") {
@@ -431,9 +428,7 @@ async function identifyProject(
       status: "success",
       projects: [],
       contacts: [],
-      message: companyId ? 
-        `No matching projects found in your company` : 
-        `No matching projects found`
+      message: `No matching projects found in company ${companyId}`
     };
     
   } catch (error) {
@@ -460,13 +455,13 @@ serve(async (req) => {
     console.log(`identify-project called with query: "${query}", type: ${type}`);
     console.log(`Security context: company_id=${company_id || 'none'}, user_id=${user_id || 'none'}`);
     
-    // Verify security parameters for user-initiated requests 
-    if (user_id && !company_id) {
-      console.error(`Security violation: User ${user_id} attempted to search without company context`);
+    // STRICT SECURITY CHECK: Company ID is now REQUIRED
+    if (!company_id) {
+      console.error(`Security violation: No company ID provided for project identification`);
       return new Response(JSON.stringify({ 
         status: "error", 
-        error: "Missing company ID",
-        message: "For security reasons, company ID is required when searching as a logged-in user"
+        error: "Company ID required",
+        message: "For security reasons, company ID is required when searching for projects"
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
