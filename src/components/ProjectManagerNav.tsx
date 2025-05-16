@@ -8,10 +8,11 @@ import {
   Settings, 
   Users 
 } from "lucide-react";
+import UserMenu from './UserMenu';
 
 const ProjectManagerNav: React.FC = () => {
   return (
-    <div className="flex justify-center p-4 bg-white border-b">
+    <div className="flex justify-between items-center p-4 bg-white border-b">
       <div className="flex space-x-2">
         <Button variant="ghost" asChild>
           <Link to="/admin">
@@ -40,6 +41,10 @@ const ProjectManagerNav: React.FC = () => {
             Settings
           </Link>
         </Button>
+      </div>
+      
+      <div>
+        <UserMenu />
       </div>
     </div>
   );
