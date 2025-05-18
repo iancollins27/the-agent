@@ -792,8 +792,10 @@ export type Database = {
           company_id: string | null
           created_at: string
           crm_id: string | null
+          email_summary: string | null
           id: string
           last_action_check: string | null
+          last_email_processed_at: string | null
           latest_prompt_run_ID: string | null
           next_check_date: string | null
           next_step: string | null
@@ -809,8 +811,10 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           crm_id?: string | null
+          email_summary?: string | null
           id?: string
           last_action_check?: string | null
+          last_email_processed_at?: string | null
           latest_prompt_run_ID?: string | null
           next_check_date?: string | null
           next_step?: string | null
@@ -826,8 +830,10 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           crm_id?: string | null
+          email_summary?: string | null
           id?: string
           last_action_check?: string | null
+          last_email_processed_at?: string | null
           latest_prompt_run_ID?: string | null
           next_check_date?: string | null
           next_step?: string | null
@@ -1153,8 +1159,10 @@ export type Database = {
           company_id: string | null
           created_at: string
           crm_id: string | null
+          email_summary: string | null
           id: string
           last_action_check: string | null
+          last_email_processed_at: string | null
           latest_prompt_run_ID: string | null
           next_check_date: string | null
           next_step: string | null
