@@ -3,3 +3,7 @@ project_id = "lvifsxsrbluehopamqpy"
 
 [functions.email-summary]
 verify_jwt = true
+
+[functions.test-workflow-prompt]
+verify_jwt = true
+

@@ -23,6 +23,31 @@ export async function executeEmailSummaryFunction(args: EmailSummaryArgs, contex
   try {
     console.log(`Executing email summary function for project ${project_id} and company ${companyId}`);
     
+    // First verify the project belongs to the company for security
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('id, company_id')
+      .eq('id', project_id)
+      .single();
+    
+    if (projectError) {
+      console.error('Error fetching project:', projectError);
+      return {
+        status: 'error',
+        error: projectError.message,
+        message: 'Failed to verify project access'
+      };
+    }
+    
+    if (projectData.company_id !== companyId) {
+      console.error(`Security error: Project ${project_id} does not belong to company ${companyId}`);
+      return {
+        status: 'error',
+        error: 'Access denied',
+        message: 'You do not have permission to access this project'
+      };
+    }
+    
     // Call the email-summary edge function
     const response = await supabase.functions.invoke('email-summary', {
       body: {

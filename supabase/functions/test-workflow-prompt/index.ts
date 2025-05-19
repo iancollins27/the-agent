@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { handleRequest } from './handlers/handleRequest.ts';
@@ -26,7 +27,26 @@ Deno.serve(async (req) => {
 
   try {
     logWithTime('Starting test-workflow-prompt function, connecting to Supabase at: ' + 
-      Deno.env.get('SUPABASE_URL')?.substring(0, 30) + '...');
+      (Deno.env.get('SUPABASE_URL')?.substring(0, 30) + '...'));
+    
+    // Check for authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logWithTime('Error: Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing or invalid authorization header',
+          message: 'This endpoint requires authentication'
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
     
     const response = await handleRequest(req);
     logWithTime('Successfully processed request, returning response');
