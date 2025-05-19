@@ -7,3 +7,12 @@ verify_jwt = true
 [functions.test-workflow-prompt]
 verify_jwt = true
 
+[functions.chat-session-manager]
+verify_jwt = true
+
+[functions.send-channel-message]
+verify_jwt = true
+
+[functions.email-webhook]
+verify_jwt = false
+

@@ -1,113 +1,60 @@
 
-/**
- * Tool registry for Chat MCP tools
- */
+import { createActionRecordTool } from "./create-action-record/index.ts";
+import { dataFetchTool } from "./data-fetch/index.ts";
+import { identifyProjectTool } from "./identify-project/index.ts";
+import { readCrmDataTool } from "./read-crm-data/index.ts";
+import { sessionManagerTool } from "./session-manager/index.ts";
+import { channelResponseTool } from "./channel-response/index.ts";
 
-import { Tool } from './types.ts';
-import { identifyProject } from './identify-project/index.ts';
-import { createActionRecord } from './create-action-record/index.ts';
-import { readCrmData } from './read-crm-data/index.ts';
+// Register all available tools
+const tools = [
+  createActionRecordTool,
+  dataFetchTool,
+  identifyProjectTool,
+  readCrmDataTool,
+  sessionManagerTool,
+  channelResponseTool
+];
 
-const tools: Record<string, Tool> = {
-  identify_project: identifyProject,
-  create_action_record: createActionRecord,
-  read_crm_data: readCrmData
-};
-
-export function getAvailableTools(): Record<string, Tool> {
-  return tools;
-}
-
-export function getTool(name: string): Tool | undefined {
-  return tools[name];
-}
-
+// Get names of all available tools
 export function getToolNames(): string[] {
-  return Object.keys(tools);
+  return tools.map(tool => tool.name);
 }
 
-/**
- * Returns the complete tool definitions for all registered tools
- */
-export function getToolDefinitions(): Array<{
-  name: string;
-  description: string;
-  parameters: {
-    type: string; 
-    properties: Record<string, any>;
-    required: string[];
-  };
-}> {
-  return Object.values(tools).map(tool => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.schema
-  }));
-}
-
-/**
- * Returns the formatted tool definitions for OpenAI API
- */
-export function getFormattedToolDefinitions(): Array<{
-  type: string;
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: string; 
-      properties: Record<string, any>;
-      required: string[];
-    };
-  };
-}> {
-  return Object.values(tools).map(tool => ({
+// Filter tools by name
+export function filterTools(toolNames: string[]) {
+  const selectedTools = tools.filter(tool => 
+    toolNames.includes(tool.name)
+  );
+  
+  console.log(`Filtered ${selectedTools.length} tools from ${tools.length} available`);
+  
+  return selectedTools.map(tool => ({
     type: "function",
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.schema
+      parameters: tool.parameters
     }
   }));
 }
 
-/**
- * Filter tools based on enabled tool names
- * @param enabledTools List of enabled tool names
- * @returns Filtered list of tool definitions
- */
-export function filterTools(enabledTools: string[]): Array<{
-  type: string;
-  function: {
-    name: string;
-    description: string;
-    parameters: {
-      type: string; 
-      properties: Record<string, any>;
-      required: string[];
-    };
-  };
-}> {
-  // If no tools are specified, return no tools
-  if (!enabledTools || enabledTools.length === 0) {
-    console.log("No tools specified in filterTools, returning empty tools array");
-    return [];
-  }
+// Get full tool definitions
+export function getToolDefinitions() {
+  return tools.map(tool => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  }));
+}
 
-  // Log which tools we're looking for
-  console.log(`Filtering for tools: ${enabledTools.join(', ')}`);
-  
-  // Return only tools that are enabled and exist in our registry
-  const filtered = enabledTools
-    .filter(toolName => tools[toolName]) // Make sure the tool exists
-    .map(toolName => ({
-      type: "function",
-      function: {
-        name: tools[toolName].name,
-        description: tools[toolName].description,
-        parameters: tools[toolName].schema
-      }
-    }));
-  
-  console.log(`Found ${filtered.length} matching tools from ${enabledTools.length} requested`);
-  return filtered;
+// Get formatted tool definitions for insertion into prompts
+export function getFormattedToolDefinitions() {
+  return tools.map(tool => {
+    const params = JSON.stringify(tool.parameters, null, 2);
+    return `Tool: ${tool.name}\nDescription: ${tool.description}\nParameters: ${params}`;
+  }).join('\n\n');
 }

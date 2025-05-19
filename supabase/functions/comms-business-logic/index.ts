@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/config.ts";
@@ -16,6 +17,11 @@ import {
   processMultiProjectCommunication
 } from "./services/multiProjectProcessor.ts";
 import { processDueBatches } from "./services/batchProcessor.ts";
+import {
+  getSessionContext,
+  updateSessionHistory,
+  markCommunicationProcessed
+} from "./services/sessionHandler.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -101,7 +107,10 @@ serve(async (req) => {
         }
       );
     }
-
+    
+    // NEW: Get or create a session for this communication
+    const sessionContext = await getSessionContext(supabase, communicationId);
+    
     console.log('Communication details:', {
       id: communication.id,
       type: communication.type,
@@ -110,7 +119,8 @@ serve(async (req) => {
       participantCount: communication.participants?.length || 0,
       project_id: communication.project_id,
       is_call: communication.type === 'CALL',
-      has_recording: !!communication.recording_url
+      has_recording: !!communication.recording_url,
+      session_id: sessionContext?.sessionId || null
     });
 
     // Check if a project_id is already assigned
@@ -144,6 +154,19 @@ serve(async (req) => {
     } else {
       console.log(`Communication already has project ID: ${projectId}`);
     }
+
+    // Update session with project ID if needed
+    if (projectId && sessionContext && !sessionContext.projectId) {
+      // Update the session with the project ID
+      const { error: updateError } = await supabase
+        .from('chat_sessions')
+        .update({ project_id: projectId })
+        .eq('id', sessionContext.sessionId);
+        
+      if (updateError) {
+        console.error('Error updating session with project ID:', updateError);
+      }
+    }
     
     // Determine if this is potentially a multi-project communication
     let isMultiProjectCommunication = false;
@@ -167,6 +190,18 @@ serve(async (req) => {
       // Continue with normal processing if multi-project detection fails
     }
     
+    // NEW: Add message to conversation history if session exists
+    if (sessionContext && communication.content) {
+      const isInbound = communication.direction.toUpperCase() === 'INBOUND';
+      
+      // Add the message to the conversation history
+      await updateSessionHistory(supabase, sessionContext.sessionId, {
+        role: 'user',
+        content: communication.content,
+        timestamp: communication.timestamp || new Date().toISOString()
+      });
+    }
+    
     // If we have a project_id or this is a multi-project communication, determine if we should process this communication now or batch it
     if (projectId || isMultiProjectCommunication) {
       try {
@@ -179,14 +214,14 @@ serve(async (req) => {
             await processCommunicationForProject(supabase, communication, projectId);
           }
         }
-        // For SMS or other communication types
-        else if (communication.type === 'SMS') {
-          console.log('Processing SMS message, checking if it should be batched');
+        // For SMS or EMAIL type communications
+        else if (communication.type === 'SMS' || communication.type === 'EMAIL') {
+          console.log(`Processing ${communication.type} message, checking if it should be batched`);
           
           let shouldBatch = false;
           
           try {
-            // Check if this SMS should be batched
+            // Check if this message should be batched
             shouldBatch = projectId ? await shouldBatchMessage(supabase, communication, projectId) : false;
           } catch (batchCheckError) {
             console.error('Error checking batch status:', batchCheckError);
@@ -195,9 +230,14 @@ serve(async (req) => {
           }
           
           if (shouldBatch) {
-            console.log('Batching SMS message for later processing');
+            console.log(`Batching ${communication.type} message for later processing`);
             try {
               await markMessageForBatch(supabase, communicationId, projectId);
+              
+              // Mark communication as processed
+              if (sessionContext) {
+                await markCommunicationProcessed(supabase, communicationId, sessionContext.sessionId);
+              }
               
               return new Response(
                 JSON.stringify({ 
@@ -205,7 +245,8 @@ serve(async (req) => {
                   project_id: projectId,
                   batched: true,
                   multi_project: isMultiProjectCommunication,
-                  message: 'SMS message batched for later processing'
+                  session_id: sessionContext?.sessionId || null,
+                  message: `${communication.type} message batched for later processing`
                 }),
                 { 
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -217,7 +258,7 @@ serve(async (req) => {
             }
           } else {
             // If we shouldn't batch or the batch criteria is met, process all recent messages
-            console.log('Processing SMS now without batching');
+            console.log(`Processing ${communication.type} now without batching`);
             if (isMultiProjectCommunication) {
               await processMultiProjectMessages(supabase, projectId, communication.batch_id);
             } else {
@@ -225,8 +266,8 @@ serve(async (req) => {
             }
           }
         } else {
-          // For other communication types (not CALL or SMS)
-          console.log(`Processing non-SMS/non-CALL communication of type: ${communication.type}`);
+          // For other communication types (not CALL, SMS, or EMAIL)
+          console.log(`Processing non-standard communication of type: ${communication.type}`);
           if (isMultiProjectCommunication) {
             // Process as multi-project communication
             await processMultiProjectCommunication(supabase, communication);
@@ -246,6 +287,7 @@ serve(async (req) => {
             batched: false,
             multi_project: isMultiProjectCommunication,
             processed_batches: processedBatches,
+            session_id: sessionContext?.sessionId || null,
             error: processingError.message
           }),
           { 
@@ -255,13 +297,19 @@ serve(async (req) => {
       }
     }
 
+    // Mark communication as processed
+    if (sessionContext) {
+      await markCommunicationProcessed(supabase, communicationId, sessionContext.sessionId);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         project_id: projectId,
         batched: false,
         multi_project: isMultiProjectCommunication,
-        processed_batches: processedBatches
+        processed_batches: processedBatches,
+        session_id: sessionContext?.sessionId || null
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
