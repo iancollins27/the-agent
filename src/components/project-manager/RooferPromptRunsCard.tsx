@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PromptRun } from '../admin/types';
 import PromptRunsTable from '../admin/PromptRunsTable';
+import MultiProjectMessage from './MultiProjectMessage';
 
 interface RooferPromptRunsCardProps {
   roofer: string;
@@ -23,8 +24,9 @@ const RooferPromptRunsCard: React.FC<RooferPromptRunsCardProps> = ({
 }) => {
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex justify-between items-center">
         <CardTitle className="text-lg">{roofer}</CardTitle>
+        <MultiProjectMessage rooferName={roofer} projects={promptRuns} />
       </CardHeader>
       <CardContent>
         <PromptRunsTable 
