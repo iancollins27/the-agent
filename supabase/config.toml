@@ -16,3 +16,8 @@ verify_jwt = true
 [functions.email-webhook]
 verify_jwt = false
 
+[functions.generate-multi-project-message]
+verify_jwt = true
+
+[functions.send-multi-project-message]
+verify_jwt = true
