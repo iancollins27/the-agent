@@ -19,17 +19,38 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Parse form data from Twilio (they send application/x-www-form-urlencoded)
+    // Parse request body based on content type
     let requestBody = {};
+    const contentType = req.headers.get('content-type') || '';
     
-    if (req.headers.get('content-type')?.includes('application/json')) {
-      requestBody = await req.json();
-    } else {
-      // Handle form-urlencoded data
-      const formData = await req.formData();
-      for (const [key, value] of formData.entries()) {
-        requestBody[key] = value;
+    try {
+      if (contentType.includes('application/json')) {
+        // Parse as JSON
+        requestBody = await req.json();
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
+        // Parse as form data
+        const formData = await req.formData();
+        for (const [key, value] of formData.entries()) {
+          requestBody[key] = value;
+        }
+      } else {
+        // Handle text or missing content type
+        const text = await req.text();
+        
+        // Try to parse as URL encoded params
+        try {
+          const params = new URLSearchParams(text);
+          for (const [key, value] of params.entries()) {
+            requestBody[key] = value;
+          }
+        } catch (parseError) {
+          console.error('Error parsing request as URL params:', parseError);
+          // If URL parsing fails, leave as empty object
+        }
       }
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      // Continue with empty object if parsing fails
     }
     
     console.log('Received Twilio webhook:', JSON.stringify(requestBody, null, 2));
