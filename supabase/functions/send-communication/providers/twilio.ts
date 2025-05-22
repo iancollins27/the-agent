@@ -23,15 +23,19 @@ export async function sendViaTwilio(
     let fromPhone;
     if (sender && sender.phone) {
       fromPhone = sender.phone.startsWith('+') ? sender.phone : `+${sender.phone}`;
+      console.log(`Using sender phone number: ${fromPhone}`);
     } else if (providerInfo.justcall_number) {
       // Use justcall_number as a fallback if no sender but we have one stored
       fromPhone = providerInfo.justcall_number;
+      console.log(`Using justcall_number as fallback: ${fromPhone}`);
     } else {
+      console.error('No sender phone number or fallback number available');
       throw new Error('No sender phone number available');
     }
     
     // Prepare authorization for Twilio API
     const auth = btoa(`${providerInfo.api_key}:${providerInfo.api_secret}`);
+    console.log(`Using Twilio API credentials: key starting with ${providerInfo.api_key.substring(0, 4)}...`);
 
     // Prepare the request body
     const formData = new URLSearchParams();
@@ -54,6 +58,7 @@ export async function sendViaTwilio(
     console.log(`Making Twilio API request to: ${twilioEndpoint}`);
     console.log(`From: ${fromPhone}, To: ${toPhone}`);
     console.log(`Message length: ${message.length} characters`);
+    console.log(`Message preview: ${message.substring(0, 50)}...`);
     
     const response = await fetch(twilioEndpoint, {
       method: 'POST',
@@ -64,13 +69,22 @@ export async function sendViaTwilio(
       body: formData
     });
     
-    // Parse the response
-    const responseData = await response.json();
+    // Get the raw response text before trying to parse JSON
+    const responseText = await response.text();
+    let responseData;
+    
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error(`Error parsing Twilio response: ${parseError.message}`);
+      console.error(`Raw response: ${responseText}`);
+      throw new Error(`Twilio API response parsing error: ${parseError.message}`);
+    }
     
     // Check if the request was successful
     if (!response.ok) {
       console.error('Twilio API error:', responseData);
-      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || 'Unknown error'}`);
+      throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || responseData.code || 'Unknown error'}`);
     }
     
     console.log('Successfully sent message via Twilio:', {

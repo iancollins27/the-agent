@@ -25,3 +25,4 @@ enabled = true
 [functions]
 [functions.comms-webhook-twilio]
 verify_jwt = false
+

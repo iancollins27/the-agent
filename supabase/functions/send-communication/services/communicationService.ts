@@ -15,6 +15,14 @@ export async function sendCommunication(
   try {
     console.log(`Using normalized provider name: "${providerInfo.provider_name.toLowerCase()}" (original: "${providerInfo.provider_name}")`);
     console.log(`Sending ${channel} via ${providerInfo.provider_name} to ${recipient.phone || recipient.email}`);
+    console.log(`Communication ID: ${commId}`);
+    
+    // Log sender information
+    if (sender) {
+      console.log(`Sender details: ${sender.phone ? `phone=${sender.phone}` : ''} ${sender.email ? `email=${sender.email}` : ''}`);
+    } else {
+      console.log(`No sender details provided, using provider defaults`);
+    }
 
     // Determine which provider to use
     const providerName = providerInfo.provider_name.toLowerCase();
@@ -23,24 +31,36 @@ export async function sendCommunication(
     
     switch (providerName) {
       case 'justcall':
+        console.log(`Using JustCall provider`);
         result = await sendViaJustCall(providerInfo, channel, message, recipient, sender);
         break;
         
       case 'twilio':
+        console.log(`Using Twilio provider`);
         result = await sendViaTwilio(providerInfo, channel, message, recipient, sender);
         break;
         
       case 'sendgrid':
       case 'email':
+        console.log(`Email provider requested but not supported`);
         throw new Error('Email communications are not currently supported');
         
       default:
+        console.error(`Unknown provider: ${providerInfo.provider_name}`);
         throw new Error(`Unsupported communication provider: ${providerInfo.provider_name}`);
     }
+    
+    console.log(`Communication sent successfully via ${providerName}`, {
+      status: result.status,
+      provider_message_id: result.provider_message_id
+    });
     
     return result;
   } catch (error) {
     console.error(`Error sending communication: ${error.message}`);
+    // Add more error details
+    console.error(`Error stack: ${error.stack || 'No stack trace available'}`);
+    console.error(`Provider: ${providerInfo.provider_name}, Channel: ${channel}`);
     throw error;
   }
 }

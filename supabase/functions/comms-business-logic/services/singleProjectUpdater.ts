@@ -1,7 +1,5 @@
 
 import { formatCommunicationData } from "../utils/communicationFormatter.ts";
-import { getAIConfiguration } from "./aiService.ts";
-import { getLatestWorkflowPrompt } from "./workflowPromptService.ts";
 
 /**
  * Update project with AI using the provided context data
@@ -41,124 +39,66 @@ export async function updateProjectWithAI(supabase: any, projectId: string, cont
       return;
     }
     
-    // Get latest workflow prompt for summary_update
-    const summaryPrompt = await getLatestWorkflowPrompt(supabase, 'summary_update');
-    if (!summaryPrompt) {
-      console.error('Failed to retrieve summary workflow prompt');
-      return;
-    }
-    
-    // Get AI configuration
-    const { provider: aiProvider, model: aiModel } = await getAIConfiguration(supabase);
-    
     // Format the communication data into a string for better readability in prompts
     const formattedCommunicationData = formatCommunicationData(contextData);
     
-    // Call the AI to update the summary
-    console.log('Calling test-workflow-prompt for summary update');
-    const summaryContext = {
-      summary: project.summary || '',
-      track_name: project.project_tracks?.name || 'Default Track',
-      current_date: new Date().toISOString().split('T')[0],
-      new_data: formattedCommunicationData
-    };
+    // Using agent-chat instead of test-workflow-prompt
+    console.log('Calling agent-chat to process communication');
     
-    // Log the actual inputs to the prompt
-    console.log('Summary update context data:', {
-      summary_length: (summaryContext.summary || '').length > 50 
-        ? `${summaryContext.summary.substring(0, 50)}...` 
-        : summaryContext.summary,
-      track_name: summaryContext.track_name,
-      current_date: summaryContext.current_date,
-      communication_type: contextData.communication_type,
-      prompt_id: summaryPrompt.id
+    // Prepare system prompt that includes project context
+    const systemPrompt = `You are an AI assistant helping with project ${projectId}. 
+This is a ${project.project_tracks?.name || 'Default Track'} project.
+Current summary: ${project.summary || 'No summary available'}
+Next step: ${project.next_step || 'No next step defined'}
+Address: ${project.Address || 'No address available'}
+
+You have received a new communication. Please analyze it and update the project accordingly.`;
+
+    // Prepare the user message with the new communication data
+    const userMessage = `New communication: ${formattedCommunicationData}
+
+Please analyze this communication and:
+1. Update the project summary with any new relevant information
+2. Determine appropriate next steps
+3. Take any actions needed based on this communication`;
+
+    // Call agent-chat with messages format
+    const { data: agentChatResult, error: agentChatError } = await supabase.functions.invoke(
+      'agent-chat',
+      {
+        body: {
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ],
+          projectId: projectId,
+          projectData: {
+            id: projectId,
+            summary: project.summary || '',
+            next_step: project.next_step || '',
+            track_name: project.project_tracks?.name || 'Default Track',
+            track_roles: project.project_tracks?.Roles || '',
+            track_base_prompt: project.project_tracks?.["track base prompt"] || '',
+            property_address: project.Address || '',
+            current_date: new Date().toISOString().split('T')[0]
+          },
+          availableTools: ['create-action-record', 'data-fetch', 'read-crm-data', 'identify-project']
+        }
+      }
+    );
+    
+    if (agentChatError) {
+      console.error('Error calling agent-chat:', agentChatError);
+      return;
+    }
+    
+    // Log the agent-chat result
+    console.log('agent-chat processing complete:', {
+      success: !!agentChatResult,
+      response_length: agentChatResult?.choices?.[0]?.message?.content?.length || 0
     });
     
-    const { data: summaryResult, error: summaryWorkflowError } = await supabase.functions.invoke(
-      'test-workflow-prompt',
-      {
-        body: {
-          promptType: 'summary_update',
-          promptText: summaryPrompt.prompt_text,
-          projectId: projectId,
-          contextData: summaryContext,
-          aiProvider: aiProvider,
-          aiModel: aiModel,
-          workflowPromptId: summaryPrompt.id,
-          initiatedBy: 'communications-webhook'
-        }
-      }
-    );
-    
-    if (summaryWorkflowError) {
-      console.error('Error calling summary workflow prompt:', summaryWorkflowError);
-      return;
-    }
-    
-    console.log('Project summary updated successfully');
-    
-    // Now run action detection and execution
-    const actionPrompt = await getLatestWorkflowPrompt(supabase, 'action_detection_execution');
-    if (!actionPrompt) {
-      console.error('Failed to retrieve action workflow prompt');
-      return;
-    }
-    
-    // Get updated project data with the new summary
-    const { data: updatedProject, error: updatedProjectError } = await supabase
-      .from('projects')
-      .select(`
-        id, 
-        summary, 
-        next_step, 
-        project_track,
-        Address,
-        project_tracks(name, Roles, "track base prompt")
-      `)
-      .eq('id', projectId)
-      .single();
-      
-    if (updatedProjectError) {
-      console.error('Error fetching updated project:', updatedProjectError);
-      return;
-    }
-    
-    // Call the AI to detect and execute actions
-    console.log('Calling test-workflow-prompt for action detection and execution');
-    const actionContext = {
-      summary: updatedProject.summary || '',
-      track_name: updatedProject.project_tracks?.name || 'Default Track',
-      track_roles: updatedProject.project_tracks?.Roles || '',
-      track_base_prompt: updatedProject.project_tracks?.["track base prompt"] || '',
-      current_date: new Date().toISOString().split('T')[0],
-      next_step: updatedProject.next_step || '',
-      new_data: formattedCommunicationData,
-      is_reminder_check: false,
-      property_address: updatedProject.Address || ''
-    };
-    
-    const { data: actionResult, error: actionWorkflowError } = await supabase.functions.invoke(
-      'test-workflow-prompt',
-      {
-        body: {
-          promptType: 'action_detection_execution',
-          promptText: actionPrompt.prompt_text,
-          projectId: projectId,
-          contextData: actionContext,
-          aiProvider: aiProvider,
-          aiModel: aiModel,
-          workflowPromptId: actionPrompt.id,
-          initiatedBy: 'communications-webhook'
-        }
-      }
-    );
-    
-    if (actionWorkflowError) {
-      console.error('Error calling action workflow prompt:', actionWorkflowError);
-      return;
-    }
-    
-    console.log('Project action detection and execution completed successfully');
+    console.log('Project updated successfully using agent-chat');
   } catch (error) {
     console.error('Error updating project with AI:', error);
   }
