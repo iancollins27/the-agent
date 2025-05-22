@@ -122,8 +122,8 @@ async function processMessage(
   // Step 4: Add the assistant's response to session history
   await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
   
-  // Step 5: Send the response back via the appropriate channel
-  await sendResponseViaChannel(session.id, assistantMessage);
+  // Step 5: Send the response directly via send-channel-message function
+  await sendDirectChannelResponse(session.id, assistantMessage);
 }
 
 /**
@@ -215,7 +215,7 @@ async function processMessageWithAgent(
             content: userMessage 
           }
         ],
-        availableTools: ['session_manager', 'channel_response', 'identify_project', 'data_fetch'],
+        availableTools: ['session_manager', 'identify_project', 'data_fetch'],
         customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
 Message: ${userMessage}`
@@ -237,36 +237,33 @@ Message: ${userMessage}`
 }
 
 /**
- * Send the AI response back to the user via the channel_response tool
+ * Send the AI response back to the user via the direct channel_response 
+ * Instead of using agent-chat to invoke channel_response tool, we call send-channel-message directly
  */
-async function sendResponseViaChannel(sessionId: string, assistantMessage: string): Promise<void> {
+async function sendDirectChannelResponse(sessionId: string, assistantMessage: string): Promise<void> {
   try {
-    const channelResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
+    const channelResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-channel-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
       },
       body: JSON.stringify({
-        messages: [
-          { 
-            role: 'system', 
-            content: `You're a tool executor. Use the channel_response tool to send this message: "${assistantMessage}"` 
-          },
-          { 
-            role: 'user', 
-            content: `Send this message to session ${sessionId}: ${assistantMessage}` 
-          }
-        ],
-        availableTools: ['channel_response'],
+        session_id: sessionId,
+        message: assistantMessage
       })
     });
     
     if (!channelResponse.ok) {
-      console.error('Error using channel_response tool:', await channelResponse.text());
+      const errorText = await channelResponse.text();
+      console.error('Error sending channel message:', errorText);
+      throw new Error(`Failed to send message: ${channelResponse.status}`);
     }
+    
+    const result = await channelResponse.json();
+    console.log(`Message sent successfully via ${result.channel_type}`, result);
   } catch (error) {
-    console.error('Error in sendResponseViaChannel:', error);
+    console.error('Error in sendDirectChannelResponse:', error);
     // Log but don't throw - this is the last step and we don't want to break the flow
   }
 }
