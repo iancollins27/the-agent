@@ -1,4 +1,3 @@
-
 /**
  * Create action record tool for agent-chat
  */
@@ -325,8 +324,8 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
   }
 }
 
-// Export the tool definition
-export const createActionRecord: Tool = {
+// Export the tool definition with the renamed export
+export const createActionRecordTool: Tool = {
   name: "create_action_record",
   description: "Creates an action record based on your analysis. Use this when you determine an action is needed (message, data update, or set a reminder).",
   schema: createActionRecordSchema,

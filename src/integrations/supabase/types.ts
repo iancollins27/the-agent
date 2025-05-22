@@ -152,6 +152,51 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_sessions: {
+        Row: {
+          active: boolean | null
+          channel_identifier: string
+          channel_type: string
+          company_id: string
+          contact_id: string | null
+          conversation_history: Json[] | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          last_activity: string | null
+          memory_mode: string | null
+          project_id: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          channel_identifier: string
+          channel_type: string
+          company_id: string
+          contact_id?: string | null
+          conversation_history?: Json[] | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          last_activity?: string | null
+          memory_mode?: string | null
+          project_id?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          channel_identifier?: string
+          channel_type?: string
+          company_id?: string
+          contact_id?: string | null
+          conversation_history?: Json[] | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          last_activity?: string | null
+          memory_mode?: string | null
+          project_id?: string | null
+        }
+        Relationships: []
+      }
       chatbot_config: {
         Row: {
           available_tools: string[] | null
