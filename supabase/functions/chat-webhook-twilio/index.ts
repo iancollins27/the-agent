@@ -215,7 +215,7 @@ async function processMessageWithAgent(
             content: userMessage 
           }
         ],
-        availableTools: ['session_manager', 'identify_project', 'data_fetch'],
+        availableTools: ['session_manager', 'identify_project', 'data_fetch', 'channel_response'],
         customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
 Message: ${userMessage}`
