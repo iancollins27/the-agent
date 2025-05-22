@@ -34,7 +34,7 @@ export function filterTools(toolNames: string[]) {
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters
+      parameters: tool.schema // Map schema to parameters for OpenAI API
     }
   }));
 }
@@ -46,7 +46,7 @@ export function getToolDefinitions() {
     function: {
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters
+      parameters: tool.schema // Map schema to parameters for OpenAI API
     }
   }));
 }
@@ -54,7 +54,7 @@ export function getToolDefinitions() {
 // Get formatted tool definitions for insertion into prompts
 export function getFormattedToolDefinitions() {
   return tools.map(tool => {
-    const params = JSON.stringify(tool.parameters, null, 2);
+    const params = JSON.stringify(tool.schema, null, 2);
     return `Tool: ${tool.name}\nDescription: ${tool.description}\nParameters: ${params}`;
   }).join('\n\n');
 }
