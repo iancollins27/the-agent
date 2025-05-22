@@ -27,7 +27,7 @@ export async function sendCommunication(
         break;
         
       case 'twilio':
-        result = await sendViaTwilio(providerInfo, channel, message, recipient);
+        result = await sendViaTwilio(providerInfo, channel, message, recipient, sender);
         break;
         
       case 'sendgrid':

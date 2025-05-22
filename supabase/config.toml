@@ -1,23 +1,27 @@
 
 project_id = "lvifsxsrbluehopamqpy"
 
-[functions.email-summary]
-verify_jwt = true
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
 
-[functions.test-workflow-prompt]
-verify_jwt = true
+[db]
+port = 54320
 
-[functions.chat-session-manager]
-verify_jwt = true
+[studio]
+port = 54323
 
-[functions.send-channel-message]
-verify_jwt = true
+[inbucket]
+port = 54324
 
-[functions.email-webhook]
+[auth]
+enabled = true
+port = 54322
+
+[storage]
+enabled = true
+
+[functions]
+[functions.comms-webhook-twilio]
 verify_jwt = false
-
-[functions.generate-multi-project-message]
-verify_jwt = true
-
-[functions.send-multi-project-message]
-verify_jwt = true
