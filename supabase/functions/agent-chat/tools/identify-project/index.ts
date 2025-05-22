@@ -1,10 +1,11 @@
+
 /**
  * Tool to identify a project based on provided information
  */
 
 import { Tool, ToolResult } from '../types.ts';
 
-export const identifyProject: Tool = {
+export const identifyProjectTool: Tool = {
   name: "identify_project",
   description: "Identifies a project based on provided information like ID, name, or address. Use this when the user mentions a specific project or address.",
   schema: {

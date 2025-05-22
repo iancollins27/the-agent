@@ -1,4 +1,3 @@
-
 /**
  * Read CRM Data Tool
  * 
@@ -673,7 +672,7 @@ class ZohoConnector {
   }
 }
 
-export const readCrmData = {
+export const readCrmDataTool = {
   name: "read_crm_data",
   description: "Retrieves comprehensive data from the CRM system for a project including details, notes, tasks, and contacts",
   schema: {

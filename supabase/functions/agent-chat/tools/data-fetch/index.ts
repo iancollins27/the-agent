@@ -5,7 +5,7 @@
 
 import { Tool, ToolResult } from '../types.ts';
 
-export const dataFetch: Tool = {
+export const dataFetchTool: Tool = {
   name: "data_fetch",
   description: "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes. Use this to get a complete view of a project's current state.",
   schema: {

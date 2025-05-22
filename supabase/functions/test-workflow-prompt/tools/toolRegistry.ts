@@ -4,16 +4,16 @@
  */
 
 import { Tool } from './types.ts';
-import { createActionRecord } from './create-action-record/index.ts';
+import { createActionRecordTool } from './create-action-record/index.ts';
 import { knowledgeBaseLookup } from './knowledge-base-lookup/index.ts';
-import { readCrmData } from './read-crm-data/index.ts';
+import { readCrmDataTool } from './read-crm-data/index.ts';
 import { crmDataWrite } from './crm-data-write/index.ts';
 import { emailSummaryTool } from './email-summary/index.ts';
 
 const tools: Record<string, Tool> = {
-  create_action_record: createActionRecord,
+  create_action_record: createActionRecordTool,
   knowledge_base_lookup: knowledgeBaseLookup,
-  read_crm_data: readCrmData,
+  read_crm_data: readCrmDataTool,
   crm_data_write: crmDataWrite,
   email_summary: emailSummaryTool
   // Additional tools can be registered here
