@@ -49,7 +49,9 @@ ${contextData.available_tools}`;
     
 When using the session_manager tool, you can manage chat sessions across different channels (web, SMS, email).
     
-When using the channel_response tool, you can send responses to users through their preferred channel, maintaining the conversation across sessions.`;
+When using the channel_response tool, you can send responses to users through their preferred channel, maintaining the conversation across sessions. The channel_response tool requires:
+- session_id: The ID of the session to send a response to
+- message: The content of the message to send`;
   }
 
   return prompt;

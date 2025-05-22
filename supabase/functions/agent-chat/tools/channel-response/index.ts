@@ -8,7 +8,7 @@ import { supabase } from "../../supabase.ts";
 export const channelResponseTool = {
   name: 'channel_response',
   description: 'Send responses to users via their preferred channel (web, SMS, email)',
-  parameters: {
+  schema: {
     type: 'object',
     properties: {
       session_id: {
