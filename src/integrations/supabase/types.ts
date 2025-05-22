@@ -1132,6 +1132,17 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      find_or_create_chat_session: {
+        Args: {
+          p_channel_type: string
+          p_channel_identifier: string
+          p_company_id: string
+          p_contact_id?: string
+          p_project_id?: string
+          p_memory_mode?: string
+        }
+        Returns: string
+      }
       get_column_info: {
         Args: { table_name: string; column_name: string }
         Returns: {
@@ -1289,6 +1300,10 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      update_session_history: {
+        Args: { p_session_id: string; p_role: string; p_content: string }
+        Returns: boolean
       }
       user_belongs_to_company: {
         Args: { company_id: string }

@@ -2,21 +2,74 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
+// CORS headers for all responses
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Types for better code organization
+interface TwilioMessage {
+  From: string;
+  Body: string;
+  To: string;
+  [key: string]: any;
+}
+
+interface ChatSession {
+  id: string;
+  [key: string]: any;
+}
+
 /**
- * Parse incoming request body based on content type
+ * Process an incoming Twilio webhook request
  */
-async function parseRequestBody(req: Request): Promise<Record<string, any>> {
+async function handleTwilioWebhook(req: Request): Promise<Response> {
+  try {
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Parse the incoming message
+    const message = await parseRequestBody(req);
+    console.log('Received Twilio chat webhook:', JSON.stringify(message, null, 2));
+
+    // Validate required fields
+    if (!message.From || !message.Body) {
+      throw new Error('Missing required fields: From and/or Body');
+    }
+
+    // Process the message through the conversation flow
+    await processMessage(supabase, message);
+
+    // Return TwiML response (empty response as we're handling async)
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+      { headers: { ...corsHeaders, 'Content-Type': 'application/xml' } }
+    );
+  } catch (error) {
+    console.error('Error processing chat webhook:', error);
+    
+    // Return error response
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
+  }
+}
+
+/**
+ * Parse the incoming request body based on content type
+ */
+async function parseRequestBody(req: Request): Promise<TwilioMessage> {
   const contentType = req.headers.get('content-type') || '';
-  let requestBody: Record<string, any> = {};
+  const requestBody: Record<string, any> = {};
   
   try {
     if (contentType.includes('application/json')) {
-      requestBody = await req.json();
+      Object.assign(requestBody, await req.json());
     } else if (contentType.includes('application/x-www-form-urlencoded')) {
       const formData = await req.formData();
       for (const [key, value] of formData.entries()) {
@@ -38,42 +91,77 @@ async function parseRequestBody(req: Request): Promise<Record<string, any>> {
     }
   } catch (parseError) {
     console.error('Error parsing request body:', parseError);
+    throw new Error(`Failed to parse request: ${parseError.message}`);
   }
   
-  return requestBody;
+  return requestBody as TwilioMessage;
 }
 
 /**
- * Create or retrieve a chat session
+ * Main message processing workflow
+ */
+async function processMessage(
+  supabase: ReturnType<typeof createClient>, 
+  message: TwilioMessage
+): Promise<void> {
+  const { From: from, Body: body } = message;
+  
+  // Default company ID - in production, you'd determine this based on the Twilio number or other context
+  const companyId = '00000000-0000-0000-0000-000000000000';
+
+  // Step 1: Get or create chat session
+  const session = await getOrCreateChatSession(from, body, companyId);
+  
+  // Step 2: Add the user's message to session history
+  await addMessageToSessionHistory(supabase, session.id, 'user', body);
+  
+  // Step 3: Process the message with AI agent
+  const assistantMessage = await processMessageWithAgent(session.id, body);
+  console.log(`Agent response: ${assistantMessage}`);
+  
+  // Step 4: Add the assistant's response to session history
+  await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
+  
+  // Step 5: Send the response back via the appropriate channel
+  await sendResponseViaChannel(session.id, assistantMessage);
+}
+
+/**
+ * Get or create a chat session
  */
 async function getOrCreateChatSession(
   from: string,
   body: string,
   companyId: string = '00000000-0000-0000-0000-000000000000'
-): Promise<{ id: string }> {
-  const sessionResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-session-manager`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
-    },
-    body: JSON.stringify({
-      channel_type: 'sms',
-      channel_identifier: from,
-      company_id: companyId,
-      message_content: body
-    })
-  });
-  
-  if (!sessionResponse.ok) {
-    const errorText = await sessionResponse.text();
-    console.error('Error creating session:', errorText);
-    throw new Error('Failed to create chat session');
+): Promise<ChatSession> {
+  try {
+    const sessionResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-session-manager`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
+      },
+      body: JSON.stringify({
+        channel_type: 'sms',
+        channel_identifier: from,
+        company_id: companyId,
+        message_content: body
+      })
+    });
+    
+    if (!sessionResponse.ok) {
+      const errorText = await sessionResponse.text();
+      console.error('Error creating session:', errorText);
+      throw new Error('Failed to create chat session');
+    }
+    
+    const sessionData = await sessionResponse.json();
+    console.log(`Chat session retrieved/created with ID: ${sessionData.session.id}`);
+    return sessionData.session;
+  } catch (error) {
+    console.error('Error in getOrCreateChatSession:', error);
+    throw error; // Re-throw to be handled by the main error handler
   }
-  
-  const sessionData = await sessionResponse.json();
-  console.log(`Chat session retrieved/created with ID: ${sessionData.session.id}`);
-  return sessionData.session;
 }
 
 /**
@@ -85,14 +173,19 @@ async function addMessageToSessionHistory(
   role: 'user' | 'assistant', 
   content: string
 ): Promise<void> {
-  const { error } = await supabase.rpc('update_session_history', {
-    p_session_id: sessionId, 
-    p_role: role, 
-    p_content: content
-  });
-  
-  if (error) {
-    console.error('Error updating session history:', error);
+  try {
+    const { error } = await supabase.rpc('update_session_history', {
+      p_session_id: sessionId, 
+      p_role: role, 
+      p_content: content
+    });
+    
+    if (error) {
+      console.error('Error updating session history:', error);
+      // Log error but continue processing - we don't want to break the flow
+    }
+  } catch (error) {
+    console.error('Exception in addMessageToSessionHistory:', error);
     // Continue despite error - we want to process the message anyway
   }
 }
@@ -104,130 +197,86 @@ async function processMessageWithAgent(
   sessionId: string,
   userMessage: string
 ): Promise<string> {
-  const agentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
-    },
-    body: JSON.stringify({
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are a helpful assistant responding to text messages. Be concise and helpful.' 
-        },
-        { 
-          role: 'user', 
-          content: userMessage 
-        }
-      ],
-      availableTools: ['session_manager', 'channel_response', 'identify_project', 'data_fetch'],
-      customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
+  try {
+    const agentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a helpful assistant responding to text messages. Be concise and helpful.' 
+          },
+          { 
+            role: 'user', 
+            content: userMessage 
+          }
+        ],
+        availableTools: ['session_manager', 'channel_response', 'identify_project', 'data_fetch'],
+        customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
 Message: ${userMessage}`
-    })
-  });
-  
-  if (!agentResponse.ok) {
-    const errorText = await agentResponse.text();
-    console.error('Error calling agent-chat:', errorText);
-    throw new Error('Failed to process message with agent-chat');
+      })
+    });
+    
+    if (!agentResponse.ok) {
+      const errorText = await agentResponse.text();
+      console.error('Error calling agent-chat:', errorText);
+      throw new Error('Failed to process message with agent-chat');
+    }
+    
+    const agentData = await agentResponse.json();
+    return agentData.choices[0].message.content;
+  } catch (error) {
+    console.error('Error in processMessageWithAgent:', error);
+    return "I'm sorry, I encountered an error processing your message. Please try again later.";
   }
-  
-  const agentData = await agentResponse.json();
-  return agentData.choices[0].message.content;
 }
 
 /**
  * Send the AI response back to the user via the channel_response tool
  */
 async function sendResponseViaChannel(sessionId: string, assistantMessage: string): Promise<void> {
-  const channelResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
-    },
-    body: JSON.stringify({
-      messages: [
-        { 
-          role: 'system', 
-          content: `You're a tool executor. Use the channel_response tool to send this message: "${assistantMessage}"` 
-        },
-        { 
-          role: 'user', 
-          content: `Send this message to session ${sessionId}: ${assistantMessage}` 
-        }
-      ],
-      availableTools: ['channel_response'],
-    })
-  });
-  
-  if (!channelResponse.ok) {
-    console.error('Error using channel_response tool:', await channelResponse.text());
+  try {
+    const channelResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { 
+            role: 'system', 
+            content: `You're a tool executor. Use the channel_response tool to send this message: "${assistantMessage}"` 
+          },
+          { 
+            role: 'user', 
+            content: `Send this message to session ${sessionId}: ${assistantMessage}` 
+          }
+        ],
+        availableTools: ['channel_response'],
+      })
+    });
+    
+    if (!channelResponse.ok) {
+      console.error('Error using channel_response tool:', await channelResponse.text());
+    }
+  } catch (error) {
+    console.error('Error in sendResponseViaChannel:', error);
+    // Log but don't throw - this is the last step and we don't want to break the flow
   }
 }
 
+// Main entry point
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Parse request body
-    const requestBody = await parseRequestBody(req);
-    console.log('Received Twilio chat webhook:', JSON.stringify(requestBody, null, 2));
-
-    // Extract message information
-    const from = requestBody.From; // The sender's phone number
-    const body = requestBody.Body;  // The message content
-    const to = requestBody.To;     // The Twilio phone number that received the message
-
-    if (!from || !body) {
-      throw new Error('Missing required fields: From and/or Body');
-    }
-
-    // Get or create a chat session
-    const session = await getOrCreateChatSession(from, body);
-    
-    // Add the user's message to the session history
-    await addMessageToSessionHistory(supabase, session.id, 'user', body);
-    
-    // Process the message with agent-chat
-    const assistantMessage = await processMessageWithAgent(session.id, body);
-    console.log(`Agent response: ${assistantMessage}`);
-    
-    // Add the assistant's message to the session history
-    await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
-    
-    // Send the response back via the channel_response tool
-    await sendResponseViaChannel(session.id, assistantMessage);
-
-    // Respond to Twilio with TwiML
-    return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/xml' 
-        } 
-      }
-    );
-  } catch (error) {
-    console.error('Error processing chat webhook:', error);
-    
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
-    );
-  }
+  return handleTwilioWebhook(req);
 });
