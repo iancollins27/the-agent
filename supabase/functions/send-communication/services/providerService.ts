@@ -30,6 +30,24 @@ export async function getProviderInfo(
     providerInfo = await getDefaultProvider(supabase, companyId, channel, actionId, sourceIp);
   }
 
+  // If still no provider found, check for system-level default Twilio configuration
+  if (!providerInfo && channel?.toLowerCase() === 'sms') {
+    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+    
+    if (twilioAccountSid && twilioAuthToken) {
+      console.log('Using system-level default Twilio configuration');
+      providerInfo = {
+        provider_name: 'twilio',
+        api_key: twilioAccountSid,
+        api_secret: twilioAuthToken,
+        account_id: twilioAccountSid,
+        justcall_number: twilioPhoneNumber
+      };
+    }
+  }
+
   // If still no provider found, use mock provider
   if (!providerInfo) {
     console.log('No provider found, using mock provider for testing');

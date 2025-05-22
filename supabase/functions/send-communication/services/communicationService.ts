@@ -45,6 +45,17 @@ export async function sendCommunication(
         console.log(`Email provider requested but not supported`);
         throw new Error('Email communications are not currently supported');
         
+      case 'mock':
+        // Handle mock provider for testing
+        console.log(`Using mock provider for testing`);
+        result = {
+          provider: 'mock',
+          status: 'test',
+          provider_message_id: `mock-${Date.now()}`,
+          provider_response: { mock: true, message: 'This is a test message response' }
+        };
+        break;
+        
       default:
         console.error(`Unknown provider: ${providerInfo.provider_name}`);
         throw new Error(`Unsupported communication provider: ${providerInfo.provider_name}`);

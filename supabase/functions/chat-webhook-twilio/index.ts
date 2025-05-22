@@ -2,24 +2,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-// CORS headers for all responses
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Types for better code organization
-interface TwilioMessage {
-  From: string;
-  Body: string;
-  To: string;
-  [key: string]: any;
-}
-
-interface ChatSession {
-  id: string;
-  [key: string]: any;
-}
 
 /**
  * Process an incoming Twilio webhook request
@@ -63,7 +49,7 @@ async function handleTwilioWebhook(req: Request): Promise<Response> {
 /**
  * Parse the incoming request body based on content type
  */
-async function parseRequestBody(req: Request): Promise<TwilioMessage> {
+async function parseRequestBody(req: Request): Promise<Record<string, any>> {
   const contentType = req.headers.get('content-type') || '';
   const requestBody: Record<string, any> = {};
   
@@ -94,7 +80,7 @@ async function parseRequestBody(req: Request): Promise<TwilioMessage> {
     throw new Error(`Failed to parse request: ${parseError.message}`);
   }
   
-  return requestBody as TwilioMessage;
+  return requestBody;
 }
 
 /**
@@ -102,7 +88,7 @@ async function parseRequestBody(req: Request): Promise<TwilioMessage> {
  */
 async function processMessage(
   supabase: ReturnType<typeof createClient>, 
-  message: TwilioMessage
+  message: Record<string, any>
 ): Promise<void> {
   const { From: from, Body: body } = message;
   
@@ -110,30 +96,31 @@ async function processMessage(
   const companyId = '00000000-0000-0000-0000-000000000000';
 
   // Step 1: Get or create chat session
-  const session = await getOrCreateChatSession(from, body, companyId);
+  const session = await getOrCreateChatSession(supabase, from, body, companyId);
   
   // Step 2: Add the user's message to session history
   await addMessageToSessionHistory(supabase, session.id, 'user', body);
   
   // Step 3: Process the message with AI agent
-  const assistantMessage = await processMessageWithAgent(session.id, body);
+  const assistantMessage = await processMessageWithAgent(supabase, session.id, body);
   console.log(`Agent response: ${assistantMessage}`);
   
   // Step 4: Add the assistant's response to session history
   await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
   
   // Step 5: Send the response directly via send-channel-message function
-  await sendDirectChannelResponse(session.id, assistantMessage);
+  await sendDirectChannelResponse(supabase, session.id, assistantMessage);
 }
 
 /**
  * Get or create a chat session
  */
 async function getOrCreateChatSession(
+  supabase: ReturnType<typeof createClient>,
   from: string,
   body: string,
   companyId: string = '00000000-0000-0000-0000-000000000000'
-): Promise<ChatSession> {
+): Promise<any> {
   try {
     const sessionResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-session-manager`, {
       method: 'POST',
@@ -194,6 +181,7 @@ async function addMessageToSessionHistory(
  * Process user message with the AI agent
  */
 async function processMessageWithAgent(
+  supabase: ReturnType<typeof createClient>,
   sessionId: string,
   userMessage: string
 ): Promise<string> {
@@ -215,7 +203,7 @@ async function processMessageWithAgent(
             content: userMessage 
           }
         ],
-        availableTools: ['session_manager', 'identify_project', 'data_fetch'],
+        availableTools: ['session_manager', 'identify_project', 'data_fetch', 'channel_response'],
         customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
 Message: ${userMessage}`
@@ -240,7 +228,11 @@ Message: ${userMessage}`
  * Send the AI response back to the user via the direct channel_response 
  * Instead of using agent-chat to invoke channel_response tool, we call send-channel-message directly
  */
-async function sendDirectChannelResponse(sessionId: string, assistantMessage: string): Promise<void> {
+async function sendDirectChannelResponse(
+  supabase: ReturnType<typeof createClient>,
+  sessionId: string, 
+  assistantMessage: string
+): Promise<void> {
   try {
     const channelResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-channel-message`, {
       method: 'POST',
