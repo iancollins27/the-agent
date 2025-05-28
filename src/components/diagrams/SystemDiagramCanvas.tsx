@@ -34,8 +34,8 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
     myDiagram.nodeTemplate = $(go.Node, 'Auto',
       {
         selectionAdorned: true,
-        click: (e, node) => {
-          if (onNodeClick) {
+        click: (e: go.InputEvent, node: go.GraphObject) => {
+          if (onNodeClick && node instanceof go.Node) {
             onNodeClick(node.data);
           }
         }
