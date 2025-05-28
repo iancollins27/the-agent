@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -101,14 +100,17 @@ async function processMessage(
   // Step 2: Add the user's message to session history
   await addMessageToSessionHistory(supabase, session.id, 'user', body);
   
-  // Step 3: Process the message with AI agent
-  const assistantMessage = await processMessageWithAgent(supabase, session.id, body);
+  // Step 3: Get the full conversation history for context
+  const conversationHistory = await getConversationHistory(supabase, session.id);
+  
+  // Step 4: Process the message with AI agent using full conversation context
+  const assistantMessage = await processMessageWithAgent(supabase, session.id, conversationHistory);
   console.log(`Agent response: ${assistantMessage}`);
   
-  // Step 4: Add the assistant's response to session history
+  // Step 5: Add the assistant's response to session history
   await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
   
-  // Step 5: Send the response directly via send-channel-message function
+  // Step 6: Send the response directly via send-channel-message function
   await sendDirectChannelResponse(supabase, session.id, assistantMessage);
 }
 
@@ -152,6 +154,40 @@ async function getOrCreateChatSession(
 }
 
 /**
+ * Get the full conversation history from the session
+ */
+async function getConversationHistory(
+  supabase: ReturnType<typeof createClient>,
+  sessionId: string
+): Promise<Array<{ role: string; content: string }>> {
+  try {
+    const { data: session, error } = await supabase
+      .from('chat_sessions')
+      .select('conversation_history')
+      .eq('id', sessionId)
+      .single();
+      
+    if (error || !session) {
+      console.error('Error fetching conversation history:', error);
+      return [];
+    }
+    
+    // Return the conversation history, ensuring it's an array
+    const history = session.conversation_history || [];
+    console.log(`Retrieved ${history.length} messages from conversation history`);
+    
+    // Format for agent-chat function
+    return history.map((msg: any) => ({
+      role: msg.role,
+      content: msg.content
+    }));
+  } catch (error) {
+    console.error('Exception in getConversationHistory:', error);
+    return [];
+  }
+}
+
+/**
  * Update the session history with a new message
  */
 async function addMessageToSessionHistory(
@@ -178,14 +214,26 @@ async function addMessageToSessionHistory(
 }
 
 /**
- * Process user message with the AI agent
+ * Process user message with the AI agent using full conversation context
  */
 async function processMessageWithAgent(
   supabase: ReturnType<typeof createClient>,
   sessionId: string,
-  userMessage: string
+  conversationHistory: Array<{ role: string; content: string }>
 ): Promise<string> {
   try {
+    // Build the messages array with system prompt and conversation history
+    const messages = [
+      { 
+        role: 'system', 
+        content: 'You are a helpful assistant responding to text messages. Be concise and helpful. Use people\'s first names when communicating with them - Talk casual and friendly!' 
+      },
+      ...conversationHistory // Include the full conversation history
+    ];
+    
+    console.log(`Sending ${messages.length} messages to agent-chat (including system prompt)`);
+    console.log('Conversation context:', JSON.stringify(messages, null, 2));
+    
     const agentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
       method: 'POST',
       headers: {
@@ -193,20 +241,11 @@ async function processMessageWithAgent(
         'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
       },
       body: JSON.stringify({
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are a helpful assistant responding to text messages. Be concise and helpful.' 
-          },
-          { 
-            role: 'user', 
-            content: userMessage 
-          }
-        ],
+        messages: messages,
         availableTools: ['session_manager', 'identify_project', 'data_fetch', 'channel_response'],
         customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
-Message: ${userMessage}`
+Keep responses conversational and friendly, using first names when appropriate.`
       })
     });
     
