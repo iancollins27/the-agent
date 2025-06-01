@@ -1,6 +1,6 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -122,6 +122,8 @@ async function handleOTPRequest(supabase: any, phoneNumber: string) {
   const { data: otpData } = await supabase.rpc('generate_otp');
   const otp = otpData;
 
+  console.log(`OTP for ${phoneNumber}: ${otp}`);
+
   // Check if this is a known contact
   const { data: contact } = await supabase
     .from('contacts')
@@ -160,8 +162,8 @@ async function handleOTPRequest(supabase: any, phoneNumber: string) {
     console.log(`OTP sent successfully to ${phoneNumber}`);
   } catch (smsError) {
     console.error(`Failed to send SMS: ${smsError.message}`);
-    // Don't throw the error here - we still want to return success even if SMS fails
-    // This allows for testing with the development OTP return
+    // Still return success for development purposes, but log the error
+    console.log(`Development fallback - OTP would be: ${otp}`);
   }
 
   return new Response(
