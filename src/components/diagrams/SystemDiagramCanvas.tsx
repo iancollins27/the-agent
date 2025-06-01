@@ -19,61 +19,84 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
 
     const $ = go.GraphObject.make;
 
-    const myDiagram = $(go.Diagram, diagramRef.current, {
-      'undoManager.isEnabled': true,
-      layout: $(go.TreeLayout, {
-        angle: 0,
-        layerSpacing: 50,
-        nodeSpacing: 30
-      }),
-      initialContentAlignment: go.Spot.Center,
-      'toolManager.hoverDelay': 100
-    });
+    // Initialize diagram with proper error handling
+    let myDiagram: go.Diagram;
+    
+    try {
+      myDiagram = $(go.Diagram, diagramRef.current, {
+        'undoManager.isEnabled': true,
+        layout: $(go.TreeLayout, {
+          angle: 0,
+          layerSpacing: 50,
+          nodeSpacing: 30
+        }),
+        initialContentAlignment: go.Spot.Center,
+        'toolManager.hoverDelay': 100
+      });
 
-    // Define node template
-    myDiagram.nodeTemplate = $(go.Node, 'Auto',
-      {
-        selectionAdorned: true,
-        click: (e: go.InputEvent, node: go.GraphObject) => {
-          if (onNodeClick && node instanceof go.Node) {
-            onNodeClick(node.data);
+      // Define node template with proper error handling
+      myDiagram.nodeTemplate = $(go.Node, 'Auto',
+        {
+          selectionAdorned: true,
+          click: (e: go.InputEvent, obj: go.GraphObject) => {
+            if (onNodeClick && obj.part && obj.part instanceof go.Node) {
+              const node = obj.part as go.Node;
+              if (node.data) {
+                onNodeClick(node.data);
+              }
+            }
           }
-        }
-      },
-      $(go.Shape, 'RoundedRectangle', {
-        fill: 'lightblue',
-        stroke: 'navy',
-        strokeWidth: 2
-      }, new go.Binding('fill', 'color')),
-      $(go.TextBlock, {
-        margin: 8,
-        font: 'bold 12px sans-serif',
-        wrap: go.TextBlock.WrapFit,
-        maxSize: new go.Size(120, NaN)
-      }, new go.Binding('text', 'text'))
-    );
+        },
+        $(go.Shape, 'RoundedRectangle', {
+          fill: 'lightblue',
+          stroke: 'navy',
+          strokeWidth: 2
+        }, new go.Binding('fill', 'color')),
+        $(go.TextBlock, {
+          margin: 8,
+          font: 'bold 12px sans-serif',
+          wrap: go.TextBlock.WrapFit,
+          maxSize: new go.Size(120, NaN)
+        }, new go.Binding('text', 'text'))
+      );
 
-    // Define link template
-    myDiagram.linkTemplate = $(go.Link,
-      { routing: go.Link.Orthogonal, corner: 5 },
-      $(go.Shape, { strokeWidth: 2, stroke: '#555' }),
-      $(go.Shape, { toArrow: 'Standard', stroke: '#555', fill: '#555' }),
-      $(go.TextBlock, {
-        textAlign: 'center',
-        font: '10px sans-serif',
-        background: 'white',
-        margin: 2
-      }, new go.Binding('text', 'text'))
-    );
+      // Define link template
+      myDiagram.linkTemplate = $(go.Link,
+        { routing: go.Link.Orthogonal, corner: 5 },
+        $(go.Shape, { strokeWidth: 2, stroke: '#555' }),
+        $(go.Shape, { toArrow: 'Standard', stroke: '#555', fill: '#555' }),
+        $(go.TextBlock, {
+          textAlign: 'center',
+          font: '10px sans-serif',
+          background: 'white',
+          margin: 2
+        }, new go.Binding('text', 'text'))
+      );
 
-    // Set model data based on diagram type
-    const modelData = getModelData(diagramType);
-    myDiagram.model = new go.GraphLinksModel(modelData.nodeDataArray, modelData.linkDataArray);
+      // Set model data based on diagram type
+      const modelData = getModelData(diagramType);
+      
+      // Ensure model data is valid before setting
+      if (modelData && modelData.nodeDataArray && modelData.linkDataArray) {
+        myDiagram.model = new go.GraphLinksModel(modelData.nodeDataArray, modelData.linkDataArray);
+      } else {
+        // Fallback to empty model
+        myDiagram.model = new go.GraphLinksModel([], []);
+      }
 
-    setDiagram(myDiagram);
+      setDiagram(myDiagram);
+    } catch (error) {
+      console.error('Error initializing GoJS diagram:', error);
+      // Create a minimal fallback diagram
+      myDiagram = $(go.Diagram, diagramRef.current);
+      myDiagram.model = new go.GraphLinksModel([], []);
+      setDiagram(myDiagram);
+    }
 
     return () => {
-      myDiagram.div = null;
+      if (myDiagram) {
+        myDiagram.div = null;
+      }
     };
   }, [diagramType, onNodeClick]);
 
@@ -87,104 +110,120 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
 };
 
 function getModelData(diagramType: string) {
+  // Ensure all data objects have required properties
+  const createNode = (key: string, text: string, color: string) => ({
+    key,
+    text: text || 'Unnamed',
+    color: color || '#E3F2FD'
+  });
+
+  const createLink = (from: string, to: string, text?: string) => ({
+    from,
+    to,
+    text: text || ''
+  });
+
   switch (diagramType) {
     case 'sms-chat':
       return {
         nodeDataArray: [
-          { key: 'twilio', text: 'Twilio SMS\nWebhook', color: '#E3F2FD' },
-          { key: 'webhook', text: 'chat-webhook-twilio', color: '#F3E5F5' },
-          { key: 'session', text: 'Chat Session\nManager', color: '#E8F5E8' },
-          { key: 'agent', text: 'agent-chat\nFunction', color: '#FFF3E0' },
-          { key: 'tools', text: 'Available Tools\n(channel_response)', color: '#FCE4EC' },
-          { key: 'response', text: 'send-channel-message', color: '#E0F2F1' },
-          { key: 'send-comm', text: 'send-communication', color: '#F1F8E9' },
-          { key: 'twilio-send', text: 'Twilio API\nSend SMS', color: '#FFF8E1' }
+          createNode('twilio', 'Twilio SMS\nWebhook', '#E3F2FD'),
+          createNode('webhook', 'chat-webhook-twilio', '#F3E5F5'),
+          createNode('session', 'Chat Session\nManager', '#E8F5E8'),
+          createNode('agent', 'agent-chat\nFunction', '#FFF3E0'),
+          createNode('tools', 'Available Tools\n(channel_response)', '#FCE4EC'),
+          createNode('response', 'send-channel-message', '#E0F2F1'),
+          createNode('send-comm', 'send-communication', '#F1F8E9'),
+          createNode('twilio-send', 'Twilio API\nSend SMS', '#FFF8E1')
         ],
         linkDataArray: [
-          { from: 'twilio', to: 'webhook', text: 'POST' },
-          { from: 'webhook', to: 'session', text: 'get/create' },
-          { from: 'webhook', to: 'agent', text: 'process' },
-          { from: 'agent', to: 'tools', text: 'execute' },
-          { from: 'tools', to: 'response', text: 'channel_response' },
-          { from: 'response', to: 'send-comm', text: 'SMS' },
-          { from: 'send-comm', to: 'twilio-send', text: 'API call' }
+          createLink('twilio', 'webhook', 'POST'),
+          createLink('webhook', 'session', 'get/create'),
+          createLink('webhook', 'agent', 'process'),
+          createLink('agent', 'tools', 'execute'),
+          createLink('tools', 'response', 'channel_response'),
+          createLink('response', 'send-comm', 'SMS'),
+          createLink('send-comm', 'twilio-send', 'API call')
         ]
       };
 
     case 'communications':
       return {
         nodeDataArray: [
-          { key: 'webhook', text: 'Communication\nWebhook', color: '#E3F2FD' },
-          { key: 'normalizer', text: 'Webhook\nNormalizer', color: '#F3E5F5' },
-          { key: 'business', text: 'Business Logic\nProcessor', color: '#E8F5E8' },
-          { key: 'detect', text: 'Project\nDetection', color: '#FFF3E0' },
-          { key: 'single', text: 'Single Project\nProcessor', color: '#FCE4EC' },
-          { key: 'multi', text: 'Multi Project\nProcessor', color: '#E0F2F1' },
-          { key: 'workflow', text: 'test-workflow-prompt', color: '#F1F8E9' },
-          { key: 'actions', text: 'Action Record\nCreation', color: '#FFF8E1' }
+          createNode('webhook', 'Communication\nWebhook', '#E3F2FD'),
+          createNode('normalizer', 'Webhook\nNormalizer', '#F3E5F5'),
+          createNode('business', 'Business Logic\nProcessor', '#E8F5E8'),
+          createNode('detect', 'Project\nDetection', '#FFF3E0'),
+          createNode('single', 'Single Project\nProcessor', '#FCE4EC'),
+          createNode('multi', 'Multi Project\nProcessor', '#E0F2F1'),
+          createNode('workflow', 'test-workflow-prompt', '#F1F8E9'),
+          createNode('actions', 'Action Record\nCreation', '#FFF8E1')
         ],
         linkDataArray: [
-          { from: 'webhook', to: 'normalizer', text: 'raw data' },
-          { from: 'normalizer', to: 'business', text: 'normalized' },
-          { from: 'business', to: 'detect', text: 'analyze' },
-          { from: 'detect', to: 'single', text: 'single' },
-          { from: 'detect', to: 'multi', text: 'multiple' },
-          { from: 'single', to: 'workflow', text: 'AI process' },
-          { from: 'multi', to: 'workflow', text: 'batch process' },
-          { from: 'workflow', to: 'actions', text: 'create actions' }
+          createLink('webhook', 'normalizer', 'raw data'),
+          createLink('normalizer', 'business', 'normalized'),
+          createLink('business', 'detect', 'analyze'),
+          createLink('detect', 'single', 'single'),
+          createLink('detect', 'multi', 'multiple'),
+          createLink('single', 'workflow', 'AI process'),
+          createLink('multi', 'workflow', 'batch process'),
+          createLink('workflow', 'actions', 'create actions')
         ]
       };
 
     case 'actions':
       return {
         nodeDataArray: [
-          { key: 'detection', text: 'Action Detection\n(AI Analysis)', color: '#E3F2FD' },
-          { key: 'record', text: 'Action Record\nCreation', color: '#F3E5F5' },
-          { key: 'approval', text: 'Approval\nProcess', color: '#E8F5E8' },
-          { key: 'execution', text: 'Action\nExecution', color: '#FFF3E0' },
-          { key: 'message', text: 'Message\nActions', color: '#FCE4EC' },
-          { key: 'data', text: 'Data Update\nActions', color: '#E0F2F1' },
-          { key: 'reminder', text: 'Reminder\nActions', color: '#F1F8E9' },
-          { key: 'crm', text: 'CRM\nIntegration', color: '#FFF8E1' }
+          createNode('detection', 'Action Detection\n(AI Analysis)', '#E3F2FD'),
+          createNode('record', 'Action Record\nCreation', '#F3E5F5'),
+          createNode('approval', 'Approval\nProcess', '#E8F5E8'),
+          createNode('execution', 'Action\nExecution', '#FFF3E0'),
+          createNode('message', 'Message\nActions', '#FCE4EC'),
+          createNode('data', 'Data Update\nActions', '#E0F2F1'),
+          createNode('reminder', 'Reminder\nActions', '#F1F8E9'),
+          createNode('crm', 'CRM\nIntegration', '#FFF8E1')
         ],
         linkDataArray: [
-          { from: 'detection', to: 'record', text: 'create' },
-          { from: 'record', to: 'approval', text: 'requires approval' },
-          { from: 'approval', to: 'execution', text: 'approved' },
-          { from: 'execution', to: 'message', text: 'message type' },
-          { from: 'execution', to: 'data', text: 'data type' },
-          { from: 'execution', to: 'reminder', text: 'reminder type' },
-          { from: 'data', to: 'crm', text: 'sync' },
-          { from: 'message', to: 'crm', text: 'log' }
+          createLink('detection', 'record', 'create'),
+          createLink('record', 'approval', 'requires approval'),
+          createLink('approval', 'execution', 'approved'),
+          createLink('execution', 'message', 'message type'),
+          createLink('execution', 'data', 'data type'),
+          createLink('execution', 'reminder', 'reminder type'),
+          createLink('data', 'crm', 'sync'),
+          createLink('message', 'crm', 'log')
         ]
       };
 
     case 'testing':
       return {
         nodeDataArray: [
-          { key: 'admin', text: 'Admin Console\nInterface', color: '#E3F2FD' },
-          { key: 'test-runner', text: 'Test Runner\nComponent', color: '#F3E5F5' },
-          { key: 'workflow-test', text: 'test-workflow-prompt\nFunction', color: '#E8F5E8' },
-          { key: 'ai-providers', text: 'AI Providers\n(OpenAI/Claude)', color: '#FFF3E0' },
-          { key: 'tools', text: 'MCP Tools\nExecution', color: '#FCE4EC' },
-          { key: 'results', text: 'Test Results\nDisplay', color: '#E0F2F1' },
-          { key: 'database', text: 'Database\nLogging', color: '#F1F8E9' },
-          { key: 'feedback', text: 'Feedback\nSystem', color: '#FFF8E1' }
+          createNode('admin', 'Admin Console\nInterface', '#E3F2FD'),
+          createNode('test-runner', 'Test Runner\nComponent', '#F3E5F5'),
+          createNode('workflow-test', 'test-workflow-prompt\nFunction', '#E8F5E8'),
+          createNode('ai-providers', 'AI Providers\n(OpenAI/Claude)', '#FFF3E0'),
+          createNode('tools', 'MCP Tools\nExecution', '#FCE4EC'),
+          createNode('results', 'Test Results\nDisplay', '#E0F2F1'),
+          createNode('database', 'Database\nLogging', '#F1F8E9'),
+          createNode('feedback', 'Feedback\nSystem', '#FFF8E1')
         ],
         linkDataArray: [
-          { from: 'admin', to: 'test-runner', text: 'user input' },
-          { from: 'test-runner', to: 'workflow-test', text: 'execute test' },
-          { from: 'workflow-test', to: 'ai-providers', text: 'AI request' },
-          { from: 'workflow-test', to: 'tools', text: 'tool calls' },
-          { from: 'tools', to: 'database', text: 'log actions' },
-          { from: 'workflow-test', to: 'results', text: 'response' },
-          { from: 'results', to: 'feedback', text: 'user rating' },
-          { from: 'feedback', to: 'database', text: 'store feedback' }
+          createLink('admin', 'test-runner', 'user input'),
+          createLink('test-runner', 'workflow-test', 'execute test'),
+          createLink('workflow-test', 'ai-providers', 'AI request'),
+          createLink('workflow-test', 'tools', 'tool calls'),
+          createLink('tools', 'database', 'log actions'),
+          createLink('workflow-test', 'results', 'response'),
+          createLink('results', 'feedback', 'user rating'),
+          createLink('feedback', 'database', 'store feedback')
         ]
       };
 
     default:
-      return { nodeDataArray: [], linkDataArray: [] };
+      return { 
+        nodeDataArray: [], 
+        linkDataArray: [] 
+      };
   }
 }
 
