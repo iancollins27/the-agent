@@ -152,6 +152,51 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          company_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          resource_id: string | null
+          resource_type: string
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          resource_id?: string | null
+          resource_type: string
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       chat_sessions: {
         Row: {
           active: boolean | null
@@ -482,6 +527,7 @@ export type Database = {
         Row: {
           associated_profile: string | null
           comms_preferences: string | null
+          company_id: string | null
           email: string | null
           full_name: string
           id: string
@@ -491,6 +537,7 @@ export type Database = {
         Insert: {
           associated_profile?: string | null
           comms_preferences?: string | null
+          company_id?: string | null
           email?: string | null
           full_name: string
           id?: string
@@ -500,6 +547,7 @@ export type Database = {
         Update: {
           associated_profile?: string | null
           comms_preferences?: string | null
+          company_id?: string | null
           email?: string | null
           full_name?: string
           id?: string
@@ -512,6 +560,13 @@ export type Database = {
             columns: ["associated_profile"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -680,6 +735,56 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phone_verifications: {
+        Row: {
+          contact_id: string | null
+          created_at: string | null
+          failed_attempts: number | null
+          id: string
+          last_sim_check: string | null
+          locked_until: string | null
+          phone_number: string
+          sim_fingerprint: string | null
+          updated_at: string | null
+          verification_code: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string | null
+          failed_attempts?: number | null
+          id?: string
+          last_sim_check?: string | null
+          locked_until?: string | null
+          phone_number: string
+          sim_fingerprint?: string | null
+          updated_at?: string | null
+          verification_code?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string | null
+          failed_attempts?: number | null
+          id?: string
+          last_sim_check?: string | null
+          locked_until?: string | null
+          phone_number?: string
+          sim_fingerprint?: string | null
+          updated_at?: string | null
+          verification_code?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_verifications_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -1075,6 +1180,44 @@ export type Database = {
           },
         ]
       }
+      user_tokens: {
+        Row: {
+          contact_id: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          scope: string | null
+          token_hash: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          revoked_at?: string | null
+          scope?: string | null
+          token_hash: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          scope?: string | null
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tokens_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_prompts: {
         Row: {
           created_at: string | null
@@ -1177,6 +1320,10 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      cleanup_expired_tokens: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       find_or_create_chat_session: {
         Args: {
           p_channel_type: string
@@ -1186,6 +1333,10 @@ export type Database = {
           p_project_id?: string
           p_memory_mode?: string
         }
+        Returns: string
+      }
+      generate_otp: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       get_column_info: {
@@ -1203,6 +1354,10 @@ export type Database = {
           api_secret: string
           account_id: string
         }[]
+      }
+      get_current_contact_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_project_search_text: {
         Args: { project_id: string }

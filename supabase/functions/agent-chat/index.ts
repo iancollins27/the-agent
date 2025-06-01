@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "./utils/cors.ts";
 import { getChatSystemPrompt } from "./mcp-system-prompts.ts";
@@ -75,31 +74,76 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client with service role key for admin access
-    // This allows bypassing RLS policies when creating action records
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
-    // Enhanced logging for debugging
-    console.log(`Request received with userId: ${payload.userId || 'not provided'}`);
-    
-    // Get user profile if userId is provided
-    const userProfile = payload.userId ? 
-      await getUserProfile(supabase, payload.userId) : null;
-    
-    console.log(`User profile lookup result: ${userProfile ? `found for ${payload.userId} with company ${userProfile.company_id}` : 'not found or not provided'}`);
-    
-    // Extract company ID from user profile or project data
+    // Determine authentication method
+    let supabase;
+    let userProfile = null;
     let companyId = null;
-    if (userProfile && userProfile.company_id) {
-      companyId = userProfile.company_id;
-      console.log(`Using company ID from user profile: ${companyId}`);
-    } else if (payload.projectData && payload.projectData.company_id) {
-      companyId = payload.projectData.company_id;
-      console.log(`Using company ID from project data: ${companyId}`);
+
+    // Check if we have a userId (contact_id) - this indicates SMS/phone auth
+    if (payload.userId) {
+      console.log(`Request received with contact_id: ${payload.userId}`);
+      
+      // Create user-scoped client for SMS users
+      const { data: userToken } = await createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+        .from('user_tokens')
+        .select('*, contacts(*)')
+        .eq('contact_id', payload.userId)
+        .gt('expires_at', new Date().toISOString())
+        .is('revoked_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (userToken) {
+        // Create user-scoped supabase client
+        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: {
+            headers: {
+              'Authorization': `Bearer ${userToken.token_hash}`
+            }
+          }
+        });
+        
+        // Set user context from contact
+        userProfile = {
+          id: userToken.contact_id,
+          company_id: userToken.contacts?.company_id,
+          profile_fname: userToken.contacts?.full_name?.split(' ')[0],
+          profile_lname: userToken.contacts?.full_name?.split(' ').slice(1).join(' '),
+          role: userToken.contacts?.role
+        };
+        companyId = userToken.contacts?.company_id;
+        
+        console.log(`SMS user authenticated - contact: ${userProfile.id}, company: ${companyId}`);
+      } else {
+        console.log(`No valid token found for contact_id: ${payload.userId}`);
+        return new Response(
+          JSON.stringify({ error: "Authentication required" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+        );
+      }
     } else {
-      console.log(`No company ID found in user profile or project data`);
+      // Web user authentication (existing flow)
+      supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      
+      // Get user profile from web auth
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        // Parse JWT to get user info (simplified)
+        try {
+          const payload_claims = JSON.parse(atob(token.split('.')[1]));
+          if (payload_claims.sub) {
+            userProfile = await getUserProfile(supabase, payload_claims.sub);
+            companyId = userProfile?.company_id;
+            console.log(`Web user authenticated - user: ${payload_claims.sub}, company: ${companyId}`);
+          }
+        } catch (e) {
+          console.log('Could not parse web auth token');
+        }
+      }
     }
-    
+
     // Special case: If getToolDefinitions flag is set, return the available tool definitions
     if (payload.getToolDefinitions) {
       console.log("Tool definitions requested");
@@ -157,6 +201,23 @@ serve(async (req) => {
     let messages = hasSystemMessage 
       ? payload.messages.map(msg => msg.role === "system" ? systemMessage : msg)
       : [systemMessage, ...payload.messages];
+
+    // Log access for audit
+    if (userProfile) {
+      await supabase
+        .from('audit_log')
+        .insert({
+          contact_id: payload.userId || null,
+          user_id: !payload.userId ? userProfile.id : null,
+          company_id: companyId,
+          action: 'agent_chat_request',
+          resource_type: 'ai_interaction',
+          details: { 
+            tool_count: requestedToolNames.length,
+            message_count: payload.messages.length
+          }
+        });
+    }
 
     // Basic request to OpenAI
     console.log("Sending OpenAI request with tools:", JSON.stringify(toolDefinitions.map(t => t.function.name)));
@@ -217,7 +278,21 @@ serve(async (req) => {
             companyId
           );
           
-          // Add the tool response to messages
+          // Log tool usage
+          await supabase
+            .from('audit_log')
+            .insert({
+              contact_id: payload.userId || null,
+              user_id: !payload.userId ? userProfile?.id : null,
+              company_id: companyId,
+              action: 'tool_execution',
+              resource_type: 'ai_tool',
+              details: { 
+                tool_name: name,
+                success: toolResult.status === 'success'
+              }
+            });
+          
           messages.push({
             role: "tool",
             tool_call_id: toolCall.id,
@@ -228,7 +303,21 @@ serve(async (req) => {
         } catch (toolError) {
           console.error(`Error executing tool ${name}:`, toolError);
           
-          // Add error response to messages
+          // Log tool error
+          await supabase
+            .from('audit_log')
+            .insert({
+              contact_id: payload.userId || null,
+              user_id: !payload.userId ? userProfile?.id : null,
+              company_id: companyId,
+              action: 'tool_execution_error',
+              resource_type: 'ai_tool',
+              details: { 
+                tool_name: name,
+                error: toolError.message
+              }
+            });
+          
           messages.push({
             role: "tool",
             tool_call_id: toolCall.id,
@@ -259,3 +348,39 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Generates an embedding vector for the given text
+ */
+async function generateEmbedding(text: string, context: any): Promise<number[] | null> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`OpenAI embeddings API error: ${error}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const embedding = data.data[0].embedding;
+    
+    // Log just the first few values of the embedding for debugging
+    console.log(`Generated embedding for query, first 5 values: [ ${embedding.slice(0, 5).join(', ')} ]`);
+    
+    return embedding;
+  } catch (error) {
+    console.error(`Error generating embedding: ${error.message}`);
+    return null;
+  }
+}

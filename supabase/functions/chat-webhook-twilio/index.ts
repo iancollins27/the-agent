@@ -6,48 +6,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-/**
- * Process an incoming Twilio webhook request
- */
-async function handleTwilioWebhook(req: Request): Promise<Response> {
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
-    // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Parse the incoming message
     const message = await parseRequestBody(req);
     console.log('Received Twilio chat webhook:', JSON.stringify(message, null, 2));
 
-    // Validate required fields
     if (!message.From || !message.Body) {
       throw new Error('Missing required fields: From and/or Body');
     }
 
-    // Process the message through the conversation flow
-    await processMessage(supabase, message);
+    // Check if phone number is verified
+    const authResult = await authenticatePhoneNumber(supabase, message.From);
+    
+    if (!authResult.authenticated) {
+      await handleUnverifiedPhone(supabase, message.From, message.Body);
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+        { headers: { ...corsHeaders, 'Content-Type': 'application/xml' } }
+      );
+    }
 
-    // Return TwiML response (empty response as we're handling async)
+    // Process the message with authenticated user context
+    await processAuthenticatedMessage(supabase, message, authResult.userToken);
+
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
       { headers: { ...corsHeaders, 'Content-Type': 'application/xml' } }
     );
   } catch (error) {
     console.error('Error processing chat webhook:', error);
-    
-    // Return error response
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
-}
+});
 
-/**
- * Parse the incoming request body based on content type
- */
 async function parseRequestBody(req: Request): Promise<Record<string, any>> {
   const contentType = req.headers.get('content-type') || '';
   const requestBody: Record<string, any> = {};
@@ -61,10 +64,7 @@ async function parseRequestBody(req: Request): Promise<Record<string, any>> {
         requestBody[key] = value;
       }
     } else {
-      // Handle text or missing content type
       const text = await req.text();
-      
-      // Try to parse as URL encoded params
       try {
         const params = new URLSearchParams(text);
         for (const [key, value] of params.entries()) {
@@ -82,86 +82,201 @@ async function parseRequestBody(req: Request): Promise<Record<string, any>> {
   return requestBody;
 }
 
-/**
- * Main message processing workflow
- */
-async function processMessage(
-  supabase: ReturnType<typeof createClient>, 
-  message: Record<string, any>
-): Promise<void> {
-  const { From: from, Body: body } = message;
-  
-  // Default company ID - in production, you'd determine this based on the Twilio number or other context
-  const companyId = '00000000-0000-0000-0000-000000000000';
+async function authenticatePhoneNumber(supabase: any, phoneNumber: string) {
+  // Check if phone number is verified
+  const { data: verification } = await supabase
+    .from('phone_verifications')
+    .select('*, contacts(*)')
+    .eq('phone_number', phoneNumber)
+    .single();
 
-  // Step 1: Get or create chat session
-  const session = await getOrCreateChatSession(supabase, from, body, companyId);
-  
-  // Step 2: Add the user's message to session history
-  await addMessageToSessionHistory(supabase, session.id, 'user', body);
-  
-  // Step 3: Get the full conversation history for context
-  const conversationHistory = await getConversationHistory(supabase, session.id);
-  
-  // Step 4: Process the message with AI agent using full conversation context
-  const assistantMessage = await processMessageWithAgent(supabase, session.id, conversationHistory);
-  console.log(`Agent response: ${assistantMessage}`);
-  
-  // Step 5: Add the assistant's response to session history
-  await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
-  
-  // Step 6: Send the response directly via send-channel-message function
-  await sendDirectChannelResponse(supabase, session.id, assistantMessage);
+  if (!verification?.verified_at) {
+    return { authenticated: false };
+  }
+
+  // Check for valid token
+  const { data: token } = await supabase
+    .from('user_tokens')
+    .select('*')
+    .eq('contact_id', verification.contact_id)
+    .gt('expires_at', new Date().toISOString())
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!token) {
+    // Need to create new token
+    const newToken = await createUserToken(supabase, verification.contacts);
+    return { authenticated: true, userToken: newToken };
+  }
+
+  return { authenticated: true, userToken: token };
 }
 
-/**
- * Get or create a chat session
- */
-async function getOrCreateChatSession(
-  supabase: ReturnType<typeof createClient>,
-  from: string,
-  body: string,
-  companyId: string = '00000000-0000-0000-0000-000000000000'
-): Promise<any> {
-  try {
-    const sessionResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-session-manager`, {
+async function createUserToken(supabase: any, contact: any) {
+  const tokenPayload = {
+    contact_id: contact.id,
+    company_id: contact.company_id,
+    role: contact.role,
+    exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+    iat: Math.floor(Date.now() / 1000)
+  };
+
+  // Simple token creation (in production, use proper JWT)
+  const tokenString = btoa(JSON.stringify(tokenPayload));
+  
+  const { data: newToken, error } = await supabase
+    .from('user_tokens')
+    .insert({
+      contact_id: contact.id,
+      token_hash: tokenString,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      scope: 'sms_verified'
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create token: ${error.message}`);
+  }
+
+  return newToken;
+}
+
+async function handleUnverifiedPhone(supabase: any, phoneNumber: string, messageBody: string) {
+  // Check if this looks like an OTP
+  const otpRegex = /^\d{6}$/;
+  if (otpRegex.test(messageBody.trim())) {
+    // Try to verify the OTP
+    const verifyResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
       },
       body: JSON.stringify({
-        channel_type: 'sms',
-        channel_identifier: from,
-        company_id: companyId,
-        message_content: body
+        phone_number: phoneNumber,
+        verification_code: messageBody.trim(),
+        action: 'verify_otp'
       })
     });
+
+    const result = await verifyResponse.json();
     
-    if (!sessionResponse.ok) {
-      const errorText = await sessionResponse.text();
-      console.error('Error creating session:', errorText);
-      throw new Error('Failed to create chat session');
+    if (verifyResponse.ok) {
+      // Send welcome message
+      await sendSMS(supabase, phoneNumber, "Welcome! Your phone number has been verified. You can now ask me questions about your projects.");
+    } else {
+      await sendSMS(supabase, phoneNumber, `Verification failed: ${result.error}. Please try again.`);
     }
-    
-    const sessionData = await sessionResponse.json();
-    console.log(`Chat session retrieved/created with ID: ${sessionData.session.id}`);
-    return sessionData.session;
-  } catch (error) {
-    console.error('Error in getOrCreateChatSession:', error);
-    throw error; // Re-throw to be handled by the main error handler
+  } else {
+    // Request OTP for new phone number
+    const otpResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      },
+      body: JSON.stringify({
+        phone_number: phoneNumber,
+        action: 'request_otp'
+      })
+    });
+
+    if (otpResponse.ok) {
+      await sendSMS(supabase, phoneNumber, "Welcome! For security, please reply with the 6-digit verification code I just sent you.");
+    } else {
+      await sendSMS(supabase, phoneNumber, "Sorry, there was an error processing your message. Please try again later.");
+    }
   }
 }
 
-/**
- * Get the full conversation history from the session
- */
-async function getConversationHistory(
-  supabase: ReturnType<typeof createClient>,
-  sessionId: string
-): Promise<Array<{ role: string; content: string }>> {
+async function processAuthenticatedMessage(supabase: any, message: any, userToken: any) {
+  const { From: from, Body: body } = message;
+  
+  // Get contact info from token
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('id', userToken.contact_id)
+    .single();
+
+  if (!contact) {
+    throw new Error('Contact not found for authenticated user');
+  }
+
+  // Create user-scoped supabase client
+  const userSupabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    {
+      global: {
+        headers: {
+          'Authorization': `Bearer ${userToken.token_hash}`
+        }
+      }
+    }
+  );
+
+  // Log the message interaction
+  await supabase
+    .from('audit_log')
+    .insert({
+      contact_id: contact.id,
+      company_id: contact.company_id,
+      action: 'sms_received',
+      resource_type: 'communication',
+      details: { phone_number: from, message_length: body.length }
+    });
+
+  // Get or create chat session with proper context
+  const session = await getOrCreateChatSession(userSupabase, from, body, contact);
+  
+  // Add the user's message to session history
+  await addMessageToSessionHistory(userSupabase, session.id, 'user', body);
+  
+  // Get the full conversation history for context
+  const conversationHistory = await getConversationHistory(userSupabase, session.id);
+  
+  // Process the message with AI agent using user context
+  const assistantMessage = await processMessageWithAgent(userSupabase, session.id, conversationHistory, userToken);
+  console.log(`Agent response: ${assistantMessage}`);
+  
+  // Add the assistant's response to session history
+  await addMessageToSessionHistory(userSupabase, session.id, 'assistant', assistantMessage);
+  
+  // Send the response back to the user
+  await sendDirectChannelResponse(userSupabase, session.id, assistantMessage);
+}
+
+async function getOrCreateChatSession(userSupabase: any, from: string, body: string, contact: any) {
   try {
-    const { data: session, error } = await supabase
+    const sessionResponse = await userSupabase.functions.invoke('chat-session-manager', {
+      body: {
+        channel_type: 'sms',
+        channel_identifier: from,
+        company_id: contact.company_id,
+        contact_id: contact.id,
+        message_content: body
+      }
+    });
+    
+    if (!sessionResponse.data) {
+      throw new Error('Failed to create chat session');
+    }
+    
+    console.log(`Chat session retrieved/created with ID: ${sessionResponse.data.session.id}`);
+    return sessionResponse.data.session;
+  } catch (error) {
+    console.error('Error in getOrCreateChatSession:', error);
+    throw error;
+  }
+}
+
+async function getConversationHistory(userSupabase: any, sessionId: string) {
+  try {
+    const { data: session, error } = await userSupabase
       .from('chat_sessions')
       .select('conversation_history')
       .eq('id', sessionId)
@@ -172,11 +287,9 @@ async function getConversationHistory(
       return [];
     }
     
-    // Return the conversation history, ensuring it's an array
     const history = session.conversation_history || [];
     console.log(`Retrieved ${history.length} messages from conversation history`);
     
-    // Format for agent-chat function
     return history.map((msg: any) => ({
       role: msg.role,
       content: msg.content
@@ -187,17 +300,9 @@ async function getConversationHistory(
   }
 }
 
-/**
- * Update the session history with a new message
- */
-async function addMessageToSessionHistory(
-  supabase: ReturnType<typeof createClient>,
-  sessionId: string, 
-  role: 'user' | 'assistant', 
-  content: string
-): Promise<void> {
+async function addMessageToSessionHistory(userSupabase: any, sessionId: string, role: 'user' | 'assistant', content: string) {
   try {
-    const { error } = await supabase.rpc('update_session_history', {
+    const { error } = await userSupabase.rpc('update_session_history', {
       p_session_id: sessionId, 
       p_role: role, 
       p_content: content
@@ -205,106 +310,84 @@ async function addMessageToSessionHistory(
     
     if (error) {
       console.error('Error updating session history:', error);
-      // Log error but continue processing - we don't want to break the flow
     }
   } catch (error) {
     console.error('Exception in addMessageToSessionHistory:', error);
-    // Continue despite error - we want to process the message anyway
   }
 }
 
-/**
- * Process user message with the AI agent using full conversation context
- */
-async function processMessageWithAgent(
-  supabase: ReturnType<typeof createClient>,
-  sessionId: string,
-  conversationHistory: Array<{ role: string; content: string }>
-): Promise<string> {
+async function processMessageWithAgent(userSupabase: any, sessionId: string, conversationHistory: any[], userToken: any) {
   try {
-    // Build the messages array with system prompt and conversation history
     const messages = [
       { 
         role: 'system', 
         content: 'You are a helpful assistant responding to text messages. Be concise and helpful. Use people\'s first names when communicating with them - Talk casual and friendly!' 
       },
-      ...conversationHistory // Include the full conversation history
+      ...conversationHistory
     ];
     
     console.log(`Sending ${messages.length} messages to agent-chat (including system prompt)`);
-    console.log('Conversation context:', JSON.stringify(messages, null, 2));
     
-    const agentResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/agent-chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
-      },
-      body: JSON.stringify({
+    const agentResponse = await userSupabase.functions.invoke('agent-chat', {
+      body: {
         messages: messages,
         availableTools: ['session_manager', 'identify_project', 'data_fetch', 'channel_response'],
         customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
-Keep responses conversational and friendly, using first names when appropriate.`
-      })
+Keep responses conversational and friendly, using first names when appropriate.`,
+        userId: userToken.contact_id // Pass the contact_id as userId for RLS context
+      }
     });
     
-    if (!agentResponse.ok) {
-      const errorText = await agentResponse.text();
-      console.error('Error calling agent-chat:', errorText);
+    if (!agentResponse.data) {
       throw new Error('Failed to process message with agent-chat');
     }
     
-    const agentData = await agentResponse.json();
-    return agentData.choices[0].message.content;
+    return agentResponse.data.choices[0].message.content;
   } catch (error) {
     console.error('Error in processMessageWithAgent:', error);
     return "I'm sorry, I encountered an error processing your message. Please try again later.";
   }
 }
 
-/**
- * Send the AI response back to the user via the direct channel_response 
- * Instead of using agent-chat to invoke channel_response tool, we call send-channel-message directly
- */
-async function sendDirectChannelResponse(
-  supabase: ReturnType<typeof createClient>,
-  sessionId: string, 
-  assistantMessage: string
-): Promise<void> {
+async function sendDirectChannelResponse(userSupabase: any, sessionId: string, assistantMessage: string) {
   try {
-    const channelResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-channel-message`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
-      },
-      body: JSON.stringify({
+    const channelResponse = await userSupabase.functions.invoke('send-channel-message', {
+      body: {
         session_id: sessionId,
         message: assistantMessage
-      })
+      }
     });
     
-    if (!channelResponse.ok) {
-      const errorText = await channelResponse.text();
-      console.error('Error sending channel message:', errorText);
-      throw new Error(`Failed to send message: ${channelResponse.status}`);
+    if (!channelResponse.data) {
+      throw new Error('Failed to send message');
     }
     
-    const result = await channelResponse.json();
-    console.log(`Message sent successfully via ${result.channel_type}`, result);
+    console.log(`Message sent successfully via ${channelResponse.data.channel_type}`, channelResponse.data);
   } catch (error) {
     console.error('Error in sendDirectChannelResponse:', error);
-    // Log but don't throw - this is the last step and we don't want to break the flow
   }
 }
 
-// Main entry point
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+async function sendSMS(supabase: any, phoneNumber: string, message: string) {
+  try {
+    // This would use your SMS provider (Twilio) to send the message
+    // For now, just log it
+    console.log(`Would send SMS to ${phoneNumber}: ${message}`);
+    
+    // Log the outbound message
+    await supabase
+      .from('audit_log')
+      .insert({
+        action: 'sms_sent',
+        resource_type: 'communication',
+        details: { 
+          phone_number: phoneNumber, 
+          message_length: message.length,
+          message_type: 'system_response'
+        }
+      });
+  } catch (error) {
+    console.error('Error sending SMS:', error);
   }
-
-  return handleTwilioWebhook(req);
-});
+}
