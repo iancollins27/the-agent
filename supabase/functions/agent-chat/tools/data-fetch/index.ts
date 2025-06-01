@@ -7,13 +7,13 @@ import { Tool, ToolResult } from '../types.ts';
 
 export const dataFetchTool: Tool = {
   name: "data_fetch",
-  description: "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes. Use this to get a complete view of a project's current state.",
+  description: "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes. IMPORTANT: You must use the project_id (UUID) returned by the identify_project tool - do NOT use raw user input or CRM IDs. Always call identify_project first to get the correct project_id before using this tool.",
   schema: {
     type: "object",
     properties: {
       project_id: {
         type: "string",
-        description: "UUID of the project to fetch data for"
+        description: "UUID of the project to fetch data for. MUST be obtained from the identify_project tool result, not from user input directly. Use the 'project_id' field from identify_project response."
       },
       include_raw: {
         type: "boolean",
@@ -30,7 +30,16 @@ export const dataFetchTool: Tool = {
       if (!project_id) {
         return {
           status: "error",
-          error: "Project ID is required"
+          error: "Project ID is required. You must call identify_project first to get the correct project_id."
+        };
+      }
+      
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(project_id)) {
+        return {
+          status: "error",
+          error: `Invalid project_id format: ${project_id}. You must use the UUID returned by identify_project tool, not a CRM ID or other identifier.`
         };
       }
       
@@ -46,6 +55,15 @@ export const dataFetchTool: Tool = {
       
       if (response.error) {
         console.error("Data fetch error:", response.error);
+        
+        // Enhanced error message for UUID not found
+        if (response.error.message && response.error.message.includes('No project found with ID')) {
+          return {
+            status: "error",
+            error: `Project not found with UUID: ${project_id}. This suggests you may be using an incorrect project_id. Please call identify_project again to get the correct UUID for this project.`
+          };
+        }
+        
         return {
           status: "error",
           error: `Failed to fetch project data: ${response.error.message || "Unknown error"}`

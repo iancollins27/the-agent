@@ -1,4 +1,3 @@
-
 /**
  * Tool to identify a project based on provided information
  */
@@ -7,7 +6,7 @@ import { Tool, ToolResult } from '../types.ts';
 
 export const identifyProjectTool: Tool = {
   name: "identify_project",
-  description: "Identifies a project based on provided information like ID, name, or address. Use this when the user mentions a specific project or address.",
+  description: "Identifies a project based on provided information like ID, name, or address. This tool MUST be called before using data_fetch. It returns the correct project_id (UUID) that should be used with other tools like data_fetch.",
   schema: {
     type: "object",
     properties: {
@@ -62,7 +61,8 @@ export const identifyProjectTool: Tool = {
             projects: projectById,
             contacts: projectContacts,
             company_id: companyId,
-            project_id: projectById[0].id  // Explicitly include project_id in the result
+            project_id: projectById[0].id,  // Explicitly include project_id for other tools
+            message: `Found project by UUID. Use project_id: ${projectById[0].id} for subsequent tool calls like data_fetch.`
           };
         }
       }
@@ -87,7 +87,8 @@ export const identifyProjectTool: Tool = {
             projects: projectByCrmId,
             contacts: projectContacts,
             company_id: companyId,
-            project_id: projectByCrmId[0].id  // Explicitly include project_id in the result
+            project_id: projectByCrmId[0].id,  // Explicitly include project_id for other tools
+            message: `Found project by CRM ID. Use project_id: ${projectByCrmId[0].id} for subsequent tool calls like data_fetch.`
           };
         }
       }
@@ -114,7 +115,8 @@ export const identifyProjectTool: Tool = {
               projects: projects.slice(0, 3),  // Ensure only 3 results max
               contacts: projectContacts,
               company_id: companyId,
-              project_id: projects[0].id  // Explicitly include project_id in the result
+              project_id: projects[0].id,  // Explicitly include project_id for other tools
+              message: `Found project(s) by name. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
             };
           }
         }
@@ -146,7 +148,8 @@ export const identifyProjectTool: Tool = {
               projects: projects.slice(0, 3),  // Ensure only 3 results max
               contacts: projectContacts,
               company_id: companyId,
-              project_id: projects[0].id  // Explicitly include project_id in the result
+              project_id: projects[0].id,  // Explicitly include project_id for other tools
+              message: `Found project(s) by address. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
             };
           }
         }
@@ -164,7 +167,8 @@ export const identifyProjectTool: Tool = {
           projects: projects.slice(0, 3),  // Ensure only 3 results max
           contacts: projectContacts,
           company_id: companyId,
-          project_id: projects[0].id  // Explicitly include project_id in the result
+          project_id: projects[0].id,  // Explicitly include project_id for other tools
+          message: `Found project(s). Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
         };
       }
       
@@ -238,7 +242,8 @@ export const identifyProjectTool: Tool = {
             projects: projects,
             contacts: projectContacts,
             company_id: companyId,
-            project_id: projects[0].id  // Explicitly include project_id in the result
+            project_id: projects[0].id,  // Explicitly include project_id for other tools
+            message: `Found project(s) via semantic search. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
           };
         }
       }
@@ -254,7 +259,8 @@ export const identifyProjectTool: Tool = {
           projects: projects,
           contacts: projectContacts,
           company_id: companyId,
-          project_id: projects[0].id  // Explicitly include project_id in the result
+          project_id: projects[0].id,  // Explicitly include project_id for other tools
+          message: `Found project(s). Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
         };
       }
       

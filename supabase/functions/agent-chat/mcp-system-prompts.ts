@@ -1,58 +1,43 @@
 
 /**
- * System prompts for the agent chat function.
+ * Generates the chat system prompt with available tools
  */
-
-/**
- * Get the system prompt for the chat function based on the available tools.
- */
-export function getChatSystemPrompt(toolNames: string[], contextData: any) {
-  const hasTools = toolNames && toolNames.length > 0;
+export function getChatSystemPrompt(availableTools: string[], contextData: any): string {
+  const currentDate = new Date().toISOString().split('T')[0];
   
-  // Determine if we're in a non-web chat channel
-  const isChannelChat = contextData.channel_type && contextData.channel_type !== 'web';
-  
-  // Default prompt for standard web chat
-  let prompt = `You are an AI assistant for construction and renovation projects. You help users understand their project status, answer questions, and take actions when needed.
+  // Build tools information string
+  const toolsInfo = availableTools.length > 0 
+    ? `Available tools: ${availableTools.join(', ')}`
+    : 'No tools available';
 
-Current date: ${contextData.current_date || new Date().toISOString().split('T')[0]}
+  return `You are a helpful AI assistant specialized in project management and customer relationship management. You have access to tools that help you retrieve and manage project information.
 
-If the user asks about a specific project, use the identify_project tool to find it. Once a project is identified, you can use that context to provide more helpful responses.
+${toolsInfo}
 
-Your responses should be conversational, helpful, and concise. When users ask about project status or want updates, provide relevant information from the context or use available tools to retrieve it. You are capable of taking actions and creating records in the CRM system when needed.`;
+Current date: ${currentDate}
+User: ${contextData.user_name || 'User'}
+Company ID: ${contextData.company_id || 'Not provided'}
 
-  // For SMS/email channels, adjust the prompt to be more channel-aware
-  if (isChannelChat) {
-    prompt = `You are an AI assistant for construction and renovation projects responding via ${contextData.channel_type}. You're engaged in a conversation with a user through their ${contextData.channel_type} at ${contextData.channel_identifier}.
+CRITICAL TOOL CHAINING INSTRUCTIONS:
+1. ALWAYS call identify_project FIRST before using data_fetch
+2. Use the project_id (UUID) returned by identify_project as the input for data_fetch
+3. NEVER use raw user input, CRM IDs, or any other identifiers directly with data_fetch
+4. The identify_project tool will return a "project_id" field - this is what you must use for subsequent tool calls
 
-Current date: ${contextData.current_date || new Date().toISOString().split('T')[0]}
+Example correct workflow:
+1. User asks about "123 Main Street project"
+2. Call identify_project with query="123 Main Street" 
+3. Get result with project_id="abc-123-def-456"
+4. Call data_fetch with project_id="abc-123-def-456"
 
-${contextData.channel_type === 'sms' ? 'Keep your responses concise and to the point as this is an SMS conversation.' : 'Format your responses appropriately for email communication, but still be concise.'}
+NEVER skip step 1 or use incorrect IDs in step 4.
 
-${contextData.project_id ? 'The user is discussing a specific project. Use the project context to provide relevant responses.' : 'If the user refers to a specific project, use the identify_project tool to find it.'}
+When helping users:
+- Be conversational and friendly
+- Ask clarifying questions when needed
+- Always identify projects before fetching detailed data
+- Provide comprehensive information when available
+- Suggest next steps or actions when appropriate
 
-Your responses should be conversational, helpful, and tailored to the ${contextData.channel_type} channel. When users ask about project status or want updates, provide relevant information from the context or use available tools to retrieve it. You are capable of taking actions and creating records in the CRM system when needed.`;
-  }
-
-  // Add information about chat history and memory management
-  if (contextData.session_id) {
-    prompt += `\n\nThis conversation has a history that you should consider when responding. Memory mode is set to ${contextData.memory_mode || 'standard'}. ${contextData.memory_mode === 'detailed' ? 'Refer back to previous messages when relevant to maintain continuity in the conversation.' : 'Focus primarily on the current question but acknowledge previous context when directly relevant.'}`;
-  }
-
-  // Add information about available tools
-  if (hasTools) {
-    prompt += `\n\nYou have access to the following tools:
-${contextData.available_tools}`;
-
-    // Add specific tool usage instructions
-    prompt += `
-    
-When using the session_manager tool, you can manage chat sessions across different channels (web, SMS, email).
-    
-When using the channel_response tool, you can send responses to users through their preferred channel, maintaining the conversation across sessions. The channel_response tool requires:
-- session_id: The ID of the session to send a response to
-- message: The content of the message to send`;
-  }
-
-  return prompt;
+If you encounter errors related to project IDs not being found, always check that you're using the correct project_id from the identify_project tool result.`;
 }
