@@ -70,6 +70,8 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Creating session for ${channel_type}:${channel_identifier} (company: ${company_id})`);
+
     // Use the database function to find or create session
     const { data: sessionId, error: sessionError } = await supabase.rpc(
       'find_or_create_chat_session',
@@ -96,6 +98,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log(`Session created/found with ID: ${sessionId}`);
 
     // If communication_id is provided, link it to this session
     if (communication_id) {

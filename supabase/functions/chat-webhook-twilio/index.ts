@@ -284,6 +284,8 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     throw new Error('Contact not found for authenticated user');
   }
 
+  console.log(`Processing message from authenticated contact: ${contact.full_name} (${contact.id})`);
+
   // Log the message interaction
   await supabase
     .from('audit_log')
@@ -295,7 +297,7 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
       details: { phone_number: from, message_length: body.length }
     });
 
-  // Get or create chat session using service role key
+  // Get or create chat session using the database function directly
   const session = await getOrCreateChatSession(supabase, from, body, contact);
   
   // Add the user's message to session history
@@ -317,6 +319,8 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
 
 async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any) {
   try {
+    console.log(`Creating chat session for contact ${contact.id} from ${from}`);
+    
     // Use the database function directly instead of calling the edge function
     const { data: sessionId, error } = await supabase.rpc('find_or_create_chat_session', {
       p_channel_type: 'sms',
