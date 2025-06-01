@@ -278,6 +278,11 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     return; // Company selection was handled
   }
 
+  // Check if this is a project selection response
+  if (await handleProjectSelection(supabase, from, body)) {
+    return; // Project selection was handled
+  }
+
   // Get the appropriate contact and company for this session
   const contactAndCompany = await resolveContactAndCompany(supabase, from, body);
   
@@ -286,9 +291,9 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     return;
   }
 
-  const { contact, companyId } = contactAndCompany;
+  const { contact, companyId, projectId } = contactAndCompany;
 
-  console.log(`Processing message from authenticated contact: ${contact.full_name} (${contact.id}) for company: ${companyId}`);
+  console.log(`Processing message from authenticated contact: ${contact.full_name} (${contact.id}) for company: ${companyId}${projectId ? ` and project: ${projectId}` : ''}`);
 
   // Log the message interaction
   await supabase
@@ -302,7 +307,7 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     });
 
   // Get or create chat session using the database function directly
-  const session = await getOrCreateChatSession(supabase, from, body, contact, companyId);
+  const session = await getOrCreateChatSession(supabase, from, body, contact, companyId, projectId);
   
   // Add the user's message to session history
   await addMessageToSessionHistory(supabase, session.id, 'user', body);
@@ -319,6 +324,61 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
   
   // Send the response back to the user
   await sendDirectChannelResponse(supabase, session.id, assistantMessage);
+}
+
+async function handleProjectSelection(supabase: any, phoneNumber: string, messageBody: string): Promise<boolean> {
+  // Check if this is a numeric response (project selection)
+  const numericResponse = messageBody.trim();
+  if (!/^\d+$/.test(numericResponse)) {
+    return false; // Not a numeric response
+  }
+
+  // Check if we have a pending project selection for this phone number
+  const { data: pendingSelection } = await supabase
+    .from('chat_sessions')
+    .select('*')
+    .eq('channel_type', 'sms')
+    .eq('channel_identifier', phoneNumber)
+    .eq('memory_mode', 'project_selection')
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!pendingSelection) {
+    return false; // No pending project selection
+  }
+
+  // Get the project options that were presented to the user
+  const projectCompanies = pendingSelection.conversation_history?.[0]?.projectCompanies || [];
+  const selectedIndex = parseInt(numericResponse) - 1;
+
+  if (selectedIndex < 0 || selectedIndex >= projectCompanies.length) {
+    await sendSMS(supabase, phoneNumber, `Invalid selection. Please reply with a number between 1 and ${projectCompanies.length}.`);
+    return true;
+  }
+
+  const selectedProjectCompany = projectCompanies[selectedIndex];
+
+  // Create a new chat session with the selected project and company
+  const { data: sessionId } = await supabase.rpc('find_or_create_chat_session', {
+    p_channel_type: 'sms',
+    p_channel_identifier: phoneNumber,
+    p_company_id: selectedProjectCompany.companyId,
+    p_contact_id: selectedProjectCompany.contactId,
+    p_project_id: selectedProjectCompany.projectId,
+    p_memory_mode: 'standard'
+  });
+
+  // Delete the project selection session
+  await supabase
+    .from('chat_sessions')
+    .update({ active: false })
+    .eq('id', pendingSelection.id);
+
+  await sendSMS(supabase, phoneNumber, `Great! You're now connected to ${selectedProjectCompany.projectName} with ${selectedProjectCompany.companyName}. How can I help you today?`);
+  
+  return true;
 }
 
 async function handleCompanySelection(supabase: any, phoneNumber: string, messageBody: string): Promise<boolean> {
@@ -395,9 +455,15 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
 
   let relevantContacts = companyContacts.length > 0 ? companyContacts : homeownerContacts;
 
-  // If we only have homeowner contacts, we can't proceed (no company_id)
-  if (relevantContacts.length === 0 || (relevantContacts[0].role === 'HO' && !relevantContacts[0].company_id)) {
-    console.log('Only homeowner contacts found with no company association');
+  // If we only have homeowner contacts, we need to look up their projects to find company_id
+  if (relevantContacts.length > 0 && relevantContacts[0].role === 'HO') {
+    console.log('Resolving company for homeowner contacts via project lookup');
+    return await resolveHomeownerCompany(supabase, phoneNumber, relevantContacts);
+  }
+
+  // Handle company contacts (existing logic)
+  if (relevantContacts.length === 0) {
+    console.log('No relevant contacts found');
     return null;
   }
 
@@ -448,6 +514,103 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
   return null; // Will be handled by company selection flow
 }
 
+async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeownerContacts: any[]) {
+  // Get all projects associated with these homeowner contacts
+  const contactIds = homeownerContacts.map(c => c.id);
+  
+  const { data: projectData } = await supabase
+    .from('project_contacts')
+    .select(`
+      project_id,
+      contact_id,
+      projects:project_id (
+        id,
+        company_id,
+        project_name,
+        companies:company_id (
+          id,
+          name
+        )
+      )
+    `)
+    .in('contact_id', contactIds);
+
+  if (!projectData || projectData.length === 0) {
+    console.log('No projects found for homeowner contacts');
+    await sendSMS(supabase, phoneNumber, "I couldn't find any projects associated with your account. Please contact your project manager to get set up.");
+    return null;
+  }
+
+  console.log(`Found ${projectData.length} project associations for homeowner`);
+
+  // Get unique project-company combinations
+  const uniqueProjectCompanies = Array.from(
+    new Map(projectData.map(pd => [
+      `${pd.projects.id}-${pd.projects.company_id}`,
+      {
+        projectId: pd.projects.id,
+        projectName: pd.projects.project_name || `Project ${pd.projects.id.slice(0, 8)}`,
+        companyId: pd.projects.company_id,
+        companyName: pd.projects.companies?.name || 'Unknown Company',
+        contactId: pd.contact_id
+      }
+    ])).values()
+  );
+
+  if (uniqueProjectCompanies.length === 1) {
+    // Only one project/company combination
+    const projectCompany = uniqueProjectCompanies[0];
+    const contact = homeownerContacts.find(c => c.id === projectCompany.contactId);
+    
+    console.log(`Using single project ${projectCompany.projectName} for company ${projectCompany.companyName}`);
+    
+    return {
+      contact: contact,
+      companyId: projectCompany.companyId,
+      projectId: projectCompany.projectId
+    };
+  }
+
+  // Multiple projects - need user to select
+  console.log(`Multiple projects found, creating selection menu`);
+  await createProjectSelectionSession(supabase, phoneNumber, uniqueProjectCompanies, homeownerContacts[0]);
+  
+  return null; // Will be handled by project selection flow
+}
+
+async function createProjectSelectionSession(supabase: any, phoneNumber: string, projectCompanies: any[], contact: any) {
+  // Create a special session for project selection
+  const { data: sessionId } = await supabase.rpc('find_or_create_chat_session', {
+    p_channel_type: 'sms',
+    p_channel_identifier: phoneNumber,
+    p_company_id: projectCompanies[0].companyId, // Use first company as placeholder
+    p_contact_id: contact.id,
+    p_project_id: null,
+    p_memory_mode: 'project_selection'
+  });
+
+  // Store the project options in the session history for reference
+  await supabase
+    .from('chat_sessions')
+    .update({
+      conversation_history: [{
+        role: 'system',
+        content: 'Project selection in progress',
+        projectCompanies: projectCompanies
+      }]
+    })
+    .eq('id', sessionId);
+
+  // Send project selection menu
+  let selectionMessage = "I see you have multiple projects. Please select which project you're asking about:\n\n";
+  projectCompanies.forEach((pc, index) => {
+    selectionMessage += `${index + 1}. ${pc.projectName} (${pc.companyName})\n`;
+  });
+  selectionMessage += "\nReply with the number of your choice.";
+
+  await sendSMS(supabase, phoneNumber, selectionMessage);
+}
+
 async function createCompanySelectionSession(supabase: any, phoneNumber: string, companies: any[]) {
   // Create a special session for company selection
   const { data: sessionId } = await supabase.rpc('find_or_create_chat_session', {
@@ -481,9 +644,9 @@ async function createCompanySelectionSession(supabase: any, phoneNumber: string,
   await sendSMS(supabase, phoneNumber, selectionMessage);
 }
 
-async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any, companyId: string) {
+async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any, companyId: string, projectId?: string) {
   try {
-    console.log(`Creating chat session for contact ${contact.id} from ${from} with company ${companyId}`);
+    console.log(`Creating chat session for contact ${contact.id} from ${from} with company ${companyId}${projectId ? ` and project ${projectId}` : ''}`);
     
     // Use the database function directly instead of calling the edge function
     const { data: sessionId, error } = await supabase.rpc('find_or_create_chat_session', {
@@ -491,7 +654,7 @@ async function getOrCreateChatSession(supabase: any, from: string, body: string,
       p_channel_identifier: from,
       p_company_id: companyId,
       p_contact_id: contact.id,
-      p_project_id: null, // Will be determined later by the AI agent
+      p_project_id: projectId || null, // Will be determined later by the AI agent
       p_memory_mode: 'standard'
     });
     
