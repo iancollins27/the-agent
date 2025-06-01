@@ -51,6 +51,62 @@ serve(async (req) => {
   }
 });
 
+async function sendTwilioSMS(phoneNumber: string, message: string) {
+  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const fromPhone = Deno.env.get('TWILIO_PHONE_NUMBER');
+
+  if (!accountSid || !authToken || !fromPhone) {
+    console.error('Missing Twilio credentials for SMS sending');
+    throw new Error('Missing Twilio credentials');
+  }
+
+  // Format phone numbers (ensure they have the + prefix for E.164 format)
+  const toPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+  const twilioFromPhone = fromPhone.startsWith('+') ? fromPhone : `+${fromPhone}`;
+
+  // Prepare authorization for Twilio API
+  const auth = btoa(`${accountSid}:${authToken}`);
+
+  // Prepare the request body
+  const formData = new URLSearchParams();
+  formData.append('To', toPhone);
+  formData.append('From', twilioFromPhone);
+  formData.append('Body', message);
+
+  // Make the API call to Twilio
+  const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+
+  console.log(`Sending Twilio SMS to ${toPhone}: ${message.substring(0, 50)}...`);
+
+  const response = await fetch(twilioEndpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  });
+
+  const responseText = await response.text();
+  let responseData;
+
+  try {
+    responseData = JSON.parse(responseText);
+  } catch (parseError) {
+    console.error(`Error parsing Twilio response: ${parseError.message}`);
+    throw new Error(`Twilio API response parsing error: ${parseError.message}`);
+  }
+
+  if (!response.ok) {
+    console.error('Twilio API error:', responseData);
+    throw new Error(`Twilio API error: ${responseData.message || responseData.error_message || 'Unknown error'}`);
+  }
+
+  console.log('Successfully sent SMS via Twilio:', responseData.sid);
+  return responseData;
+}
+
 async function parseRequestBody(req: Request): Promise<Record<string, any>> {
   const contentType = req.headers.get('content-type') || '';
   const requestBody: Record<string, any> = {};
@@ -371,9 +427,8 @@ async function sendDirectChannelResponse(userSupabase: any, sessionId: string, a
 
 async function sendSMS(supabase: any, phoneNumber: string, message: string) {
   try {
-    // This would use your SMS provider (Twilio) to send the message
-    // For now, just log it
-    console.log(`Would send SMS to ${phoneNumber}: ${message}`);
+    // Actually send SMS via Twilio instead of just logging
+    await sendTwilioSMS(phoneNumber, message);
     
     // Log the outbound message
     await supabase
@@ -389,5 +444,17 @@ async function sendSMS(supabase: any, phoneNumber: string, message: string) {
       });
   } catch (error) {
     console.error('Error sending SMS:', error);
+    // Also log the failed attempt
+    await supabase
+      .from('audit_log')
+      .insert({
+        action: 'sms_send_failed',
+        resource_type: 'communication',
+        details: { 
+          phone_number: phoneNumber, 
+          error: error.message,
+          message_type: 'system_response'
+        }
+      });
   }
 }
