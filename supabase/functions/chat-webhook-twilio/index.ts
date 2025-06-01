@@ -201,48 +201,70 @@ async function createUserToken(supabase: any, contact: any) {
 }
 
 async function handleUnverifiedPhone(supabase: any, phoneNumber: string, messageBody: string) {
+  console.log(`Handling unverified phone ${phoneNumber} with message: ${messageBody}`);
+  
   // Check if this looks like an OTP
   const otpRegex = /^\d{6}$/;
   if (otpRegex.test(messageBody.trim())) {
-    // Try to verify the OTP
-    const verifyResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      },
-      body: JSON.stringify({
-        phone_number: phoneNumber,
-        verification_code: messageBody.trim(),
-        action: 'verify_otp'
-      })
-    });
-
-    const result = await verifyResponse.json();
+    console.log(`Attempting to verify OTP: ${messageBody.trim()}`);
     
-    if (verifyResponse.ok) {
-      // Send welcome message
-      await sendSMS(supabase, phoneNumber, "Welcome! Your phone number has been verified. You can now ask me questions about your projects.");
-    } else {
-      await sendSMS(supabase, phoneNumber, `Verification failed: ${result.error}. Please try again.`);
+    // Try to verify the OTP
+    try {
+      const verifyResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          verification_code: messageBody.trim(),
+          action: 'verify_otp'
+        })
+      });
+
+      const result = await verifyResponse.json();
+      
+      if (verifyResponse.ok) {
+        console.log('OTP verification successful');
+        // Send welcome message
+        await sendSMS(supabase, phoneNumber, "Welcome! Your phone number has been verified. You can now ask me questions about your projects.");
+      } else {
+        console.log('OTP verification failed:', result.error);
+        await sendSMS(supabase, phoneNumber, `Verification failed: ${result.error}. Please try again.`);
+      }
+    } catch (error) {
+      console.error('Error during OTP verification:', error);
+      await sendSMS(supabase, phoneNumber, "Sorry, there was an error verifying your code. Please try again.");
     }
   } else {
+    console.log(`Requesting new OTP for ${phoneNumber}`);
+    
     // Request OTP for new phone number
-    const otpResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      },
-      body: JSON.stringify({
-        phone_number: phoneNumber,
-        action: 'request_otp'
-      })
-    });
+    try {
+      const otpResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          action: 'request_otp'
+        })
+      });
 
-    if (otpResponse.ok) {
-      await sendSMS(supabase, phoneNumber, "Welcome! For security, please reply with the 6-digit verification code I just sent you.");
-    } else {
+      const result = await otpResponse.json();
+      
+      if (otpResponse.ok) {
+        console.log('OTP request successful');
+        await sendSMS(supabase, phoneNumber, "Welcome! For security, please reply with the 6-digit verification code I just sent you.");
+      } else {
+        console.error('OTP request failed:', result.error);
+        await sendSMS(supabase, phoneNumber, `Sorry, there was an error: ${result.error}. Please try again later.`);
+      }
+    } catch (error) {
+      console.error('Error during OTP request:', error);
       await sendSMS(supabase, phoneNumber, "Sorry, there was an error processing your message. Please try again later.");
     }
   }

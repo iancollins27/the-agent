@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -140,7 +139,7 @@ async function handleOTPRequest(supabase: any, phoneNumber: string) {
     contactId = null;
   }
 
-  // Store or update phone verification
+  // Store or update phone verification - FIXED: Added onConflict parameter
   const { error: upsertError } = await supabase
     .from('phone_verifications')
     .upsert({
@@ -150,11 +149,16 @@ async function handleOTPRequest(supabase: any, phoneNumber: string) {
       failed_attempts: 0,
       locked_until: null,
       last_sim_check: new Date().toISOString()
+    }, {
+      onConflict: 'phone_number'  // This is the key fix - specify which column to conflict on
     });
 
   if (upsertError) {
+    console.error('Upsert error details:', upsertError);
     throw new Error(`Failed to store OTP: ${upsertError.message}`);
   }
+
+  console.log(`Successfully stored/updated OTP for ${phoneNumber}`);
 
   // Send OTP via Twilio SMS
   try {
@@ -276,7 +280,7 @@ async function handleOTPVerification(supabase: any, phoneNumber: string, verific
   };
 
   // Create a simple JWT-like token (in production, use proper JWT library)
-  const tokenString = encode(JSON.stringify(tokenPayload));
+  const tokenString = btoa(JSON.stringify(tokenPayload));
   
   // Store token hash in database
   const { error: tokenError } = await supabase
