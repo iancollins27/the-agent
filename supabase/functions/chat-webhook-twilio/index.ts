@@ -404,6 +404,13 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
   // If there's only one relevant contact, use it
   if (relevantContacts.length === 1) {
     const contact = relevantContacts[0];
+    
+    // Double check that we have a company_id
+    if (!contact.company_id) {
+      console.log(`Contact ${contact.id} has no company_id, cannot create session`);
+      return null;
+    }
+    
     return {
       contact: contact,
       companyId: contact.company_id
@@ -422,6 +429,13 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
   if (uniqueCompanies.length === 1) {
     // Multiple contacts but same company
     const contact = relevantContacts[0];
+    
+    // Double check that we have a company_id
+    if (!contact.company_id) {
+      console.log(`Contact ${contact.id} has no company_id, cannot create session`);
+      return null;
+    }
+    
     return {
       contact: contact,
       companyId: contact.company_id
