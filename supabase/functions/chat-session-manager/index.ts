@@ -29,7 +29,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders, status: 200 });
   }
   
-  // Verify authentication
+  // Verify authentication - but allow service role key
   const authHeader = req.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return new Response(
@@ -70,15 +70,15 @@ serve(async (req) => {
       );
     }
 
-    // Find or create session using the DB function
-    const { data: sessionData, error: sessionError } = await supabase.rpc(
+    // Use the database function to find or create session
+    const { data: sessionId, error: sessionError } = await supabase.rpc(
       'find_or_create_chat_session',
       {
         p_channel_type: channel_type,
         p_channel_identifier: channel_identifier,
-        p_contact_id: contact_id,
+        p_contact_id: contact_id || null,
         p_company_id: company_id,
-        p_project_id: project_id,
+        p_project_id: project_id || null,
         p_memory_mode: memory_mode || 'standard'
       }
     );
@@ -101,7 +101,7 @@ serve(async (req) => {
     if (communication_id) {
       const { error: updateError } = await supabase
         .from('communications')
-        .update({ session_id: sessionData })
+        .update({ session_id: sessionId })
         .eq('id', communication_id);
 
       if (updateError) {
@@ -114,7 +114,7 @@ serve(async (req) => {
     const { data: fullSession, error: fetchError } = await supabase
       .from('chat_sessions')
       .select('*')
-      .eq('id', sessionData)
+      .eq('id', sessionId)
       .single();
 
     if (fetchError) {
@@ -123,7 +123,7 @@ serve(async (req) => {
         JSON.stringify({
           error: fetchError.message,
           message: "Session was created but details could not be fetched",
-          session_id: sessionData
+          session_id: sessionId
         }),
         {
           status: 200, // Still return 200 as the core operation succeeded

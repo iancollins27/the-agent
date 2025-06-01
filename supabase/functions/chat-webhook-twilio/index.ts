@@ -284,19 +284,6 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     throw new Error('Contact not found for authenticated user');
   }
 
-  // Create user-scoped supabase client
-  const userSupabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    {
-      global: {
-        headers: {
-          'Authorization': `Bearer ${userToken.token_hash}`
-        }
-      }
-    }
-  );
-
   // Log the message interaction
   await supabase
     .from('audit_log')
@@ -308,44 +295,57 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
       details: { phone_number: from, message_length: body.length }
     });
 
-  // Get or create chat session with proper context
-  const session = await getOrCreateChatSession(userSupabase, from, body, contact);
+  // Get or create chat session using service role key
+  const session = await getOrCreateChatSession(supabase, from, body, contact);
   
   // Add the user's message to session history
-  await addMessageToSessionHistory(userSupabase, session.id, 'user', body);
+  await addMessageToSessionHistory(supabase, session.id, 'user', body);
   
   // Get the full conversation history for context
-  const conversationHistory = await getConversationHistory(userSupabase, session.id);
+  const conversationHistory = await getConversationHistory(supabase, session.id);
   
   // Process the message with AI agent using user context
-  const assistantMessage = await processMessageWithAgent(userSupabase, session.id, conversationHistory, userToken);
+  const assistantMessage = await processMessageWithAgent(supabase, session.id, conversationHistory, userToken);
   console.log(`Agent response: ${assistantMessage}`);
   
   // Add the assistant's response to session history
-  await addMessageToSessionHistory(userSupabase, session.id, 'assistant', assistantMessage);
+  await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
   
   // Send the response back to the user
-  await sendDirectChannelResponse(userSupabase, session.id, assistantMessage);
+  await sendDirectChannelResponse(supabase, session.id, assistantMessage);
 }
 
-async function getOrCreateChatSession(userSupabase: any, from: string, body: string, contact: any) {
+async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any) {
   try {
-    const sessionResponse = await userSupabase.functions.invoke('chat-session-manager', {
-      body: {
-        channel_type: 'sms',
-        channel_identifier: from,
-        company_id: contact.company_id,
-        contact_id: contact.id,
-        message_content: body
-      }
+    // Use the database function directly instead of calling the edge function
+    const { data: sessionId, error } = await supabase.rpc('find_or_create_chat_session', {
+      p_channel_type: 'sms',
+      p_channel_identifier: from,
+      p_company_id: contact.company_id,
+      p_contact_id: contact.id,
+      p_project_id: null, // Will be determined later by the AI agent
+      p_memory_mode: 'standard'
     });
     
-    if (!sessionResponse.data) {
-      throw new Error('Failed to create chat session');
+    if (error) {
+      console.error('Error creating chat session:', error);
+      throw new Error(`Failed to create chat session: ${error.message}`);
     }
     
-    console.log(`Chat session retrieved/created with ID: ${sessionResponse.data.session.id}`);
-    return sessionResponse.data.session;
+    // Get the full session data
+    const { data: session, error: fetchError } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+      
+    if (fetchError) {
+      console.error('Error fetching session details:', fetchError);
+      throw new Error(`Failed to fetch session: ${fetchError.message}`);
+    }
+    
+    console.log(`Chat session retrieved/created with ID: ${session.id}`);
+    return session;
   } catch (error) {
     console.error('Error in getOrCreateChatSession:', error);
     throw error;
