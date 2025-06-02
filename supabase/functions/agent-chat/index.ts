@@ -25,6 +25,7 @@ serve(async (req) => {
     let userProfile = null
     let companyId = null
     let authContext = 'anonymous'
+    let authenticatedContact = null
     
     // Handle different authentication types
     if (contact_id) {
@@ -38,15 +39,178 @@ serve(async (req) => {
         .single()
       
       if (contact && !contactError) {
+        authenticatedContact = contact
         userProfile = contact
         companyId = contact.company_id
         authContext = 'sms'
         
-        // For homeowners, company_id might be null - this is expected
+        console.log(`SMS contact authenticated - contact: ${contact.id}, company: ${companyId || 'null (homeowner)'}, role: ${contact.role}`)
+        
+        // For homeowners, directly fetch their projects without using identify_project tool
         if (contact.role === 'homeowner' || contact.role === 'HO') {
-          console.log(`SMS user authenticated - contact: ${contact.id}, company: ${companyId || 'null (homeowner)'}, role: ${contact.role}`)
-        } else {
-          console.log(`SMS user authenticated - contact: ${contact.id}, company: ${companyId}`)
+          console.log(`Homeowner detected - fetching projects directly for contact ${contact.id}`)
+          
+          // Get homeowner's projects directly
+          const { data: homeownerProjects, error: projectsError } = await supabase
+            .from('project_contacts')
+            .select(`
+              project_id,
+              projects!inner(
+                id,
+                crm_id, 
+                company_id,
+                project_name,
+                summary,
+                next_step,
+                Address,
+                Project_status
+              )
+            `)
+            .eq('contact_id', contact.id)
+          
+          if (!projectsError && homeownerProjects && homeownerProjects.length > 0) {
+            // Store the project information for the context
+            const homeownerProjectData = homeownerProjects[0].projects
+            console.log(`Found ${homeownerProjects.length} projects for homeowner`)
+            
+            // Update the context with the homeowner's project
+            if (!projectId && homeownerProjectData) {
+              // Set the project context for tools
+              const toolContext = {
+                supabase,
+                userProfile: contact,
+                companyId: homeownerProjectData.company_id,
+                projectId: homeownerProjectData.id,
+                projectData: homeownerProjectData,
+                authContext: 'homeowner',
+                authenticatedContact: contact,
+                req
+              }
+              
+              // Enhanced system prompt for homeowners
+              const homeownerPrompt = `${customPrompt || 'You are a helpful AI assistant.'}
+
+HOMEOWNER CONTEXT:
+- You are speaking with ${contact.full_name}, a homeowner
+- Their project: ${homeownerProjectData.project_name || homeownerProjectData.Address || 'Roofing Project'}
+- Project status: ${homeownerProjectData.Project_status || 'Active'}
+- You can help them with updates about their specific project
+
+IMPORTANT: You are speaking with the homeowner directly. Use tools like data_fetch with project_id: ${homeownerProjectData.id} to get current project information.
+
+Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record'].includes(t.name)).map(t => t.name).join(', ')}`
+
+              // Filter tools to only homeowner-appropriate ones
+              const homeownerTools = toolRegistry.getAllTools().filter(tool => 
+                ['data_fetch', 'create_action_record'].includes(tool.name)
+              )
+              
+              const toolDefinitions = homeownerTools.map(tool => ({
+                type: "function",
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.schema
+                }
+              }))
+
+              // Prepare messages for OpenAI
+              const openAIMessages = [
+                { role: "system", content: homeownerPrompt },
+                ...messages
+              ]
+
+              console.log(`Sending OpenAI request for homeowner with tools: [${toolDefinitions.map(t => `"${t.function.name}"`).join(',')}]`)
+
+              // Call OpenAI
+              const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o',
+                  messages: openAIMessages,
+                  tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+                  tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
+                  temperature: 0.7
+                })
+              })
+
+              if (!openAIResponse.ok) {
+                const errorData = await openAIResponse.text()
+                console.error('OpenAI API error:', errorData)
+                throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
+              }
+
+              const openAIData = await openAIResponse.json()
+              const assistantMessage = openAIData.choices[0].message
+
+              // Handle tool calls if present
+              if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+                console.log(`Processing ${assistantMessage.tool_calls.length} tool calls for homeowner`)
+                
+                const toolResponses = []
+                
+                for (const toolCall of assistantMessage.tool_calls) {
+                  console.log(`Executing tool ${toolCall.function.name} for homeowner with args: ${toolCall.function.arguments}`)
+                  
+                  try {
+                    const args = JSON.parse(toolCall.function.arguments)
+                    const result = await toolExecutor.executeTool(
+                      toolCall.function.name,
+                      args,
+                      toolContext
+                    )
+                    
+                    toolResponses.push({
+                      tool_call_id: toolCall.id,
+                      content: JSON.stringify(result)
+                    })
+                    
+                    console.log(`Tool ${toolCall.function.name} execution completed for homeowner`)
+                  } catch (error) {
+                    console.error(`Tool execution error for homeowner ${toolCall.function.name}:`, error)
+                    toolResponses.push({
+                      tool_call_id: toolCall.id,
+                      content: JSON.stringify({
+                        status: "error",
+                        error: error.message
+                      })
+                    })
+                  }
+                }
+                
+                // Add tool responses to the message
+                assistantMessage.tool_responses = toolResponses
+              }
+
+              // Log observability data for homeowner
+              await logObservability({
+                supabase,
+                projectId: homeownerProjectData.id,
+                userProfile: contact,
+                companyId: homeownerProjectData.company_id,
+                messages: openAIMessages,
+                response: assistantMessage,
+                toolCalls: assistantMessage.tool_calls || [],
+                model: 'gpt-4o',
+                usage: openAIData.usage
+              })
+
+              return new Response(JSON.stringify({
+                choices: [{
+                  message: assistantMessage
+                }],
+                usage: openAIData.usage
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              })
+            }
+          } else {
+            console.log(`No projects found for homeowner ${contact.id}`)
+          }
         }
       } else {
         console.error(`Failed to authenticate contact: ${contactError?.message}`)
@@ -86,6 +250,7 @@ serve(async (req) => {
       })
     }
 
+    // Continue with regular flow for web users
     // Filter tools based on availability
     const registeredTools = toolRegistry.getAllTools()
     const filteredTools = availableTools.length > 0 
@@ -111,10 +276,11 @@ serve(async (req) => {
     const toolContext = {
       supabase,
       userProfile,
-      companyId, // For homeowners, this might be null - tools should handle this
+      companyId,
       projectId,
       projectData,
       authContext,
+      authenticatedContact,
       req
     }
 
@@ -170,13 +336,6 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
       
       for (const toolCall of assistantMessage.tool_calls) {
         console.log(`Executing tool ${toolCall.function.name} with args: ${toolCall.function.arguments}`)
-        
-        // Enhanced security context logging for homeowners
-        if (userProfile?.role === 'homeowner' || userProfile?.role === 'HO') {
-          console.log(`Security context for tool execution - homeowner: ${userProfile.id}, company: ${companyId || 'none'}`)
-        } else {
-          console.log(`Security context for tool execution - user: ${userProfile?.id}, company: ${companyId || 'none'}`)
-        }
         
         try {
           const args = JSON.parse(toolCall.function.arguments)

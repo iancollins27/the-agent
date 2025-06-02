@@ -46,12 +46,29 @@ export async function executeToolCall(
 // Create the toolExecutor object that agent-chat expects
 export const toolExecutor = {
   executeTool: async (toolName: string, args: any, context: any) => {
+    // Enhanced context handling for contact-based authentication
+    const enhancedContext = {
+      ...context,
+      // Pass through contact information for homeowner flows
+      authenticatedContact: context.authenticatedContact || null,
+      authContext: context.authContext || 'web'
+    };
+
+    console.log(`Tool execution context: ${JSON.stringify({
+      toolName,
+      authContext: enhancedContext.authContext,
+      userProfile: enhancedContext.userProfile?.id,
+      companyId: enhancedContext.companyId,
+      projectId: enhancedContext.projectId,
+      contactId: enhancedContext.authenticatedContact?.id
+    })}`);
+
     return await executeToolCall(
-      context.supabase,
+      enhancedContext.supabase,
       toolName,
       args,
-      context.userProfile,
-      context.companyId
+      enhancedContext.userProfile,
+      enhancedContext.companyId
     );
   }
 };
