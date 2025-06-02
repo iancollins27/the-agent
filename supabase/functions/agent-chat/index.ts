@@ -59,19 +59,20 @@ serve(async (req) => {
       // Web authentication - userId provided
       console.log(`Request received with userId: ${userId}`)
       
-      const { data: profile, error: profileError } = await supabase
+      // Fix the authentication query to handle multiple or no profiles
+      const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, company_id, role, permission')
         .eq('id', userId)
-        .single()
+        .limit(1)
       
-      if (profile && !profileError) {
-        userProfile = profile
-        companyId = profile.company_id
+      if (profiles && profiles.length > 0 && !profileError) {
+        userProfile = profiles[0] // Take the first profile
+        companyId = profiles[0].company_id
         authContext = 'web'
-        console.log(`Web user authenticated - user: ${profile.id}, company: ${companyId}`)
+        console.log(`Web user authenticated - user: ${profiles[0].id}, company: ${companyId}`)
       } else {
-        console.error(`Failed to authenticate user: ${profileError?.message}`)
+        console.error(`Failed to authenticate user: ${profileError?.message || 'No profile found'}`)
         return new Response(JSON.stringify({ error: 'Authentication failed' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
