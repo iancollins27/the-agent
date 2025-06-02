@@ -13,6 +13,91 @@ export interface ConversationMetrics {
   cost: number;
 }
 
+export interface LogObservabilityParams {
+  supabase: any;
+  projectId?: string;
+  userProfile?: any;
+  companyId?: string;
+  messages: any[];
+  response: any;
+  toolCalls: any[];
+  model: string;
+  usage?: any;
+}
+
+export async function logObservability(params: LogObservabilityParams): Promise<void> {
+  try {
+    const {
+      supabase,
+      projectId,
+      userProfile,
+      companyId,
+      messages,
+      response,
+      toolCalls,
+      model,
+      usage
+    } = params;
+
+    // Calculate metrics
+    const metrics: Partial<ConversationMetrics> = {};
+    if (usage) {
+      metrics.promptTokens = usage.prompt_tokens || 0;
+      metrics.completionTokens = usage.completion_tokens || 0;
+      metrics.totalTokens = usage.total_tokens || 0;
+      metrics.cost = calculateOpenAICost(model, {
+        prompt: metrics.promptTokens,
+        completion: metrics.completionTokens
+      });
+    }
+    
+    metrics.toolCalls = toolCalls?.length || 0;
+
+    // Create a prompt run record for observability
+    const promptRunData = {
+      project_id: projectId,
+      company_id: companyId,
+      contact_id: userProfile?.id,
+      model: model,
+      prompt_input: JSON.stringify({
+        messages: messages,
+        model: model,
+        tools_available: toolCalls?.length > 0
+      }),
+      prompt_output: JSON.stringify(response),
+      status: 'COMPLETED',
+      prompt_tokens: metrics.promptTokens,
+      completion_tokens: metrics.completionTokens,
+      usd_cost: metrics.cost,
+      tool_calls: metrics.toolCalls,
+      created_at: new Date().toISOString(),
+      completed_at: new Date().toISOString()
+    };
+
+    // Insert the prompt run record
+    const { error: promptRunError } = await supabase
+      .from('prompt_runs')
+      .insert(promptRunData);
+
+    if (promptRunError) {
+      console.error('Error logging prompt run:', promptRunError);
+    } else {
+      console.log('Successfully logged conversation observability data');
+    }
+
+    // Log tool usage if any tools were called
+    if (toolCalls && toolCalls.length > 0) {
+      console.log(`Logged conversation with ${toolCalls.length} tool calls, ${metrics.totalTokens} tokens, cost: $${metrics.cost?.toFixed(4) || '0.0000'}`);
+    } else {
+      console.log(`Logged conversation with ${metrics.totalTokens} tokens, cost: $${metrics.cost?.toFixed(4) || '0.0000'}`);
+    }
+
+  } catch (error) {
+    console.error('Error in logObservability:', error);
+    // Don't throw here to avoid breaking the main conversation flow
+  }
+}
+
 export async function logPromptCompletion(
   supabase: any,
   promptRunId: string,
