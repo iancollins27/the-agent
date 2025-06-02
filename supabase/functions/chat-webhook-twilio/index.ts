@@ -444,20 +444,23 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
     .eq('phone_number', phoneNumber);
 
   if (!contacts || contacts.length === 0) {
+    console.log(`No contacts found for phone ${phoneNumber}`);
     return null;
   }
 
-  console.log(`Found ${contacts.length} contacts for phone ${phoneNumber}`);
+  console.log(`Found ${contacts.length} contacts for phone ${phoneNumber}:`, contacts.map(c => ({ id: c.id, role: c.role, company_id: c.company_id, full_name: c.full_name })));
 
   // Filter contacts: prioritize company contacts over homeowners
   const companyContacts = contacts.filter(c => c.role !== 'HO' && c.company_id);
   const homeownerContacts = contacts.filter(c => c.role === 'HO');
 
+  console.log(`Company contacts: ${companyContacts.length}, Homeowner contacts: ${homeownerContacts.length}`);
+
   let relevantContacts = companyContacts.length > 0 ? companyContacts : homeownerContacts;
 
   // If we only have homeowner contacts, we need to look up their projects to find company_id
   if (relevantContacts.length > 0 && relevantContacts[0].role === 'HO') {
-    console.log('Resolving company for homeowner contacts via project lookup');
+    console.log('Processing homeowner contacts - looking up projects');
     return await resolveHomeownerCompany(supabase, phoneNumber, relevantContacts);
   }
 
@@ -477,6 +480,7 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
       return null;
     }
     
+    console.log(`Using single company contact: ${contact.id} with company ${contact.company_id}`);
     return {
       contact: contact,
       companyId: contact.company_id
@@ -502,6 +506,7 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
       return null;
     }
     
+    console.log(`Using contact from single company: ${contact.id} with company ${contact.company_id}`);
     return {
       contact: contact,
       companyId: contact.company_id
@@ -509,16 +514,20 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
   }
 
   // Multiple companies - create a selection session
+  console.log(`Multiple companies found, creating selection menu`);
   await createCompanySelectionSession(supabase, phoneNumber, uniqueCompanies);
   
   return null; // Will be handled by company selection flow
 }
 
 async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeownerContacts: any[]) {
+  console.log(`Resolving company for ${homeownerContacts.length} homeowner contacts`);
+  
   // Get all projects associated with these homeowner contacts
   const contactIds = homeownerContacts.map(c => c.id);
+  console.log(`Looking up projects for contact IDs: ${contactIds.join(', ')}`);
   
-  const { data: projectData } = await supabase
+  const { data: projectData, error: projectError } = await supabase
     .from('project_contacts')
     .select(`
       project_id,
@@ -535,6 +544,14 @@ async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeo
     `)
     .in('contact_id', contactIds);
 
+  console.log(`Project query result:`, { projectData, projectError });
+
+  if (projectError) {
+    console.error('Error querying projects for homeowner:', projectError);
+    await sendSMS(supabase, phoneNumber, "Sorry, there was an error looking up your project information. Please try again later.");
+    return null;
+  }
+
   if (!projectData || projectData.length === 0) {
     console.log('No projects found for homeowner contacts');
     await sendSMS(supabase, phoneNumber, "I couldn't find any projects associated with your account. Please contact your project manager to get set up.");
@@ -543,9 +560,20 @@ async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeo
 
   console.log(`Found ${projectData.length} project associations for homeowner`);
 
+  // Filter out any projects without valid company data
+  const validProjects = projectData.filter(pd => pd.projects && pd.projects.company_id && pd.projects.companies);
+  
+  if (validProjects.length === 0) {
+    console.log('No projects with valid company data found');
+    await sendSMS(supabase, phoneNumber, "I found your projects but they don't have valid company information. Please contact your project manager.");
+    return null;
+  }
+
+  console.log(`Found ${validProjects.length} valid project associations`);
+
   // Get unique project-company combinations
   const uniqueProjectCompanies = Array.from(
-    new Map(projectData.map(pd => [
+    new Map(validProjects.map(pd => [
       `${pd.projects.id}-${pd.projects.company_id}`,
       {
         projectId: pd.projects.id,
@@ -556,6 +584,8 @@ async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeo
       }
     ])).values()
   );
+
+  console.log(`Unique project-company combinations: ${uniqueProjectCompanies.length}`);
 
   if (uniqueProjectCompanies.length === 1) {
     // Only one project/company combination
