@@ -1,172 +1,133 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ProviderInfo } from "../types.ts";
 
 export async function getProviderInfo(
-  supabase: SupabaseClient,
-  providerId?: string,
-  companyId?: string,
-  channel?: string,
-  actionId?: string,
-  sourceIp: string = 'unknown'
+  supabase: any,
+  providerId: string | undefined,
+  companyId: string | null,
+  channel: string,
+  actionId: string | undefined,
+  sourceIp: string
 ): Promise<ProviderInfo> {
-  let providerInfo: ProviderInfo | null = null;
-  
-  // Log input parameters for debugging
-  console.log("getProviderInfo called with:", {
-    providerId,
-    companyId, 
-    channel,
-    actionId,
-    sourceIp
-  });
-  
-  // If specific provider ID was provided, use that
-  if (providerId) {
-    providerInfo = await getProviderById(supabase, providerId, actionId, channel, sourceIp);
-  } 
-  // Otherwise use the default provider for this channel type if company ID is available
-  else if (companyId && channel) {
-    providerInfo = await getDefaultProvider(supabase, companyId, channel, actionId, sourceIp);
-  }
+  console.log(`getProviderInfo called with: {
+  providerId: ${providerId || 'undefined'},
+  companyId: "${companyId}",
+  channel: "${channel}",
+  actionId: ${actionId || 'undefined'},
+  sourceIp: "${sourceIp}"
+}`);
 
-  // If still no provider found, check for system-level default Twilio configuration
-  if (!providerInfo && channel?.toLowerCase() === 'sms') {
+  // Check if this is a forced provider request (for agent responses)
+  if (providerId === 'twilio' && channel.toLowerCase() === 'sms') {
+    console.log('Forced Twilio provider requested - using system-level credentials');
+    
+    // Use system-level Twilio credentials
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
     
-    if (twilioAccountSid && twilioAuthToken) {
-      console.log('Using system-level default Twilio configuration');
-      providerInfo = {
+    if (twilioAccountSid && twilioAuthToken && twilioPhoneNumber) {
+      return {
         provider_name: 'twilio',
         api_key: twilioAccountSid,
         api_secret: twilioAuthToken,
-        account_id: twilioAccountSid,
-        justcall_number: twilioPhoneNumber
+        justcall_number: twilioPhoneNumber,
+        account_id: twilioAccountSid
+      };
+    } else {
+      console.warn('System-level Twilio credentials not found, falling back to database lookup');
+    }
+  }
+
+  // If a specific provider ID is requested, look it up
+  if (providerId) {
+    console.log(`Looking up provider with ID: ${providerId}`);
+    
+    const { data: provider, error } = await supabase
+      .from('communication_providers')
+      .select('*')
+      .eq('id', providerId)
+      .single();
+
+    if (error) {
+      console.error(`Error looking up provider ${providerId}:`, error);
+      throw new Error(`Provider not found: ${providerId}`);
+    }
+
+    if (!provider) {
+      throw new Error(`Provider not found: ${providerId}`);
+    }
+
+    console.log(`Provider found with ID: ${providerId}`, {
+      provider_name: provider.provider_name,
+      has_api_key: !!provider.api_key,
+      has_api_secret: !!provider.api_secret,
+      has_account_id: !!provider.account_id
+    });
+
+    return {
+      provider_name: provider.provider_name,
+      api_key: provider.api_key,
+      api_secret: provider.api_secret,
+      justcall_number: provider.justcall_number,
+      account_id: provider.account_id
+    };
+  }
+
+  // If no specific provider ID and we have a company, look up default provider
+  if (companyId) {
+    const channelType = channel.toLowerCase() === 'sms' ? 'phone' : channel.toLowerCase();
+    console.log(`Looking up default ${channelType} provider for company ${companyId}`);
+    
+    const { data: defaultProvider, error } = await supabase
+      .from('communication_providers')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('channel_type', channelType)
+      .eq('is_default', true)
+      .single();
+
+    if (!error && defaultProvider) {
+      console.log(`Found default provider ID: ${defaultProvider.id}`);
+      
+      console.log(`Provider found with ID: ${defaultProvider.id}`, {
+        provider_name: defaultProvider.provider_name,
+        has_api_key: !!defaultProvider.api_key,
+        has_api_secret: !!defaultProvider.api_secret,
+        has_account_id: !!defaultProvider.account_id
+      });
+
+      return {
+        provider_name: defaultProvider.provider_name,
+        api_key: defaultProvider.api_key,
+        api_secret: defaultProvider.api_secret,
+        justcall_number: defaultProvider.justcall_number,
+        account_id: defaultProvider.account_id
+      };
+    } else {
+      console.log(`No default ${channelType} provider found for company ${companyId}`);
+    }
+  }
+
+  // Fallback to system-level Twilio for SMS if no company provider found
+  if (channel.toLowerCase() === 'sms') {
+    console.log('Falling back to system-level Twilio credentials');
+    
+    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+    
+    if (twilioAccountSid && twilioAuthToken && twilioPhoneNumber) {
+      console.log('Using system-level Twilio credentials as fallback');
+      return {
+        provider_name: 'twilio',
+        api_key: twilioAccountSid,
+        api_secret: twilioAuthToken,
+        justcall_number: twilioPhoneNumber,
+        account_id: twilioAccountSid
       };
     }
   }
 
-  // If still no provider found, use mock provider
-  if (!providerInfo) {
-    console.log('No provider found, using mock provider for testing');
-    providerInfo = { 
-      provider_name: 'mock',
-      api_key: 'mock-key',
-      api_secret: 'mock-secret'
-    };
-  }
-  
-  return providerInfo;
-}
-
-async function getProviderById(
-  supabase: SupabaseClient,
-  providerId: string,
-  actionId?: string,
-  channel?: string,
-  sourceIp: string = 'unknown'
-): Promise<ProviderInfo | null> {
-  console.log(`Looking up provider with ID: ${providerId}`);
-  
-  // Log access to the integration keys
-  await logIntegrationKeyAccess(
-    supabase,
-    providerId,
-    actionId ? `send-communication function (action: ${actionId})` : 'send-communication function',
-    `Sending ${channel || 'unknown'} communication`,
-    sourceIp
-  );
-  
-  // Get provider credentials using the secure function
-  const { data: providerData, error: providerError } = await supabase.rpc(
-    'get_company_integration_keys',
-    { integration_id: providerId }
-  );
-  
-  if (providerError) {
-    console.error(`Error fetching provider details: ${providerError.message}`);
-    return null;
-  } 
-  
-  if (providerData && providerData.length > 0) {
-    // Query to get the provider_name, as it's not included in the secure RPC
-    const { data: integrationData, error: integrationError } = await supabase
-      .from('company_integrations')
-      .select('provider_name')
-      .eq('id', providerId)
-      .single();
-      
-    // Merge the provider_name from company_integrations with the secure credentials
-    const providerName = integrationError ? 'unnamed' : integrationData?.provider_name || 'unnamed';
-    
-    console.log(`Provider found with ID: ${providerId}`, {
-      provider_name: providerName,
-      has_api_key: !!providerData[0].api_key,
-      has_api_secret: !!providerData[0].api_secret,
-      has_account_id: !!providerData[0].account_id
-    });
-    
-    return {
-      ...providerData[0],
-      provider_name: providerName
-    };
-  }
-  
-  console.log(`No provider found with ID: ${providerId}`);
-  return null;
-}
-
-async function getDefaultProvider(
-  supabase: SupabaseClient,
-  companyId: string,
-  channel: string,
-  actionId?: string,
-  sourceIp: string = 'unknown'
-): Promise<ProviderInfo | null> {
-  const providerType = channel === 'email' ? 'email' : 'phone';
-  
-  console.log(`Looking up default ${providerType} provider for company ${companyId}`);
-  
-  // Get the default provider ID for this channel
-  const defaultProviderColumn = channel === 'email' ? 'default_email_provider' : 'default_phone_provider';
-  
-  const { data: companyData, error: companyError } = await supabase
-    .from('companies')
-    .select(defaultProviderColumn)
-    .eq('id', companyId)
-    .single();
-    
-  if (companyError) {
-    console.error(`Error fetching company: ${companyError.message}`);
-    return null;
-  } 
-  
-  if (companyData && companyData[defaultProviderColumn]) {
-    const defaultProviderId = companyData[defaultProviderColumn];
-    console.log(`Found default provider ID: ${defaultProviderId}`);
-    
-    return await getProviderById(supabase, defaultProviderId, actionId, channel, sourceIp);
-  }
-  
-  return null;
-}
-
-async function logIntegrationKeyAccess(
-  supabase: SupabaseClient,
-  integrationId: string,
-  accessedBy: string,
-  accessReason: string,
-  sourceIp: string
-): Promise<void> {
-  await supabase.rpc(
-    'log_integration_key_access',
-    { 
-      p_integration_id: integrationId,
-      p_accessed_by: accessedBy,
-      p_access_reason: accessReason,
-      p_source_ip: sourceIp
-    }
-  );
+  throw new Error(`No communication provider configured for ${channel} channel${companyId ? ` for company ${companyId}` : ''}`);
 }

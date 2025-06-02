@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { corsHeaders } from "./utils/headers.ts";
@@ -48,26 +47,46 @@ serve(async (req) => {
       projectId, 
       companyId, 
       isTest,
-      sender
+      sender,
+      providerInfo: forcedProviderInfo
     } = requestData;
 
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
     console.log(`Sender details:`, sender || 'Not provided');
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
+    
+    // Check if provider is forced (for agent responses)
+    if (forcedProviderInfo && forcedProviderInfo.provider_name) {
+      console.log(`Forced provider requested: ${forcedProviderInfo.provider_name}`);
+    }
 
     // Determine company ID
     const targetCompanyId = await determineCompanyId(supabase, companyId, projectId);
     
-    // Determine provider info
-    const providerInfo = await getProviderInfo(
-      supabase, 
-      providerId, 
-      targetCompanyId, 
-      channel, 
-      actionId, 
-      req.headers.get('x-real-ip') || 'unknown'
-    );
+    // Determine provider info - use forced provider if specified, otherwise follow normal logic
+    let providerInfo;
+    if (forcedProviderInfo && forcedProviderInfo.provider_name) {
+      // Use the forced provider (for agent responses)
+      providerInfo = await getProviderInfo(
+        supabase, 
+        forcedProviderInfo.provider_name, // Pass the provider name as providerId
+        targetCompanyId, 
+        channel, 
+        actionId, 
+        req.headers.get('x-real-ip') || 'unknown'
+      );
+    } else {
+      // Normal provider selection logic
+      providerInfo = await getProviderInfo(
+        supabase, 
+        providerId, 
+        targetCompanyId, 
+        channel, 
+        actionId, 
+        req.headers.get('x-real-ip') || 'unknown'
+      );
+    }
 
     // Validate required fields
     if (!messageContent) {

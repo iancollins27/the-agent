@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -190,6 +189,28 @@ async function sendSmsMessage(session: any, message: string, sender?: any): Prom
       }
     }
     
+    // Prepare request body for send-communication
+    const requestBody: any = {
+      projectId: session.project_id || null,
+      channel: 'SMS',
+      messageContent: message,
+      recipient,
+      sender: sender || null
+    };
+
+    // If sender is provided (agent response), force Twilio provider
+    if (sender && sender.phone) {
+      console.log('Agent SMS response - forcing Twilio provider');
+      requestBody.providerInfo = {
+        provider_name: 'twilio' // Force Twilio for agent responses
+      };
+    } else {
+      // Let send-communication choose the appropriate provider
+      requestBody.providerInfo = {
+        provider_name: 'auto'
+      };
+    }
+    
     // Use send-communication function to send SMS
     const response = await fetch(`${supabaseUrl}/functions/v1/send-communication`, {
       method: 'POST',
@@ -197,16 +218,7 @@ async function sendSmsMessage(session: any, message: string, sender?: any): Prom
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${supabaseServiceKey}`,
       },
-      body: JSON.stringify({
-        projectId: session.project_id || null,
-        channel: 'SMS',
-        messageContent: message,
-        recipient,
-        sender: sender || null, // Pass sender information if provided
-        providerInfo: {
-          provider_name: 'auto' // Let send-communication choose the appropriate provider
-        }
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -215,7 +227,7 @@ async function sendSmsMessage(session: any, message: string, sender?: any): Prom
     }
 
     const result = await response.json();
-    return result.id || null;
+    return result.communication_id || null;
   } catch (error) {
     console.error('Error in sendSmsMessage:', error);
     return null;
