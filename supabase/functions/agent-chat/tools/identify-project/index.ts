@@ -1,41 +1,35 @@
+
 /**
  * Tool to identify a project based on provided information
- * Now properly respects RLS and user scoping
+ * Now properly respects RLS and user scoping, with special handling for homeowners
  */
 
 import { Tool, ToolResult } from '../types.ts';
 
 export const identifyProjectTool: Tool = {
   name: "identify_project",
-  description: "Identifies a project based on provided information like ID, name, or address. This tool MUST be called before using data_fetch. It returns the correct project_id (UUID) that should be used with other tools like data_fetch. Respects user permissions - company users see company projects, homeowners see only their projects.",
+  description: "Identifies a project based on provided information like ID, name, or address. For homeowners, automatically returns their associated projects. For company users, searches based on the query. This tool MUST be called before using data_fetch. It returns the correct project_id (UUID) that should be used with other tools like data_fetch.",
   schema: {
     type: "object",
     properties: {
       query: {
         type: "string",
-        description: "The project identifier, address, or description to search for"
+        description: "The project identifier, address, or description to search for (optional for homeowners - they get their projects automatically)"
       },
       type: {
         type: "string",
         enum: ["id", "crm_id", "name", "address", "any"],
-        description: "Type of query (defaults to 'any')"
+        description: "Type of query (defaults to 'any', ignored for homeowners)"
       }
     },
-    required: ["query"]
+    required: []
   },
   
   async execute(args: any, context: any): Promise<ToolResult> {
     try {
-      const { query, type = "any" } = args;
+      const { query = "", type = "any" } = args;
       
-      if (!query) {
-        return {
-          status: "error",
-          error: "Query is required to identify a project"
-        };
-      }
-      
-      console.log(`Executing identify_project tool: query="${query}", user context: contact=${context.userProfile?.id}, company=${context.companyId}`);
+      console.log(`Executing identify_project tool: query="${query}", user context: contact=${context.userProfile?.id}, company=${context.companyId}, role=${context.userProfile?.role}`);
       
       // Log the search attempt
       await context.supabase
@@ -45,16 +39,119 @@ export const identifyProjectTool: Tool = {
           company_id: context.companyId,
           action: 'project_search',
           resource_type: 'project',
-          details: { query, search_type: type }
+          details: { query, search_type: type, user_role: context.userProfile?.role }
         });
       
       let projects = [];
       let projectContacts = [];
       let companyId = context.companyId;
       
+      // Check if this is a homeowner
+      const isHomeowner = context.userProfile?.role === 'homeowner' || context.userProfile?.role === 'HO';
+      
+      if (isHomeowner && context.userProfile?.id) {
+        console.log(`Homeowner detected - fetching projects for contact ${context.userProfile.id}`);
+        
+        // For homeowners, get their projects directly from project_contacts
+        const { data: homeownerProjects, error: homeownerError } = await context.supabase
+          .from('project_contacts')
+          .select(`
+            project_id,
+            projects!inner(
+              id,
+              crm_id, 
+              company_id,
+              project_name,
+              summary,
+              next_step,
+              Address,
+              Project_status
+            )
+          `)
+          .eq('contact_id', context.userProfile.id);
+        
+        if (homeownerError) {
+          console.error(`Error fetching homeowner projects: ${homeownerError.message}`);
+          return {
+            status: "error",
+            error: homeownerError.message,
+            message: "Could not retrieve your projects"
+          };
+        }
+        
+        if (homeownerProjects && homeownerProjects.length > 0) {
+          // Transform the data to match expected format
+          projects = homeownerProjects.map(pc => pc.projects);
+          companyId = projects[0]?.company_id;
+          
+          // Get contacts for the first project
+          projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
+          
+          console.log(`Found ${projects.length} projects for homeowner ${context.userProfile.id}`);
+          
+          if (projects.length === 1) {
+            return {
+              status: "success",
+              projects: projects,
+              contacts: projectContacts,
+              company_id: companyId,
+              project_id: projects[0].id,
+              message: `Found your project: ${projects[0].project_name || projects[0].Address || 'Project'}. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
+            };
+          } else {
+            // Multiple projects - let homeowner choose
+            const projectList = projects.map((p, index) => {
+              const details = [
+                `#${index + 1}:`,
+                p.Address ? `Address: ${p.Address}` : null,
+                p.project_name ? `Name: ${p.project_name}` : null,
+                p.Project_status ? `Status: ${p.Project_status}` : null
+              ].filter(Boolean).join(' ');
+              return details;
+            }).join('\n');
+            
+            return {
+              status: "success",
+              projects: projects,
+              contacts: projectContacts,
+              company_id: companyId,
+              project_id: projects[0].id, // Default to first project
+              multipleMatches: true,
+              message: `I found ${projects.length} of your projects. Please specify which one you're asking about:\n\n${projectList}\n\nOr I can help with the first one listed.`
+            };
+          }
+        } else {
+          return {
+            status: "success",
+            projects: [],
+            contacts: [],
+            message: "I couldn't find any projects associated with your account. Please contact your project manager if you believe this is an error."
+          };
+        }
+      }
+      
+      // For company users, proceed with the existing search logic
+      if (!query) {
+        return {
+          status: "error",
+          error: "Query is required for company users to identify a project"
+        };
+      }
+      
+      // STRICT SECURITY CHECK: Company ID is REQUIRED for company users
+      if (!companyId) {
+        console.error(`Security violation: No company ID provided for project identification`);
+        return {
+          status: "error",
+          error: "Company ID required",
+          message: "For security reasons, you must provide a company ID when searching for projects"
+        };
+      }
+      
+      console.log(`Company user search: query="${query}", type=${type}, companyId=${companyId}`);
+      
       // RLS will automatically filter results based on user's permissions
       // Company users will see their company's projects
-      // Homeowners will see only projects they're associated with
       
       // First try exact matches
       if (type === "id" || type === "any") {
@@ -175,7 +272,7 @@ export const identifyProjectTool: Tool = {
         };
       }
       
-      // If no matches found yet, try a vector search (if user has permission to search)
+      // If no matches found yet, try a vector search (only for company users)
       console.log(`Performing semantic vector search for: ${query}`);
       
       const embedding = await generateEmbedding(query, context);
