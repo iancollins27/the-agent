@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from './utils/cors.ts'
@@ -43,6 +44,8 @@ serve(async (req) => {
       supabase = createContactAuthenticatedClient(supabaseUrl, supabaseAnonKey, contact_id)
       
       try {
+        console.log(`Attempting to fetch contact details for: ${contact_id}`)
+        
         // Fetch contact details using RLS-enabled client
         const { data: contact, error: contactError } = await supabase
           .from('contacts')
@@ -51,10 +54,16 @@ serve(async (req) => {
           .single()
         
         if (contactError) {
-          console.error(`Failed to authenticate contact ${contact_id}:`, contactError)
+          console.error(`Contact lookup failed for ${contact_id}:`, {
+            error: contactError,
+            message: contactError.message,
+            details: contactError.details,
+            hint: contactError.hint
+          })
           return new Response(JSON.stringify({ 
-            error: 'Authentication failed - contact not found or access denied',
-            details: contactError.message 
+            error: 'Contact authentication failed',
+            details: contactError.message,
+            contact_id 
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -64,19 +73,25 @@ serve(async (req) => {
         if (!contact) {
           console.error(`No contact found for ID: ${contact_id}`)
           return new Response(JSON.stringify({ 
-            error: 'Contact not found' 
+            error: 'Contact not found',
+            contact_id 
           }), {
             status: 404,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
         
+        console.log(`Contact authenticated successfully:`, {
+          id: contact.id,
+          name: contact.full_name,
+          role: contact.role,
+          company_id: contact.company_id
+        })
+        
         authenticatedContact = contact
         userProfile = contact
         companyId = contact.company_id
         authContext = 'homeowner'
-        
-        console.log(`Homeowner authenticated - contact: ${contact.id}, company: ${companyId || 'null'}, role: ${contact.role}`)
         
         // For homeowners, directly fetch their projects using RLS-enabled functions
         if (contact.role === 'homeowner' || contact.role === 'HO') {
@@ -86,9 +101,18 @@ serve(async (req) => {
             // Get homeowner's projects using security definer function
             const homeownerProjects = await getContactProjects(supabase, contact.id)
             
+            console.log(`Project fetch result:`, {
+              projectCount: homeownerProjects?.length || 0,
+              projects: homeownerProjects
+            })
+            
             if (homeownerProjects && homeownerProjects.length > 0) {
               const homeownerProjectData = homeownerProjects[0]
-              console.log(`Found ${homeownerProjects.length} projects for homeowner`)
+              console.log(`Using project for homeowner chat:`, {
+                projectId: homeownerProjectData.id,
+                projectName: homeownerProjectData.project_name,
+                address: homeownerProjectData.address
+              })
               
               // Set up the context for the homeowner's project
               const toolContext = {
@@ -107,8 +131,8 @@ serve(async (req) => {
 
 HOMEOWNER CONTEXT:
 - You are speaking with ${contact.full_name}, a homeowner
-- Their project: ${homeownerProjectData.project_name || homeownerProjectData.Address || 'Your Project'}
-- Project status: ${homeownerProjectData.Project_status || 'Active'}
+- Their project: ${homeownerProjectData.project_name || homeownerProjectData.address || 'Your Project'}
+- Project status: ${homeownerProjectData.project_status || 'Active'}
 - You can help them with updates about their specific project
 
 IMPORTANT: You are speaking with the homeowner directly. Use tools like data_fetch with project_id: ${homeownerProjectData.id} to get current project information.
@@ -155,7 +179,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
 
               if (!openAIResponse.ok) {
                 const errorData = await openAIResponse.text()
-                console.error('OpenAI API error:', errorData)
+                console.error('OpenAI API error for homeowner:', errorData)
                 throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
               }
 
@@ -169,7 +193,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                 const toolResponses = []
                 
                 for (const toolCall of assistantMessage.tool_calls) {
-                  console.log(`Executing tool ${toolCall.function.name} for homeowner`)
+                  console.log(`Executing tool ${toolCall.function.name} for homeowner with args:`, toolCall.function.arguments)
                   
                   try {
                     const args = JSON.parse(toolCall.function.arguments)
@@ -186,7 +210,11 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                     
                     console.log(`Tool ${toolCall.function.name} execution completed for homeowner`)
                   } catch (error) {
-                    console.error(`Tool execution error for homeowner ${toolCall.function.name}:`, error)
+                    console.error(`Tool execution error for homeowner ${toolCall.function.name}:`, {
+                      error: error.message,
+                      stack: error.stack,
+                      args: toolCall.function.arguments
+                    })
                     toolResponses.push({
                       tool_call_id: toolCall.id,
                       content: JSON.stringify({
@@ -201,17 +229,22 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
               }
 
               // Log observability data for homeowner
-              await logObservability({
-                supabase,
-                projectId: homeownerProjectData.id,
-                userProfile: contact,
-                companyId: homeownerProjectData.company_id,
-                messages: openAIMessages,
-                response: assistantMessage,
-                toolCalls: assistantMessage.tool_calls || [],
-                model: 'gpt-4o',
-                usage: openAIData.usage
-              })
+              try {
+                await logObservability({
+                  supabase,
+                  projectId: homeownerProjectData.id,
+                  userProfile: contact,
+                  companyId: homeownerProjectData.company_id,
+                  messages: openAIMessages,
+                  response: assistantMessage,
+                  toolCalls: assistantMessage.tool_calls || [],
+                  model: 'gpt-4o',
+                  usage: openAIData.usage
+                })
+              } catch (obsError) {
+                console.error('Observability logging failed for homeowner:', obsError)
+                // Don't fail the request for observability errors
+              }
 
               return new Response(JSON.stringify({
                 choices: [{
@@ -224,17 +257,23 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
             } else {
               console.log(`No projects found for homeowner ${contact.id}`)
               return new Response(JSON.stringify({ 
-                error: 'No projects found for this homeowner' 
+                error: 'No projects found for this homeowner',
+                contact_id: contact.id 
               }), {
                 status: 404,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
               })
             }
           } catch (projectError) {
-            console.error(`Error fetching projects for homeowner ${contact.id}:`, projectError)
+            console.error(`Error fetching projects for homeowner ${contact.id}:`, {
+              error: projectError.message,
+              stack: projectError.stack,
+              contact_id: contact.id
+            })
             return new Response(JSON.stringify({ 
               error: 'Error accessing homeowner projects',
-              details: projectError.message 
+              details: projectError.message,
+              contact_id: contact.id 
             }), {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -243,17 +282,24 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
         } else {
           console.log(`Contact ${contact.id} is not a homeowner (role: ${contact.role})`)
           return new Response(JSON.stringify({ 
-            error: 'Contact is not a homeowner' 
+            error: 'Contact is not a homeowner',
+            role: contact.role,
+            contact_id: contact.id 
           }), {
             status: 403,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
       } catch (authError) {
-        console.error(`Authentication error for contact ${contact_id}:`, authError)
+        console.error(`Authentication error for contact ${contact_id}:`, {
+          error: authError.message,
+          stack: authError.stack,
+          contact_id
+        })
         return new Response(JSON.stringify({ 
-          error: 'Authentication failed',
-          details: authError.message 
+          error: 'Contact authentication failed',
+          details: authError.message,
+          contact_id 
         }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -278,7 +324,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
         authContext = 'web'
         console.log(`Web user authenticated - user: ${profiles[0].id}, company: ${companyId}`)
       } else {
-        console.error(`Failed to authenticate user: ${profileError?.message || 'No profile found'}`)
+        console.error(`Failed to authenticate web user: ${profileError?.message || 'No profile found'}`)
         return new Response(JSON.stringify({ error: 'Authentication failed' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -410,17 +456,22 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
     }
 
     // Log observability data
-    await logObservability({
-      supabase,
-      projectId,
-      userProfile,
-      companyId,
-      messages: openAIMessages,
-      response: assistantMessage,
-      toolCalls: assistantMessage.tool_calls || [],
-      model: 'gpt-4o',
-      usage: openAIData.usage
-    })
+    try {
+      await logObservability({
+        supabase,
+        projectId,
+        userProfile,
+        companyId,
+        messages: openAIMessages,
+        response: assistantMessage,
+        toolCalls: assistantMessage.tool_calls || [],
+        model: 'gpt-4o',
+        usage: openAIData.usage
+      })
+    } catch (obsError) {
+      console.error('Observability logging failed:', obsError)
+      // Don't fail the request for observability errors
+    }
 
     return new Response(JSON.stringify({
       choices: [{
@@ -432,7 +483,11 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
     })
 
   } catch (error) {
-    console.error('Error in agent-chat:', error)
+    console.error('Error in agent-chat:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    })
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
       details: error.message 

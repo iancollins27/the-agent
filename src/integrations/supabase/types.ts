@@ -1324,6 +1324,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      contact_can_access_project: {
+        Args: { contact_id: string; project_id: string }
+        Returns: boolean
+      }
       find_or_create_chat_session: {
         Args: {
           p_channel_type: string
@@ -1353,6 +1357,18 @@ export type Database = {
           api_key: string
           api_secret: string
           account_id: string
+        }[]
+      }
+      get_contact_projects: {
+        Args: { contact_id: string }
+        Returns: {
+          id: string
+          project_name: string
+          address: string
+          company_id: string
+          project_status: string
+          summary: string
+          next_step: string
         }[]
       }
       get_current_contact_id: {
