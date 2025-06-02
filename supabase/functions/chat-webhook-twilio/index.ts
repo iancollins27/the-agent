@@ -774,7 +774,7 @@ async function processMessageWithAgent(userSupabase: any, sessionId: string, con
         customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
 Keep responses conversational and friendly, using first names when appropriate.`,
-        userId: userToken.contact_id // Pass the contact_id as userId for RLS context
+        contact_id: userToken.contact_id // Changed from userId to contact_id
       }
     });
     
