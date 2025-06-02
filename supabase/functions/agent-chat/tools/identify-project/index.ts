@@ -44,7 +44,6 @@ export const identifyProjectTool: Tool = {
       
       let projects = [];
       let projectContacts = [];
-      let companyId = context.companyId;
       
       // Check if this is a homeowner
       const isHomeowner = context.userProfile?.role === 'homeowner' || context.userProfile?.role === 'HO';
@@ -52,7 +51,8 @@ export const identifyProjectTool: Tool = {
       if (isHomeowner && context.userProfile?.id) {
         console.log(`Homeowner detected - fetching projects for contact ${context.userProfile.id}`);
         
-        // For homeowners, get their projects directly from project_contacts
+        // For homeowners, get their projects directly from project_contacts using the new RLS policies
+        // The RLS policies will automatically filter to only show projects they have access to
         const { data: homeownerProjects, error: homeownerError } = await context.supabase
           .from('project_contacts')
           .select(`
@@ -82,9 +82,8 @@ export const identifyProjectTool: Tool = {
         if (homeownerProjects && homeownerProjects.length > 0) {
           // Transform the data to match expected format
           projects = homeownerProjects.map(pc => pc.projects);
-          companyId = projects[0]?.company_id;
           
-          // Get contacts for the first project
+          // Get contacts for the first project using new RLS policies
           projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
           
           console.log(`Found ${projects.length} projects for homeowner ${context.userProfile.id}`);
@@ -94,7 +93,7 @@ export const identifyProjectTool: Tool = {
               status: "success",
               projects: projects,
               contacts: projectContacts,
-              company_id: companyId,
+              company_id: projects[0].company_id, // Include company_id from project for context
               project_id: projects[0].id,
               message: `Found your project: ${projects[0].project_name || projects[0].Address || 'Project'}. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
             };
@@ -114,7 +113,7 @@ export const identifyProjectTool: Tool = {
               status: "success",
               projects: projects,
               contacts: projectContacts,
-              company_id: companyId,
+              company_id: projects[0].company_id, // Include company_id from project for context
               project_id: projects[0].id, // Default to first project
               multipleMatches: true,
               message: `I found ${projects.length} of your projects. Please specify which one you're asking about:\n\n${projectList}\n\nOr I can help with the first one listed.`
@@ -139,7 +138,7 @@ export const identifyProjectTool: Tool = {
       }
       
       // STRICT SECURITY CHECK: Company ID is REQUIRED for company users
-      if (!companyId) {
+      if (!context.companyId) {
         console.error(`Security violation: No company ID provided for project identification`);
         return {
           status: "error",
@@ -148,7 +147,7 @@ export const identifyProjectTool: Tool = {
         };
       }
       
-      console.log(`Company user search: query="${query}", type=${type}, companyId=${companyId}`);
+      console.log(`Company user search: query="${query}", type=${type}, companyId=${context.companyId}`);
       
       // RLS will automatically filter results based on user's permissions
       // Company users will see their company's projects
@@ -163,7 +162,6 @@ export const identifyProjectTool: Tool = {
           
         if (projectById && projectById.length > 0) {
           projects = projectById;
-          companyId = projectById[0].company_id;
           
           projectContacts = await fetchProjectContacts(context.supabase, projectById[0].id);
           
@@ -171,7 +169,7 @@ export const identifyProjectTool: Tool = {
             status: "success",
             projects: projectById,
             contacts: projectContacts,
-            company_id: companyId,
+            company_id: projectById[0].company_id,
             project_id: projectById[0].id,
             message: `Found project by UUID. Use project_id: ${projectById[0].id} for subsequent tool calls like data_fetch.`
           };
@@ -187,7 +185,6 @@ export const identifyProjectTool: Tool = {
           
         if (projectByCrmId && projectByCrmId.length > 0) {
           projects = projectByCrmId;
-          companyId = projectByCrmId[0].company_id;
           
           projectContacts = await fetchProjectContacts(context.supabase, projectByCrmId[0].id);
           
@@ -195,7 +192,7 @@ export const identifyProjectTool: Tool = {
             status: "success",
             projects: projectByCrmId,
             contacts: projectContacts,
-            company_id: companyId,
+            company_id: projectByCrmId[0].company_id,
             project_id: projectByCrmId[0].id,
             message: `Found project by CRM ID. Use project_id: ${projectByCrmId[0].id} for subsequent tool calls like data_fetch.`
           };
@@ -211,7 +208,6 @@ export const identifyProjectTool: Tool = {
           
         if (projectByName && projectByName.length > 0) {
           projects = [...projectByName];
-          companyId = projectByName[0].company_id;
           
           if (projects.length > 0 && type === "name") {
             projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
@@ -220,7 +216,7 @@ export const identifyProjectTool: Tool = {
               status: "success",
               projects: projects.slice(0, 3),
               contacts: projectContacts,
-              company_id: companyId,
+              company_id: projects[0].company_id,
               project_id: projects[0].id,
               message: `Found project(s) by name. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
             };
@@ -240,7 +236,6 @@ export const identifyProjectTool: Tool = {
             p1 => !projects.some(p2 => p2.id === p1.id)
           );
           projects = [...projects, ...newProjects];
-          companyId = projectByAddress[0].company_id;
           
           if (projects.length > 0 && type === "address") {
             projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
@@ -249,7 +244,7 @@ export const identifyProjectTool: Tool = {
               status: "success",
               projects: projects.slice(0, 3),
               contacts: projectContacts,
-              company_id: companyId,
+              company_id: projects[0].company_id,
               project_id: projects[0].id,
               message: `Found project(s) by address. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
             };
@@ -260,13 +255,12 @@ export const identifyProjectTool: Tool = {
       if (projects.length > 0) {
         console.log(`Found ${projects.length} projects by ${type !== "any" ? type : "name/address"}`);
         projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
-        companyId = projects[0].company_id;
         
         return {
           status: "success",
           projects: projects.slice(0, 3),
           contacts: projectContacts,
-          company_id: companyId,
+          company_id: projects[0].company_id,
           project_id: projects[0].id,
           message: `Found project(s). Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
         };
@@ -289,7 +283,7 @@ export const identifyProjectTool: Tool = {
           searchEmbedding: embedding,
           matchThreshold: 0.2,
           matchCount: 3,
-          companyId: companyId // Pass the user's company context
+          companyId: context.companyId // Pass the user's company context
         }
       });
       
@@ -321,7 +315,6 @@ export const identifyProjectTool: Tool = {
           const existingIds = new Set(projects.map(p => p.id));
           const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
           projects = [...projects, ...newProjects];
-          companyId = vectorProjects[0].company_id;
           
           console.log(`Found ${vectorProjects.length} projects via vector search`);
           
@@ -335,7 +328,7 @@ export const identifyProjectTool: Tool = {
             status: "success",
             projects: projects,
             contacts: projectContacts,
-            company_id: companyId,
+            company_id: projects[0].company_id,
             project_id: projects[0].id,
             message: `Found project(s) via semantic search. Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
           };
@@ -344,13 +337,12 @@ export const identifyProjectTool: Tool = {
       
       if (projects.length > 0) {
         projectContacts = await fetchProjectContacts(context.supabase, projects[0].id);
-        companyId = projects[0].company_id;
         
         return {
           status: "success",
           projects: projects,
           contacts: projectContacts,
-          company_id: companyId,
+          company_id: projects[0].company_id,
           project_id: projects[0].id,
           message: `Found project(s). Use project_id: ${projects[0].id} for subsequent tool calls like data_fetch.`
         };
@@ -422,13 +414,14 @@ async function generateEmbedding(text: string, context: any): Promise<number[] |
 }
 
 /**
- * Fetch contacts for a specific project
+ * Fetch contacts for a specific project - now works with homeowner RLS policies
  */
 async function fetchProjectContacts(supabase: any, projectId: string) {
   try {
     console.log(`Fetching contacts for project: ${projectId}`);
     
     // RLS will automatically filter these based on user permissions
+    // For homeowners, the new policies allow them to see contacts on their projects
     const { data: projectContacts, error: projectContactsError } = await supabase
       .from('project_contacts')
       .select('contact_id')
@@ -447,6 +440,7 @@ async function fetchProjectContacts(supabase: any, projectId: string) {
     const contactIds = projectContacts.map(pc => pc.contact_id);
     
     // RLS will filter contacts based on user permissions
+    // For homeowners, the new policies allow them to see contacts on their projects
     const { data: contacts, error: contactsError } = await supabase
       .from('contacts')
       .select('id, full_name, role, email, phone_number')
