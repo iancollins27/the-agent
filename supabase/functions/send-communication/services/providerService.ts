@@ -17,6 +17,12 @@ export async function getProviderInfo(
   sourceIp: "${sourceIp}"
 }`);
 
+  // Handle "auto" provider selection - skip database lookup and go to auto-selection logic
+  if (providerId === 'auto') {
+    console.log('Auto provider selection requested - skipping provider ID lookup');
+    providerId = undefined; // Treat as no specific provider requested
+  }
+
   // Check if this is a forced provider request (for agent responses)
   if (providerId === 'twilio' && channel.toLowerCase() === 'sms') {
     console.log('Forced Twilio provider requested - using system-level credentials');

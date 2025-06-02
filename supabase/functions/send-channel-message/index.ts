@@ -201,15 +201,10 @@ async function sendSmsMessage(session: any, message: string, sender?: any): Prom
     // If sender is provided (agent response), force Twilio provider
     if (sender && sender.phone) {
       console.log('Agent SMS response - forcing Twilio provider');
-      requestBody.providerInfo = {
-        provider_name: 'twilio' // Force Twilio for agent responses
-      };
-    } else {
-      // Let send-communication choose the appropriate provider
-      requestBody.providerInfo = {
-        provider_name: 'auto'
-      };
+      requestBody.providerId = 'twilio'; // Use providerId instead of providerInfo
     }
+    // For non-agent responses, let the system choose the appropriate provider automatically
+    // Don't set any provider info - let the normal provider selection logic handle it
     
     // Use send-communication function to send SMS
     const response = await fetch(`${supabaseUrl}/functions/v1/send-communication`, {
