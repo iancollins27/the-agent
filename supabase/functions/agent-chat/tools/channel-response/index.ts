@@ -46,29 +46,44 @@ export const channelResponseTool = {
         };
       }
 
+      // Get session details to determine channel type
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('chat_sessions')
+        .select('channel_type, company_id')
+        .eq('id', session_id)
+        .single();
+        
+      if (sessionError) {
+        return {
+          status: 'error',
+          error: sessionError.message,
+          message: 'Session not found'
+        };
+      }
+
       // Verify company access if needed
       if (context.companyId) {
-        const { data: sessionCheck, error: checkError } = await supabase
-          .from('chat_sessions')
-          .select('company_id')
-          .eq('id', session_id)
-          .single();
-          
-        if (checkError) {
-          return {
-            status: 'error',
-            error: checkError.message,
-            message: 'Session not found'
-          };
-        }
-        
-        if (sessionCheck.company_id !== context.companyId) {
+        if (sessionData.company_id !== context.companyId) {
           return {
             status: 'error',
             error: 'Access denied',
             message: 'You do not have permission to respond to this session'
           };
         }
+      }
+
+      // For SMS sessions, include agent phone number as sender
+      const requestBody: any = {
+        session_id,
+        message,
+        project_id
+      };
+
+      // Add sender information for SMS responses (agent's phone number)
+      if (sessionData.channel_type === 'sms') {
+        requestBody.sender = {
+          phone: '+18662439163' // Agent's phone number
+        };
       }
 
       // Call the send-channel-message function to deliver the response
@@ -78,11 +93,7 @@ export const channelResponseTool = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""}`,
         },
-        body: JSON.stringify({
-          session_id,
-          message,
-          project_id
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {

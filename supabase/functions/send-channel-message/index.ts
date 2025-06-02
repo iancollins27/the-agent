@@ -16,6 +16,11 @@ interface ChannelMessageRequest {
   session_id: string;
   message: string;
   project_id?: string;
+  sender?: {
+    phone?: string;
+    email?: string;
+    name?: string;
+  };
 }
 
 serve(async (req) => {
@@ -40,7 +45,7 @@ serve(async (req) => {
   }
 
   try {
-    const { session_id, message, project_id } = await req.json() as ChannelMessageRequest;
+    const { session_id, message, project_id, sender } = await req.json() as ChannelMessageRequest;
 
     // Validate required fields
     if (!session_id || !message) {
@@ -106,12 +111,12 @@ serve(async (req) => {
     switch (session.channel_type) {
       case 'sms':
         // Use send-communication for SMS
-        communicationId = await sendSmsMessage(session, message);
+        communicationId = await sendSmsMessage(session, message, sender);
         break;
         
       case 'email':
         // Use send-communication for Email
-        communicationId = await sendEmailMessage(session, message);
+        communicationId = await sendEmailMessage(session, message, sender);
         break;
         
       case 'web':
@@ -159,7 +164,7 @@ serve(async (req) => {
   }
 });
 
-async function sendSmsMessage(session: any, message: string): Promise<string | null> {
+async function sendSmsMessage(session: any, message: string, sender?: any): Promise<string | null> {
   try {
     // Get contact details if available
     let recipient = {
@@ -197,6 +202,7 @@ async function sendSmsMessage(session: any, message: string): Promise<string | n
         channel: 'SMS',
         messageContent: message,
         recipient,
+        sender: sender || null, // Pass sender information if provided
         providerInfo: {
           provider_name: 'auto' // Let send-communication choose the appropriate provider
         }
@@ -216,7 +222,7 @@ async function sendSmsMessage(session: any, message: string): Promise<string | n
   }
 }
 
-async function sendEmailMessage(session: any, message: string): Promise<string | null> {
+async function sendEmailMessage(session: any, message: string, sender?: any): Promise<string | null> {
   try {
     // Get contact details if available
     let recipient = {
