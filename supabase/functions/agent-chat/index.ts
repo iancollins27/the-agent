@@ -1,13 +1,13 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from './utils/cors.ts'
 import { toolRegistry } from './tools/toolRegistry.ts'
 import { toolExecutor } from './tools/toolExecutor.ts'
 import { logObservability } from './observability.ts'
+import { createContactAuthenticatedClient, getContactProjects } from './utils/contactAuth.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -15,67 +15,82 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    
     // Get the request body
     const body = await req.json()
     const { messages, projectId, projectData, customPrompt, availableTools = [], userId, contact_id } = body
+    
+    console.log('Agent-chat request received:', {
+      hasMessages: messages?.length > 0,
+      projectId,
+      userId,
+      contact_id,
+      availableTools: availableTools?.length || 0
+    })
     
     // Determine authentication context
     let userProfile = null
     let companyId = null
     let authContext = 'anonymous'
     let authenticatedContact = null
+    let supabase = null
     
     // Handle different authentication types
     if (contact_id) {
       // SMS/Channel authentication - contact_id provided directly
-      console.log(`Request received with contact_id: ${contact_id}`)
+      console.log(`Processing homeowner request with contact_id: ${contact_id}`)
       
-      const { data: contact, error: contactError } = await supabase
-        .from('contacts')
-        .select('id, full_name, role, email, phone_number, company_id')
-        .eq('id', contact_id)
-        .single()
+      // Create contact-authenticated client (uses anon key + contact context for RLS)
+      supabase = createContactAuthenticatedClient(supabaseUrl, supabaseAnonKey, contact_id)
       
-      if (contact && !contactError) {
+      try {
+        // Fetch contact details using RLS-enabled client
+        const { data: contact, error: contactError } = await supabase
+          .from('contacts')
+          .select('id, full_name, role, email, phone_number, company_id')
+          .eq('id', contact_id)
+          .single()
+        
+        if (contactError) {
+          console.error(`Failed to authenticate contact ${contact_id}:`, contactError)
+          return new Response(JSON.stringify({ 
+            error: 'Authentication failed - contact not found or access denied',
+            details: contactError.message 
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        
+        if (!contact) {
+          console.error(`No contact found for ID: ${contact_id}`)
+          return new Response(JSON.stringify({ 
+            error: 'Contact not found' 
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
+        
         authenticatedContact = contact
         userProfile = contact
         companyId = contact.company_id
-        authContext = 'sms'
+        authContext = 'homeowner'
         
-        console.log(`SMS contact authenticated - contact: ${contact.id}, company: ${companyId || 'null (homeowner)'}, role: ${contact.role}`)
+        console.log(`Homeowner authenticated - contact: ${contact.id}, company: ${companyId || 'null'}, role: ${contact.role}`)
         
-        // For homeowners, directly fetch their projects without using identify_project tool
+        // For homeowners, directly fetch their projects using RLS-enabled functions
         if (contact.role === 'homeowner' || contact.role === 'HO') {
-          console.log(`Homeowner detected - fetching projects directly for contact ${contact.id}`)
+          console.log(`Fetching projects for homeowner ${contact.id}`)
           
-          // Get homeowner's projects directly
-          const { data: homeownerProjects, error: projectsError } = await supabase
-            .from('project_contacts')
-            .select(`
-              project_id,
-              projects!inner(
-                id,
-                crm_id, 
-                company_id,
-                project_name,
-                summary,
-                next_step,
-                Address,
-                Project_status
-              )
-            `)
-            .eq('contact_id', contact.id)
-          
-          if (!projectsError && homeownerProjects && homeownerProjects.length > 0) {
-            // Store the project information for the context
-            const homeownerProjectData = homeownerProjects[0].projects
-            console.log(`Found ${homeownerProjects.length} projects for homeowner`)
+          try {
+            // Get homeowner's projects using security definer function
+            const homeownerProjects = await getContactProjects(supabase, contact.id)
             
-            // Update the context with the homeowner's project
-            if (!projectId && homeownerProjectData) {
-              // Set the project context for tools
+            if (homeownerProjects && homeownerProjects.length > 0) {
+              const homeownerProjectData = homeownerProjects[0]
+              console.log(`Found ${homeownerProjects.length} projects for homeowner`)
+              
+              // Set up the context for the homeowner's project
               const toolContext = {
                 supabase,
                 userProfile: contact,
@@ -92,7 +107,7 @@ serve(async (req) => {
 
 HOMEOWNER CONTEXT:
 - You are speaking with ${contact.full_name}, a homeowner
-- Their project: ${homeownerProjectData.project_name || homeownerProjectData.Address || 'Roofing Project'}
+- Their project: ${homeownerProjectData.project_name || homeownerProjectData.Address || 'Your Project'}
 - Project status: ${homeownerProjectData.Project_status || 'Active'}
 - You can help them with updates about their specific project
 
@@ -120,7 +135,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                 ...messages
               ]
 
-              console.log(`Sending OpenAI request for homeowner with tools: [${toolDefinitions.map(t => `"${t.function.name}"`).join(',')}]`)
+              console.log(`Sending OpenAI request for homeowner with ${toolDefinitions.length} tools`)
 
               // Call OpenAI
               const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -154,7 +169,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                 const toolResponses = []
                 
                 for (const toolCall of assistantMessage.tool_calls) {
-                  console.log(`Executing tool ${toolCall.function.name} for homeowner with args: ${toolCall.function.arguments}`)
+                  console.log(`Executing tool ${toolCall.function.name} for homeowner`)
                   
                   try {
                     const args = JSON.parse(toolCall.function.arguments)
@@ -182,7 +197,6 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                   }
                 }
                 
-                // Add tool responses to the message
                 assistantMessage.tool_responses = toolResponses
               }
 
@@ -207,23 +221,51 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
               }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
               })
+            } else {
+              console.log(`No projects found for homeowner ${contact.id}`)
+              return new Response(JSON.stringify({ 
+                error: 'No projects found for this homeowner' 
+              }), {
+                status: 404,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              })
             }
-          } else {
-            console.log(`No projects found for homeowner ${contact.id}`)
+          } catch (projectError) {
+            console.error(`Error fetching projects for homeowner ${contact.id}:`, projectError)
+            return new Response(JSON.stringify({ 
+              error: 'Error accessing homeowner projects',
+              details: projectError.message 
+            }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
           }
+        } else {
+          console.log(`Contact ${contact.id} is not a homeowner (role: ${contact.role})`)
+          return new Response(JSON.stringify({ 
+            error: 'Contact is not a homeowner' 
+          }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
         }
-      } else {
-        console.error(`Failed to authenticate contact: ${contactError?.message}`)
-        return new Response(JSON.stringify({ error: 'Authentication failed' }), {
+      } catch (authError) {
+        console.error(`Authentication error for contact ${contact_id}:`, authError)
+        return new Response(JSON.stringify({ 
+          error: 'Authentication failed',
+          details: authError.message 
+        }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
     } else if (userId) {
       // Web authentication - userId provided
-      console.log(`Request received with userId: ${userId}`)
+      console.log(`Processing web request with userId: ${userId}`)
       
-      // Fix the authentication query to handle multiple or no profiles
+      // Use anon key for web users (they should be authenticated via auth.users)
+      supabase = createClient(supabaseUrl, supabaseAnonKey)
+      
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, company_id, role, permission')
@@ -231,7 +273,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
         .limit(1)
       
       if (profiles && profiles.length > 0 && !profileError) {
-        userProfile = profiles[0] // Take the first profile
+        userProfile = profiles[0]
         companyId = profiles[0].company_id
         authContext = 'web'
         console.log(`Web user authenticated - user: ${profiles[0].id}, company: ${companyId}`)
@@ -392,7 +434,8 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
   } catch (error) {
     console.error('Error in agent-chat:', error)
     return new Response(JSON.stringify({ 
-      error: error.message || 'An error occurred processing your request'
+      error: 'Internal server error',
+      details: error.message 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

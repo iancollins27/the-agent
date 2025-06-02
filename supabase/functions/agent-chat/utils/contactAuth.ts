@@ -5,10 +5,9 @@
  */
 
 export function createContactBasedClient(supabaseUrl: string, supabaseKey: string, contactId: string) {
-  // For now, we'll use the service role but this should be replaced with proper contact auth
-  // TODO: Implement proper contact JWT authentication
   const { createClient } = require('https://esm.sh/@supabase/supabase-js@2')
   
+  // Create client with anon key and contact context
   const client = createClient(supabaseUrl, supabaseKey, {
     auth: {
       persistSession: false
@@ -28,50 +27,64 @@ export function createContactBasedClient(supabaseUrl: string, supabaseKey: strin
  */
 export async function canContactAccessProject(supabase: any, contactId: string, projectId: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
-      .from('project_contacts')
-      .select('contact_id')
-      .eq('contact_id', contactId)
-      .eq('project_id', projectId)
-      .single()
+    // Use RPC to check access with security definer privileges
+    const { data, error } = await supabase.rpc('contact_can_access_project', {
+      contact_id: contactId,
+      project_id: projectId
+    })
     
-    return !error && data !== null
+    if (error) {
+      console.error('Error checking contact project access:', error)
+      return false
+    }
+    
+    return data === true
   } catch (error) {
-    console.error('Error checking contact project access:', error)
+    console.error('Error in canContactAccessProject:', error)
     return false
   }
 }
 
 /**
- * Get projects accessible to a specific contact
+ * Get projects accessible to a specific contact using security definer
  */
 export async function getContactProjects(supabase: any, contactId: string) {
   try {
-    const { data, error } = await supabase
-      .from('project_contacts')
-      .select(`
-        project_id,
-        projects!inner(
-          id,
-          crm_id, 
-          company_id,
-          project_name,
-          summary,
-          next_step,
-          Address,
-          Project_status
-        )
-      `)
-      .eq('contact_id', contactId)
+    // Use RPC to get projects with security definer privileges
+    const { data, error } = await supabase.rpc('get_contact_projects', {
+      contact_id: contactId
+    })
     
     if (error) {
       console.error('Error fetching contact projects:', error)
       return []
     }
     
-    return data?.map(pc => pc.projects) || []
+    return data || []
   } catch (error) {
     console.error('Error in getContactProjects:', error)
     return []
   }
+}
+
+/**
+ * Create a contact-authenticated supabase client that respects RLS
+ */
+export function createContactAuthenticatedClient(supabaseUrl: string, supabaseAnonKey: string, contactId: string) {
+  const { createClient } = require('https://esm.sh/@supabase/supabase-js@2')
+  
+  // Use anon key with contact context for RLS
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false
+    },
+    global: {
+      headers: {
+        'X-Contact-ID': contactId,
+        'X-Contact-Auth': 'true'
+      }
+    }
+  })
+  
+  return client
 }
