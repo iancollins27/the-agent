@@ -42,3 +42,16 @@ export async function executeToolCall(
       throw new Error(`Unknown tool: ${toolName}`);
   }
 }
+
+// Create the toolExecutor object that agent-chat expects
+export const toolExecutor = {
+  executeTool: async (toolName: string, args: any, context: any) => {
+    return await executeToolCall(
+      context.supabase,
+      toolName,
+      args,
+      context.userProfile,
+      context.companyId
+    );
+  }
+};
