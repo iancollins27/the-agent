@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from './utils/cors.ts'
@@ -19,6 +18,13 @@ serve(async (req) => {
     // Get the request body
     const body = await req.json()
     const { messages, projectId, projectData, customPrompt, availableTools = [], userId, contact_id } = body
+    
+    // ADD DIAGNOSTIC LOGGING
+    console.log('=== DIAGNOSTIC: Agent-chat received parameters ===');
+    console.log('Received userId:', userId);
+    console.log('Received contact_id:', contact_id);
+    console.log('Full request body keys:', Object.keys(body));
+    console.log('=== END DIAGNOSTIC ===');
     
     console.log('Agent-chat request received:', {
       hasMessages: messages?.length > 0,

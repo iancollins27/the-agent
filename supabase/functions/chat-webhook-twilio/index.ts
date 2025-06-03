@@ -767,15 +767,23 @@ async function processMessageWithAgent(userSupabase: any, sessionId: string, con
     
     console.log(`Sending ${messages.length} messages to agent-chat (including system prompt)`);
     
-    const agentResponse = await userSupabase.functions.invoke('agent-chat', {
-      body: {
-        messages: messages,
-        availableTools: ['session_manager', 'identify_project', 'data_fetch', 'channel_response'],
-        customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
+    // ADD DIAGNOSTIC LOGGING
+    const agentChatPayload = {
+      messages: messages,
+      availableTools: ['session_manager', 'identify_project', 'data_fetch', 'channel_response'],
+      customPrompt: `You are responding to an SMS message. Be concise and provide clear information.
 Current session: ${sessionId}
 Keep responses conversational and friendly, using first names when appropriate.`,
-        contact_id: userToken.contact_id // Changed from userId to contact_id
-      }
+      contact_id: userToken.contact_id // Changed from userId to contact_id
+    };
+    
+    console.log('=== DIAGNOSTIC: Agent-chat payload being sent ===');
+    console.log('Contact ID being passed:', userToken.contact_id);
+    console.log('Full payload:', JSON.stringify(agentChatPayload, null, 2));
+    console.log('=== END DIAGNOSTIC ===');
+    
+    const agentResponse = await userSupabase.functions.invoke('agent-chat', {
+      body: agentChatPayload
     });
     
     if (!agentResponse.data) {
