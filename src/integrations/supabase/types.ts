@@ -1409,6 +1409,19 @@ export type Database = {
           definition: string
         }[]
       }
+      get_user_accessible_project_contacts: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          contact_id: string
+          project_id: string
+        }[]
+      }
+      get_user_accessible_projects: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          project_id: string
+        }[]
+      }
       get_user_company_id: {
         Args: Record<PropertyKey, never>
         Returns: string
