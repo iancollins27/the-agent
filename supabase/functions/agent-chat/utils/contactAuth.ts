@@ -1,12 +1,12 @@
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
 /**
  * Contact-based authentication utilities for homeowner access
  * These functions help create RLS policies that work with contact_id instead of auth.uid()
  */
 
 export function createContactBasedClient(supabaseUrl: string, supabaseKey: string, contactId: string) {
-  const { createClient } = require('https://esm.sh/@supabase/supabase-js@2')
-  
   // Create client with anon key and contact context
   const client = createClient(supabaseUrl, supabaseKey, {
     auth: {
@@ -71,8 +71,6 @@ export async function getContactProjects(supabase: any, contactId: string) {
  * Create a contact-authenticated supabase client that respects RLS
  */
 export function createContactAuthenticatedClient(supabaseUrl: string, supabaseAnonKey: string, contactId: string) {
-  const { createClient } = require('https://esm.sh/@supabase/supabase-js@2')
-  
   // Use anon key with contact context for RLS
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
