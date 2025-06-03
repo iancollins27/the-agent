@@ -101,8 +101,20 @@ If no scheduling information is found, suggest contacting the project manager fo
   const fetchAvailableTools = async () => {
     setLoadingTools(true);
     try {
-      // Call the agent-chat edge function with a special flag to get tool definitions
+      // Get the current user session for authentication
       const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user?.id) {
+        console.error('No authenticated user found');
+        toast({
+          variant: "destructive",
+          title: "Authentication Error",
+          description: "Please log in to access tool definitions.",
+        });
+        return;
+      }
+
+      // Call the agent-chat edge function with proper authentication
       const response = await fetch(
         'https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/agent-chat',
         {
@@ -113,6 +125,7 @@ If no scheduling information is found, suggest contacting the project manager fo
           },
           body: JSON.stringify({
             messages: [{ role: 'system', content: 'tool_list_request' }],
+            userId: session.user.id, // Add proper user authentication
             getToolDefinitions: true
           }),
         }
@@ -205,6 +218,25 @@ If no scheduling information is found, suggest contacting the project manager fo
             }
           },
           "required": ["query"]
+        }
+      },
+      {
+        "name": "read_crm_data",
+        "description": "Reads data from the CRM system for a specific project",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "The ID of the project to read data for"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["project", "contacts", "tasks", "notes", "all"],
+              "description": "Type of data to fetch (default: all)"
+            }
+          },
+          "required": ["project_id"]
         }
       },
       {
