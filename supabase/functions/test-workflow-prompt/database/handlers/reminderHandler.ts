@@ -38,7 +38,8 @@ export async function handleFutureReminder(
         action_payload: {
           days_until_check: daysToAdd,
           check_reason: actionData.check_reason || 'Follow-up check',
-          description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`
+          description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`,
+          reminder_description: `Reminder set for ${daysToAdd} day${daysToAdd === 1 ? '' : 's'} from now`
         },
         reminder_date: reminderDate.toISOString(),
         requires_approval: false,

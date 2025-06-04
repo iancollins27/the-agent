@@ -295,10 +295,13 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
 
     // For reminder actions, ensure fields are in the payload
     if (args.action_type === 'set_future_reminder') {
+      const daysUntilCheck = args.days_until_check || actionPayload.days_until_check || 7;
       actionPayload = {
         ...actionPayload,
-        days_until_check: args.days_until_check || actionPayload.days_until_check,
-        check_reason: args.check_reason || actionPayload.check_reason,
+        days_until_check: daysUntilCheck,
+        check_reason: args.check_reason || actionPayload.check_reason || 'Follow-up check',
+        description: `Set reminder to check in ${daysUntilCheck} days: ${args.check_reason || actionPayload.check_reason || 'Follow-up check'}`,
+        reminder_description: `Reminder set for ${daysUntilCheck} day${daysUntilCheck === 1 ? '' : 's'} from now`
       };
     }
 
