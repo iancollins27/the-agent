@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import Tool from '@/components/icons/Tool';
 
 interface PromptInputProps {
@@ -10,8 +9,6 @@ interface PromptInputProps {
 }
 
 const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
-  const [viewType, setViewType] = useState<'formatted' | 'raw'>('formatted');
-  
   // Determine if this is an MCP execution
   const isMCPExecution = promptRun.toolLogsCount ? 
     promptRun.toolLogsCount > 0 : // Use the property if it exists
@@ -106,15 +103,6 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
             </div>
           )}
         </CardTitle>
-        
-        {hasContent && (
-          <Tabs value={viewType} onValueChange={(v) => setViewType(v as 'formatted' | 'raw')} className="w-full mt-2">
-            <TabsList className="grid grid-cols-2 w-52">
-              <TabsTrigger value="formatted">Formatted</TabsTrigger>
-              <TabsTrigger value="raw">Raw</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        )}
       </CardHeader>
       
       <CardContent className="pt-2">
@@ -122,51 +110,39 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
           <div className="text-center py-8 text-muted-foreground">
             No prompt input available for this execution
           </div>
-        ) : (
-          <>
-            <TabsContent value="raw" className={viewType === 'raw' ? 'block' : 'hidden'}>
-              <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
-                {rawPromptInput}
+        ) : showFormatted ? (
+          <div className="space-y-4">
+            {systemPrompt && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">System Prompt</h3>
+                <div className="font-mono text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-900 p-4 rounded-md overflow-x-auto max-h-[30vh] overflow-y-auto border">
+                  {systemPrompt}
+                </div>
               </div>
-            </TabsContent>
+            )}
             
-            <TabsContent value="formatted" className={viewType === 'formatted' ? 'block' : 'hidden'}>
-              {showFormatted ? (
-                <div className="space-y-4">
-                  {systemPrompt && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">System Prompt</h3>
-                      <div className="font-mono text-sm whitespace-pre-wrap bg-slate-50 dark:bg-slate-900 p-4 rounded-md overflow-x-auto max-h-[30vh] overflow-y-auto border">
-                        {systemPrompt}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {milestoneInstructions && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400">Milestone Instructions</h3>
-                      <div className="font-mono text-sm whitespace-pre-wrap bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto border border-blue-100 dark:border-blue-800">
-                        {milestoneInstructions}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {userPrompt && (
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">User Prompt</h3>
-                      <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[30vh] overflow-y-auto">
-                        {userPrompt}
-                      </div>
-                    </div>
-                  )}
+            {milestoneInstructions && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400">Milestone Instructions</h3>
+                <div className="font-mono text-sm whitespace-pre-wrap bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md overflow-x-auto max-h-[20vh] overflow-y-auto border border-blue-100 dark:border-blue-800">
+                  {milestoneInstructions}
                 </div>
-              ) : (
-                <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
-                  {rawPromptInput}
+              </div>
+            )}
+            
+            {userPrompt && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">User Prompt</h3>
+                <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[30vh] overflow-y-auto">
+                  {userPrompt}
                 </div>
-              )}
-            </TabsContent>
-          </>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
+            {rawPromptInput}
+          </div>
         )}
       </CardContent>
     </Card>
