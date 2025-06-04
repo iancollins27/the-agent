@@ -18,7 +18,8 @@ serve(async (req) => {
   }
   
   try {
-    console.log("Running check-project-reminders function");
+    const currentTime = new Date().toISOString();
+    console.log(`Running check-project-reminders function at ${currentTime}`);
     
     // Get projects that are due for checking
     const { data: projectsDue, error: projectsError } = await supabase.rpc(
@@ -30,14 +31,33 @@ serve(async (req) => {
       throw new Error("Failed to fetch projects due for check");
     }
     
-    console.log(`Found ${projectsDue?.length || 0} projects due for check`);
+    console.log(`Found ${projectsDue?.length || 0} projects due for check at ${currentTime}`);
+    
+    // If no projects are due, return early with success
+    if (!projectsDue || projectsDue.length === 0) {
+      return new Response(
+        JSON.stringify({
+          projects_processed: 0,
+          results: [],
+          message: "No projects due for check at this time",
+          checked_at: currentTime
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        }
+      );
+    }
     
     // Track results for all project checks
     const results = [];
     
     // Process each project that's due for a check
     for (const project of projectsDue || []) {
-      console.log(`Processing project ${project.id}`);
+      console.log(`Processing project ${project.id} with next_check_date: ${project.next_check_date}`);
       
       try {
         // Get the appropriate workflow prompt for action detection
@@ -92,7 +112,9 @@ serve(async (req) => {
           track_name: contextData.project_tracks?.name,
           track_description: contextData.project_tracks?.description,
           current_date: new Date().toISOString().split('T')[0],
-          is_reminder_check: true
+          is_reminder_check: true,
+          scheduled_check_time: currentTime,
+          original_next_check_date: project.next_check_date
         };
         
         // Replace variables in the prompt
@@ -288,7 +310,8 @@ serve(async (req) => {
               await supabase
                 .from('projects')
                 .update({
-                  next_check_date: nextCheckDate.toISOString()
+                  next_check_date: nextCheckDate.toISOString(),
+                  last_action_check: new Date().toISOString()
                 })
                 .eq('id', project.id);
               
@@ -302,14 +325,16 @@ serve(async (req) => {
                   action_payload: {
                     days_until_check: actionData.days_until_check,
                     check_reason: actionData.check_reason || 'Follow-up check',
-                    description: `Automatically set reminder to check in ${actionData.days_until_check} days: ${actionData.check_reason || 'Follow-up check'}`
+                    description: `Automatically set reminder to check in ${actionData.days_until_check} days: ${actionData.check_reason || 'Follow-up check'}`,
+                    scheduled_from: currentTime
                   },
+                  reminder_date: nextCheckDate.toISOString(), // Ensure reminder_date is set
                   status: 'executed',
                   requires_approval: false,
                   executed_at: new Date().toISOString()
                 });
                 
-              console.log(`Set new reminder for project ${project.id} in ${actionData.days_until_check} days`);
+              console.log(`Set new reminder for project ${project.id} in ${actionData.days_until_check} days (${nextCheckDate.toISOString()})`);
             } else if (actionData.action_type === "data_update" && actionData.field_to_update) {
               // Create an action record for the data update (requiring approval)
               await supabase
@@ -326,6 +351,15 @@ serve(async (req) => {
                   requires_approval: true,
                   status: 'pending'
                 });
+                
+              // Clear the next_check_date since this requires manual approval
+              await supabase
+                .from('projects')
+                .update({
+                  next_check_date: null,
+                  last_action_check: new Date().toISOString()
+                })
+                .eq('id', project.id);
                 
               console.log(`Created data update action for project ${project.id}`);
             } else if (actionData.action_type === "message") {
@@ -344,6 +378,15 @@ serve(async (req) => {
                   requires_approval: true,
                   status: 'pending'
                 });
+                
+              // Clear the next_check_date since this requires manual approval
+              await supabase
+                .from('projects')
+                .update({
+                  next_check_date: null,
+                  last_action_check: new Date().toISOString()
+                })
+                .eq('id', project.id);
                 
               console.log(`Created message action for project ${project.id}`);
             } else if (actionData.action_type === "no_action") {
@@ -364,7 +407,8 @@ serve(async (req) => {
                   project_id: project.id,
                   action_type: 'no_action',
                   action_payload: {
-                    description: actionData.description || 'No action needed at this time'
+                    description: actionData.description || 'No action needed at this time',
+                    checked_at: currentTime
                   },
                   status: 'executed',
                   requires_approval: false,
@@ -377,7 +421,8 @@ serve(async (req) => {
             results.push({
               project_id: project.id,
               success: true,
-              action_type: actionData.action_type
+              action_type: actionData.action_type,
+              processed_at: currentTime
             });
           } catch (error) {
             console.error(`Error creating action record for project ${project.id}:`, error);
@@ -400,7 +445,8 @@ serve(async (req) => {
           results.push({
             project_id: project.id,
             success: true,
-            action_type: 'no_action_extracted'
+            action_type: 'no_action_extracted',
+            processed_at: currentTime
           });
           
           console.log(`No action data extracted for project ${project.id}, cleared next_check_date`);
@@ -415,9 +461,17 @@ serve(async (req) => {
       }
     }
     
+    const successfulProcesses = results.filter(r => r.success).length;
+    const failedProcesses = results.filter(r => !r.success).length;
+    
+    console.log(`Completed check-project-reminders: ${successfulProcesses} successful, ${failedProcesses} failed`);
+    
     return new Response(
       JSON.stringify({
         projects_processed: projectsDue?.length || 0,
+        successful_processes: successfulProcesses,
+        failed_processes: failedProcesses,
+        checked_at: currentTime,
         results
       }),
       {
@@ -434,6 +488,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error.message,
+        checked_at: new Date().toISOString()
       }),
       {
         headers: {

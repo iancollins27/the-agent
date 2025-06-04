@@ -24,7 +24,7 @@ export async function handleFutureReminder(
       };
     }
 
-    // Calculate the reminder date
+    // Calculate the reminder date (same as next check date)
     const reminderDate = new Date();
     reminderDate.setDate(reminderDate.getDate() + daysToAdd);
     
@@ -39,9 +39,10 @@ export async function handleFutureReminder(
           days_until_check: daysToAdd,
           check_reason: actionData.check_reason || 'Follow-up check',
           description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`,
-          reminder_description: `Reminder set for ${daysToAdd} day${daysToAdd === 1 ? '' : 's'} from now`
+          reminder_description: `Reminder set for ${daysToAdd} day${daysToAdd === 1 ? '' : 's'} from now`,
+          scheduled_date: reminderDate.toISOString()
         },
-        reminder_date: reminderDate.toISOString(),
+        reminder_date: reminderDate.toISOString(), // Ensure this is always set
         requires_approval: false,
         status: 'executed',
         executed_at: new Date().toISOString()
@@ -58,6 +59,8 @@ export async function handleFutureReminder(
     }
     
     console.log("Reminder action record created successfully:", data);
+    console.log(`Project ${projectId} scheduled for check on ${reminderDate.toISOString()}`);
+    
     return { 
       status: "success", 
       action_record_id: data.id,
@@ -65,7 +68,7 @@ export async function handleFutureReminder(
       reminderDays: daysToAdd,
       reminderDate: reminderDate.toISOString(),
       nextCheckDate: nextCheckDate,
-      message: "Reminder set successfully"
+      message: `Reminder set successfully for ${daysToAdd} day${daysToAdd === 1 ? '' : 's'} from now`
     };
   } catch (error) {
     console.error("Error creating reminder action record:", error);
