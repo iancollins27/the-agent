@@ -54,6 +54,7 @@ export type Database = {
           project_id: string | null
           prompt_run_id: string | null
           recipient_id: string | null
+          reminder_date: string | null
           requires_approval: boolean
           sender_ID: string | null
           sender_phone: string | null
@@ -71,6 +72,7 @@ export type Database = {
           project_id?: string | null
           prompt_run_id?: string | null
           recipient_id?: string | null
+          reminder_date?: string | null
           requires_approval?: boolean
           sender_ID?: string | null
           sender_phone?: string | null
@@ -88,6 +90,7 @@ export type Database = {
           project_id?: string | null
           prompt_run_id?: string | null
           recipient_id?: string | null
+          reminder_date?: string | null
           requires_approval?: boolean
           sender_ID?: string | null
           sender_phone?: string | null

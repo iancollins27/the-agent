@@ -1,16 +1,26 @@
 
 import React from 'react';
 import { CalendarClock } from "lucide-react";
+import { format } from 'date-fns';
 
 interface ReminderActionProps {
   daysUntilCheck: number;
   checkReason: string;
   description?: string;
+  reminderDate?: string;
 }
 
-const ReminderAction: React.FC<ReminderActionProps> = ({ daysUntilCheck, checkReason, description }) => {
-  const checkDate = new Date();
-  checkDate.setDate(checkDate.getDate() + daysUntilCheck);
+const ReminderAction: React.FC<ReminderActionProps> = ({ 
+  daysUntilCheck, 
+  checkReason, 
+  description, 
+  reminderDate 
+}) => {
+  const checkDate = reminderDate ? new Date(reminderDate) : (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysUntilCheck);
+    return date;
+  })();
   
   return (
     <div className="space-y-2">
@@ -32,7 +42,7 @@ const ReminderAction: React.FC<ReminderActionProps> = ({ daysUntilCheck, checkRe
         <p className="p-2 bg-gray-50 rounded">{checkReason}</p>
       </div>
       <div className="text-sm text-muted-foreground">
-        Scheduled date: {checkDate.toLocaleDateString()}
+        Scheduled date: {format(checkDate, 'PPP p')}
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ export async function createReminderActionRecord(
       reason: reason,
       description: `Reminder set for ${reminderDate}: ${reason}`
     },
+    reminder_date: reminderDate,
     status: 'executed',
     requires_approval: false,
     executed_at: new Date().toISOString()

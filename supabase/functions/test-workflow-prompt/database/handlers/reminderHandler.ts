@@ -23,6 +23,10 @@ export async function handleFutureReminder(
         error: "Failed to set next check date" 
       };
     }
+
+    // Calculate the reminder date
+    const reminderDate = new Date();
+    reminderDate.setDate(reminderDate.getDate() + daysToAdd);
     
     // Create an action record to document the reminder setting
     const { data, error } = await supabase
@@ -36,6 +40,7 @@ export async function handleFutureReminder(
           check_reason: actionData.check_reason || 'Follow-up check',
           description: `Set reminder to check in ${daysToAdd} days: ${actionData.check_reason || 'Follow-up check'}`
         },
+        reminder_date: reminderDate.toISOString(),
         requires_approval: false,
         status: 'executed',
         executed_at: new Date().toISOString()
@@ -57,6 +62,7 @@ export async function handleFutureReminder(
       action_record_id: data.id,
       reminderSet: true,
       reminderDays: daysToAdd,
+      reminderDate: reminderDate.toISOString(),
       nextCheckDate: nextCheckDate,
       message: "Reminder set successfully"
     };

@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
 import { ActionRecord } from './types';
 
@@ -39,6 +40,8 @@ const ActionDetails: React.FC<ActionDetailsProps> = ({ action }) => {
     }
   };
 
+  const isReminderAction = action.action_type.includes('reminder');
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -54,6 +57,19 @@ const ActionDetails: React.FC<ActionDetailsProps> = ({ action }) => {
           } />
           <InfoItem label="Created" value={timestamp} />
           <InfoItem label="Project" value={action.project_name || 'N/A'} />
+          {isReminderAction && action.reminder_date && (
+            <InfoItem 
+              label="Reminder Date" 
+              value={
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-blue-600">
+                    {formatDate(action.reminder_date)}
+                  </span>
+                </div>
+              } 
+            />
+          )}
         </InfoCard>
 
         <InfoCard title="People">

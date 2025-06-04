@@ -1,3 +1,4 @@
+
 /**
  * Create action record tool for agent-chat
  */
@@ -42,6 +43,14 @@ export const createActionRecordSchema = {
     project_id: {
       type: "string",
       description: "The project ID associated with this action"
+    },
+    days_until_check: {
+      type: "integer",
+      description: "For reminder actions, how many days until the reminder should trigger"
+    },
+    check_reason: {
+      type: "string",
+      description: "For reminder actions, the reason for the reminder"
     }
   },
   required: ["action_type"]
@@ -261,6 +270,14 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
       console.log(`Resolved sender "${args.sender}" to ID: ${senderId}`);
     }
     
+    // Calculate reminder date for reminder actions
+    let reminderDate = null;
+    if (args.action_type === 'set_future_reminder' && args.days_until_check) {
+      const checkDate = new Date();
+      checkDate.setDate(checkDate.getDate() + args.days_until_check);
+      reminderDate = checkDate.toISOString();
+    }
+    
     // Prepare action payload with resolved IDs
     let actionPayload = args.action_payload || {};
     
@@ -276,6 +293,15 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
       };
     }
 
+    // For reminder actions, ensure fields are in the payload
+    if (args.action_type === 'set_future_reminder') {
+      actionPayload = {
+        ...actionPayload,
+        days_until_check: args.days_until_check || actionPayload.days_until_check,
+        check_reason: args.check_reason || actionPayload.check_reason,
+      };
+    }
+
     // Prepare the action record data
     const actionData: Record<string, any> = {
       action_type: args.action_type,
@@ -287,6 +313,7 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
       status: (args.requires_approval ?? true) ? 'pending' : 'approved',
       project_id: projectId,
       created_by: userId,
+      reminder_date: reminderDate,
     };
 
     // Do NOT include company_id field at all even if we have it
@@ -313,6 +340,7 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
     return {
       status: "success",
       action_record_id: data.id,
+      reminder_date: reminderDate,
       message: `Created ${args.action_type} action record`
     };
   } catch (error) {
