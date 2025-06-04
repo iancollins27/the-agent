@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PromptRun } from '@/components/admin/types';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Loader2, Search, Filter } from 'lucide-react';
+import { Loader2, Search, Filter, RefreshCw } from 'lucide-react';
 import { 
   Table, 
   TableHeader, 
@@ -136,7 +135,7 @@ const ExecutionsList: React.FC = () => {
   };
 
   // Query for executions
-  const { data: executions, isLoading, refetch } = useQuery({
+  const { data: executions, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['executions', currentPage, pageSize, statusFilter, searchTerm, hasToolCalls],
     queryFn: fetchExecutions,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -230,6 +229,17 @@ const ExecutionsList: React.FC = () => {
         <h1 className="text-2xl font-bold">Execution History</h1>
         
         <div className="flex flex-col sm:flex-row gap-4">
+          {/* Refresh Button */}
+          <Button 
+            variant="outline" 
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Refreshing...' : 'Refresh'}
+          </Button>
+          
           {/* Search */}
           <form onSubmit={handleSearch} className="flex gap-2">
             <div className="relative">
