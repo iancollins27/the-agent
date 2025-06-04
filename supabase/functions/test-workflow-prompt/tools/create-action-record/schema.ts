@@ -8,12 +8,12 @@ export const createActionRecordSchema = {
   properties: {
     action_type: {
       type: "string",
-      enum: ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query"],
+      enum: ["message", "data_update", "set_future_reminder", "human_in_loop", "knowledge_query", "escalation"],
       description: "The type of action to create"
     },
     decision: {
       type: "string",
-      enum: ["ACTION_NEEDED", "NO_ACTION", "SET_FUTURE_REMINDER", "REQUEST_HUMAN_REVIEW"],
+      enum: ["ACTION_NEEDED", "NO_ACTION", "SET_FUTURE_REMINDER", "REQUEST_HUMAN_REVIEW", "ESCALATION"],
       description: "The decision made by the orchestrator (included for backwards compatibility)"
     },
     priority: {
@@ -68,6 +68,10 @@ export const createActionRecordSchema = {
     data_value: {
       type: "string",
       description: "For data_update actions, the new value for the field"
+    },
+    escalation_details: {
+      type: "string",
+      description: "For escalation actions, specific details about why the project needs to be escalated"
     }
   },
   required: ["action_type"]

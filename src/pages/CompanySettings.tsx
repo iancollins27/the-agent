@@ -5,6 +5,7 @@ import ProjectManagerNav from "../components/ProjectManagerNav";
 import KnowledgeBaseSettings from "../components/Settings/KnowledgeBaseSettings";
 import CommunicationSettings from "../components/Settings/CommunicationSettings";
 import ProjectTrackSettings from "../components/Settings/ProjectTrackSettings";
+import EscalationSettings from "../components/Settings/EscalationSettings";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 
 const CompanySettings: React.FC = () => {
@@ -19,10 +20,11 @@ const CompanySettings: React.FC = () => {
           <h1 className="text-3xl font-bold mb-6">Company Settings</h1>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid grid-cols-3 w-full sm:w-[600px]">
+            <TabsList className="grid grid-cols-4 w-full sm:w-[800px]">
               <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
               <TabsTrigger value="communications">Communication</TabsTrigger>
               <TabsTrigger value="project-tracks">Project Tracks</TabsTrigger>
+              <TabsTrigger value="escalations">Escalations</TabsTrigger>
             </TabsList>
             
             <TabsContent value="knowledge-base">
@@ -35,6 +37,10 @@ const CompanySettings: React.FC = () => {
             
             <TabsContent value="project-tracks">
               <ProjectTrackSettings />
+            </TabsContent>
+            
+            <TabsContent value="escalations">
+              <EscalationSettings />
             </TabsContent>
           </Tabs>
         </div>

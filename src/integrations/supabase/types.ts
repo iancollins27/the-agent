@@ -574,6 +574,50 @@ export type Database = {
           },
         ]
       }
+      escalation_config: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          notification_types: string[]
+          recipient_email: string | null
+          recipient_name: string
+          recipient_phone: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notification_types?: string[]
+          recipient_email?: string | null
+          recipient_name: string
+          recipient_phone: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notification_types?: string[]
+          recipient_email?: string | null
+          recipient_name?: string
+          recipient_phone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalation_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_job_queue: {
         Row: {
           action_record_id: string | null

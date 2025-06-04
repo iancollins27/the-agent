@@ -335,6 +335,37 @@ serve(async (req) => {
                 });
                 
               console.log(`Set new reminder for project ${project.id} in ${actionData.days_until_check} days (${nextCheckDate.toISOString()})`);
+            } else if (actionData.action_type === "escalation") {
+              // Handle escalation - call the escalation handler directly
+              try {
+                const escalationResult = await supabase.functions.invoke('test-workflow-prompt', {
+                  body: {
+                    action_type: 'escalation',
+                    project_id: project.id,
+                    prompt_run_id: promptRun?.id,
+                    action_data: actionData
+                  }
+                });
+                
+                if (escalationResult.error) {
+                  console.error(`Error processing escalation for project ${project.id}:`, escalationResult.error);
+                } else {
+                  console.log(`Escalation processed for project ${project.id}`);
+                }
+              } catch (escalationError) {
+                console.error(`Error calling escalation handler for project ${project.id}:`, escalationError);
+              }
+              
+              // Clear the next_check_date since escalation requires immediate attention
+              await supabase
+                .from('projects')
+                .update({
+                  next_check_date: null,
+                  last_action_check: new Date().toISOString()
+                })
+                .eq('id', project.id);
+                
+              console.log(`Escalated project ${project.id}, cleared next_check_date`);
             } else if (actionData.action_type === "data_update" && actionData.field_to_update) {
               // Create an action record for the data update (requiring approval)
               await supabase
@@ -492,11 +523,11 @@ serve(async (req) => {
       }),
       {
         headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-        status: 500,
-      }
-    );
-  }
+        ...corsHeaders,
+        "Content-Type": "application/json",
+      },
+      status: 500,
+    }
+  );
+}
 });

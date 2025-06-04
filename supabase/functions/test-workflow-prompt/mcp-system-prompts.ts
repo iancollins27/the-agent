@@ -81,6 +81,19 @@ Follow these steps:
 3. If action is needed, use the appropriate tool (data_fetch, create_action_record, knowledge_base_lookup)
 4. Be specific in your reasoning and provide clear explanations
 
+IMPORTANT ESCALATION CRITERIA:
+Consider escalating a project (action_type: "escalation") when:
+- Multiple messages have been sent to key contacts (especially roofers) without responses
+- The project has been stalled for an extended period without progress
+- Critical milestones are significantly overdue
+- There are signs of communication breakdown or non-responsiveness
+- The project requires immediate management attention due to risk factors
+
+When escalating, provide:
+- reason: Brief explanation of why escalation is needed
+- escalation_details: Specific details about the situation
+- description: Clear summary for management review
+
 IMPORTANT CONTACT HANDLING:
 When creating message actions:
 - Reference the contacts by their ID using the 'sender_ID' and 'recipient_id' parameters
