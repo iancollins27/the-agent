@@ -14,8 +14,35 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
     promptRun.toolLogsCount > 0 : // Use the property if it exists
     Array.isArray(promptRun.toolLogs) && promptRun.toolLogs.length > 0; // Fallback to checking toolLogs array
 
-  // Get the raw prompt input
-  const rawPromptInput = promptRun.prompt_input || '';
+  // For MCP executions, we want to show the actual processed input that was sent to the LLM
+  // This should be the final prompt after all variable substitutions
+  let actualPromptInput = promptRun.prompt_input || '';
+  
+  // If this is MCP and we have tool logs, the actual input might be in a different field
+  // or we might need to reconstruct it from the context
+  if (isMCPExecution && promptRun.toolLogs && promptRun.toolLogs.length > 0) {
+    // For MCP executions, check if we have the processed prompt in tool logs or other fields
+    const firstToolLog = promptRun.toolLogs[0];
+    if (firstToolLog && firstToolLog.input_data) {
+      try {
+        const inputData = typeof firstToolLog.input_data === 'string' 
+          ? JSON.parse(firstToolLog.input_data) 
+          : firstToolLog.input_data;
+        
+        // Look for the actual system prompt or messages that were sent
+        if (inputData.messages && Array.isArray(inputData.messages)) {
+          const systemMessage = inputData.messages.find(msg => msg.role === 'system');
+          if (systemMessage && systemMessage.content) {
+            actualPromptInput = systemMessage.content;
+          }
+        } else if (inputData.prompt) {
+          actualPromptInput = inputData.prompt;
+        }
+      } catch (e) {
+        console.error('Error parsing tool log input data:', e);
+      }
+    }
+  }
   
   const toolsUsed = promptRun.toolLogs?.map(log => log.tool_name).filter((value, index, self) => 
     self.indexOf(value) === index
@@ -24,7 +51,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
   // Parse the prompt input to extract system prompt and milestone instructions
   const parsePromptInput = () => {
     try {
-      const input = rawPromptInput;
+      const input = actualPromptInput;
       
       // If there's no input, return empty structure
       if (!input || typeof input !== 'string') {
@@ -72,7 +99,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
       return { 
         systemPrompt: '', 
         milestoneInstructions: '', 
-        userPrompt: rawPromptInput || 'Error parsing prompt input' 
+        userPrompt: actualPromptInput || 'Error parsing prompt input' 
       };
     }
   };
@@ -80,7 +107,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
   const { systemPrompt, milestoneInstructions, userPrompt } = parsePromptInput();
   
   // Always show content - if parsing fails, show raw input
-  const hasContent = rawPromptInput && rawPromptInput.length > 0;
+  const hasContent = actualPromptInput && actualPromptInput.length > 0;
   const showFormatted = hasContent && (systemPrompt || milestoneInstructions);
   
   return (
@@ -89,7 +116,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
         <CardTitle className="text-base flex items-center flex-wrap">
           <div className="flex items-center">
             <Tool className="h-4 w-4 mr-2 text-blue-500" />
-            <span>Prompt Input</span>
+            <span>Actual Prompt Input (Processed)</span>
             {isMCPExecution && <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700">MCP</Badge>}
           </div>
           
@@ -141,7 +168,7 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
           </div>
         ) : (
           <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
-            {rawPromptInput}
+            {actualPromptInput}
           </div>
         )}
       </CardContent>
