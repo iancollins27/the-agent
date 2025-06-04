@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PromptRun } from '@/components/admin/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +41,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useDebounce } from '@/hooks/use-debounce';
 
 const ExecutionsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,8 +51,25 @@ const ExecutionsList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [hasToolCalls, setHasToolCalls] = useState(false);
 
+  // Debounce search term to avoid too many queries
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   // Function to fetch executions
   const fetchExecutions = async () => {
+    let matchingProjectIds: string[] = [];
+    
+    // If there's a search term, first find matching projects
+    if (debouncedSearchTerm && debouncedSearchTerm.trim()) {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id')
+        .or(`crm_id.ilike.%${debouncedSearchTerm}%,Address.ilike.%${debouncedSearchTerm}%,project_name.ilike.%${debouncedSearchTerm}%`);
+      
+      if (projects) {
+        matchingProjectIds = projects.map(p => p.id);
+      }
+    }
+
     // Start with the base query
     let query = supabase
       .from('prompt_runs')
@@ -83,8 +102,20 @@ const ExecutionsList: React.FC = () => {
       query = query.eq('status', statusFilter);
     }
     
-    if (searchTerm) {
-      query = query.or(`prompt_input.ilike.%${searchTerm}%,projects.crm_id.ilike.%${searchTerm}%`);
+    // Apply search filters
+    if (debouncedSearchTerm && debouncedSearchTerm.trim()) {
+      const searchConditions = [];
+      
+      // Search in prompt_input
+      searchConditions.push(`prompt_input.ilike.%${debouncedSearchTerm}%`);
+      
+      // If we found matching projects, include them
+      if (matchingProjectIds.length > 0) {
+        query = query.or(`prompt_input.ilike.%${debouncedSearchTerm}%,project_id.in.(${matchingProjectIds.join(',')})`);
+      } else {
+        // Only search in prompt_input if no projects matched
+        query = query.ilike('prompt_input', `%${debouncedSearchTerm}%`);
+      }
     }
 
     if (hasToolCalls) {
@@ -136,7 +167,7 @@ const ExecutionsList: React.FC = () => {
 
   // Query for executions
   const { data: executions, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['executions', currentPage, pageSize, statusFilter, searchTerm, hasToolCalls],
+    queryKey: ['executions', currentPage, pageSize, statusFilter, debouncedSearchTerm, hasToolCalls],
     queryFn: fetchExecutions,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -147,10 +178,26 @@ const ExecutionsList: React.FC = () => {
     setCurrentPage(1); // Reset to first page when filter changes
   };
 
-  // Handle search
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  // Handle search form submission (for explicit search button)
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1); // Reset to first page when searching
+    // The debounced search term will trigger the query automatically
+  };
+
+  // Handle Enter key in search input
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setCurrentPage(1);
+      // Force immediate search by updating the debounced term
+    }
   };
 
   // Handle pagination - revised to properly handle navigation
@@ -245,13 +292,16 @@ const ExecutionsList: React.FC = () => {
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search executions..."
-                className="pl-8"
+                placeholder="Search executions, projects, addresses..."
+                className="pl-8 min-w-[250px]"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
+                onKeyPress={handleKeyPress}
               />
             </div>
-            <Button type="submit" variant="outline">Search</Button>
+            <Button type="submit" variant="outline" disabled={isFetching}>
+              Search
+            </Button>
           </form>
           
           {/* Filter */}
@@ -283,6 +333,14 @@ const ExecutionsList: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Show search results info */}
+      {debouncedSearchTerm && (
+        <div className="text-sm text-muted-foreground">
+          {isFetching ? 'Searching...' : `Search results for "${debouncedSearchTerm}"`}
+          {executions?.count !== undefined && ` (${executions.count} result${executions.count !== 1 ? 's' : ''})`}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center items-center p-12">
@@ -349,7 +407,9 @@ const ExecutionsList: React.FC = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8">
-                        <div className="text-muted-foreground">No executions found</div>
+                        <div className="text-muted-foreground">
+                          {debouncedSearchTerm ? 'No executions found matching your search' : 'No executions found'}
+                        </div>
                         <Button variant="outline" className="mt-2" onClick={() => refetch()}>
                           Refresh
                         </Button>
