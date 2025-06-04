@@ -35,6 +35,8 @@ const EscalationSettings: React.FC = () => {
   const fetchEscalationRecipients = async () => {
     try {
       setIsLoading(true);
+      console.log('Fetching escalation recipients for company:', companySettings?.id);
+      
       const { data, error } = await supabase
         .from('escalation_config')
         .select('*')
@@ -49,6 +51,7 @@ const EscalationSettings: React.FC = () => {
           variant: "destructive",
         });
       } else {
+        console.log('Fetched escalation recipients:', data);
         setRecipients(data || []);
       }
     } catch (error) {
@@ -96,6 +99,7 @@ const EscalationSettings: React.FC = () => {
           .eq('id', recipient.id);
 
         if (error) {
+          console.error('Error deleting recipient:', error);
           toast({
             title: "Error",
             description: "Failed to delete recipient",
@@ -104,6 +108,7 @@ const EscalationSettings: React.FC = () => {
           return;
         }
       } catch (error) {
+        console.error('Error deleting recipient:', error);
         toast({
           title: "Error",
           description: "An unexpected error occurred",
@@ -134,6 +139,7 @@ const EscalationSettings: React.FC = () => {
 
     try {
       setIsSaving(true);
+      console.log('Saving escalation settings for company:', companySettings.id);
 
       // Validate recipients
       const validRecipients = recipients.filter(r => 
@@ -153,6 +159,7 @@ const EscalationSettings: React.FC = () => {
       for (const recipient of validRecipients) {
         if (recipient.id) {
           // Update existing
+          console.log('Updating recipient:', recipient.id);
           const { error } = await supabase
             .from('escalation_config')
             .update({
@@ -166,22 +173,29 @@ const EscalationSettings: React.FC = () => {
             .eq('id', recipient.id);
 
           if (error) {
+            console.error('Error updating recipient:', error);
             throw error;
           }
         } else {
-          // Insert new
+          // Insert new - explicitly set company_id
+          console.log('Creating new recipient for company:', companySettings.id);
+          const insertData = {
+            company_id: companySettings.id,
+            recipient_name: recipient.recipient_name,
+            recipient_phone: recipient.recipient_phone,
+            recipient_email: recipient.recipient_email || null,
+            is_active: recipient.is_active,
+            notification_types: recipient.notification_types
+          };
+          
+          console.log('Insert data:', insertData);
+          
           const { error } = await supabase
             .from('escalation_config')
-            .insert({
-              company_id: companySettings.id,
-              recipient_name: recipient.recipient_name,
-              recipient_phone: recipient.recipient_phone,
-              recipient_email: recipient.recipient_email || null,
-              is_active: recipient.is_active,
-              notification_types: recipient.notification_types
-            });
+            .insert(insertData);
 
           if (error) {
+            console.error('Error creating recipient:', error);
             throw error;
           }
         }
