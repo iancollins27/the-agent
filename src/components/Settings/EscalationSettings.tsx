@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/providers/SettingsProvider";
@@ -23,6 +22,7 @@ const EscalationSettings: React.FC = () => {
   const [recipients, setRecipients] = useState<EscalationRecipient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const { toast } = useToast();
   const { companySettings } = useSettings();
 
@@ -125,6 +125,96 @@ const EscalationSettings: React.FC = () => {
       title: "Success",
       description: "Recipient removed",
     });
+  };
+
+  const testEscalationSMS = async () => {
+    if (!companySettings?.id) {
+      toast({
+        title: "Error",
+        description: "No company selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const activeRecipients = recipients.filter(r => r.is_active && r.recipient_phone);
+    
+    if (activeRecipients.length === 0) {
+      toast({
+        title: "No Recipients",
+        description: "No active recipients with phone numbers found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsTesting(true);
+      console.log('Testing escalation SMS for company:', companySettings.id);
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const recipient of activeRecipients) {
+        try {
+          console.log(`Sending test SMS to ${recipient.recipient_name} at ${recipient.recipient_phone}`);
+          
+          const { data, error } = await supabase.functions.invoke('send-communication', {
+            body: {
+              messageContent: `Test escalation notification from your roofing management system. This is a test message to verify SMS delivery is working correctly. - ${new Date().toLocaleString()}`,
+              recipient: {
+                id: recipient.id,
+                name: recipient.recipient_name,
+                phone: recipient.recipient_phone,
+                email: recipient.recipient_email
+              },
+              channel: 'sms',
+              companyId: companySettings.id,
+              isTest: false // Set to false to actually send the SMS
+            }
+          });
+
+          if (error) {
+            console.error(`Error sending test SMS to ${recipient.recipient_name}:`, error);
+            errorCount++;
+          } else {
+            console.log(`Successfully sent test SMS to ${recipient.recipient_name}:`, data);
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`Exception sending test SMS to ${recipient.recipient_name}:`, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0 && errorCount === 0) {
+        toast({
+          title: "Success",
+          description: `Test SMS sent successfully to ${successCount} recipient${successCount > 1 ? 's' : ''}`,
+        });
+      } else if (successCount > 0 && errorCount > 0) {
+        toast({
+          title: "Partial Success",
+          description: `Sent to ${successCount} recipients, failed for ${errorCount} recipients`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed",
+          description: `Failed to send test SMS to all ${errorCount} recipients`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error testing escalation SMS:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send test SMS messages",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const saveSettings = async () => {
@@ -304,12 +394,24 @@ const EscalationSettings: React.FC = () => {
             Add Recipient
           </Button>
           
-          <Button
-            onClick={saveSettings}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Save Settings'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={testEscalationSMS}
+              disabled={isTesting || recipients.filter(r => r.is_active && r.recipient_phone).length === 0}
+              className="flex items-center gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              {isTesting ? 'Sending Test...' : 'Test SMS'}
+            </Button>
+            
+            <Button
+              onClick={saveSettings}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </div>
         </div>
 
         <div className="bg-blue-50 p-4 rounded-lg">
@@ -319,6 +421,7 @@ const EscalationSettings: React.FC = () => {
             <li>• Escalations are triggered for non-responsive contacts, overdue milestones, or critical issues</li>
             <li>• All active recipients will receive SMS notifications with project details</li>
             <li>• Escalations are executed immediately without requiring approval</li>
+            <li>• Use the "Test SMS" button to verify your SMS configuration is working</li>
           </ul>
         </div>
       </CardContent>
