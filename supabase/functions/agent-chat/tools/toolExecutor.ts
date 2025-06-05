@@ -1,7 +1,6 @@
 
 import { createActionRecordTool } from "./create-action-record/index.ts";
 import { dataFetchTool } from "./data-fetch/index.ts";
-import { identifyProjectTool } from "./identify-project/index.ts";
 import { readCrmDataTool } from "./read-crm-data/index.ts";
 import { sessionManagerTool } from "./session-manager/index.ts";
 import { channelResponseTool } from "./channel-response/index.ts";
@@ -24,14 +23,53 @@ export async function executeToolCall(
 
   console.log(`Executing tool ${toolName} with args: ${JSON.stringify(args)}`);
   
-  // Map tool name to actual tool
+  // Handle identify_project as external edge function call
+  if (toolName === 'identify_project') {
+    console.log(`Calling external identify-project edge function with args:`, args);
+    
+    try {
+      // Prepare the request body for the identify-project edge function
+      const requestBody = {
+        query: args.query || '',
+        type: args.type || 'any',
+        company_id: companyId,
+        user_id: userProfile?.id
+      };
+      
+      console.log(`Invoking identify-project with body:`, requestBody);
+      
+      const { data, error } = await supabase.functions.invoke('identify-project', {
+        body: requestBody
+      });
+      
+      if (error) {
+        console.error(`Error calling identify-project edge function:`, error);
+        return {
+          status: "error",
+          error: error.message || "Failed to call identify-project function",
+          details: error
+        };
+      }
+      
+      console.log(`identify-project edge function response:`, data);
+      return data;
+      
+    } catch (error) {
+      console.error(`Exception calling identify-project edge function:`, error);
+      return {
+        status: "error",
+        error: error.message || "Exception calling identify-project function",
+        details: error
+      };
+    }
+  }
+  
+  // Map tool name to actual internal tool
   switch (toolName) {
     case 'create_action_record':
       return await createActionRecordTool.execute(args, context);
     case 'data_fetch':
       return await dataFetchTool.execute(args, context);
-    case 'identify_project':
-      return await identifyProjectTool.execute(args, context);
     case 'read_crm_data':
       return await readCrmDataTool.execute(args, context);
     case 'session_manager':

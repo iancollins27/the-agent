@@ -82,12 +82,8 @@ export async function processToolCalls(
           continue; // Skip to next tool call
         }
         
-        // Explicitly add company_id to arguments for identify_project calls
-        call.arguments.company_id = companyId;
-        
-        if (userProfile) {
-          call.arguments.user_id = userProfile.id;
-        }
+        // The external edge function will handle company_id and user_id internally
+        // No need to explicitly add them to arguments since toolExecutor handles this
       }
       
       // Execute the tool with context including companyId
@@ -105,33 +101,6 @@ export async function processToolCalls(
       if (call.name === 'identify_project' && 
           toolResult?.status === 'success' && 
           toolResult?.projects?.length > 0) {
-        
-        // Double check security as a defense in depth approach
-        if (companyId) {
-          // Filter projects by company ID
-          const authorizedProjects = toolResult.projects.filter((p: any) => {
-            return p.company_id === companyId;
-          });
-          
-          if (authorizedProjects.length === 0) {
-            // No authorized projects found
-            toolResult.status = "error";
-            toolResult.error = "No authorized projects found for your company";
-            toolResult.message = "You do not have access to any projects matching your query.";
-            toolResult.projects = [];
-            
-            console.log(`Security filter: User ${userProfile?.id || 'unknown'} from company ${companyId} attempted to access unauthorized projects`);
-          } else {
-            // Update the projects array with only authorized projects
-            toolResult.projects = authorizedProjects;
-            
-            // Update message if some projects were filtered out
-            if (authorizedProjects.length < toolResult.projects.length) {
-              console.log(`Security filter: Filtered out ${toolResult.projects.length - authorizedProjects.length} unauthorized projects`);
-              toolResult.message = `Found ${authorizedProjects.length} authorized projects matching your query.`;
-            }
-          }
-        }
         
         // Check for multiple matches
         if (toolResult.projects.length > 1) {
@@ -249,7 +218,7 @@ export async function processToolCalls(
       context.messages.push({
         role: 'tool',
         tool_call_id: call.id,
-        content: JSON.stringify(errorResult)
+        content: JSON.stringify(toolResult)
       });
     }
   }

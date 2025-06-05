@@ -1,15 +1,13 @@
 import { createActionRecordTool } from "./create-action-record/index.ts";
 import { dataFetchTool } from "./data-fetch/index.ts";
-import { identifyProjectTool } from "./identify-project/index.ts";
 import { readCrmDataTool } from "./read-crm-data/index.ts";
 import { sessionManagerTool } from "./session-manager/index.ts";
 import { channelResponseTool } from "./channel-response/index.ts";
 
-// Register all available tools
+// Register all available tools (removed identify_project - it's now an external edge function)
 const tools = [
   createActionRecordTool,
   dataFetchTool,
-  identifyProjectTool,
   readCrmDataTool,
   sessionManagerTool,
   channelResponseTool
