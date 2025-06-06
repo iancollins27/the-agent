@@ -59,6 +59,8 @@ export const useTestRunner = (
       // Get the available tools based on MCP mode
       const availableTools = getAvailableTools(useMCP || isMCPOrchestratorSelected);
       
+      console.log(`Test runner: MCP enabled: ${useMCP || isMCPOrchestratorSelected}, Available tools:`, availableTools);
+      
       const allResults: ProjectTestResult[] = [];
       
       for (const projectId of selectedProjectIds) {
@@ -69,6 +71,8 @@ export const useTestRunner = (
             isMultiProjectTest,
             availableTools
           );
+          
+          console.log(`Context data for project ${projectId}:`, contextData);
           
           const projectResults = [];
           
@@ -87,19 +91,39 @@ export const useTestRunner = (
               console.warn(`Using MCP mode with a non-orchestrator prompt type: ${promptData.type}`);
             }
             
+            // For MCP orchestrator prompts, ensure tools are enabled
+            const shouldUseMCP = useMCP || promptData.type === 'mcp_orchestrator';
+            const toolsForThisPrompt = shouldUseMCP ? availableTools : [];
+            
+            console.log(`Running prompt ${promptData.type} with MCP: ${shouldUseMCP}, Tools count: ${toolsForThisPrompt.length}`);
+            
             try {
+              // Enhanced context data with proper tool setup for MCP
+              const enhancedContextData = {
+                ...contextData,
+                available_tools: toolsForThisPrompt,
+                useMCP: shouldUseMCP,
+                promptType: promptData.type
+              };
+              
+              console.log(`Enhanced context data for MCP:`, {
+                available_tools: enhancedContextData.available_tools,
+                useMCP: enhancedContextData.useMCP,
+                promptType: enhancedContextData.promptType
+              });
+              
               // Run the test using our service
               const data = await testRunnerService.runPromptTest({
                 promptType: promptData.type,
                 promptText: promptData.prompt_text,
                 projectId: projectData.id,
-                contextData: contextData,
+                contextData: enhancedContextData,
                 aiProvider: aiProvider,
                 aiModel: aiModel,
                 workflowPromptId: promptData.id,
                 initiatedBy: userEmail,
                 isMultiProjectTest: isMultiProjectTest,
-                useMCP: useMCP || promptData.type === 'mcp_orchestrator' // Force MCP for orchestrator prompts
+                useMCP: shouldUseMCP
               });
               
               projectResults.push({
@@ -123,7 +147,8 @@ export const useTestRunner = (
                 promptType: promptData.type,
                 projectId: projectData.id,
                 error: functionError.message || "Unknown error",
-                useMCP: useMCP || promptData.type === 'mcp_orchestrator'
+                useMCP: shouldUseMCP,
+                availableTools: toolsForThisPrompt
               };
               
               // Set a user-friendly error message

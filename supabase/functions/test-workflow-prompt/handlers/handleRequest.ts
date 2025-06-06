@@ -181,17 +181,30 @@ async function handlePromptRequest(
   companyId: string | null
 ): Promise<any> {
   try {
-    const { prompt, project_id: projectId, prompt_run_id: promptRunId } = requestBody;
+    const { prompt, project_id: projectId, prompt_run_id: promptRunId, contextData } = requestBody;
+
+    console.log("Request body keys:", Object.keys(requestBody));
+    console.log("Context data:", contextData ? JSON.stringify(contextData, null, 2) : "No context data");
 
     if (!prompt || !projectId || !promptRunId) {
-      console.error("Missing required parameters");
+      console.error("Missing required parameters - prompt:", !!prompt, "projectId:", !!projectId, "promptRunId:", !!promptRunId);
       return {
         status: "error",
-        error: "Missing required parameters"
+        error: "Missing required parameters: prompt, project_id, or prompt_run_id"
       };
     }
 
-    console.log(`Received prompt: ${prompt} for project ${projectId}`);
+    console.log(`Received prompt: ${prompt.substring(0, 100)}... for project ${projectId}`);
+
+    // Log MCP and tools information from context data
+    if (contextData) {
+      console.log("MCP configuration:", {
+        useMCP: contextData.useMCP,
+        available_tools: contextData.available_tools,
+        tools_count: Array.isArray(contextData.available_tools) ? contextData.available_tools.length : 0,
+        promptType: contextData.promptType
+      });
+    }
 
     // Get project details for context
     const { data: projectData, error: projectError } = await supabase
@@ -229,6 +242,29 @@ async function handlePromptRequest(
         error: "Failed to fetch company settings"
       };
     }
+
+    // Enhanced context merging - preserve tools from testing interface
+    const enhancedContextData = {
+      // First, apply any existing context data from the request
+      ...(contextData || {}),
+      // Then add project-specific context
+      project_name: projectData.project_name,
+      project_summary: projectData.summary,
+      project_next_step: projectData.next_step,
+      project_address: projectData.Address,
+      company_name: projectData.companies.name,
+      company_ai_prompt_context: companySettings?.ai_prompt_context || '',
+      // Preserve tools configuration from testing interface
+      available_tools: contextData?.available_tools || [],
+      useMCP: contextData?.useMCP || false
+    };
+
+    console.log("Enhanced context data for MCP processing:", {
+      available_tools: enhancedContextData.available_tools,
+      tools_count: Array.isArray(enhancedContextData.available_tools) ? enhancedContextData.available_tools.length : 0,
+      useMCP: enhancedContextData.useMCP,
+      promptType: enhancedContextData.promptType
+    });
 
     // Construct the prompt with project details
     const fullPrompt = `
@@ -287,11 +323,15 @@ async function handlePromptRequest(
     }
 
     const responseText = openAiData.choices[0].message.content;
-    console.log(`Received response: ${responseText}`);
+    console.log(`Received response: ${responseText.substring(0, 100)}...`);
 
     return {
       status: "success",
-      response: responseText
+      response: responseText,
+      output: responseText,
+      finalPrompt: fullPrompt,
+      promptRunId: promptRunId,
+      usedMCP: enhancedContextData.useMCP
     };
   } catch (error) {
     console.error("Error in handlePromptRequest:", error);

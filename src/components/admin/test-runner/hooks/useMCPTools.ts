@@ -28,13 +28,17 @@ export const useMCPTools = () => {
   useEffect(() => {
     const fetchTools = async () => {
       if (useMCP) {
-        // In a real implementation, we'd fetch this from a backend endpoint
-        // that accesses the tool registry
-        setAvailableTools([
+        // Set the available tools for MCP mode
+        const tools = [
           'create_action_record',
-          'knowledge_base_lookup'
-          // Adding more tools as they become available
-        ]);
+          'knowledge_base_lookup',
+          'read_crm_data',
+          'crm_data_write',
+          'email_summary'
+        ];
+        
+        console.log('Setting available MCP tools:', tools);
+        setAvailableTools(tools);
       } else {
         setAvailableTools([]);
       }
@@ -45,9 +49,21 @@ export const useMCPTools = () => {
   
   // Get available tools based on MCP mode
   const getAvailableTools = (useMCPMode: boolean): string[] => {
-    if (!useMCPMode) return [];
+    if (!useMCPMode) {
+      console.log('MCP mode disabled, returning no tools');
+      return [];
+    }
     
-    return availableTools;
+    const tools = [
+      'create_action_record',
+      'knowledge_base_lookup',
+      'read_crm_data',
+      'crm_data_write',
+      'email_summary'
+    ];
+    
+    console.log('MCP mode enabled, returning tools:', tools);
+    return tools;
   };
   
   // Get the limit for a specific tool
