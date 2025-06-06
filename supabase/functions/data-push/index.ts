@@ -1,7 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { ZohoWriter } from "./writers/zoho.ts";
+import { JobProgressWriter } from "./writers/jobprogress.ts";
 
 // CORS headers for browser support
 const corsHeaders = {
@@ -63,6 +63,9 @@ class DataWriteRouter {
       switch (integration.provider_name.toLowerCase()) {
         case "zoho":
           writer = new ZohoWriter(integration, credentials);
+          break;
+        case "jobprogress":
+          writer = new JobProgressWriter(integration, credentials);
           break;
         default:
           throw new Error(`Unsupported CRM provider: ${integration.provider_name}`);

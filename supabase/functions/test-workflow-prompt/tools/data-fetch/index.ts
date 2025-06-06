@@ -3,7 +3,7 @@ import { Tool, ToolResult } from '../types.ts';
 
 export const dataFetch: Tool = {
   name: "data_fetch",
-  description: "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes. Use this to get a complete view of a project's current state.",
+  description: "Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes. Supports multiple CRM providers including Zoho and JobProgress. Use this to get a complete view of a project's current state.",
   schema: {
     type: "object",
     properties: {

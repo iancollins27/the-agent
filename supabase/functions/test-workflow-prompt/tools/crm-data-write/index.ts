@@ -5,7 +5,7 @@ import { z } from 'https://esm.sh/zod@3.21.4';
 
 export const crmDataWrite: Tool = {
   name: "crm_data_write",
-  description: "Writes data to the CRM system for projects, tasks, or contacts. Use this to create or update records in the CRM.",
+  description: "Writes data to the CRM system for projects, tasks, or contacts. Supports multiple CRM providers including Zoho and JobProgress. Use this to create or update records in the CRM.",
   schema: {
     type: "object",
     properties: {

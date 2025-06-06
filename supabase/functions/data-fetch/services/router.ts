@@ -1,5 +1,6 @@
 
 import { ZohoConnector } from "../connectors/zoho.ts";
+import { JobProgressConnector } from "../connectors/jobprogress.ts";
 import { BaseConnector } from "../models/connector.ts";
 
 export class DataFetchRouter {
@@ -215,6 +216,8 @@ export class DataFetchRouter {
     switch (providerName.toLowerCase()) {
       case "zoho":
         return new ZohoConnector(this.supabase, integration);
+      case "jobprogress":
+        return new JobProgressConnector(this.supabase, integration);
       // Add more cases for other CRM providers as they're implemented
       default:
         throw new Error(`Unsupported provider: ${providerName}`);
