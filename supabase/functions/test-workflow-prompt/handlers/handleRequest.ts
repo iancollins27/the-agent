@@ -1,6 +1,135 @@
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
 
-export async function handlePromptRequest(
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+function logWithTime(message: string) {
+  const now = new Date();
+  const timeString = now.toISOString();
+  console.log(`[${timeString}] ${message}`);
+}
+
+export async function handleRequest(req: Request): Promise<Response> {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: corsHeaders,
+      status: 200
+    });
+  }
+
+  try {
+    logWithTime('Starting test-workflow-prompt function, connecting to Supabase at: ' + 
+      (supabaseUrl?.substring(0, 30) + '...'));
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check for authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logWithTime('Error: Missing or invalid authorization header');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing or invalid authorization header',
+          message: 'This endpoint requires authentication'
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Parse request body
+    const requestBody = await req.json();
+    
+    // Get user profile from auth header
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      logWithTime('Error: Invalid user token');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid user token',
+          message: 'Authentication failed'
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Get user profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      logWithTime('Error fetching user profile: ' + profileError.message);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to fetch user profile',
+          message: profileError.message
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    const companyId = userProfile?.company_id || null;
+    
+    const result = await handlePromptRequest(supabase, requestBody, userProfile, companyId);
+    
+    logWithTime('Successfully processed request, returning response');
+    
+    return new Response(
+      JSON.stringify(result),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+  } catch (error) {
+    logWithTime(`Error processing request: ${error.message}`);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message || 'An unexpected error occurred',
+        stack: Deno.env.get('NODE_ENV') === 'development' ? error.stack : undefined
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  }
+}
+
+async function handlePromptRequest(
   supabase: any,
   requestBody: any,
   userProfile: any,
