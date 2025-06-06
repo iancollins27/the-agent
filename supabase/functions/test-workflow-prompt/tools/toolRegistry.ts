@@ -9,14 +9,15 @@ import { knowledgeBaseLookup } from './knowledge-base-lookup/index.ts';
 import { readCrmDataTool } from './read-crm-data/index.ts';
 import { crmDataWrite } from './crm-data-write/index.ts';
 import { emailSummaryTool } from './email-summary/index.ts';
+import { identifyProjectTool } from './identify-project/index.ts';
 
 const tools: Record<string, Tool> = {
   create_action_record: createActionRecordTool,
   knowledge_base_lookup: knowledgeBaseLookup,
   read_crm_data: readCrmDataTool,
   crm_data_write: crmDataWrite,
-  email_summary: emailSummaryTool
-  // Additional tools can be registered here
+  email_summary: emailSummaryTool,
+  identify_project: identifyProjectTool
 };
 
 export function getAvailableTools(): Record<string, Tool> {
