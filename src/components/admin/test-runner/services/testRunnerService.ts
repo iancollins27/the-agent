@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -26,13 +25,16 @@ export const testRunnerService = {
     // Call the edge function to test the prompt
     const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
       body: {
+        // Map the parameter names to what handlePromptRequest expects
+        prompt: params.promptText,           // Changed from promptText to prompt
+        project_id: params.projectId,        // Changed from projectId to project_id
+        prompt_run_id: params.workflowPromptId, // Changed from workflowPromptId to prompt_run_id
+        
+        // Keep these parameters as they are used elsewhere in the function
         promptType: params.promptType,
-        promptText: params.promptText,
-        projectId: params.projectId,
         contextData: params.contextData,
         aiProvider: params.aiProvider,
         aiModel: params.aiModel,
-        workflowPromptId: params.workflowPromptId,
         initiatedBy: params.initiatedBy,
         isMultiProjectTest: params.isMultiProjectTest,
         useMCP: params.useMCP
