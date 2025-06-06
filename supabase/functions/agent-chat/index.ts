@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from './utils/cors.ts'
@@ -345,38 +346,14 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
     }
 
     // Continue with regular flow for web users
-    // Filter tools based on availability - now include identify_project as external tool
+    // Filter tools based on availability
     const registeredTools = toolRegistry.getAllTools()
     
-    // Add identify_project to the available tools since it's now external
-    const allAvailableTools = [
-      ...registeredTools,
-      {
-        name: "identify_project",
-        description: "Identifies a project based on provided information like ID, name, or address. For homeowners, automatically returns their associated projects. For company users, searches based on the query. This tool MUST be called before using data_fetch. It returns the correct project_id (UUID) that should be used with other tools like data_fetch.",
-        schema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "The project identifier, address, or description to search for (optional for homeowners - they get their projects automatically)"
-            },
-            type: {
-              type: "string",
-              enum: ["id", "crm_id", "name", "address", "any"],
-              description: "Type of query (defaults to 'any', ignored for homeowners)"
-            }
-          },
-          required: []
-        }
-      }
-    ];
-    
     const filteredTools = availableTools.length > 0 
-      ? allAvailableTools.filter(tool => availableTools.includes(tool.name))
-      : allAvailableTools
+      ? registeredTools.filter(tool => availableTools.includes(tool.name))
+      : registeredTools
 
-    console.log(`Filtered ${filteredTools.length} tools from ${allAvailableTools.length} available`)
+    console.log(`Filtered ${filteredTools.length} tools from ${registeredTools.length} available`)
     console.log(`Available tools for this request: [${filteredTools.map(t => `"${t.name}"`).join(',')}]`)
 
     // Convert tools to OpenAI format

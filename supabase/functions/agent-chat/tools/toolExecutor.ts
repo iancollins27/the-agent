@@ -5,6 +5,7 @@ import { readCrmDataTool } from "./read-crm-data/index.ts";
 import { sessionManagerTool } from "./session-manager/index.ts";
 import { channelResponseTool } from "./channel-response/index.ts";
 import { escalationTool } from "./escalation/index.ts";
+import { identifyProjectTool } from "./identify-project/index.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 // Execute a tool call based on its name
@@ -24,47 +25,6 @@ export async function executeToolCall(
 
   console.log(`Executing tool ${toolName} with args: ${JSON.stringify(args)}`);
   
-  // Handle identify_project as external edge function call
-  if (toolName === 'identify_project') {
-    console.log(`Calling external identify-project edge function with args:`, args);
-    
-    try {
-      // Prepare the request body for the identify-project edge function
-      const requestBody = {
-        query: args.query || '',
-        type: args.type || 'any',
-        company_id: companyId,
-        user_id: userProfile?.id
-      };
-      
-      console.log(`Invoking identify-project with body:`, requestBody);
-      
-      const { data, error } = await supabase.functions.invoke('identify-project', {
-        body: requestBody
-      });
-      
-      if (error) {
-        console.error(`Error calling identify-project edge function:`, error);
-        return {
-          status: "error",
-          error: error.message || "Failed to call identify-project function",
-          details: error
-        };
-      }
-      
-      console.log(`identify-project edge function response:`, data);
-      return data;
-      
-    } catch (error) {
-      console.error(`Exception calling identify-project edge function:`, error);
-      return {
-        status: "error",
-        error: error.message || "Exception calling identify-project function",
-        details: error
-      };
-    }
-  }
-  
   // Map tool name to actual internal tool
   switch (toolName) {
     case 'create_action_record':
@@ -79,6 +39,8 @@ export async function executeToolCall(
       return await channelResponseTool.execute(args, context);
     case 'escalation':
       return await escalationTool.execute(args, context);
+    case 'identify_project':
+      return await identifyProjectTool.execute(args, context);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
