@@ -27,10 +27,58 @@ export async function handleRequest(req: Request): Promise<Response> {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check for authentication
+    // Parse request body
+    const requestBody = await req.json();
+    
+    // Check if this is an escalation processing request (internal call)
+    if (requestBody.action_type === 'process_escalation') {
+      console.log("Processing internal escalation request:", requestBody);
+      
+      const { action_record_id, project_id } = requestBody;
+      
+      if (!action_record_id || !project_id) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            error: "Missing action_record_id or project_id for escalation processing"
+          }),
+          {
+            status: 400,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      }
+
+      // Call the escalation handler directly with service role permissions
+      const escalationResult = await handleEscalation(
+        supabase,
+        null, // No prompt run ID for direct escalation processing
+        project_id,
+        { 
+          reason: "Direct escalation processing",
+          description: "Processing escalation from action record"
+        }
+      );
+
+      return new Response(
+        JSON.stringify(escalationResult),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // For all other requests, require user authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      logWithTime('Error: Missing or invalid authorization header');
+      logWithTime('Error: Missing or invalid authorization header for user request');
       return new Response(
         JSON.stringify({ 
           error: 'Missing or invalid authorization header',
@@ -46,9 +94,6 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    // Parse request body
-    const requestBody = await req.json();
-    
     // Get user profile from auth header
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -136,33 +181,6 @@ async function handlePromptRequest(
   companyId: string | null
 ): Promise<any> {
   try {
-    // Check if this is an escalation processing request
-    if (requestBody.action_type === 'process_escalation') {
-      console.log("Processing escalation request:", requestBody);
-      
-      const { action_record_id, project_id } = requestBody;
-      
-      if (!action_record_id || !project_id) {
-        return {
-          status: "error",
-          error: "Missing action_record_id or project_id for escalation processing"
-        };
-      }
-
-      // Call the escalation handler
-      const escalationResult = await handleEscalation(
-        supabase,
-        null, // No prompt run ID for direct escalation processing
-        project_id,
-        { 
-          reason: "Direct escalation processing",
-          description: "Processing escalation from action record"
-        }
-      );
-
-      return escalationResult;
-    }
-
     const { prompt, project_id: projectId, prompt_run_id: promptRunId } = requestBody;
 
     if (!prompt || !projectId || !promptRunId) {
