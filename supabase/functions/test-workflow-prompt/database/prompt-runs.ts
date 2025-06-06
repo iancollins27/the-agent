@@ -50,10 +50,11 @@ export async function logPromptRun(
       throw new Error(`Failed to log prompt run: ${error.message}`);
     }
     
+    console.log(`Successfully created prompt run record with ID: ${data.id}`);
     return data.id;
   } catch (error) {
     console.error("Error logging prompt run:", error);
-    return null;
+    throw error; // Re-throw to let caller handle it
   }
 }
 

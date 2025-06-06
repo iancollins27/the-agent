@@ -1,8 +1,8 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
 import { executeMCPRequest } from "../services/mcpService.ts";
+import { logPromptRun } from "../database/prompt-runs.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -197,52 +197,76 @@ async function handlePromptRequest(
 
     console.log(`Received prompt: ${prompt.substring(0, 100)}... for project ${projectId}`);
 
-    // Check if we should use MCP based on prompt type or explicit flag
-    const shouldUseMCP = useMCP || promptType === 'mcp_orchestrator';
+    // CRITICAL FIX: Create the prompt run record in the database FIRST
+    // This ensures the record exists before any tool calls are made
+    console.log(`Creating prompt run record in database with ID: ${promptRunId}`);
     
-    console.log(`MCP decision: useMCP=${useMCP}, promptType=${promptType}, shouldUseMCP=${shouldUseMCP}`);
-
-    // If we should use MCP, route to the MCP service
-    if (shouldUseMCP) {
-      console.log("Routing to MCP service for processing");
-      
-      // Log MCP and tools information from context data
-      if (contextData) {
-        console.log("MCP configuration:", {
-          useMCP: contextData.useMCP,
-          available_tools: contextData.available_tools,
-          tools_count: Array.isArray(contextData.available_tools) ? contextData.available_tools.length : 0,
-          promptType: contextData.promptType
-        });
-      }
-
-      // Route to the MCP service with proper context
-      const mcpResult = await executeMCPRequest(
+    try {
+      const dbPromptRunId = await logPromptRun(
         supabase,
         projectId,
-        contextData,
+        promptRunId, // Use the provided ID as workflow_prompt_id 
+        prompt,
         aiProvider,
         aiModel,
-        promptRunId
+        'test-runner' // Mark as initiated by test runner
       );
+      
+      if (!dbPromptRunId) {
+        throw new Error("Failed to create prompt run record in database");
+      }
+      
+      console.log(`Successfully created prompt run record with database ID: ${dbPromptRunId}`);
+      
+      // Use the database ID for all subsequent operations
+      const actualPromptRunId = dbPromptRunId;
+      
+      // Check if we should use MCP based on prompt type or explicit flag
+      const shouldUseMCP = useMCP || promptType === 'mcp_orchestrator';
+      
+      console.log(`MCP decision: useMCP=${useMCP}, promptType=${promptType}, shouldUseMCP=${shouldUseMCP}`);
 
-      return {
-        status: "success",
-        response: mcpResult.result || mcpResult.output || "MCP processing completed",
-        output: mcpResult.result || mcpResult.output || "MCP processing completed",
-        finalPrompt: mcpResult.finalPrompt || prompt,
-        promptRunId: promptRunId,
-        usedMCP: true,
-        actionRecordId: mcpResult.actionRecordId,
-        humanReviewRequestId: mcpResult.humanReviewRequestId,
-        knowledgeResults: mcpResult.knowledgeResults || []
-      };
-    }
+      // If we should use MCP, route to the MCP service
+      if (shouldUseMCP) {
+        console.log("Routing to MCP service for processing");
+        
+        // Log MCP and tools information from context data
+        if (contextData) {
+          console.log("MCP configuration:", {
+            useMCP: contextData.useMCP,
+            available_tools: contextData.available_tools,
+            tools_count: Array.isArray(contextData.available_tools) ? contextData.available_tools.length : 0,
+            promptType: contextData.promptType
+          });
+        }
 
-    // For non-MCP requests, use the simple OpenAI flow
-    console.log("Using simple OpenAI flow (non-MCP)");
+        // Route to the MCP service with proper context and the ACTUAL database prompt run ID
+        const mcpResult = await executeMCPRequest(
+          supabase,
+          projectId,
+          contextData,
+          aiProvider,
+          aiModel,
+          actualPromptRunId // Use the actual database ID here
+        );
 
-    // Get project details for context
+        return {
+          status: "success",
+          response: mcpResult.result || mcpResult.output || "MCP processing completed",
+          output: mcpResult.result || mcpResult.output || "MCP processing completed",
+          finalPrompt: mcpResult.finalPrompt || prompt,
+          promptRunId: actualPromptRunId, // Return the actual database ID
+          usedMCP: true,
+          actionRecordId: mcpResult.actionRecordId,
+          humanReviewRequestId: mcpResult.humanReviewRequestId,
+          knowledgeResults: mcpResult.knowledgeResults || []
+        };
+      }
+
+      // For non-MCP requests, use the simple OpenAI flow
+      console.log("Using simple OpenAI flow (non-MCP)");
+
+      // Get project details for context
     const { data: projectData, error: projectError } = await supabase
       .from('projects')
       .select(`
@@ -346,6 +370,16 @@ async function handlePromptRequest(
       promptRunId: promptRunId,
       usedMCP: false
     };
+      
+    } catch (promptRunError) {
+      console.error("Error creating prompt run record:", promptRunError);
+      return {
+        status: "error",
+        error: `Failed to create prompt run record: ${promptRunError.message}`
+      };
+    }
+
+    
   } catch (error) {
     console.error("Error in handlePromptRequest:", error);
     return {
