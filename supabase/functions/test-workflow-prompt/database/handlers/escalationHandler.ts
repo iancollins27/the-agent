@@ -5,7 +5,7 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
  */
 export async function handleEscalation(
   supabase: SupabaseClient,
-  promptRunId: string,
+  promptRunId: string | null,
   projectId: string,
   actionData: any
 ) {
@@ -59,38 +59,7 @@ export async function handleEscalation(
       };
     }
 
-    // Create the escalation action record
-    const { data: actionRecord, error: actionError } = await supabase
-      .from('action_records')
-      .insert({
-        prompt_run_id: promptRunId,
-        project_id: projectId,
-        action_type: 'escalation',
-        action_payload: {
-          reason: actionData.reason || 'Project requires escalation',
-          description: actionData.description || 'Project has been escalated for manager review',
-          escalation_details: actionData.escalation_details || 'No specific details provided',
-          project_details: {
-            name: projectData.project_name,
-            address: projectData.Address,
-            summary: projectData.summary,
-            next_step: projectData.next_step
-          },
-          recipients_count: escalationRecipients.length
-        },
-        requires_approval: false, // Escalations are executed immediately
-        status: 'pending' // Will be updated to 'executed' after notifications are sent
-      })
-      .select()
-      .single();
-
-    if (actionError) {
-      console.error("Error creating escalation action record:", actionError);
-      return {
-        status: "error",
-        error: "Failed to create escalation action record"
-      };
-    }
+    console.log(`Found ${escalationRecipients.length} escalation recipients`);
 
     // Send notifications to each escalation recipient
     const notificationResults = [];
@@ -102,6 +71,8 @@ export async function handleEscalation(
           actionData,
           recipient.recipient_name
         );
+
+        console.log(`Sending escalation SMS to ${recipient.recipient_name} at ${recipient.recipient_phone}`);
 
         // Call the send-communication function for SMS
         const { data: commResult, error: commError } = await supabase.functions.invoke('send-communication', {
@@ -143,28 +114,42 @@ export async function handleEscalation(
       }
     }
 
-    // Update the action record with results
+    // Update any existing action record with results
     const successCount = notificationResults.filter(r => r.success).length;
     const failureCount = notificationResults.filter(r => !r.success).length;
 
-    await supabase
+    // Try to find and update the related action record
+    const { data: existingAction } = await supabase
       .from('action_records')
-      .update({
-        status: successCount > 0 ? 'executed' : 'failed',
-        executed_at: new Date().toISOString(),
-        execution_result: {
-          notifications_sent: successCount,
-          notifications_failed: failureCount,
-          results: notificationResults
-        }
-      })
-      .eq('id', actionRecord.id);
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('action_type', 'escalation')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingAction) {
+      console.log("Updating escalation action record:", existingAction.id);
+      await supabase
+        .from('action_records')
+        .update({
+          status: successCount > 0 ? 'executed' : 'failed',
+          executed_at: new Date().toISOString(),
+          execution_result: {
+            notifications_sent: successCount,
+            notifications_failed: failureCount,
+            results: notificationResults
+          }
+        })
+        .eq('id', existingAction.id);
+    }
 
     console.log(`Escalation processed: ${successCount} successful, ${failureCount} failed notifications`);
 
     return {
       status: "success",
-      action_record_id: actionRecord.id,
+      action_record_id: existingAction?.id,
       notifications_sent: successCount,
       notifications_failed: failureCount,
       results: notificationResults,

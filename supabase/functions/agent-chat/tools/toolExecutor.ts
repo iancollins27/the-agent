@@ -4,6 +4,7 @@ import { dataFetchTool } from "./data-fetch/index.ts";
 import { readCrmDataTool } from "./read-crm-data/index.ts";
 import { sessionManagerTool } from "./session-manager/index.ts";
 import { channelResponseTool } from "./channel-response/index.ts";
+import { escalationTool } from "./escalation/index.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 // Execute a tool call based on its name
@@ -76,6 +77,8 @@ export async function executeToolCall(
       return await sessionManagerTool.execute(args, context);
     case 'channel_response':
       return await channelResponseTool.execute(args, context);
+    case 'escalation':
+      return await escalationTool.execute(args, context);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }

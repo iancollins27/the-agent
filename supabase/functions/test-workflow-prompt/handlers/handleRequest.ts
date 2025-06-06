@@ -1,92 +1,156 @@
+import { handleEscalation } from "../database/handlers/escalationHandler.ts";
 
-import { corsHeaders } from '../utils/cors.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { parseRequestBody } from '../middleware/requestParser.ts';
-import { loadMilestoneInstructions } from '../middleware/milestoneLoader.ts';
-import { runPrompt } from '../middleware/promptRunner.ts';
-import { formatResponse, handleError } from '../middleware/responseFormatter.ts';
-import { prepareContextData } from '../database/utils/contextUtils.ts';
-import { getProjectContacts, formatContactsForContext } from '../database/contacts.ts';
-
-const supabaseClient = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
-
-/**
- * Main handler for the test-workflow-prompt edge function
- * Refactored to use middleware pattern for better organization
- */
-export async function handleRequest(req: Request) {
-  // Handle CORS preflight request
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 200 });
-  }
-
+export async function handlePromptRequest(
+  supabase: any,
+  requestBody: any,
+  userProfile: any,
+  companyId: string | null
+): Promise<any> {
   try {
-    console.log(`[DEBUG] HandleRequest: Starting request handling`);
-    
-    // Parse and validate request body
-    const { body, error } = await parseRequestBody(req);
-    if (error) return error;
-
-    // Ensure we have context data
-    const contextData = body.contextData || {};
-    console.log(`[DEBUG] HandleRequest: After parseRequestBody, context keys: ${Object.keys(contextData).join(', ')}`);
-    console.log(`[DEBUG] HandleRequest: After parseRequestBody, project_contacts exists: ${!!contextData.project_contacts}`);
-    
-    // If we have a projectId but no project_contacts, fetch them explicitly
-    if (body.projectId && !contextData.project_contacts) {
-      try {
-        console.log(`[DEBUG] HandleRequest: Explicitly fetching contacts for project: ${body.projectId}`);
-        
-        // Approach 1: Direct fetch
-        console.log(`[DEBUG] HandleRequest: Approach 1 - Direct fetch using getProjectContacts`);
-        const contacts = await getProjectContacts(supabaseClient, body.projectId);
-        console.log(`[DEBUG] HandleRequest: Direct fetch returned ${contacts?.length || 0} contacts`);
-        
-        if (contacts && contacts.length > 0) {
-          const formattedContacts = formatContactsForContext(contacts);
-          console.log(`[DEBUG] HandleRequest: Formatted ${contacts.length} contacts: ${formattedContacts?.substring(0, 100)}...`);
-          contextData.project_contacts = formattedContacts;
-        }
-        
-        // Approach 2: Use prepareContextData
-        console.log(`[DEBUG] HandleRequest: Approach 2 - Using prepareContextData`);
-        const { contextData: enhancedContext } = await prepareContextData(supabaseClient, body.projectId);
-        
-        // Log what we got from prepareContextData
-        console.log(`[DEBUG] HandleRequest: prepareContextData returned project_contacts: ${!!enhancedContext.project_contacts}`);
-        
-        // Merge the context data to ensure we have project_contacts
-        Object.assign(contextData, enhancedContext);
-        console.log(`[DEBUG] HandleRequest: After merging, project_contacts exists: ${!!contextData.project_contacts}`);
-        
-        if (contextData.project_contacts) {
-          console.log(`[DEBUG] HandleRequest: Final project_contacts (first 100 chars): ${contextData.project_contacts.substring(0, 100)}...`);
-        } else {
-          console.log(`[DEBUG] HandleRequest: Failed to get project_contacts from either approach`);
-        }
-      } catch (contactError) {
-        console.error("[DEBUG] HandleRequest: Error explicitly fetching project contacts:", contactError);
+    // Check if this is an escalation processing request
+    if (requestBody.action_type === 'process_escalation') {
+      console.log("Processing escalation request:", requestBody);
+      
+      const { action_record_id, project_id } = requestBody;
+      
+      if (!action_record_id || !project_id) {
+        return {
+          status: "error",
+          error: "Missing action_record_id or project_id for escalation processing"
+        };
       }
+
+      // Call the escalation handler
+      const escalationResult = await handleEscalation(
+        supabase,
+        null, // No prompt run ID for direct escalation processing
+        project_id,
+        { 
+          reason: "Direct escalation processing",
+          description: "Processing escalation from action record"
+        }
+      );
+
+      return escalationResult;
     }
-    
-    // Load milestone instructions if needed
-    if (contextData.next_step && !contextData.milestone_instructions) {
-      contextData.milestone_instructions = await loadMilestoneInstructions(supabaseClient, contextData);
+
+    const { prompt, project_id: projectId, prompt_run_id: promptRunId } = requestBody;
+
+    if (!prompt || !projectId || !promptRunId) {
+      console.error("Missing required parameters");
+      return {
+        status: "error",
+        error: "Missing required parameters"
+      };
     }
-    
-    // Log contextData keys right before running the prompt
-    console.log(`[DEBUG] HandleRequest: Final contextData keys: ${Object.keys(contextData).join(', ')}`);
-    console.log(`[DEBUG] HandleRequest: project_contacts exists in final data: ${!!contextData.project_contacts}`);
-    
-    // Run the prompt and process the AI response
-    const result = await runPrompt(supabaseClient, { ...body, contextData });
-    
-    // Format and return the response
-    return formatResponse(result);
+
+    console.log(`Received prompt: ${prompt} for project ${projectId}`);
+
+    // Get project details for context
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select(`
+        id,
+        project_name,
+        summary,
+        next_step,
+        Address,
+        companies(name, id)
+      `)
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) {
+      console.error("Error fetching project data:", projectError);
+      return {
+        status: "error",
+        error: "Failed to fetch project data"
+      };
+    }
+
+    // Get the company settings
+    const { data: companySettings, error: companyError } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('id', projectData?.companies?.id)
+      .single();
+
+    if (companyError) {
+      console.error("Error fetching company settings:", companyError);
+      return {
+        status: "error",
+        error: "Failed to fetch company settings"
+      };
+    }
+
+    // Construct the prompt with project details
+    const fullPrompt = `
+      You are an AI project manager. Your goal is to help manage roofing and solar projects.
+      You have access to project details and can create action records to manage the project.
+      
+      Project Name: ${projectData.project_name}
+      Project Summary: ${projectData.summary}
+      Project Next Step: ${projectData.next_step}
+      Project Address: ${projectData.Address}
+      
+      Company Name: ${projectData.companies.name}
+      
+      ${companySettings?.ai_prompt_context || ''}
+      
+      Based on the above information, respond to the following prompt:
+      ${prompt}
+    `;
+
+    // Call the OpenAI API
+    const openAiUrl = "https://api.openai.com/v1/chat/completions";
+    const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+
+    if (!openAiApiKey) {
+      console.error("OPENAI_API_KEY is not set");
+      return {
+        status: "error",
+        error: "OPENAI_API_KEY is not set"
+      };
+    }
+
+    const openAiBody = {
+      model: "gpt-4",
+      messages: [{ role: "user", content: fullPrompt }],
+      temperature: 0.7,
+    };
+
+    const openAiResponse = await fetch(openAiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openAiApiKey}`,
+      },
+      body: JSON.stringify(openAiBody),
+    });
+
+    const openAiData = await openAiResponse.json();
+
+    if (!openAiResponse.ok) {
+      console.error("OpenAI API error:", openAiData);
+      return {
+        status: "error",
+        error: "OpenAI API error",
+        details: openAiData
+      };
+    }
+
+    const responseText = openAiData.choices[0].message.content;
+    console.log(`Received response: ${responseText}`);
+
+    return {
+      status: "success",
+      response: responseText
+    };
   } catch (error) {
-    return handleError(error);
+    console.error("Error in handlePromptRequest:", error);
+    return {
+      status: "error",
+      error: error.message || "An unexpected error occurred"
+    };
   }
 }

@@ -1,16 +1,19 @@
+
 import { createActionRecordTool } from "./create-action-record/index.ts";
 import { dataFetchTool } from "./data-fetch/index.ts";
 import { readCrmDataTool } from "./read-crm-data/index.ts";
 import { sessionManagerTool } from "./session-manager/index.ts";
 import { channelResponseTool } from "./channel-response/index.ts";
+import { escalationTool } from "./escalation/index.ts";
 
-// Register all available tools (removed identify_project - it's now an external edge function)
+// Register all available tools (including escalation)
 const tools = [
   createActionRecordTool,
   dataFetchTool,
   readCrmDataTool,
   sessionManagerTool,
-  channelResponseTool
+  channelResponseTool,
+  escalationTool
 ];
 
 // Create the toolRegistry object that agent-chat expects
