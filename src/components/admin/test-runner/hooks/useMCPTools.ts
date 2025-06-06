@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,14 +27,13 @@ export const useMCPTools = () => {
   useEffect(() => {
     const fetchTools = async () => {
       if (useMCP) {
-        // Set the available tools for MCP mode - now includes identify_project
+        // Set the available tools for MCP mode - removed identify_project
         const tools = [
           'create_action_record',
           'knowledge_base_lookup',
           'read_crm_data',
           'crm_data_write',
-          'email_summary',
-          'identify_project'
+          'email_summary'
         ];
         
         console.log('Setting available MCP tools:', tools);
@@ -60,8 +58,7 @@ export const useMCPTools = () => {
       'knowledge_base_lookup',
       'read_crm_data',
       'crm_data_write',
-      'email_summary',
-      'identify_project'
+      'email_summary'
     ];
     
     console.log('MCP mode enabled, returning tools:', tools);
