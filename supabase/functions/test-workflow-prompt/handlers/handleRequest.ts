@@ -2,6 +2,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
+import { executeMCPRequest } from "../services/mcpService.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -181,7 +182,7 @@ async function handlePromptRequest(
   companyId: string | null
 ): Promise<any> {
   try {
-    const { prompt, project_id: projectId, prompt_run_id: promptRunId, contextData } = requestBody;
+    const { prompt, project_id: projectId, prompt_run_id: promptRunId, contextData, promptType, useMCP, aiProvider = 'openai', aiModel = 'gpt-4' } = requestBody;
 
     console.log("Request body keys:", Object.keys(requestBody));
     console.log("Context data:", contextData ? JSON.stringify(contextData, null, 2) : "No context data");
@@ -196,15 +197,50 @@ async function handlePromptRequest(
 
     console.log(`Received prompt: ${prompt.substring(0, 100)}... for project ${projectId}`);
 
-    // Log MCP and tools information from context data
-    if (contextData) {
-      console.log("MCP configuration:", {
-        useMCP: contextData.useMCP,
-        available_tools: contextData.available_tools,
-        tools_count: Array.isArray(contextData.available_tools) ? contextData.available_tools.length : 0,
-        promptType: contextData.promptType
-      });
+    // Check if we should use MCP based on prompt type or explicit flag
+    const shouldUseMCP = useMCP || promptType === 'mcp_orchestrator';
+    
+    console.log(`MCP decision: useMCP=${useMCP}, promptType=${promptType}, shouldUseMCP=${shouldUseMCP}`);
+
+    // If we should use MCP, route to the MCP service
+    if (shouldUseMCP) {
+      console.log("Routing to MCP service for processing");
+      
+      // Log MCP and tools information from context data
+      if (contextData) {
+        console.log("MCP configuration:", {
+          useMCP: contextData.useMCP,
+          available_tools: contextData.available_tools,
+          tools_count: Array.isArray(contextData.available_tools) ? contextData.available_tools.length : 0,
+          promptType: contextData.promptType
+        });
+      }
+
+      // Route to the MCP service with proper context
+      const mcpResult = await executeMCPRequest(
+        supabase,
+        projectId,
+        contextData,
+        aiProvider,
+        aiModel,
+        promptRunId
+      );
+
+      return {
+        status: "success",
+        response: mcpResult.result || mcpResult.output || "MCP processing completed",
+        output: mcpResult.result || mcpResult.output || "MCP processing completed",
+        finalPrompt: mcpResult.finalPrompt || prompt,
+        promptRunId: promptRunId,
+        usedMCP: true,
+        actionRecordId: mcpResult.actionRecordId,
+        humanReviewRequestId: mcpResult.humanReviewRequestId,
+        knowledgeResults: mcpResult.knowledgeResults || []
+      };
     }
+
+    // For non-MCP requests, use the simple OpenAI flow
+    console.log("Using simple OpenAI flow (non-MCP)");
 
     // Get project details for context
     const { data: projectData, error: projectError } = await supabase
@@ -243,29 +279,6 @@ async function handlePromptRequest(
       };
     }
 
-    // Enhanced context merging - preserve tools from testing interface
-    const enhancedContextData = {
-      // First, apply any existing context data from the request
-      ...(contextData || {}),
-      // Then add project-specific context
-      project_name: projectData.project_name,
-      project_summary: projectData.summary,
-      project_next_step: projectData.next_step,
-      project_address: projectData.Address,
-      company_name: projectData.companies.name,
-      company_ai_prompt_context: companySettings?.ai_prompt_context || '',
-      // Preserve tools configuration from testing interface
-      available_tools: contextData?.available_tools || [],
-      useMCP: contextData?.useMCP || false
-    };
-
-    console.log("Enhanced context data for MCP processing:", {
-      available_tools: enhancedContextData.available_tools,
-      tools_count: Array.isArray(enhancedContextData.available_tools) ? enhancedContextData.available_tools.length : 0,
-      useMCP: enhancedContextData.useMCP,
-      promptType: enhancedContextData.promptType
-    });
-
     // Construct the prompt with project details
     const fullPrompt = `
       You are an AI project manager. Your goal is to help manage roofing and solar projects.
@@ -297,7 +310,7 @@ async function handlePromptRequest(
     }
 
     const openAiBody = {
-      model: "gpt-4",
+      model: aiModel,
       messages: [{ role: "user", content: fullPrompt }],
       temperature: 0.7,
     };
@@ -331,7 +344,7 @@ async function handlePromptRequest(
       output: responseText,
       finalPrompt: fullPrompt,
       promptRunId: promptRunId,
-      usedMCP: enhancedContextData.useMCP
+      usedMCP: false
     };
   } catch (error) {
     console.error("Error in handlePromptRequest:", error);
