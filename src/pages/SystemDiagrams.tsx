@@ -8,10 +8,10 @@ import DiagramToolbar from '@/components/diagrams/DiagramToolbar';
 import DiagramLegend from '@/components/diagrams/DiagramLegend';
 import { toast } from '@/components/ui/use-toast';
 
-type DiagramType = 'sms-chat' | 'communications' | 'actions' | 'testing';
+type DiagramType = 'high-level-architecture' | 'sms-chat' | 'communications' | 'actions' | 'testing';
 
 const SystemDiagrams = () => {
-  const [activeTab, setActiveTab] = useState<DiagramType>('sms-chat');
+  const [activeTab, setActiveTab] = useState<DiagramType>('high-level-architecture');
   const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const handleNodeClick = useCallback((nodeData: any) => {
@@ -52,6 +52,13 @@ const SystemDiagrams = () => {
 
   const getDiagramInfo = (type: DiagramType) => {
     switch (type) {
+      case 'high-level-architecture':
+        return {
+          title: 'High-Level Application Architecture',
+          description: 'Two main orchestrators: Proactive Background Processing and Interactive Multi-Channel Chat',
+          status: 'Active',
+          functions: ['test-workflow-prompt', 'agent-chat', 'comms-business-logic', 'send-communication']
+        };
       case 'sms-chat':
         return {
           title: 'SMS Chat Flow',
@@ -100,8 +107,9 @@ const SystemDiagrams = () => {
       </header>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as DiagramType)}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="sms-chat">SMS Chat Flow</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="high-level-architecture">High-Level</TabsTrigger>
+          <TabsTrigger value="sms-chat">SMS Chat</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
           <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
@@ -194,6 +202,16 @@ const SystemDiagrams = () => {
 
 function getFlowDetails(type: DiagramType) {
   switch (type) {
+    case 'high-level-architecture':
+      return [
+        { step: 'Proactive Orchestrator', description: 'Monitors projects, detects needed actions, sets reminders, processes in background' },
+        { step: 'Interactive Chat Orchestrator', description: 'Handles real-time multi-channel communications (SMS, Email, Web Chat)' },
+        { step: 'Shared Infrastructure', description: 'Both orchestrators use the same database, AI processing, and action execution system' },
+        { step: 'Cross-Communication', description: 'Chat system can trigger proactive workflows, proactive system can initiate communications' },
+        { step: 'Multi-Company Support', description: 'Both systems designed to work across multiple companies and user contexts' },
+        { step: 'Action Execution', description: 'Unified action system handles data updates, reminders, and communications from both orchestrators' }
+      ];
+    
     case 'sms-chat':
       return [
         { step: 'SMS Received', description: 'User sends SMS to Twilio number' },

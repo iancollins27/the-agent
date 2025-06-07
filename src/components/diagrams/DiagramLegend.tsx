@@ -15,6 +15,16 @@ interface DiagramLegendProps {
 const DiagramLegend: React.FC<DiagramLegendProps> = ({ diagramType }) => {
   const getLegendItems = (type: string): LegendItem[] => {
     switch (type) {
+      case 'high-level-architecture':
+        return [
+          { color: '#FF6B6B', label: 'Proactive Orchestrator', description: 'Background processing system' },
+          { color: '#FFE66D', label: 'Proactive Components', description: 'Project monitoring and workflows' },
+          { color: '#4ECDC4', label: 'Chat Orchestrator', description: 'Interactive communication system' },
+          { color: '#95E1D3', label: 'Chat Components', description: 'Multi-channel handlers' },
+          { color: '#A8E6CF', label: 'Shared Infrastructure', description: 'Common system components' },
+          { color: '#DDA0DD', label: 'Core Services', description: 'Database, AI, integrations' }
+        ];
+      
       case 'sms-chat':
         return [
           { color: '#E3F2FD', label: 'External Service', description: 'Twilio webhook endpoints' },

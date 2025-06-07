@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as go from 'gojs';
 
 interface SystemDiagramCanvasProps {
-  diagramType: 'sms-chat' | 'communications' | 'actions' | 'testing';
+  diagramType: 'high-level-architecture' | 'sms-chat' | 'communications' | 'actions' | 'testing';
   onNodeClick?: (nodeData: any) => void;
 }
 
@@ -25,11 +25,17 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
     try {
       myDiagram = $(go.Diagram, diagramRef.current, {
         'undoManager.isEnabled': true,
-        layout: $(go.TreeLayout, {
-          angle: 0,
-          layerSpacing: 50,
-          nodeSpacing: 30
-        }),
+        layout: diagramType === 'high-level-architecture' ? 
+          $(go.LayeredDigraphLayout, {
+            direction: 0,
+            layerSpacing: 100,
+            columnSpacing: 50
+          }) :
+          $(go.TreeLayout, {
+            angle: 0,
+            layerSpacing: 50,
+            nodeSpacing: 30
+          }),
         initialContentAlignment: go.Spot.Center,
         'toolManager.hoverDelay': 100
       });
@@ -124,6 +130,58 @@ function getModelData(diagramType: string) {
   });
 
   switch (diagramType) {
+    case 'high-level-architecture':
+      return {
+        nodeDataArray: [
+          createNode('proactive-orchestrator', 'Proactive Background\nOrchestrator', '#FF6B6B'),
+          createNode('project-monitor', 'Project\nMonitoring', '#FFE66D'),
+          createNode('workflow-engine', 'Workflow\nEngine', '#FFE66D'),
+          createNode('action-detection', 'Action\nDetection', '#FFE66D'),
+          createNode('reminder-system', 'Self-Reminder\nSystem', '#FFE66D'),
+          
+          createNode('chat-orchestrator', 'Interactive Chat\nOrchestrator', '#4ECDC4'),
+          createNode('multi-channel', 'Multi-Channel\nHandler', '#95E1D3'),
+          createNode('sms-handler', 'SMS\nHandler', '#95E1D3'),
+          createNode('email-handler', 'Email\nHandler', '#95E1D3'),
+          createNode('web-chat', 'Web Chat\nHandler', '#95E1D3'),
+          createNode('support-agent', 'Support Agent\nInterface', '#95E1D3'),
+          
+          createNode('shared-infra', 'Shared Infrastructure', '#A8E6CF'),
+          createNode('database', 'Database\n(Projects, Actions)', '#DDA0DD'),
+          createNode('ai-engine', 'AI Processing\nEngine', '#DDA0DD'),
+          createNode('action-executor', 'Action Execution\nSystem', '#DDA0DD'),
+          createNode('integrations', 'External\nIntegrations', '#DDA0DD'),
+          createNode('multi-company', 'Multi-Company\nSupport', '#DDA0DD')
+        ],
+        linkDataArray: [
+          // Proactive orchestrator connections
+          createLink('proactive-orchestrator', 'project-monitor', 'monitors'),
+          createLink('proactive-orchestrator', 'workflow-engine', 'executes'),
+          createLink('proactive-orchestrator', 'action-detection', 'detects'),
+          createLink('proactive-orchestrator', 'reminder-system', 'schedules'),
+          
+          // Chat orchestrator connections
+          createLink('chat-orchestrator', 'multi-channel', 'routes'),
+          createLink('multi-channel', 'sms-handler', ''),
+          createLink('multi-channel', 'email-handler', ''),
+          createLink('multi-channel', 'web-chat', ''),
+          createLink('chat-orchestrator', 'support-agent', 'assists'),
+          
+          // Shared infrastructure connections
+          createLink('proactive-orchestrator', 'shared-infra', 'uses'),
+          createLink('chat-orchestrator', 'shared-infra', 'uses'),
+          createLink('shared-infra', 'database', ''),
+          createLink('shared-infra', 'ai-engine', ''),
+          createLink('shared-infra', 'action-executor', ''),
+          createLink('shared-infra', 'integrations', ''),
+          createLink('shared-infra', 'multi-company', ''),
+          
+          // Cross-communication
+          createLink('chat-orchestrator', 'proactive-orchestrator', 'triggers'),
+          createLink('proactive-orchestrator', 'chat-orchestrator', 'initiates')
+        ]
+      };
+
     case 'sms-chat':
       return {
         nodeDataArray: [
