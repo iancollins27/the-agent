@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { UserMenu } from '@/components/UserMenu';
+import UserMenu from '@/components/UserMenu';
 import JobProgressTestPanel from '@/components/admin/JobProgressTestPanel';
 
 const IntegrationTesting = () => {
