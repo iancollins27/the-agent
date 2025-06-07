@@ -9,17 +9,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { Loader2, CheckCircle, XCircle, TestTube, Database, Edit3 } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, TestTube } from "lucide-react";
 
 const JobProgressTestPanel = () => {
   const [companyId, setCompanyId] = useState('');
   const [testJobId, setTestJobId] = useState('');
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isTestingDataFetch, setIsTestingDataFetch] = useState(false);
-  const [isTestingWrite, setIsTestingWrite] = useState(false);
   const [connectionResult, setConnectionResult] = useState<any>(null);
   const [dataFetchResult, setDataFetchResult] = useState<any>(null);
-  const [writeTestResult, setWriteTestResult] = useState<any>(null);
   const { toast } = useToast();
 
   const testConnection = async () => {
@@ -91,14 +89,14 @@ const JobProgressTestPanel = () => {
     setDataFetchResult(null);
 
     try {
-      // First create a test project record with valid enum value
+      // First create a test project record
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .insert({
           company_id: companyId.trim(),
           crm_id: testJobId.trim(),
           project_name: `Test Job ${testJobId}`,
-          Project_status: 'Active' as const // Use proper enum value
+          Project_status: 'active'
         })
         .select()
         .single();
@@ -108,13 +106,10 @@ const JobProgressTestPanel = () => {
       }
 
       // Now test the data fetch with the project UUID
-      const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
+      const { data, error } = await supabase.functions.invoke('data-fetch', {
         body: {
-          tool_name: 'data_fetch',
-          args: {
-            project_id: projectData.id,
-            include_raw: true
-          }
+          project_id: projectData.id,
+          include_raw: true
         }
       });
 
@@ -159,83 +154,16 @@ const JobProgressTestPanel = () => {
     }
   };
 
-  const testWriteOperation = async () => {
-    if (!companyId.trim() || !testJobId.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter both company ID and job ID for write test",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsTestingWrite(true);
-    setWriteTestResult(null);
-
-    try {
-      // Test creating a note in JobProgress
-      const testNoteData = {
-        content: `Test note created at ${new Date().toISOString()}`,
-        title: "Integration Test Note",
-        project_id: testJobId.trim()
-      };
-
-      const { data, error } = await supabase.functions.invoke('test-workflow-prompt', {
-        body: {
-          tool_name: 'crm_data_write',
-          args: {
-            companyId: companyId.trim(),
-            resourceType: 'note',
-            operationType: 'create',
-            data: testNoteData
-          }
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      setWriteTestResult(data);
-      
-      if (data.status === 'success') {
-        toast({
-          title: "Write Test Successful",
-          description: "Successfully created a test note in JobProgress",
-        });
-      } else {
-        toast({
-          title: "Write Test Failed",
-          description: data.error,
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      console.error('Write test error:', error);
-      setWriteTestResult({
-        status: 'error',
-        error: error.message || 'Unknown error occurred'
-      });
-      toast({
-        title: "Test Failed",
-        description: error.message || "Unknown error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsTestingWrite(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TestTube className="h-5 w-5" />
-            JobProgress Integration Testing
+            JobProgress Connectivity Test
           </CardTitle>
           <CardDescription>
-            Test connectivity, data fetching, and write operations for JobProgress integration
+            Test the JobProgress integration connectivity and data fetching
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -250,7 +178,7 @@ const JobProgressTestPanel = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="testJobId">JobProgress Job ID</Label>
+              <Label htmlFor="testJobId">Test Job ID (Optional)</Label>
               <Input
                 id="testJobId"
                 value={testJobId}
@@ -260,14 +188,13 @@ const JobProgressTestPanel = () => {
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
             <Button 
               onClick={testConnection}
               disabled={isTestingConnection}
               className="flex items-center gap-2"
             >
               {isTestingConnection && <Loader2 className="h-4 w-4 animate-spin" />}
-              <TestTube className="h-4 w-4" />
               Test Connection
             </Button>
             
@@ -278,19 +205,7 @@ const JobProgressTestPanel = () => {
               className="flex items-center gap-2"
             >
               {isTestingDataFetch && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Database className="h-4 w-4" />
               Test Data Fetch
-            </Button>
-
-            <Button 
-              onClick={testWriteOperation}
-              disabled={isTestingWrite || !testJobId.trim()}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              {isTestingWrite && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Edit3 className="h-4 w-4" />
-              Test Write Operation
             </Button>
           </div>
         </CardContent>
@@ -409,56 +324,6 @@ const JobProgressTestPanel = () => {
               <Alert>
                 <AlertDescription>
                   <strong>Error:</strong> {dataFetchResult.error}
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Write Operation Test Results */}
-      {writeTestResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {writeTestResult.status === 'success' ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-600" />
-              )}
-              Write Operation Test Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Badge variant={writeTestResult.status === 'success' ? "default" : "destructive"}>
-              {writeTestResult.status === 'success' ? "Success" : "Failed"}
-            </Badge>
-            
-            {writeTestResult.status === 'success' ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium">Write Operation Summary</h4>
-                  <div className="text-sm text-gray-600 mt-1">
-                    <p>Operation: Create Note</p>
-                    <p>Target: JobProgress Job {testJobId}</p>
-                    <p>Status: Successfully created test note</p>
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium">Full Response</h4>
-                  <Textarea
-                    readOnly
-                    value={JSON.stringify(writeTestResult, null, 2)}
-                    className="text-xs font-mono"
-                    rows={8}
-                  />
-                </div>
-              </div>
-            ) : (
-              <Alert>
-                <AlertDescription>
-                  <strong>Error:</strong> {writeTestResult.error}
                 </AlertDescription>
               </Alert>
             )}
