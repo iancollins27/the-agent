@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +17,7 @@ import ExecutionView from "./components/admin/execution-view/ExecutionView";
 import UpdateProjectEmbeddings from "./pages/UpdateProjectEmbeddings";
 import ToolsAdmin from "./pages/ToolsAdmin";
 import SystemDiagrams from "./pages/SystemDiagrams";
+import IntegrationTesting from "./pages/IntegrationTesting";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +105,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProjectManager />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/integration-testing"
+              element={
+                <ProtectedRoute>
+                  <IntegrationTesting />
                 </ProtectedRoute>
               }
             />
