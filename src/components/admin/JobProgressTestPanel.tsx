@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,24 +7,60 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, XCircle, TestTube } from "lucide-react";
 
+interface Company {
+  id: string;
+  name: string;
+}
+
 const JobProgressTestPanel = () => {
-  const [companyId, setCompanyId] = useState('');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [testJobId, setTestJobId] = useState('');
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isTestingDataFetch, setIsTestingDataFetch] = useState(false);
   const [connectionResult, setConnectionResult] = useState<any>(null);
   const [dataFetchResult, setDataFetchResult] = useState<any>(null);
   const { toast } = useToast();
 
-  const testConnection = async () => {
-    if (!companyId.trim()) {
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name');
+
+      if (error) {
+        throw error;
+      }
+
+      setCompanies(data || []);
+    } catch (error: any) {
+      console.error('Error fetching companies:', error);
       toast({
         title: "Error",
-        description: "Please enter a company ID",
+        description: "Failed to fetch companies",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingCompanies(false);
+    }
+  };
+
+  const testConnection = async () => {
+    if (!selectedCompanyId.trim()) {
+      toast({
+        title: "Error",
+        description: "Please select a company",
         variant: "destructive",
       });
       return;
@@ -36,7 +72,7 @@ const JobProgressTestPanel = () => {
     try {
       const { data, error } = await supabase.functions.invoke('test-jobprogress-connection', {
         body: {
-          companyId: companyId.trim(),
+          companyId: selectedCompanyId.trim(),
           testJobId: testJobId.trim() || undefined
         }
       });
@@ -76,10 +112,10 @@ const JobProgressTestPanel = () => {
   };
 
   const testDataFetch = async () => {
-    if (!companyId.trim() || !testJobId.trim()) {
+    if (!selectedCompanyId.trim() || !testJobId.trim()) {
       toast({
         title: "Error",
-        description: "Please enter both company ID and job ID for data fetch test",
+        description: "Please select a company and enter a job ID for data fetch test",
         variant: "destructive",
       });
       return;
@@ -93,7 +129,7 @@ const JobProgressTestPanel = () => {
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .insert({
-          company_id: companyId.trim(),
+          company_id: selectedCompanyId.trim(),
           crm_id: testJobId.trim(),
           project_name: `Test Job ${testJobId}`,
           Project_status: 'Archived'
@@ -169,13 +205,26 @@ const JobProgressTestPanel = () => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="companyId">Company ID</Label>
-              <Input
-                id="companyId"
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
-                placeholder="Enter company UUID"
-              />
+              <Label htmlFor="companySelect">Company</Label>
+              {isLoadingCompanies ? (
+                <div className="flex items-center gap-2 p-2 border rounded-md">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Loading companies...</span>
+                </div>
+              ) : (
+                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="testJobId">Test Job ID (Optional)</Label>
@@ -191,7 +240,7 @@ const JobProgressTestPanel = () => {
           <div className="flex gap-2">
             <Button 
               onClick={testConnection}
-              disabled={isTestingConnection}
+              disabled={isTestingConnection || !selectedCompanyId}
               className="flex items-center gap-2"
             >
               {isTestingConnection && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -200,7 +249,7 @@ const JobProgressTestPanel = () => {
             
             <Button 
               onClick={testDataFetch}
-              disabled={isTestingDataFetch || !testJobId.trim()}
+              disabled={isTestingDataFetch || !testJobId.trim() || !selectedCompanyId}
               variant="outline"
               className="flex items-center gap-2"
             >
