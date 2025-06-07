@@ -18,33 +18,27 @@ const ZohoTestPanel: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Fetch companies with Zoho integrations
+  // Fetch companies with Zoho integrations using the new edge function
   const { data: companies, isLoading: companiesLoading } = useQuery({
     queryKey: ['companies-zoho'],
     queryFn: async () => {
-      console.log('Fetching Zoho companies...');
-      const { data, error } = await supabase
-        .from('company_integrations')
-        .select(`
-          id,
-          company_id,
-          provider_name,
-          is_active,
-          companies!company_integrations_company_id_fkey (
-            id,
-            name
-          )
-        `)
-        .eq('provider_name', 'Zoho')
-        .eq('is_active', true);
+      console.log('Fetching Zoho companies via edge function...');
       
-      console.log('Zoho companies query result:', { data, error });
+      const { data, error } = await supabase.functions.invoke('get-company-integrations', {
+        body: {},
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (error) {
-        console.error('Error fetching Zoho companies:', error);
+        console.error('Error calling get-company-integrations function:', error);
         throw error;
       }
-      return data;
+      
+      console.log('Zoho companies result:', data);
+      return data?.data || [];
     }
   });
 

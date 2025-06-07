@@ -19,33 +19,27 @@ const JobProgressTestPanel: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Fetch companies with JobProgress integrations
+  // Fetch companies with JobProgress integrations using the new edge function
   const { data: companies, isLoading: companiesLoading } = useQuery({
     queryKey: ['companies-jobprogress'],
     queryFn: async () => {
-      console.log('Fetching JobProgress companies...');
-      const { data, error } = await supabase
-        .from('company_integrations')
-        .select(`
-          id,
-          company_id,
-          provider_name,
-          is_active,
-          companies!company_integrations_company_id_fkey (
-            id,
-            name
-          )
-        `)
-        .eq('provider_name', 'JobProgress')
-        .eq('is_active', true);
+      console.log('Fetching JobProgress companies via edge function...');
       
-      console.log('JobProgress companies query result:', { data, error });
+      const { data, error } = await supabase.functions.invoke('get-company-integrations', {
+        body: {},
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
       if (error) {
-        console.error('Error fetching JobProgress companies:', error);
+        console.error('Error calling get-company-integrations function:', error);
         throw error;
       }
-      return data;
+      
+      console.log('JobProgress companies result:', data);
+      return data?.data || [];
     }
   });
 
