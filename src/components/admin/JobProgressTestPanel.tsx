@@ -96,7 +96,7 @@ const JobProgressTestPanel = () => {
           company_id: companyId.trim(),
           crm_id: testJobId.trim(),
           project_name: `Test Job ${testJobId}`,
-          Project_status: 'active'
+          Project_status: 'Archived'
         })
         .select()
         .single();

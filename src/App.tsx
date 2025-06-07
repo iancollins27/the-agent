@@ -16,6 +16,7 @@ import ExecutionView from "./components/admin/execution-view/ExecutionView";
 import UpdateProjectEmbeddings from "./pages/UpdateProjectEmbeddings";
 import ToolsAdmin from "./pages/ToolsAdmin";
 import SystemDiagrams from "./pages/SystemDiagrams";
+import IntegrationTesting from "./pages/IntegrationTesting";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +74,14 @@ function App() {
             >
               <Route path="" element={<ExecutionView />} />
             </Route>
+            <Route 
+              path="/integration-testing" 
+              element={
+                <ProtectedRoute>
+                  <IntegrationTesting />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/chat" 
               element={
