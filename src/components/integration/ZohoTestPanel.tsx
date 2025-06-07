@@ -23,6 +23,7 @@ const ZohoTestPanel: React.FC = () => {
   const { data: companies, isLoading: companiesLoading } = useQuery({
     queryKey: ['companies-zoho'],
     queryFn: async () => {
+      console.log('Fetching Zoho companies...');
       const { data, error } = await supabase
         .from('company_integrations')
         .select(`
@@ -38,7 +39,12 @@ const ZohoTestPanel: React.FC = () => {
         .eq('provider_name', 'Zoho')
         .eq('is_active', true);
       
-      if (error) throw error;
+      console.log('Zoho companies query result:', { data, error });
+      
+      if (error) {
+        console.error('Error fetching Zoho companies:', error);
+        throw error;
+      }
       return data;
     }
   });
@@ -110,7 +116,7 @@ const ZohoTestPanel: React.FC = () => {
             <Label htmlFor="company">Company</Label>
             <Select value={selectedCompany} onValueChange={setSelectedCompany}>
               <SelectTrigger>
-                <SelectValue placeholder={companiesLoading ? "Loading companies..." : "Select a company"} />
+                <SelectValue placeholder={companiesLoading ? "Loading companies..." : companies?.length === 0 ? "No Zoho integrations found" : "Select a company"} />
               </SelectTrigger>
               <SelectContent>
                 {companies?.map((integration) => (
@@ -120,6 +126,11 @@ const ZohoTestPanel: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+            {companies?.length === 0 && !companiesLoading && (
+              <p className="text-sm text-muted-foreground">
+                No active Zoho integrations found. Please configure a Zoho integration in company settings first.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

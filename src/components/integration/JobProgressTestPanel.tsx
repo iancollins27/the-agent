@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +23,7 @@ const JobProgressTestPanel: React.FC = () => {
   const { data: companies, isLoading: companiesLoading } = useQuery({
     queryKey: ['companies-jobprogress'],
     queryFn: async () => {
+      console.log('Fetching JobProgress companies...');
       const { data, error } = await supabase
         .from('company_integrations')
         .select(`
@@ -39,10 +39,17 @@ const JobProgressTestPanel: React.FC = () => {
         .eq('provider_name', 'JobProgress')
         .eq('is_active', true);
       
-      if (error) throw error;
+      console.log('JobProgress companies query result:', { data, error });
+      
+      if (error) {
+        console.error('Error fetching JobProgress companies:', error);
+        throw error;
+      }
       return data;
     }
   });
+
+  console.log('Companies data:', companies);
 
   const testDataFetch = async (operation: string) => {
     if (!selectedCompany || !projectId) {
@@ -170,7 +177,7 @@ const JobProgressTestPanel: React.FC = () => {
             <Label htmlFor="company">Company</Label>
             <Select value={selectedCompany} onValueChange={setSelectedCompany}>
               <SelectTrigger>
-                <SelectValue placeholder={companiesLoading ? "Loading companies..." : "Select a company"} />
+                <SelectValue placeholder={companiesLoading ? "Loading companies..." : companies?.length === 0 ? "No JobProgress integrations found" : "Select a company"} />
               </SelectTrigger>
               <SelectContent>
                 {companies?.map((integration) => (
@@ -180,6 +187,11 @@ const JobProgressTestPanel: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
+            {companies?.length === 0 && !companiesLoading && (
+              <p className="text-sm text-muted-foreground">
+                No active JobProgress integrations found. Please configure a JobProgress integration in company settings first.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
