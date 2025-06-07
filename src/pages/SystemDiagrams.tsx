@@ -1,9 +1,8 @@
-
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import SystemDiagramCanvas from '@/components/diagrams/SystemDiagramCanvas';
+import SystemDiagramCanvas, { DiagramControls } from '@/components/diagrams/SystemDiagramCanvas';
 import DiagramToolbar from '@/components/diagrams/DiagramToolbar';
 import DiagramLegend from '@/components/diagrams/DiagramLegend';
 import { toast } from '@/components/ui/use-toast';
@@ -13,6 +12,7 @@ type DiagramType = 'high-level-architecture' | 'sms-chat' | 'communications' | '
 const SystemDiagrams = () => {
   const [activeTab, setActiveTab] = useState<DiagramType>('high-level-architecture');
   const [selectedNode, setSelectedNode] = useState<any>(null);
+  const diagramRef = useRef<DiagramControls>(null);
 
   const handleNodeClick = useCallback((nodeData: any) => {
     setSelectedNode(nodeData);
@@ -23,31 +23,41 @@ const SystemDiagrams = () => {
   }, []);
 
   const handleZoomIn = useCallback(() => {
-    // GoJS zoom functionality would be implemented here
-    console.log('Zoom in');
+    if (diagramRef.current) {
+      diagramRef.current.zoomIn();
+      console.log('Zoom in');
+    }
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    // GoJS zoom functionality would be implemented here
-    console.log('Zoom out');
+    if (diagramRef.current) {
+      diagramRef.current.zoomOut();
+      console.log('Zoom out');
+    }
   }, []);
 
   const handleReset = useCallback(() => {
-    // GoJS reset view functionality would be implemented here
-    console.log('Reset view');
+    if (diagramRef.current) {
+      diagramRef.current.resetView();
+      console.log('Reset view');
+    }
   }, []);
 
   const handleExport = useCallback(() => {
-    // GoJS export functionality would be implemented here
-    toast({
-      title: "Export Started",
-      description: "Diagram export functionality is being processed...",
-    });
+    if (diagramRef.current) {
+      diagramRef.current.exportPNG();
+      toast({
+        title: "Export Complete",
+        description: "Diagram has been downloaded as PNG",
+      });
+    }
   }, []);
 
   const handleSearch = useCallback((term: string) => {
-    // GoJS search functionality would be implemented here
-    console.log('Search for:', term);
+    if (diagramRef.current) {
+      diagramRef.current.searchNodes(term);
+      console.log('Search for:', term);
+    }
   }, []);
 
   const getDiagramInfo = (type: DiagramType) => {
@@ -152,6 +162,7 @@ const SystemDiagrams = () => {
               />
               
               <SystemDiagramCanvas
+                ref={diagramRef}
                 diagramType={activeTab}
                 onNodeClick={handleNodeClick}
               />

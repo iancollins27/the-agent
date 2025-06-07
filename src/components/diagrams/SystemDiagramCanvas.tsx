@@ -1,5 +1,4 @@
-
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import * as go from 'gojs';
 
 interface SystemDiagramCanvasProps {
@@ -7,12 +6,99 @@ interface SystemDiagramCanvasProps {
   onNodeClick?: (nodeData: any) => void;
 }
 
-const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({ 
+export interface DiagramControls {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetView: () => void;
+  exportPNG: () => void;
+  searchNodes: (term: string) => void;
+}
+
+const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps>(({ 
   diagramType, 
   onNodeClick 
-}) => {
+}, ref) => {
   const diagramRef = useRef<HTMLDivElement>(null);
   const [diagram, setDiagram] = useState<go.Diagram | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      if (diagram) {
+        const currentScale = diagram.scale;
+        if (currentScale < 3) { // Max zoom limit
+          diagram.scale = Math.min(currentScale * 1.2, 3);
+        }
+      }
+    },
+    zoomOut: () => {
+      if (diagram) {
+        const currentScale = diagram.scale;
+        if (currentScale > 0.1) { // Min zoom limit
+          diagram.scale = Math.max(currentScale / 1.2, 0.1);
+        }
+      }
+    },
+    resetView: () => {
+      if (diagram) {
+        diagram.scale = 1;
+        diagram.position = new go.Point(0, 0);
+        diagram.centerRect(diagram.documentBounds);
+      }
+    },
+    exportPNG: () => {
+      if (diagram) {
+        const dataUrl = diagram.makeImageData({
+          background: 'white',
+          returnType: 'dataUrl',
+          maxSize: new go.Size(2000, 2000)
+        });
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.download = `${diagramType}-diagram.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    },
+    searchNodes: (term: string) => {
+      if (!diagram || !term.trim()) {
+        // Clear any existing highlights
+        diagram?.nodes.each((node) => {
+          const shape = node.findObject('SHAPE') as go.Shape;
+          if (shape) {
+            shape.stroke = 'navy';
+            shape.strokeWidth = 2;
+          }
+        });
+        return;
+      }
+
+      let found = false;
+      diagram.nodes.each((node) => {
+        const shape = node.findObject('SHAPE') as go.Shape;
+        const text = node.data?.text?.toLowerCase() || '';
+        
+        if (text.includes(term.toLowerCase())) {
+          if (shape) {
+            shape.stroke = '#ff6b6b';
+            shape.strokeWidth = 4;
+          }
+          found = true;
+        } else if (shape) {
+          shape.stroke = 'navy';
+          shape.strokeWidth = 2;
+        }
+      });
+
+      if (found) {
+        console.log(`Found nodes matching: ${term}`);
+      } else {
+        console.log(`No nodes found matching: ${term}`);
+      }
+    }
+  }), [diagram, diagramType]);
 
   useEffect(() => {
     if (!diagramRef.current) return;
@@ -37,7 +123,10 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
             nodeSpacing: 30
           }),
         initialContentAlignment: go.Spot.Center,
-        'toolManager.hoverDelay': 100
+        'toolManager.hoverDelay': 100,
+        allowZoom: true,
+        allowHorizontalScroll: true,
+        allowVerticalScroll: true
       });
 
       // Define node template with proper error handling
@@ -54,6 +143,7 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
           }
         },
         $(go.Shape, 'RoundedRectangle', {
+          name: 'SHAPE',
           fill: 'lightblue',
           stroke: 'navy',
           strokeWidth: 2
@@ -113,7 +203,9 @@ const SystemDiagramCanvas: React.FC<SystemDiagramCanvasProps> = ({
       style={{ minHeight: '400px' }}
     />
   );
-};
+});
+
+SystemDiagramCanvas.displayName = 'SystemDiagramCanvas';
 
 function getModelData(diagramType: string) {
   // Ensure all data objects have required properties
