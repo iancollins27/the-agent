@@ -91,14 +91,14 @@ const JobProgressTestPanel = () => {
     setDataFetchResult(null);
 
     try {
-      // First create a test project record
+      // First create a test project record with valid enum value
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .insert({
           company_id: companyId.trim(),
           crm_id: testJobId.trim(),
           project_name: `Test Job ${testJobId}`,
-          Project_status: 'active'
+          Project_status: 'Active' as const // Use proper enum value
         })
         .select()
         .single();

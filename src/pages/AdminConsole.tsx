@@ -2,13 +2,11 @@
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TestingTab from "@/components/admin/TestingTab";
-import UserManagementTab from "@/components/admin/UserManagementTab";
-import PromptManagementTab from "@/components/admin/PromptManagementTab";
-import { UserMenu } from "@/components/UserMenu";
+import UserMenu from "@/components/UserMenu";
 import IntegrationsTestTab from "@/components/admin/IntegrationsTestTab";
 
 const AdminConsole = () => {
-  const [activeTab, setActiveTab] = useState("prompts");
+  const [activeTab, setActiveTab] = useState("integrations-test");
 
   return (
     <div className="min-h-screen bg-background">
@@ -23,21 +21,13 @@ const AdminConsole = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="prompts">Prompts</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="testing">Testing</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="integrations-test">Integration Tests</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="prompts">
-            <PromptManagementTab />
-          </TabsContent>
           <TabsContent value="testing">
             <TestingTab />
-          </TabsContent>
-          <TabsContent value="users">
-            <UserManagementTab />
           </TabsContent>
           
           <TabsContent value="integrations-test">
