@@ -26,7 +26,7 @@ const JobProgressTestPanel: React.FC = () => {
       console.log('Fetching JobProgress companies via edge function...');
       
       const { data, error } = await supabase.functions.invoke('get-company-integrations', {
-        body: {},
+        body: { provider: 'JobProgress' },
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

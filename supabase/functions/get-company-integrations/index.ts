@@ -20,8 +20,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Try to get provider from URL query parameters first, then from request body
     const url = new URL(req.url);
-    const providerName = url.searchParams.get('provider');
+    let providerName = url.searchParams.get('provider');
+    
+    if (!providerName && req.method === 'POST') {
+      const body = await req.json();
+      providerName = body.provider;
+    }
 
     if (!providerName) {
       return new Response(
