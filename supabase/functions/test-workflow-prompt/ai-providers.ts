@@ -1,7 +1,6 @@
 
 import { callOpenAI, callOpenAIWithMCP } from "./services/providers/openAIProvider.ts";
 import { callClaude, callClaudeWithMCP } from "./services/providers/claudeProvider.ts";
-import { corsHeaders } from "./index.ts";
 
 /**
  * Cost per 1k tokens for different models (in USD)
