@@ -31,7 +31,7 @@ const JobProgressTestPanel: React.FC = () => {
           company_id,
           provider_name,
           is_active,
-          companies (
+          companies!company_integrations_company_id_fkey (
             id,
             name
           )

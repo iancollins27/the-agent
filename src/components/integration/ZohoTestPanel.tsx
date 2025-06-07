@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,7 @@ const ZohoTestPanel: React.FC = () => {
           company_id,
           provider_name,
           is_active,
-          companies (
+          companies!company_integrations_company_id_fkey (
             id,
             name
           )
