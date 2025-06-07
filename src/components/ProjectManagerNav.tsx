@@ -6,8 +6,7 @@ import {
   LayoutDashboard, 
   MessageSquare, 
   Settings, 
-  Users,
-  TestTube
+  Users
 } from "lucide-react";
 import UserMenu from './UserMenu';
 
@@ -33,13 +32,6 @@ const ProjectManagerNav: React.FC = () => {
           <Link to="/chat">
             <MessageSquare className="h-4 w-4 mr-2" />
             Chat
-          </Link>
-        </Button>
-        
-        <Button variant="ghost" asChild>
-          <Link to="/integration-testing">
-            <TestTube className="h-4 w-4 mr-2" />
-            Integration Testing
           </Link>
         </Button>
         
