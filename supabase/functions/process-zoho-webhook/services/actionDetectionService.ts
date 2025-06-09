@@ -71,8 +71,14 @@ export async function runActionDetectionWithMCP(
     
     console.log('Calling MCP workflow with context:', Object.keys(mcpContext));
     
-    // Call the test-workflow-prompt function with MCP enabled
-    const { data: mcpResult, error: mcpError } = await supabase.functions.invoke(
+    // Create a service role client for internal function calls
+    const serviceRoleClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    
+    // Call the test-workflow-prompt function with service role permissions
+    const { data: mcpResult, error: mcpError } = await serviceRoleClient.functions.invoke(
       'test-workflow-prompt',
       {
         body: {
@@ -84,7 +90,9 @@ export async function runActionDetectionWithMCP(
           aiModel: aiModel,
           workflowPromptId: mcpPrompt.id,
           initiatedBy: 'zoho-webhook',
-          useMCP: true
+          useMCP: true,
+          // Add a flag to indicate this is an internal service call
+          internalServiceCall: true
         }
       }
     );

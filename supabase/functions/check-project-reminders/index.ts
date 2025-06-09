@@ -55,6 +55,9 @@ serve(async (req) => {
     // Track results for all project checks
     const results = [];
     
+    // Create a service role client for internal function calls
+    const serviceRoleClient = createClient(supabaseUrl, supabaseServiceKey);
+    
     // Process each project that's due for a check
     for (const project of projectsDue || []) {
       console.log(`Processing project ${project.id} with next_check_date: ${project.next_check_date}`);
@@ -140,8 +143,8 @@ serve(async (req) => {
         
         console.log(`Using MCP workflow for project ${project.id} with ${aiProvider} ${aiModel}`);
         
-        // Call the MCP workflow instead of the old action detection
-        const { data: mcpResult, error: mcpError } = await supabase.functions.invoke(
+        // Call the MCP workflow using service role client with internal service call flag
+        const { data: mcpResult, error: mcpError } = await serviceRoleClient.functions.invoke(
           'test-workflow-prompt',
           {
             body: {
@@ -153,7 +156,9 @@ serve(async (req) => {
               aiModel: aiModel,
               workflowPromptId: prompt.id,
               initiatedBy: 'check-project-reminders',
-              useMCP: true
+              useMCP: true,
+              // Add flag to indicate this is an internal service call
+              internalServiceCall: true
             }
           }
         );

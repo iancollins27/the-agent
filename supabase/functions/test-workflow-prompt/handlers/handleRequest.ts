@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
@@ -66,6 +67,31 @@ export async function handleRequest(req: Request): Promise<Response> {
 
       return new Response(
         JSON.stringify(escalationResult),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    // Check if this is an internal service call (bypass user authentication)
+    if (requestBody.internalServiceCall) {
+      console.log("Processing internal service call, bypassing user authentication");
+      
+      const result = await handlePromptRequest(
+        supabase, 
+        requestBody, 
+        null, // No user profile for internal calls
+        null  // No company ID for internal calls
+      );
+      
+      logWithTime('Successfully processed internal service request');
+      
+      return new Response(
+        JSON.stringify(result),
         {
           status: 200,
           headers: {
@@ -209,7 +235,7 @@ async function handlePromptRequest(
         prompt,
         aiProvider,
         aiModel,
-        'test-runner' // Mark as initiated by test runner
+        requestBody.internalServiceCall ? 'internal-service' : 'test-runner' // Mark source appropriately
       );
       
       if (!dbPromptRunId) {
