@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
@@ -32,9 +31,16 @@ export async function handleRequest(req: Request): Promise<Response> {
     // Parse request body
     const requestBody = await req.json();
     
+    // Log request details for debugging
+    logWithTime(`Request method: ${req.method}`);
+    logWithTime(`Request headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
+    logWithTime(`Request body keys: ${Object.keys(requestBody).join(', ')}`);
+    logWithTime(`Internal service call flag: ${requestBody.internalServiceCall}`);
+    logWithTime(`Initiated by: ${requestBody.initiatedBy || 'unknown'}`);
+    
     // Check if this is an escalation processing request (internal call)
     if (requestBody.action_type === 'process_escalation') {
-      console.log("Processing internal escalation request:", requestBody);
+      logWithTime("Processing internal escalation request");
       
       const { action_record_id, project_id } = requestBody;
       
@@ -79,7 +85,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // Check if this is an internal service call (bypass user authentication)
     if (requestBody.internalServiceCall) {
-      console.log("Processing internal service call, bypassing user authentication");
+      logWithTime("Processing internal service call, bypassing user authentication");
       
       const result = await handlePromptRequest(
         supabase, 
@@ -185,6 +191,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   } catch (error) {
     logWithTime(`Error processing request: ${error.message}`);
+    logWithTime(`Error stack: ${error.stack}`);
     return new Response(
       JSON.stringify({ 
         error: error.message || 'An unexpected error occurred',
@@ -210,22 +217,22 @@ async function handlePromptRequest(
   try {
     const { prompt, project_id: projectId, prompt_run_id: promptRunId, contextData, promptType, useMCP, aiProvider = 'openai', aiModel = 'gpt-4' } = requestBody;
 
-    console.log("Request body keys:", Object.keys(requestBody));
-    console.log("Context data:", contextData ? JSON.stringify(contextData, null, 2) : "No context data");
+    logWithTime("Request body keys: " + Object.keys(requestBody).join(', '));
+    logWithTime("Context data: " + (contextData ? JSON.stringify(contextData, null, 2) : "No context data"));
 
     if (!prompt || !projectId || !promptRunId) {
-      console.error("Missing required parameters - prompt:", !!prompt, "projectId:", !!projectId, "promptRunId:", !!promptRunId);
+      logWithTime("Missing required parameters - prompt: " + !!prompt + ", projectId: " + !!projectId + ", promptRunId: " + !!promptRunId);
       return {
         status: "error",
         error: "Missing required parameters: prompt, project_id, or prompt_run_id"
       };
     }
 
-    console.log(`Received prompt: ${prompt.substring(0, 100)}... for project ${projectId}`);
+    logWithTime(`Received prompt: ${prompt.substring(0, 100)}... for project ${projectId}`);
 
     // CRITICAL FIX: Create the prompt run record in the database FIRST
     // This ensures the record exists before any tool calls are made
-    console.log(`Creating prompt run record in database with ID: ${promptRunId}`);
+    logWithTime(`Creating prompt run record in database with ID: ${promptRunId}`);
     
     try {
       const dbPromptRunId = await logPromptRun(
@@ -242,7 +249,7 @@ async function handlePromptRequest(
         throw new Error("Failed to create prompt run record in database");
       }
       
-      console.log(`Successfully created prompt run record with database ID: ${dbPromptRunId}`);
+      logWithTime(`Successfully created prompt run record with database ID: ${dbPromptRunId}`);
       
       // Use the database ID for all subsequent operations
       const actualPromptRunId = dbPromptRunId;
@@ -250,20 +257,20 @@ async function handlePromptRequest(
       // Check if we should use MCP based on prompt type or explicit flag
       const shouldUseMCP = useMCP || promptType === 'mcp_orchestrator';
       
-      console.log(`MCP decision: useMCP=${useMCP}, promptType=${promptType}, shouldUseMCP=${shouldUseMCP}`);
+      logWithTime(`MCP decision: useMCP=${useMCP}, promptType=${promptType}, shouldUseMCP=${shouldUseMCP}`);
 
       // If we should use MCP, route to the MCP service
       if (shouldUseMCP) {
-        console.log("Routing to MCP service for processing");
+        logWithTime("Routing to MCP service for processing");
         
         // Log MCP and tools information from context data
         if (contextData) {
-          console.log("MCP configuration:", {
+          logWithTime("MCP configuration: " + JSON.stringify({
             useMCP: contextData.useMCP,
             available_tools: contextData.available_tools,
             tools_count: Array.isArray(contextData.available_tools) ? contextData.available_tools.length : 0,
             promptType: contextData.promptType
-          });
+          }));
         }
 
         // Route to the MCP service with proper context and the ACTUAL database prompt run ID
@@ -290,7 +297,7 @@ async function handlePromptRequest(
       }
 
       // For non-MCP requests, use the simple OpenAI flow
-      console.log("Using simple OpenAI flow (non-MCP)");
+      logWithTime("Using simple OpenAI flow (non-MCP)");
 
       // Get project details for context
     const { data: projectData, error: projectError } = await supabase
@@ -398,7 +405,7 @@ async function handlePromptRequest(
     };
       
     } catch (promptRunError) {
-      console.error("Error creating prompt run record:", promptRunError);
+      logWithTime("Error creating prompt run record: " + promptRunError.message);
       return {
         status: "error",
         error: `Failed to create prompt run record: ${promptRunError.message}`
@@ -407,7 +414,7 @@ async function handlePromptRequest(
 
     
   } catch (error) {
-    console.error("Error in handlePromptRequest:", error);
+    logWithTime("Error in handlePromptRequest: " + error.message);
     return {
       status: "error",
       error: error.message || "An unexpected error occurred"

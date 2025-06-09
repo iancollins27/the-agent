@@ -142,6 +142,7 @@ serve(async (req) => {
         const aiModel = aiConfig?.model || 'gpt-4o';
         
         console.log(`Using MCP workflow for project ${project.id} with ${aiProvider} ${aiModel}`);
+        console.log(`Invoking test-workflow-prompt with internal service call flag`);
         
         // Call the MCP workflow using service role client with internal service call flag
         const { data: mcpResult, error: mcpError } = await serviceRoleClient.functions.invoke(
@@ -165,6 +166,7 @@ serve(async (req) => {
         
         if (mcpError) {
           console.error(`Error invoking MCP workflow for project ${project.id}:`, mcpError);
+          console.error(`Error details:`, JSON.stringify(mcpError, null, 2));
           results.push({
             project_id: project.id,
             success: false,
@@ -196,6 +198,7 @@ serve(async (req) => {
         
       } catch (error) {
         console.error(`Error processing project ${project.id}:`, error);
+        console.error(`Error stack:`, error.stack);
         results.push({
           project_id: project.id,
           success: false,
@@ -227,6 +230,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in check-project-reminders function:", error);
+    console.error("Error stack:", error.stack);
     
     return new Response(
       JSON.stringify({

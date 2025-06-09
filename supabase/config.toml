@@ -29,4 +29,5 @@ verify_jwt = false
 [functions.chat-webhook-twilio]
 verify_jwt = false
 
-
+[functions.test-workflow-prompt]
+verify_jwt = false

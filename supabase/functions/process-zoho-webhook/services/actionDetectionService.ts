@@ -77,6 +77,19 @@ export async function runActionDetectionWithMCP(
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
+    console.log('Service role client created, invoking test-workflow-prompt...');
+    console.log('Function invocation payload:', {
+      promptType: 'mcp_orchestrator',
+      projectId: projectId,
+      contextData: Object.keys(mcpContext),
+      aiProvider: aiProvider,
+      aiModel: aiModel,
+      workflowPromptId: mcpPrompt.id,
+      initiatedBy: 'zoho-webhook',
+      useMCP: true,
+      internalServiceCall: true
+    });
+    
     // Call the test-workflow-prompt function with service role permissions
     const { data: mcpResult, error: mcpError } = await serviceRoleClient.functions.invoke(
       'test-workflow-prompt',
@@ -99,6 +112,7 @@ export async function runActionDetectionWithMCP(
     
     if (mcpError) {
       console.error('Error invoking MCP workflow:', mcpError);
+      console.error('Error details:', JSON.stringify(mcpError, null, 2));
       return {
         error: `MCP workflow error: ${mcpError.message}`,
         status: 'error'
@@ -113,6 +127,7 @@ export async function runActionDetectionWithMCP(
     return mcpResult;
   } catch (error) {
     console.error('Error in MCP action detection process:', error);
+    console.error('Error stack:', error.stack);
     return {
       error: `MCP action detection failed: ${error.message}`,
       status: 'error'
