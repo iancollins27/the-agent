@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
@@ -215,16 +216,26 @@ async function handlePromptRequest(
   companyId: string | null
 ): Promise<any> {
   try {
-    const { prompt, project_id: projectId, prompt_run_id: promptRunId, contextData, promptType, useMCP, aiProvider = 'openai', aiModel = 'gpt-4' } = requestBody;
+    // FIXED: Accept both parameter naming conventions
+    const prompt = requestBody.prompt || requestBody.promptText;
+    const projectId = requestBody.project_id || requestBody.projectId;
+    const promptRunId = requestBody.prompt_run_id || requestBody.promptRunId || requestBody.workflowPromptId;
+    const contextData = requestBody.contextData || {};
+    const promptType = requestBody.promptType;
+    const useMCP = requestBody.useMCP;
+    const aiProvider = requestBody.aiProvider || 'openai';
+    const aiModel = requestBody.aiModel || 'gpt-4';
 
+    logWithTime("FIXED: Using normalized parameters");
     logWithTime("Request body keys: " + Object.keys(requestBody).join(', '));
+    logWithTime("Normalized parameters - prompt: " + !!prompt + ", projectId: " + !!projectId + ", promptRunId: " + !!promptRunId);
     logWithTime("Context data: " + (contextData ? JSON.stringify(contextData, null, 2) : "No context data"));
 
     if (!prompt || !projectId || !promptRunId) {
-      logWithTime("Missing required parameters - prompt: " + !!prompt + ", projectId: " + !!projectId + ", promptRunId: " + !!promptRunId);
+      logWithTime("VALIDATION ERROR - Missing required parameters - prompt: " + !!prompt + ", projectId: " + !!projectId + ", promptRunId: " + !!promptRunId);
       return {
         status: "error",
-        error: "Missing required parameters: prompt, project_id, or prompt_run_id"
+        error: "Missing required parameters: prompt/promptText, project_id/projectId, or prompt_run_id/promptRunId/workflowPromptId"
       };
     }
 
@@ -261,7 +272,7 @@ async function handlePromptRequest(
 
       // If we should use MCP, route to the MCP service
       if (shouldUseMCP) {
-        logWithTime("Routing to MCP service for processing");
+        logWithTime("ROUTING TO MCP SERVICE for processing");
         
         // Log MCP and tools information from context data
         if (contextData) {
@@ -282,6 +293,13 @@ async function handlePromptRequest(
           aiModel,
           actualPromptRunId // Use the actual database ID here
         );
+
+        logWithTime("MCP RESULT: " + JSON.stringify({
+          hasResult: !!mcpResult.result,
+          hasOutput: !!mcpResult.output,
+          actionRecordId: mcpResult.actionRecordId,
+          toolOutputsCount: mcpResult.toolOutputs?.length || 0
+        }));
 
         return {
           status: "success",
