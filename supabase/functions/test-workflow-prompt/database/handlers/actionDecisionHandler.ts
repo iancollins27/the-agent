@@ -1,9 +1,11 @@
+
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { handleMessageAction } from "./messageActionHandler.ts";
 import { handleOtherActionTypes } from "./otherActionHandler.ts";
 
 /**
- * Handle the ACTION_NEEDED decision type
+ * Handle the ACTION_NEEDED decision type (Legacy support - MCP is now preferred)
+ * This handler remains for backward compatibility with existing workflows
  */
 export async function handleActionNeeded(
   supabase: SupabaseClient,
@@ -11,6 +13,8 @@ export async function handleActionNeeded(
   projectId: string,
   actionData: any
 ) {
+  console.log("Note: Using legacy action handler. Consider migrating to MCP workflow.");
+  
   // Extract action type from response or default to message
   let actionType = actionData.action_type || "message";
   

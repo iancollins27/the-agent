@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,7 +9,7 @@ import DiagramLegend from '@/components/diagrams/DiagramLegend';
 import NodeDetailPanel from '@/components/diagrams/NodeDetailPanel';
 import { toast } from '@/components/ui/use-toast';
 
-type DiagramType = 'high-level-architecture' | 'sms-chat' | 'communications' | 'actions' | 'testing';
+type DiagramType = 'high-level-architecture' | 'sms-chat' | 'communications' | 'testing';
 
 const SystemDiagrams = () => {
   const [activeTab, setActiveTab] = useState<DiagramType>('high-level-architecture');
@@ -84,17 +85,10 @@ const SystemDiagrams = () => {
           status: 'Active',
           functions: ['comms-webhook-twilio', 'comms-webhook-normalizer', 'comms-business-logic']
         };
-      case 'actions':
-        return {
-          title: 'Action Detection & Execution',
-          description: 'AI-driven action detection, approval workflows, and execution system',
-          status: 'Active',
-          functions: ['test-workflow-prompt', 'create-action-record', 'data-push']
-        };
       case 'testing':
         return {
           title: 'Testing & Admin Framework',
-          description: 'Comprehensive testing system with AI prompt testing and admin controls',
+          description: 'Comprehensive testing system with MCP orchestrator testing and admin controls',
           status: 'Active',
           functions: ['test-workflow-prompt', 'agent-chat']
         };
@@ -118,11 +112,10 @@ const SystemDiagrams = () => {
       </header>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as DiagramType)}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="high-level-architecture">High-Level</TabsTrigger>
           <TabsTrigger value="sms-chat">SMS Chat</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
-          <TabsTrigger value="actions">Actions</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
         </TabsList>
 
@@ -210,12 +203,12 @@ function getFlowDetails(type: DiagramType) {
   switch (type) {
     case 'high-level-architecture':
       return [
-        { step: 'Proactive Orchestrator', description: 'Monitors projects, detects needed actions, sets reminders, processes in background using shared tools' },
+        { step: 'Proactive Orchestrator', description: 'Monitors projects, detects needed actions, sets reminders, processes in background using shared tools and MCP workflow' },
         { step: 'Interactive Chat Orchestrator', description: 'Handles real-time multi-channel communications with separate inbound/outbound handlers' },
         { step: 'Shared Tools Infrastructure', description: 'Common data reading tools (CRM, communication logs) and action tools used by both orchestrators' },
         { step: 'Inbound/Outbound Separation', description: 'Clear separation between message intake (webhooks) and message sending (communication APIs)' },
         { step: 'Cross-Communication', description: 'Chat system can trigger proactive workflows, proactive system can initiate communications' },
-        { step: 'Unified Action System', description: 'Both orchestrators use the same create-action-record tool for consistent action management' }
+        { step: 'Unified MCP System', description: 'Both orchestrators use the MCP (Model Context Protocol) workflow for consistent action management and tool execution' }
       ];
     
     case 'sms-chat':
@@ -235,24 +228,14 @@ function getFlowDetails(type: DiagramType) {
         { step: 'Business Logic', description: 'Apply routing and processing rules' },
         { step: 'Project Detection', description: 'Identify associated projects' },
         { step: 'Processing Route', description: 'Route to single or multi-project handlers' },
-        { step: 'AI Analysis', description: 'Process with workflow prompts and AI' }
-      ];
-    
-    case 'actions':
-      return [
-        { step: 'Action Detection', description: 'AI analyzes content for required actions' },
-        { step: 'Record Creation', description: 'Create action records in database' },
-        { step: 'Approval Check', description: 'Determine if human approval is required' },
-        { step: 'Execution', description: 'Execute approved actions automatically' },
-        { step: 'Type Routing', description: 'Route to specific action handlers' },
-        { step: 'Integration', description: 'Sync with external systems (CRM, etc.)' }
+        { step: 'MCP Analysis', description: 'Process with MCP orchestrator workflow and AI' }
       ];
     
     case 'testing':
       return [
         { step: 'Test Setup', description: 'Configure test parameters in admin console' },
-        { step: 'Execution', description: 'Run test through workflow prompt system' },
-        { step: 'AI Processing', description: 'Process with selected AI provider' },
+        { step: 'Execution', description: 'Run test through MCP orchestrator workflow system' },
+        { step: 'AI Processing', description: 'Process with selected AI provider using MCP' },
         { step: 'Tool Execution', description: 'Execute any required MCP tools' },
         { step: 'Results Collection', description: 'Gather and format test results' },
         { step: 'Feedback Loop', description: 'Collect user feedback and store results' }

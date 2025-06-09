@@ -108,9 +108,10 @@ export async function handleZohoWebhook(req: Request) {
       return createErrorResponse(`Workflow prompt error: ${error.message}`, 500);
     }
 
-    // Step 5: Run action detection and execution using MCP
+    // Step 5: Run MCP-based action detection (only MCP now)
     let actionResult = {};
     try {
+      console.log('Using MCP workflow for action detection');
       actionResult = await runActionDetectionWithMCP(
         supabase,
         businessLogicResult.projectId,
@@ -126,7 +127,7 @@ export async function handleZohoWebhook(req: Request) {
         businessLogicResult.propertyAddress
       );
     } catch (error) {
-      console.error('Error detecting actions:', error);
+      console.error('Error in MCP action detection:', error);
       // We don't want to fail the webhook if action detection fails
       // Just log the error and continue
     }
@@ -143,7 +144,8 @@ export async function handleZohoWebhook(req: Request) {
       aiProvider: businessLogicResult.aiProvider,
       aiModel: businessLogicResult.aiModel,
       projectId: businessLogicResult.projectId,
-      actionResult
+      actionResult,
+      workflow: 'mcp' // Indicate we're using MCP workflow
     });
   } catch (error) {
     console.error('Unhandled error:', error);
