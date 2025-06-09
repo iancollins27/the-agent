@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import SystemDiagramCanvas, { DiagramControls } from '@/components/diagrams/SystemDiagramCanvas';
 import DiagramToolbar from '@/components/diagrams/DiagramToolbar';
 import DiagramLegend from '@/components/diagrams/DiagramLegend';
+import NodeDetailPanel from '@/components/diagrams/NodeDetailPanel';
 import { toast } from '@/components/ui/use-toast';
 
 type DiagramType = 'high-level-architecture' | 'sms-chat' | 'communications' | 'actions' | 'testing';
@@ -64,10 +65,10 @@ const SystemDiagrams = () => {
     switch (type) {
       case 'high-level-architecture':
         return {
-          title: 'High-Level Application Architecture',
-          description: 'Two main orchestrators: Proactive Background Processing and Interactive Multi-Channel Chat',
+          title: 'Enhanced High-Level Application Architecture',
+          description: 'Two main orchestrators with shared tools: Proactive Background Processing and Interactive Multi-Channel Chat',
           status: 'Active',
-          functions: ['test-workflow-prompt', 'agent-chat', 'comms-business-logic', 'send-communication']
+          functions: ['test-workflow-prompt', 'agent-chat', 'comms-business-logic', 'send-communication', 'check-project-reminders']
         };
       case 'sms-chat':
         return {
@@ -168,13 +169,7 @@ const SystemDiagrams = () => {
               />
               
               {selectedNode && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border">
-                  <h4 className="font-medium text-sm">Selected Component</h4>
-                  <p className="text-sm text-gray-600">{selectedNode.text}</p>
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    Click nodes to see details
-                  </Badge>
-                </div>
+                <NodeDetailPanel nodeData={selectedNode} />
               )}
             </CardContent>
           </Card>
@@ -215,12 +210,12 @@ function getFlowDetails(type: DiagramType) {
   switch (type) {
     case 'high-level-architecture':
       return [
-        { step: 'Proactive Orchestrator', description: 'Monitors projects, detects needed actions, sets reminders, processes in background' },
-        { step: 'Interactive Chat Orchestrator', description: 'Handles real-time multi-channel communications (SMS, Email, Web Chat)' },
-        { step: 'Shared Infrastructure', description: 'Both orchestrators use the same database, AI processing, and action execution system' },
+        { step: 'Proactive Orchestrator', description: 'Monitors projects, detects needed actions, sets reminders, processes in background using shared tools' },
+        { step: 'Interactive Chat Orchestrator', description: 'Handles real-time multi-channel communications with separate inbound/outbound handlers' },
+        { step: 'Shared Tools Infrastructure', description: 'Common data reading tools (CRM, communication logs) and action tools used by both orchestrators' },
+        { step: 'Inbound/Outbound Separation', description: 'Clear separation between message intake (webhooks) and message sending (communication APIs)' },
         { step: 'Cross-Communication', description: 'Chat system can trigger proactive workflows, proactive system can initiate communications' },
-        { step: 'Multi-Company Support', description: 'Both systems designed to work across multiple companies and user contexts' },
-        { step: 'Action Execution', description: 'Unified action system handles data updates, reminders, and communications from both orchestrators' }
+        { step: 'Unified Action System', description: 'Both orchestrators use the same create-action-record tool for consistent action management' }
       ];
     
     case 'sms-chat':

@@ -25,7 +25,7 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
     zoomIn: () => {
       if (diagram) {
         const currentScale = diagram.scale;
-        if (currentScale < 3) { // Max zoom limit
+        if (currentScale < 3) {
           diagram.scale = Math.min(currentScale * 1.2, 3);
         }
       }
@@ -33,7 +33,7 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
     zoomOut: () => {
       if (diagram) {
         const currentScale = diagram.scale;
-        if (currentScale > 0.1) { // Min zoom limit
+        if (currentScale > 0.1) {
           diagram.scale = Math.max(currentScale / 1.2, 0.1);
         }
       }
@@ -51,9 +51,8 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
           background: 'white',
           returnType: 'dataUrl',
           maxSize: new go.Size(2000, 2000)
-        });
+        }) as string;
         
-        // Create download link
         const link = document.createElement('a');
         link.download = `${diagramType}-diagram.png`;
         link.href = dataUrl;
@@ -64,7 +63,6 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
     },
     searchNodes: (term: string) => {
       if (!diagram || !term.trim()) {
-        // Clear any existing highlights
         diagram?.nodes.each((node) => {
           const shape = node.findObject('SHAPE') as go.Shape;
           if (shape) {
@@ -105,7 +103,6 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
 
     const $ = go.GraphObject.make;
 
-    // Initialize diagram with proper error handling
     let myDiagram: go.Diagram;
     
     try {
@@ -114,8 +111,8 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
         layout: diagramType === 'high-level-architecture' ? 
           $(go.LayeredDigraphLayout, {
             direction: 0,
-            layerSpacing: 100,
-            columnSpacing: 50
+            layerSpacing: 120,
+            columnSpacing: 60
           }) :
           $(go.TreeLayout, {
             angle: 0,
@@ -129,7 +126,6 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
         allowVerticalScroll: true
       });
 
-      // Define node template with proper error handling
       myDiagram.nodeTemplate = $(go.Node, 'Auto',
         {
           selectionAdorned: true,
@@ -152,11 +148,10 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
           margin: 8,
           font: 'bold 12px sans-serif',
           wrap: go.TextBlock.WrapFit,
-          maxSize: new go.Size(120, NaN)
+          maxSize: new go.Size(140, NaN)
         }, new go.Binding('text', 'text'))
       );
 
-      // Define link template
       myDiagram.linkTemplate = $(go.Link,
         { routing: go.Link.Orthogonal, corner: 5 },
         $(go.Shape, { strokeWidth: 2, stroke: '#555' }),
@@ -169,21 +164,17 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
         }, new go.Binding('text', 'text'))
       );
 
-      // Set model data based on diagram type
       const modelData = getModelData(diagramType);
       
-      // Ensure model data is valid before setting
       if (modelData && modelData.nodeDataArray && modelData.linkDataArray) {
         myDiagram.model = new go.GraphLinksModel(modelData.nodeDataArray, modelData.linkDataArray);
       } else {
-        // Fallback to empty model
         myDiagram.model = new go.GraphLinksModel([], []);
       }
 
       setDiagram(myDiagram);
     } catch (error) {
       console.error('Error initializing GoJS diagram:', error);
-      // Create a minimal fallback diagram
       myDiagram = $(go.Diagram, diagramRef.current);
       myDiagram.model = new go.GraphLinksModel([], []);
       setDiagram(myDiagram);
@@ -208,11 +199,13 @@ const SystemDiagramCanvas = forwardRef<DiagramControls, SystemDiagramCanvasProps
 SystemDiagramCanvas.displayName = 'SystemDiagramCanvas';
 
 function getModelData(diagramType: string) {
-  // Ensure all data objects have required properties
-  const createNode = (key: string, text: string, color: string) => ({
+  const createNode = (key: string, text: string, color: string, description?: string, edgeFunctions?: string[], fileReferences?: string[]) => ({
     key,
     text: text || 'Unnamed',
-    color: color || '#E3F2FD'
+    color: color || '#E3F2FD',
+    description: description || '',
+    edgeFunctions: edgeFunctions || [],
+    fileReferences: fileReferences || []
   });
 
   const createLink = (from: string, to: string, text?: string) => ({
@@ -225,25 +218,106 @@ function getModelData(diagramType: string) {
     case 'high-level-architecture':
       return {
         nodeDataArray: [
-          createNode('proactive-orchestrator', 'Proactive Background\nOrchestrator', '#FF6B6B'),
-          createNode('project-monitor', 'Project\nMonitoring', '#FFE66D'),
-          createNode('workflow-engine', 'Workflow\nEngine', '#FFE66D'),
-          createNode('action-detection', 'Action\nDetection', '#FFE66D'),
-          createNode('reminder-system', 'Self-Reminder\nSystem', '#FFE66D'),
+          // Proactive Orchestrator
+          createNode('proactive-orchestrator', 'Proactive Background\nOrchestrator', '#FF6B6B', 
+            'Monitors projects in background, detects needed actions, and schedules reminders', 
+            ['check-project-reminders'], 
+            ['supabase/functions/check-project-reminders/index.ts']),
           
-          createNode('chat-orchestrator', 'Interactive Chat\nOrchestrator', '#4ECDC4'),
-          createNode('multi-channel', 'Multi-Channel\nHandler', '#95E1D3'),
-          createNode('sms-handler', 'SMS\nHandler', '#95E1D3'),
-          createNode('email-handler', 'Email\nHandler', '#95E1D3'),
-          createNode('web-chat', 'Web Chat\nHandler', '#95E1D3'),
-          createNode('support-agent', 'Support Agent\nInterface', '#95E1D3'),
+          createNode('project-monitor', 'Project\nMonitoring', '#FFE66D',
+            'Continuously monitors project status and milestones',
+            ['check-project-reminders'],
+            ['supabase/functions/check-project-reminders/index.ts']),
           
-          createNode('shared-infra', 'Shared Infrastructure', '#A8E6CF'),
-          createNode('database', 'Database\n(Projects, Actions)', '#DDA0DD'),
-          createNode('ai-engine', 'AI Processing\nEngine', '#DDA0DD'),
-          createNode('action-executor', 'Action Execution\nSystem', '#DDA0DD'),
-          createNode('integrations', 'External\nIntegrations', '#DDA0DD'),
-          createNode('multi-company', 'Multi-Company\nSupport', '#DDA0DD')
+          createNode('workflow-engine', 'Workflow\nEngine', '#FFE66D',
+            'Executes AI-driven workflow prompts and business logic',
+            ['test-workflow-prompt'],
+            ['supabase/functions/test-workflow-prompt/index.ts']),
+          
+          createNode('action-detection', 'Action\nDetection', '#FFE66D',
+            'AI-powered detection of required actions from project data',
+            ['test-workflow-prompt'],
+            ['supabase/functions/test-workflow-prompt/index.ts']),
+          
+          createNode('reminder-system', 'Self-Reminder\nSystem', '#FFE66D',
+            'Schedules and manages automated project reminders',
+            ['check-project-reminders'],
+            ['supabase/functions/check-project-reminders/index.ts']),
+          
+          // Interactive Chat Orchestrator
+          createNode('chat-orchestrator', 'Interactive Chat\nOrchestrator', '#4ECDC4',
+            'Handles real-time multi-channel communications and customer interactions',
+            ['agent-chat'],
+            ['supabase/functions/agent-chat/index.ts']),
+          
+          createNode('inbound-handler', 'Inbound Message\nHandler', '#95E1D3',
+            'Processes incoming messages from all communication channels',
+            ['comms-webhook-twilio', 'comms-webhook-justcall', 'chat-webhook-twilio'],
+            ['supabase/functions/comms-webhook-twilio/index.ts', 'supabase/functions/chat-webhook-twilio/index.ts']),
+          
+          createNode('outbound-handler', 'Outbound Message\nHandler', '#95E1D3',
+            'Sends responses and notifications through appropriate channels',
+            ['send-communication', 'send-channel-message'],
+            ['supabase/functions/send-communication/index.ts', 'supabase/functions/send-channel-message/index.ts']),
+          
+          createNode('sms-handler', 'SMS Channel\nProcessor', '#B8E6B8',
+            'Dedicated SMS message processing and routing',
+            ['comms-webhook-twilio', 'chat-webhook-twilio'],
+            ['supabase/functions/comms-webhook-twilio/index.ts', 'supabase/functions/chat-webhook-twilio/index.ts']),
+          
+          createNode('email-handler', 'Email Channel\nProcessor', '#B8E6B8',
+            'Email message processing and routing',
+            ['comms-webhook-normalizer'],
+            ['supabase/functions/comms-webhook-normalizer/index.ts']),
+          
+          createNode('support-agent', 'AI Support Agent\nInterface', '#95E1D3',
+            'AI-powered customer support and assistance',
+            ['agent-chat'],
+            ['supabase/functions/agent-chat/index.ts']),
+
+          // Shared Tools Section
+          createNode('shared-tools', 'Shared Tools\nInfrastructure', '#DDA0DD',
+            'Common tools and utilities used by both orchestrators',
+            [],
+            []),
+          
+          // Data Reading Tools
+          createNode('read-crm-tool', 'Read CRM Data\nTool', '#E6E6FA',
+            'Retrieves comprehensive project and contact data from CRM systems',
+            ['test-workflow-prompt'],
+            ['supabase/functions/test-workflow-prompt/tools/read-crm-data/index.ts']),
+          
+          createNode('read-comms-tool', 'Communication Logs\nReader', '#E6E6FA',
+            'Accesses historical SMS, email, and call communication logs',
+            ['test-workflow-prompt'],
+            ['supabase/functions/test-workflow-prompt/database/index.ts']),
+          
+          // Action Tools
+          createNode('create-action-tool', 'Create Action Record\nTool', '#FFE4E1',
+            'Creates and manages action records for workflow execution',
+            ['test-workflow-prompt'],
+            ['supabase/functions/test-workflow-prompt/tools/create-action-record/index.ts']),
+          
+          // Core Infrastructure
+          createNode('database', 'Database\n(Projects, Actions)', '#A8E6CF',
+            'Central data storage for projects, actions, communications, and contacts',
+            [],
+            ['Database tables and functions']),
+          
+          createNode('ai-engine', 'AI Processing\nEngine', '#A8E6CF',
+            'OpenAI and Claude integration for intelligent processing',
+            ['test-workflow-prompt', 'agent-chat'],
+            ['supabase/functions/test-workflow-prompt/ai-providers.ts']),
+          
+          createNode('integrations', 'External\nIntegrations', '#A8E6CF',
+            'CRM, communication provider, and third-party system integrations',
+            ['data-fetch', 'data-push'],
+            ['supabase/functions/data-fetch/index.ts', 'supabase/functions/data-push/index.ts']),
+          
+          createNode('multi-company', 'Multi-Company\nSupport', '#A8E6CF',
+            'Tenant isolation and multi-company data management',
+            [],
+            ['Database RLS policies and company filtering'])
         ],
         linkDataArray: [
           // Proactive orchestrator connections
@@ -253,38 +327,85 @@ function getModelData(diagramType: string) {
           createLink('proactive-orchestrator', 'reminder-system', 'schedules'),
           
           // Chat orchestrator connections
-          createLink('chat-orchestrator', 'multi-channel', 'routes'),
-          createLink('multi-channel', 'sms-handler', ''),
-          createLink('multi-channel', 'email-handler', ''),
-          createLink('multi-channel', 'web-chat', ''),
-          createLink('chat-orchestrator', 'support-agent', 'assists'),
+          createLink('chat-orchestrator', 'inbound-handler', 'routes'),
+          createLink('chat-orchestrator', 'outbound-handler', 'sends'),
+          createLink('inbound-handler', 'sms-handler', 'SMS'),
+          createLink('inbound-handler', 'email-handler', 'Email'),
+          createLink('outbound-handler', 'sms-handler', 'SMS'),
+          createLink('outbound-handler', 'email-handler', 'Email'),
+          createLink('chat-orchestrator', 'support-agent', 'AI assist'),
           
-          // Shared infrastructure connections
-          createLink('proactive-orchestrator', 'shared-infra', 'uses'),
-          createLink('chat-orchestrator', 'shared-infra', 'uses'),
-          createLink('shared-infra', 'database', ''),
-          createLink('shared-infra', 'ai-engine', ''),
-          createLink('shared-infra', 'action-executor', ''),
-          createLink('shared-infra', 'integrations', ''),
-          createLink('shared-infra', 'multi-company', ''),
+          // Shared tools connections
+          createLink('proactive-orchestrator', 'shared-tools', 'uses'),
+          createLink('chat-orchestrator', 'shared-tools', 'uses'),
+          createLink('shared-tools', 'read-crm-tool', ''),
+          createLink('shared-tools', 'read-comms-tool', ''),
+          createLink('shared-tools', 'create-action-tool', ''),
+          
+          // Infrastructure connections
+          createLink('shared-tools', 'database', 'stores/reads'),
+          createLink('shared-tools', 'ai-engine', 'processes'),
+          createLink('proactive-orchestrator', 'database', 'reads/writes'),
+          createLink('chat-orchestrator', 'database', 'reads/writes'),
+          createLink('workflow-engine', 'ai-engine', 'AI calls'),
+          createLink('support-agent', 'ai-engine', 'AI calls'),
+          createLink('database', 'integrations', 'syncs'),
+          createLink('database', 'multi-company', 'isolates'),
           
           // Cross-communication
           createLink('chat-orchestrator', 'proactive-orchestrator', 'triggers'),
-          createLink('proactive-orchestrator', 'chat-orchestrator', 'initiates')
+          createLink('proactive-orchestrator', 'chat-orchestrator', 'initiates'),
+          
+          // Tool usage
+          createLink('workflow-engine', 'read-crm-tool', 'reads data'),
+          createLink('workflow-engine', 'create-action-tool', 'creates actions'),
+          createLink('support-agent', 'read-crm-tool', 'reads data'),
+          createLink('support-agent', 'read-comms-tool', 'reads history')
         ]
       };
 
     case 'sms-chat':
       return {
         nodeDataArray: [
-          createNode('twilio', 'Twilio SMS\nWebhook', '#E3F2FD'),
-          createNode('webhook', 'chat-webhook-twilio', '#F3E5F5'),
-          createNode('session', 'Chat Session\nManager', '#E8F5E8'),
-          createNode('agent', 'agent-chat\nFunction', '#FFF3E0'),
-          createNode('tools', 'Available Tools\n(channel_response)', '#FCE4EC'),
-          createNode('response', 'send-channel-message', '#E0F2F1'),
-          createNode('send-comm', 'send-communication', '#F1F8E9'),
-          createNode('twilio-send', 'Twilio API\nSend SMS', '#FFF8E1')
+          createNode('twilio', 'Twilio SMS\nWebhook', '#E3F2FD',
+            'External Twilio webhook endpoint for incoming SMS messages',
+            [],
+            ['Twilio webhook configuration']),
+          
+          createNode('webhook', 'chat-webhook-twilio', '#F3E5F5',
+            'Processes incoming SMS webhooks and creates chat sessions',
+            ['chat-webhook-twilio'],
+            ['supabase/functions/chat-webhook-twilio/index.ts']),
+          
+          createNode('session', 'Chat Session\nManager', '#E8F5E8',
+            'Manages conversation state and message history',
+            ['chat-session-manager'],
+            ['supabase/functions/chat-session-manager/index.ts']),
+          
+          createNode('agent', 'agent-chat\nFunction', '#FFF3E0',
+            'AI-powered chat agent with tool access and context awareness',
+            ['agent-chat'],
+            ['supabase/functions/agent-chat/index.ts']),
+          
+          createNode('tools', 'Available Tools\n(channel_response)', '#FCE4EC',
+            'Tools available to AI agent including response generation',
+            ['agent-chat'],
+            ['supabase/functions/agent-chat/tools/']),
+          
+          createNode('response', 'send-channel-message', '#E0F2F1',
+            'Handles channel-specific message sending logic',
+            ['send-channel-message'],
+            ['supabase/functions/send-channel-message/index.ts']),
+          
+          createNode('send-comm', 'send-communication', '#F1F8E9',
+            'Core communication sending with provider selection',
+            ['send-communication'],
+            ['supabase/functions/send-communication/index.ts']),
+          
+          createNode('twilio-send', 'Twilio API\nSend SMS', '#FFF8E1',
+            'External Twilio API for sending SMS responses',
+            [],
+            ['Twilio SMS API integration'])
         ],
         linkDataArray: [
           createLink('twilio', 'webhook', 'POST'),
