@@ -3,6 +3,95 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { findContactId } from "../utils/contactUtils.ts";
 
 /**
+ * Check if a string is a valid UUID format
+ */
+function isValidUUID(str: string): boolean {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+/**
+ * Check if a string looks like a CRM ID (numeric string)
+ */
+function isCrmId(str: string): boolean {
+  if (!str) return false;
+  return /^\d+$/.test(str) && str.length > 10; // CRM IDs are typically long numeric strings
+}
+
+/**
+ * Look up contact UUID by CRM ID
+ */
+async function findContactByCrmId(supabase: SupabaseClient, crmId: string): Promise<string | null> {
+  try {
+    console.log(`Looking up contact with CRM ID: ${crmId}`);
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('profile_crm_id', crmId)
+      .single();
+    
+    if (error || !data) {
+      console.log(`No profile found with CRM ID ${crmId}`);
+      return null;
+    }
+    
+    console.log(`Found profile UUID ${data.id} for CRM ID ${crmId}`);
+    return data.id;
+  } catch (error) {
+    console.error(`Error looking up CRM ID ${crmId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Resolve sender/recipient ID to UUID, handling both CRM IDs and UUIDs
+ */
+async function resolveContactId(
+  supabase: SupabaseClient, 
+  id: string | null, 
+  name: string | null, 
+  projectId: string,
+  type: 'sender' | 'recipient'
+): Promise<string | null> {
+  if (!id && !name) {
+    console.log(`No ${type} ID or name provided`);
+    return null;
+  }
+  
+  // If we have an ID, try to resolve it
+  if (id) {
+    // Check if it's already a valid UUID
+    if (isValidUUID(id)) {
+      console.log(`${type} ID is already a valid UUID: ${id}`);
+      return id;
+    }
+    
+    // Check if it's a CRM ID
+    if (isCrmId(id)) {
+      console.log(`${type} ID appears to be a CRM ID: ${id}`);
+      const uuid = await findContactByCrmId(supabase, id);
+      if (uuid) {
+        console.log(`Successfully resolved CRM ID ${id} to UUID ${uuid}`);
+        return uuid;
+      }
+      console.log(`Could not resolve CRM ID ${id} to UUID`);
+    } else {
+      console.log(`${type} ID format not recognized: ${id}`);
+    }
+  }
+  
+  // Fall back to name-based lookup if ID resolution failed or no ID provided
+  if (name) {
+    console.log(`Attempting name-based lookup for ${type}: ${name}`);
+    return await findContactId(supabase, name, projectId);
+  }
+  
+  return null;
+}
+
+/**
  * Handle the message action type
  */
 export async function handleMessageAction(
@@ -54,69 +143,68 @@ export async function handleMessageAction(
     console.log("Final message content:", messageContent);
   }
   
-  // Extract recipient ID directly if provided
-  let recipientId = actionData.recipient_id || 
-                    (actionData.action_payload && actionData.action_payload.recipient_id) || 
-                    null;
+  // Extract sender and recipient info
+  const rawSenderId = actionData.sender_ID || actionData.sender_id || 
+                     (actionData.action_payload && (actionData.action_payload.sender_ID || actionData.action_payload.sender_id));
   
-  // If recipient ID is not provided directly, try to look it up by name/role
-  if (!recipientId) {
-    // Extract recipient info
-    const recipient = actionData.recipient || 
-      (actionData.action_payload && actionData.action_payload.recipient) || 
-      "Project team";
-    
-    console.log("Looking up recipient ID for:", recipient);
-    
-    try {
-      // Find contact ID for recipient
-      recipientId = await findContactId(supabase, recipient, projectId);
-      console.log(`Recipient ID resolution: ${recipient} -> ${recipientId || 'Not found'}`);
-    } catch (err) {
-      console.error("Error finding recipient ID:", err);
-    }
-  } else {
-    console.log("Using provided recipient ID:", recipientId);
+  const rawRecipientId = actionData.recipient_id || 
+                        (actionData.action_payload && actionData.action_payload.recipient_id);
+  
+  const senderName = actionData.sender || 
+                    (actionData.action_payload && actionData.action_payload.sender) || 
+                    "BidList Project Manager";
+  
+  const recipientName = actionData.recipient || 
+                       (actionData.action_payload && actionData.action_payload.recipient) || 
+                       "Project team";
+  
+  console.log("Resolving contact IDs...");
+  console.log("Raw sender ID:", rawSenderId, "Sender name:", senderName);
+  console.log("Raw recipient ID:", rawRecipientId, "Recipient name:", recipientName);
+  
+  // Resolve sender and recipient IDs with improved error handling
+  let senderId: string | null = null;
+  let recipientId: string | null = null;
+  
+  try {
+    senderId = await resolveContactId(supabase, rawSenderId, senderName, projectId, 'sender');
+    console.log("Resolved sender ID:", senderId);
+  } catch (error) {
+    console.error("Error resolving sender ID:", error);
+    senderId = null;
   }
   
-  // Extract sender ID directly if provided - check all possible field names
-  let senderId = actionData.sender_ID || actionData.sender_id || 
-                (actionData.action_payload && (actionData.action_payload.sender_ID || actionData.action_payload.sender_id)) || 
-                null;
-  
-  // If sender ID is not provided directly, try to look it up by name/role
-  if (!senderId) {
-    // Extract sender info with default fallback to BidList Project Manager
-    const sender = actionData.sender || 
-      (actionData.action_payload && actionData.action_payload.sender) || 
-      "BidList Project Manager";
-    
-    console.log("Looking up sender ID for:", sender);
-    
-    try {
-      // Find contact ID for sender
-      senderId = await findContactId(supabase, sender, projectId);
-      console.log(`Sender ID resolution: ${sender} -> ${senderId || 'Not found'}`);
-    } catch (err) {
-      console.error("Error finding sender ID:", err);
-    }
-  } else {
-    console.log("Using provided sender ID:", senderId);
+  try {
+    recipientId = await resolveContactId(supabase, rawRecipientId, recipientName, projectId, 'recipient');
+    console.log("Resolved recipient ID:", recipientId);
+  } catch (error) {
+    console.error("Error resolving recipient ID:", error);
+    recipientId = null;
   }
   
-  // Log IDs before database operation
-  console.log("Final IDs for database insert - recipient_id:", recipientId, "sender_ID:", senderId);
+  // Additional validation to ensure we have valid UUIDs or null
+  if (senderId && !isValidUUID(senderId)) {
+    console.error("Sender ID is not a valid UUID after resolution:", senderId);
+    senderId = null;
+  }
+  
+  if (recipientId && !isValidUUID(recipientId)) {
+    console.error("Recipient ID is not a valid UUID after resolution:", recipientId);
+    recipientId = null;
+  }
 
   // Prepare the action payload
   const actionPayload = {
-    recipient: actionData.recipient || (actionData.action_payload && actionData.action_payload.recipient),
-    sender: actionData.sender || (actionData.action_payload && actionData.action_payload.sender),
+    recipient: recipientName,
+    sender: senderName,
     message_content: messageContent,
     recipient_id: recipientId,
     sender_ID: senderId
   };
   
   console.log("Creating message action with payload:", JSON.stringify(actionPayload));
+  console.log("Final validation - senderId valid:", senderId ? isValidUUID(senderId) : 'null');
+  console.log("Final validation - recipientId valid:", recipientId ? isValidUUID(recipientId) : 'null');
   
   try {
     const { data, error } = await supabase
@@ -137,6 +225,7 @@ export async function handleMessageAction(
     
     if (error) {
       console.error("Error creating message action record:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
       throw new Error(`Failed to create action record: ${error.message}`);
     }
     
@@ -144,6 +233,12 @@ export async function handleMessageAction(
     return data.id;
   } catch (insertError) {
     console.error("Exception during action record insert:", insertError);
-    return null;
+    console.error("Insert error details:", {
+      senderId,
+      recipientId,
+      senderIdValid: senderId ? isValidUUID(senderId) : 'null',
+      recipientIdValid: recipientId ? isValidUUID(recipientId) : 'null'
+    });
+    throw insertError;
   }
 }
