@@ -73,6 +73,7 @@ async function resolveContactId(
       console.log(`${type} ID appears to be a CRM ID: ${id}`);
       const uuid = await findContactByCrmId(supabase, id);
       if (uuid) {
+        console.log(`Successfully resolved CRM ID ${id} to UUID ${uuid}`);
         return uuid;
       }
       console.log(`Could not resolve CRM ID ${id} to UUID`);
@@ -161,22 +162,35 @@ export async function handleMessageAction(
   console.log("Raw sender ID:", rawSenderId, "Sender name:", senderName);
   console.log("Raw recipient ID:", rawRecipientId, "Recipient name:", recipientName);
   
-  // Resolve sender and recipient IDs
-  const senderId = await resolveContactId(supabase, rawSenderId, senderName, projectId, 'sender');
-  const recipientId = await resolveContactId(supabase, rawRecipientId, recipientName, projectId, 'recipient');
+  // Resolve sender and recipient IDs with improved error handling
+  let senderId: string | null = null;
+  let recipientId: string | null = null;
   
-  console.log("Resolved sender ID:", senderId);
-  console.log("Resolved recipient ID:", recipientId);
+  try {
+    senderId = await resolveContactId(supabase, rawSenderId, senderName, projectId, 'sender');
+    console.log("Resolved sender ID:", senderId);
+  } catch (error) {
+    console.error("Error resolving sender ID:", error);
+    senderId = null;
+  }
   
-  // Validate that we have valid UUIDs or null
+  try {
+    recipientId = await resolveContactId(supabase, rawRecipientId, recipientName, projectId, 'recipient');
+    console.log("Resolved recipient ID:", recipientId);
+  } catch (error) {
+    console.error("Error resolving recipient ID:", error);
+    recipientId = null;
+  }
+  
+  // Additional validation to ensure we have valid UUIDs or null
   if (senderId && !isValidUUID(senderId)) {
-    console.error("Sender ID is not a valid UUID:", senderId);
-    throw new Error(`Invalid sender ID format: ${senderId}`);
+    console.error("Sender ID is not a valid UUID after resolution:", senderId);
+    senderId = null;
   }
   
   if (recipientId && !isValidUUID(recipientId)) {
-    console.error("Recipient ID is not a valid UUID:", recipientId);
-    throw new Error(`Invalid recipient ID format: ${recipientId}`);
+    console.error("Recipient ID is not a valid UUID after resolution:", recipientId);
+    recipientId = null;
   }
 
   // Prepare the action payload
@@ -189,6 +203,8 @@ export async function handleMessageAction(
   };
   
   console.log("Creating message action with payload:", JSON.stringify(actionPayload));
+  console.log("Final validation - senderId valid:", senderId ? isValidUUID(senderId) : 'null');
+  console.log("Final validation - recipientId valid:", recipientId ? isValidUUID(recipientId) : 'null');
   
   try {
     const { data, error } = await supabase
