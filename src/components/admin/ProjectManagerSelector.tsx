@@ -78,7 +78,7 @@ const ProjectManagerSelector: React.FC<ProjectManagerSelectorProps> = ({ value, 
   }, []);
 
   return (
-    <div className="min-w-[200px]">
+    <div className="w-full sm:min-w-[200px]">
       <Select 
         value={value || "all"} 
         onValueChange={(val) => onChange(val === "all" ? null : val)}
@@ -87,13 +87,13 @@ const ProjectManagerSelector: React.FC<ProjectManagerSelectorProps> = ({ value, 
           {loading ? (
             <div className="flex items-center">
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span>Loading managers...</span>
+              <span className="text-sm">Loading...</span>
             </div>
           ) : (
             <SelectValue placeholder="Filter by manager" />
           )}
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-white z-50">
           <SelectItem value="all" className="flex items-center">
             <div className="flex items-center">
               <User className="h-4 w-4 mr-2 text-muted-foreground" />
@@ -105,7 +105,7 @@ const ProjectManagerSelector: React.FC<ProjectManagerSelectorProps> = ({ value, 
             <SelectItem key={manager.id} value={manager.id} className="flex items-center">
               <div className="flex items-center">
                 <User className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>{manager.full_name}</span>
+                <span className="truncate">{manager.full_name}</span>
               </div>
             </SelectItem>
           ))}
