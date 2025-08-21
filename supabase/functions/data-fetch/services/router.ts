@@ -1,6 +1,7 @@
 
 import { ZohoConnector } from "../connectors/zoho.ts";
 import { JobProgressConnector } from "../connectors/jobprogress.ts";
+import { GoogleSheetsConnector } from "../connectors/google-sheets.ts";
 import { BaseConnector } from "../models/connector.ts";
 
 export class DataFetchRouter {
@@ -218,6 +219,8 @@ export class DataFetchRouter {
         return new ZohoConnector(this.supabase, integration);
       case "jobprogress":
         return new JobProgressConnector(this.supabase, integration);
+      case "google-sheets":
+        return new GoogleSheetsConnector(this.supabase, integration);
       // Add more cases for other CRM providers as they're implemented
       default:
         throw new Error(`Unsupported provider: ${providerName}`);
