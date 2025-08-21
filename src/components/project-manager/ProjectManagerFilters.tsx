@@ -58,15 +58,16 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
   };
 
   return (
-    <div className="flex items-center gap-4 flex-wrap justify-between">
-      <div className="flex items-center gap-4 flex-wrap">
+    <div className="space-y-4">
+      {/* Mobile-first: Stack key filters */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex items-center space-x-2">
           <Switch
             id="hide-reviewed"
             checked={hideReviewed}
             onCheckedChange={(value) => handleFilterChange(setHideReviewed, value)}
           />
-          <Label htmlFor="hide-reviewed">Hide Reviewed</Label>
+          <Label htmlFor="hide-reviewed" className="text-sm">Hide Reviewed</Label>
         </div>
         
         <div className="flex items-center space-x-2">
@@ -75,16 +76,28 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
             checked={excludeReminderActions}
             onCheckedChange={(value) => handleFilterChange(setExcludeReminderActions, value)}
           />
-          <Label htmlFor="exclude-reminder-actions">Exclude Reminders and No Actions</Label>
+          <Label htmlFor="exclude-reminder-actions" className="text-sm">Exclude Reminders</Label>
         </div>
 
-        <span className="text-sm text-muted-foreground">Show:</span>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="only-pending-actions"
+            checked={onlyPendingActions}
+            onCheckedChange={(value) => handleFilterChange(setOnlyPendingActions, value)}
+          />
+          <Label htmlFor="only-pending-actions" className="text-sm">Pending Actions Only</Label>
+        </div>
+      </div>
+
+      {/* Second row: Selectors and filters */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+        <span className="text-sm text-muted-foreground hidden sm:inline">Show:</span>
         
         <Select 
           value={timeFilter} 
           onValueChange={(value) => handleFilterChange(setTimeFilter, value)}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-full sm:w-[160px]">
             <SelectValue placeholder="Select time range" />
           </SelectTrigger>
           <SelectContent>
@@ -95,50 +108,46 @@ const ProjectManagerFilters: React.FC<ProjectManagerFiltersProps> = ({
           </SelectContent>
         </Select>
         
-        <ProjectManagerSelector 
-          value={projectManagerFilter} 
-          onChange={(value) => handleFilterChange(setProjectManagerFilter, value)}
-        />
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[240px]">
-            <DropdownMenuCheckboxItem
-              checked={onlyMyProjects}
-              onCheckedChange={(value) => handleFilterChange(setOnlyMyProjects, value)}
-            >
-              Only My Projects
-            </DropdownMenuCheckboxItem>
-            
-            <DropdownMenuSeparator />
-            
-            <DropdownMenuCheckboxItem
-              checked={groupByRoofer}
-              onCheckedChange={(value) => handleFilterChange(setGroupByRoofer, value)}
-            >
-              Group by Roofer
-            </DropdownMenuCheckboxItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="only-pending-actions"
-            checked={onlyPendingActions}
-            onCheckedChange={(value) => handleFilterChange(setOnlyPendingActions, value)}
+        <div className="w-full sm:w-auto">
+          <ProjectManagerSelector 
+            value={projectManagerFilter} 
+            onChange={(value) => handleFilterChange(setProjectManagerFilter, value)}
           />
-          <Label htmlFor="only-pending-actions">Only Show Projects with Pending Actions</Label>
+        </div>
+        
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span className="hidden sm:inline">More Filters</span>
+                <span className="sm:hidden">Filters</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[240px] bg-white z-50">
+              <DropdownMenuCheckboxItem
+                checked={onlyMyProjects}
+                onCheckedChange={(value) => handleFilterChange(setOnlyMyProjects, value)}
+              >
+                Only My Projects
+              </DropdownMenuCheckboxItem>
+              
+              <DropdownMenuSeparator />
+              
+              <DropdownMenuCheckboxItem
+                checked={groupByRoofer}
+                onCheckedChange={(value) => handleFilterChange(setGroupByRoofer, value)}
+              >
+                Group by Roofer
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button onClick={onRefresh} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
-
-      <Button onClick={onRefresh} variant="outline" size="icon">
-        <RefreshCw className="h-4 w-4" />
-      </Button>
     </div>
   );
 };

@@ -9,7 +9,7 @@ const ProjectManagerHeader: React.FC<ProjectManagerHeaderProps> = ({
   title 
 }) => {
   return (
-    <h2 className="text-2xl font-bold">{title}</h2>
+    <h2 className="text-xl md:text-2xl font-bold text-gray-900">{title}</h2>
   );
 };
 

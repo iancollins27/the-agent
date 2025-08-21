@@ -73,18 +73,18 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-12 bg-slate-200 rounded"></div>
-        <div className="h-64 bg-slate-200 rounded"></div>
+        <div className="h-8 md:h-12 bg-slate-200 rounded"></div>
+        <div className="h-48 md:h-64 bg-slate-200 rounded"></div>
       </div>
     );
   }
   
   if (filteredPromptRuns.length === 0) {
     return (
-      <div className="bg-white p-8 rounded-lg shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
-        <Smile className="h-16 w-16 text-green-400 mb-4" />
-        <h3 className="text-xl font-medium mb-2">You're all caught up!</h3>
-        <p className="text-gray-600 max-w-md">
+      <div className="bg-white p-4 md:p-8 rounded-lg shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center">
+        <Smile className="h-12 w-12 md:h-16 md:w-16 text-green-400 mb-4" />
+        <h3 className="text-lg md:text-xl font-medium mb-2">You're all caught up!</h3>
+        <p className="text-gray-600 max-w-md text-sm md:text-base">
           You currently have no pending projects that require your attention.
         </p>
         
@@ -103,7 +103,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
   return (
     <div>
       {groupByRoofer ? (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {rooferGroups.map(({ roofer, runs }) => (
             <RooferPromptRunsCard
               key={roofer}
@@ -117,7 +117,7 @@ const ProjectManagerContent: React.FC<ProjectManagerContentProps> = ({
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-slate-200">
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-x-auto">
           <PromptRunsTable 
             promptRuns={filteredPromptRuns}
             onRatingChange={onRatingChange}

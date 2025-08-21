@@ -31,8 +31,8 @@ const ProjectManager: React.FC = () => {
     <div className="min-h-screen bg-slate-50">
       <ProjectManagerNav />
       
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center flex-wrap gap-4">
+      <div className="container mx-auto py-3 md:py-6 px-4 space-y-4 md:space-y-6">
+        <div className="space-y-4">
           <ProjectManagerHeader title="Project Manager Dashboard" />
           <ProjectManagerFilters 
             hideReviewed={filters.hideReviewed}

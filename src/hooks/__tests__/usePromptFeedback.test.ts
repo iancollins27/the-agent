@@ -12,13 +12,17 @@ vi.mock('@/components/ui/use-toast', () => ({
 }));
 
 let eqMock: any;
+const updateMock = vi.fn();
 const fromMock = vi.fn(() => ({
-  update: vi.fn(() => ({
-    eq: eqMock
-  }))
+  update: updateMock
 }));
+
+updateMock.mockReturnValue({
+  eq: () => eqMock
+});
+
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: (...args: any[]) => fromMock(...args) }
+  supabase: { from: fromMock }
 }));
 
 describe('usePromptFeedback', () => {
@@ -55,7 +59,7 @@ describe('usePromptFeedback', () => {
   beforeEach(() => {
     toastMock.mockClear();
     eqMock = vi.fn().mockResolvedValue({ error: null });
-    fromMock.mockReturnValue({ update: () => ({ eq: eqMock }) });
+    updateMock.mockReturnValue({ eq: eqMock });
   });
 
   it('updates feedback successfully', async () => {
@@ -75,7 +79,7 @@ describe('usePromptFeedback', () => {
 
   it('handles supabase error', async () => {
     eqMock = vi.fn().mockResolvedValue({ error: new Error('fail') });
-    fromMock.mockReturnValue({ update: () => ({ eq: eqMock }) });
+    updateMock.mockReturnValue({ eq: eqMock });
     const { result } = renderHook(() => {
       const [runs, setRuns] = React.useState<PromptRunUI[]>([initialRun]);
       const actions = usePromptFeedback(updater => setRuns(updater));
