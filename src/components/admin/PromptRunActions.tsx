@@ -256,6 +256,27 @@ const PromptRunActions: React.FC<PromptRunActionsProps> = ({ promptRunId }) => {
                   </div>
                 )}
                 
+                {(action.action_type.includes('reminder') || action.action_type === 'set_future_reminder') && (
+                  <div className="text-sm">
+                    <div className="font-medium mb-1">
+                      {typeof action.action_payload === 'object' && action.action_payload !== null ? 
+                        (action.action_payload as any).check_reason || 
+                        (action.action_payload as any).reason ||
+                        'Follow-up reminder' : 'Follow-up reminder'}
+                    </div>
+                    
+                    {/* Reminder description */}
+                    {typeof action.action_payload === 'object' && action.action_payload !== null && (
+                      (action.action_payload as any).description || 
+                      (action.action_payload as any).reminder_description
+                    ) && (
+                      <div className="text-sm text-muted-foreground mb-2 p-2 bg-muted rounded">
+                        {(action.action_payload as any).description || (action.action_payload as any).reminder_description}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 {renderCommunicationParties(action)}
                 
                 <div className="text-xs font-medium">
