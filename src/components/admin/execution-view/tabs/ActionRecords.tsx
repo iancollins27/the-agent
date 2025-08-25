@@ -179,6 +179,13 @@ const ActionRecords: React.FC<ActionRecordsProps> = ({ promptRunId }) => {
                           'Follow-up reminder' : 'Follow-up reminder'}
                       </div>
                       
+                      {/* Reminder description */}
+                      {typeof action.action_payload === 'object' && action.action_payload !== null && (action.action_payload as any).description && (
+                        <div className="text-sm text-muted-foreground mb-2 p-2 bg-muted rounded">
+                          {(action.action_payload as any).description}
+                        </div>
+                      )}
+                      
                       {reminderInfo?.reminderDate && (
                         <div className="text-xs text-muted-foreground">
                           Scheduled for: {reminderInfo.formattedDate}
