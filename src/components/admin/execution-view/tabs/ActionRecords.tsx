@@ -37,7 +37,7 @@ const ActionRecords: React.FC<ActionRecordsProps> = ({ promptRunId }) => {
   });
 
   const formatReminderInfo = (action: ActionRecord) => {
-    if (!action.action_type.includes('reminder')) return null;
+    if (!action.action_type.includes('reminder') && action.action_type !== 'set_future_reminder') return null;
     
     const actionPayload = action.action_payload as Record<string, any>;
     const daysUntilCheck = actionPayload?.days_until_check;
@@ -170,7 +170,7 @@ const ActionRecords: React.FC<ActionRecordsProps> = ({ promptRunId }) => {
                     </div>
                   )}
 
-                  {action.action_type.includes('reminder') && (
+                  {(action.action_type.includes('reminder') || action.action_type === 'set_future_reminder') && (
                     <div className="text-sm">
                       <div className="font-medium mb-1">
                         {typeof action.action_payload === 'object' && action.action_payload !== null ? 
