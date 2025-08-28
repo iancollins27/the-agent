@@ -34,7 +34,15 @@ export const useProjectManagerState = () => {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      if (!user) return;
+      if (!user) {
+        setUserProfile(null);
+        return;
+      }
+      
+      // Only fetch if user ID actually changed to prevent unnecessary refetches
+      if (userProfile?.id === user.id) {
+        return;
+      }
       
       try {
         const { data, error } = await supabase
@@ -68,7 +76,7 @@ export const useProjectManagerState = () => {
     };
     
     fetchUserProfile();
-  }, [user]);
+  }, [user?.id, userProfile?.id]);
 
   useEffect(() => {
     if (filters.onlyMyProjects) {

@@ -28,9 +28,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes - ignore token refresh events to prevent unnecessary re-renders
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // Only update on meaningful auth changes, not token refreshes
+        if (event === 'TOKEN_REFRESHED') {
+          return;
+        }
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);

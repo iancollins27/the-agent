@@ -17,8 +17,12 @@ export const useAuth = () => {
     
     getSession();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth changes - ignore token refresh events to prevent unnecessary re-renders
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Only update on meaningful auth changes, not token refreshes
+      if (event === 'TOKEN_REFRESHED') {
+        return;
+      }
       setUser(session?.user ?? null);
       setLoading(false);
     });
