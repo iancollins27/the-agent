@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, MapPin, Search } from "lucide-react";
+import { Loader2, MapPin, Search, RefreshCw } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 type ProjectSelectorProps = {
   selectedProjectIds: string[];
@@ -28,46 +29,46 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
   const [trackFilter, setTrackFilter] = useState<string>("all");
   const [projectTracks, setProjectTracks] = useState<any[]>([]);
   
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      
-      // Fetch projects with track information
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select(`
-          id,
-          crm_id,
-          next_step,
-          Address,
-          project_track,
-          companies(name),
-          project_tracks(id, name)
-        `)
-        .order('id');
-        
-      // Fetch all project tracks for the filter dropdown
-      const { data: tracksData, error: tracksError } = await supabase
-        .from('project_tracks')
-        .select('id, name')
-        .order('name');
-        
-      if (projectsError) {
-        console.error('Error fetching projects:', projectsError);
-      } else {
-        setProjects(projectsData || []);
-        setFilteredProjects(projectsData || []);
-      }
-      
-      if (tracksError) {
-        console.error('Error fetching tracks:', tracksError);
-      } else {
-        setProjectTracks(tracksData || []);
-      }
-      
-      setIsLoading(false);
-    };
+  const fetchData = async () => {
+    setIsLoading(true);
     
+    // Fetch projects with track information
+    const { data: projectsData, error: projectsError } = await supabase
+      .from('projects')
+      .select(`
+        id,
+        crm_id,
+        next_step,
+        Address,
+        project_track,
+        companies(name),
+        project_tracks(id, name)
+      `)
+      .order('id');
+      
+    // Fetch all project tracks for the filter dropdown
+    const { data: tracksData, error: tracksError } = await supabase
+      .from('project_tracks')
+      .select('id, name')
+      .order('name');
+      
+    if (projectsError) {
+      console.error('Error fetching projects:', projectsError);
+    } else {
+      setProjects(projectsData || []);
+      setFilteredProjects(projectsData || []);
+    }
+    
+    if (tracksError) {
+      console.error('Error fetching tracks:', tracksError);
+    } else {
+      setProjectTracks(tracksData || []);
+    }
+    
+    setIsLoading(false);
+  };
+  
+  useEffect(() => {
     fetchData();
   }, []);
   
@@ -75,33 +76,23 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
     // Filter projects when search term or track filter changes
     let filtered = projects;
     
-    console.log('Filtering - trackFilter:', trackFilter, 'projects count:', projects.length);
-    
     // Apply address search filter
     if (searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(project => 
         project.Address && project.Address.toLowerCase().includes(term)
       );
-      console.log('After address filter:', filtered.length);
     }
     
     // Apply track filter
     if (trackFilter !== "all") {
-      console.log('Applying track filter:', trackFilter);
       if (trackFilter === "no-track") {
         filtered = filtered.filter(project => !project.project_track);
       } else {
-        const beforeTrackFilter = filtered.length;
-        filtered = filtered.filter(project => {
-          console.log('Comparing:', project.project_track, '===', trackFilter, ':', project.project_track === trackFilter);
-          return project.project_track === trackFilter;
-        });
-        console.log('Track filter - before:', beforeTrackFilter, 'after:', filtered.length);
+        filtered = filtered.filter(project => project.project_track === trackFilter);
       }
     }
     
-    console.log('Final filtered count:', filtered.length);
     setFilteredProjects(filtered);
   }, [searchTerm, trackFilter, projects]);
   
@@ -148,6 +139,23 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={fetchData}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+      
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Badge variant="secondary">
+          Loaded: {projects.length}
+        </Badge>
+        <Badge variant="outline">
+          Filtered: {filteredProjects.length}
+        </Badge>
       </div>
       
       <div className="max-h-[400px] overflow-y-auto">
