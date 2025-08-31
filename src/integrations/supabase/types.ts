@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -489,6 +489,7 @@ export type Database = {
           id: string
           integration_mode: string
           is_active: boolean | null
+          oauth_refresh_token: string | null
           provider_name: string
           provider_type: Database["public"]["Enums"]["provider_type_enum"]
           updated_at: string
@@ -503,6 +504,7 @@ export type Database = {
           id?: string
           integration_mode?: string
           is_active?: boolean | null
+          oauth_refresh_token?: string | null
           provider_name: string
           provider_type: Database["public"]["Enums"]["provider_type_enum"]
           updated_at?: string
@@ -517,6 +519,7 @@ export type Database = {
           id?: string
           integration_mode?: string
           is_active?: boolean | null
+          oauth_refresh_token?: string | null
           provider_name?: string
           provider_type?: Database["public"]["Enums"]["provider_type_enum"]
           updated_at?: string
@@ -1382,12 +1385,12 @@ export type Database = {
       }
       find_or_create_chat_session: {
         Args: {
-          p_channel_type: string
           p_channel_identifier: string
+          p_channel_type: string
           p_company_id: string
           p_contact_id?: string
-          p_project_id?: string
           p_memory_mode?: string
+          p_project_id?: string
         }
         Returns: string
       }
@@ -1396,31 +1399,31 @@ export type Database = {
         Returns: string
       }
       get_column_info: {
-        Args: { table_name: string; column_name: string }
+        Args: { column_name: string; table_name: string }
         Returns: {
+          column_default: string
           data_type: string
           is_nullable: boolean
-          column_default: string
         }[]
       }
       get_company_integration_keys: {
         Args: { integration_id: string }
         Returns: {
+          account_id: string
           api_key: string
           api_secret: string
-          account_id: string
         }[]
       }
       get_contact_projects: {
         Args: { contact_id: string }
         Returns: {
-          id: string
-          project_name: string
           address: string
           company_id: string
+          id: string
+          next_step: string
+          project_name: string
           project_status: string
           summary: string
-          next_step: string
         }[]
       }
       get_current_contact_id: {
@@ -1536,42 +1539,42 @@ export type Database = {
       }
       log_integration_key_access: {
         Args: {
-          p_integration_id: string
-          p_accessed_by: string
           p_access_reason: string
+          p_accessed_by: string
+          p_integration_id: string
           p_source_ip: string
         }
         Returns: undefined
       }
       match_documents: {
-        Args: { embedding: string; k: number; _company_id: string }
+        Args: { _company_id: string; embedding: string; k: number }
         Returns: {
-          id: string
-          title: string
           content: string
-          url: string
+          id: string
           similarity: number
+          title: string
+          url: string
         }[]
       }
       search_projects_by_vector: {
         Args: {
-          search_embedding: string
-          match_threshold?: number
           match_count?: number
+          match_threshold?: number
           p_company_id?: string
+          search_embedding: string
         }
         Returns: {
-          id: string
-          crm_id: string
-          summary: string
-          next_step: string
-          project_track: string
+          address: string
           company_id: string
           company_name: string
-          address: string
-          status: string
-          similarity: number
+          crm_id: string
+          id: string
+          next_step: string
           project_name: string
+          project_track: string
+          similarity: number
+          status: string
+          summary: string
         }[]
       }
       sparsevec_out: {
@@ -1587,7 +1590,7 @@ export type Database = {
         Returns: number
       }
       update_session_history: {
-        Args: { p_session_id: string; p_role: string; p_content: string }
+        Args: { p_content: string; p_role: string; p_session_id: string }
         Returns: boolean
       }
       user_belongs_to_company: {
