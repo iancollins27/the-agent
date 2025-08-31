@@ -75,23 +75,33 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
     // Filter projects when search term or track filter changes
     let filtered = projects;
     
+    console.log('Filtering - trackFilter:', trackFilter, 'projects count:', projects.length);
+    
     // Apply address search filter
     if (searchTerm.trim() !== "") {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(project => 
         project.Address && project.Address.toLowerCase().includes(term)
       );
+      console.log('After address filter:', filtered.length);
     }
     
     // Apply track filter
     if (trackFilter !== "all") {
+      console.log('Applying track filter:', trackFilter);
       if (trackFilter === "no-track") {
         filtered = filtered.filter(project => !project.project_track);
       } else {
-        filtered = filtered.filter(project => project.project_track === trackFilter);
+        const beforeTrackFilter = filtered.length;
+        filtered = filtered.filter(project => {
+          console.log('Comparing:', project.project_track, '===', trackFilter, ':', project.project_track === trackFilter);
+          return project.project_track === trackFilter;
+        });
+        console.log('Track filter - before:', beforeTrackFilter, 'after:', filtered.length);
       }
     }
     
+    console.log('Final filtered count:', filtered.length);
     setFilteredProjects(filtered);
   }, [searchTerm, trackFilter, projects]);
   
