@@ -33,6 +33,10 @@ const ProjectContext: React.FC<ProjectContextProps> = ({ project }) => {
               <div>{project.crm_id || 'Not available'}</div>
             </div>
             <div>
+              <div className="text-muted-foreground">Project Name</div>
+              <div>{project.project_name || 'Not available'}</div>
+            </div>
+            <div>
               <div className="text-muted-foreground">Address</div>
               <div>{project.Address || 'Not available'}</div>
             </div>
