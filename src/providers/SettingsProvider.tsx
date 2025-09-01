@@ -42,12 +42,43 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const fetchCompanySettings = async () => {
       try {
         setIsLoading(true);
-        // Get the first company as default
+        
+        // Get the current user's profile to find their company
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          console.log('No authenticated user found');
+          return;
+        }
+
+        // Get user's profile which contains company_id
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+          toast({
+            title: "Error",
+            description: "Failed to load user profile",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (!profile?.company_id) {
+          console.log('User has no company assigned');
+          return;
+        }
+
+        // Get the user's company settings
         const { data, error } = await supabase
           .from('companies')
           .select('*')
-          .limit(1)
-          .maybeSingle();
+          .eq('id', profile.company_id)
+          .single();
           
         if (error) {
           console.error('Error fetching company settings:', error);
