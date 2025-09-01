@@ -40,8 +40,8 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
         crm_id,
         next_step,
         Address,
+        project_name,
         project_track,
-        companies(name),
         project_tracks(id, name)
       `)
       .order('id');
@@ -163,7 +163,7 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]"></TableHead>
-              <TableHead>Company</TableHead>
+              <TableHead>Project Name</TableHead>
               <TableHead>Address</TableHead>
               <TableHead>Track</TableHead>
               <TableHead>Current Step</TableHead>
@@ -187,7 +187,7 @@ const ProjectSelector = ({ selectedProjectIds, setSelectedProjectIds }: ProjectS
                       onClick={(e) => e.stopPropagation()}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{project.companies?.name || 'Unknown'}</TableCell>
+                  <TableCell className="font-medium">{project.project_name || 'Unnamed Project'}</TableCell>
                   <TableCell className="max-w-xs">
                     {project.Address ? (
                       <div className="flex items-center">

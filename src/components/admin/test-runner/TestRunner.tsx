@@ -35,12 +35,8 @@ const TestRunner: React.FC<TestRunnerProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <MCPToggle 
-          checked={useMCP}
-          onCheckedChange={setUseMCP}
-        />
-        <Button 
+      <div className="flex items-center justify-end">
+        <Button
           onClick={runTest} 
           disabled={isLoading || selectedPromptIds.length === 0 || selectedProjectIds.length === 0}
         >

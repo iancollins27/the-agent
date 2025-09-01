@@ -74,7 +74,9 @@ const TestResults: React.FC<TestResultsProps> = ({ actionId, results }) => {
         <h2 className="text-xl font-bold">Test Results</h2>
         {results.map((projectResult: any, index: number) => (
           <div key={index} className="border rounded-md p-4 space-y-4">
-            <h3 className="text-lg font-medium">Project ID: {projectResult.projectId}</h3>
+            <h3 className="text-lg font-medium">
+              {projectResult.projectName ? `Project: ${projectResult.projectName}` : `Project ID: ${projectResult.projectId}`}
+            </h3>
             <div className="space-y-4">
               {projectResult.results.map((result: any, resultIndex: number) => {
                 const resultKey = `${index}-${resultIndex}`;
