@@ -14,34 +14,15 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
     promptRun.toolLogsCount > 0 : // Use the property if it exists
     Array.isArray(promptRun.toolLogs) && promptRun.toolLogs.length > 0; // Fallback to checking toolLogs array
 
-  // For MCP executions, we want to show the actual processed input that was sent to the LLM
-  // This should be the final prompt after all variable substitutions
+  // For both MCP and non-MCP executions, use the prompt_input field directly
+  // The MCP processor now saves the actual processed prompt in this field
   let actualPromptInput = promptRun.prompt_input || '';
   
-  // If this is MCP and we have tool logs, the actual input might be in a different field
-  // or we might need to reconstruct it from the context
-  if (isMCPExecution && promptRun.toolLogs && promptRun.toolLogs.length > 0) {
-    // For MCP executions, check if we have the processed prompt in tool logs or other fields
-    const firstToolLog = promptRun.toolLogs[0];
-    if (firstToolLog && firstToolLog.input_data) {
-      try {
-        const inputData = typeof firstToolLog.input_data === 'string' 
-          ? JSON.parse(firstToolLog.input_data) 
-          : firstToolLog.input_data;
-        
-        // Look for the actual system prompt or messages that were sent
-        if (inputData.messages && Array.isArray(inputData.messages)) {
-          const systemMessage = inputData.messages.find(msg => msg.role === 'system');
-          if (systemMessage && systemMessage.content) {
-            actualPromptInput = systemMessage.content;
-          }
-        } else if (inputData.prompt) {
-          actualPromptInput = inputData.prompt;
-        }
-      } catch (e) {
-        console.error('Error parsing tool log input data:', e);
-      }
-    }
+  // Check if we still have variables (indicating the prompt wasn't properly processed)
+  const hasVariables = actualPromptInput.includes('{{') && actualPromptInput.includes('}}');
+  
+  if (hasVariables) {
+    console.warn('Prompt input still contains variables - this may indicate processing issues');
   }
   
   const toolsUsed = promptRun.toolLogs?.map(log => log.tool_name).filter((value, index, self) => 
@@ -136,6 +117,18 @@ const PromptInput: React.FC<PromptInputProps> = ({ promptRun }) => {
         {!hasContent ? (
           <div className="text-center py-8 text-muted-foreground">
             No prompt input available for this execution
+          </div>
+        ) : hasVariables ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="h-4 w-4 rounded-full bg-amber-400"></div>
+              <span className="text-sm text-amber-800 dark:text-amber-200">
+                This prompt contains unprocessed variables - showing template version
+              </span>
+            </div>
+            <div className="font-mono text-sm whitespace-pre-wrap bg-muted/30 p-4 rounded-md overflow-x-auto max-h-[50vh] overflow-y-auto">
+              {actualPromptInput}
+            </div>
           </div>
         ) : showFormatted ? (
           <div className="space-y-4">

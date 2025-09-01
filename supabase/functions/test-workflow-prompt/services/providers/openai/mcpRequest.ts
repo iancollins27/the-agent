@@ -306,6 +306,25 @@ export async function processMCPRequest(
   // Update the prompt run with the final result
   await updatePromptRunWithResult(supabase, promptRunId, finalAnswer);
 
+  // Now update the prompt_input with the actual processed prompt that was sent to the LLM
+  // This captures the enhanced system prompt with all variables substituted
+  try {
+    const { error: updateError } = await supabase
+      .from('prompt_runs')
+      .update({ 
+        prompt_input: enhancedSystemPrompt + (userPrompt ? `\n\nUser: ${userPrompt}` : '')
+      })
+      .eq('id', promptRunId);
+      
+    if (updateError) {
+      console.error('Error updating prompt_input with processed prompt:', updateError);
+    } else {
+      console.log('Successfully updated prompt_input with processed prompt');
+    }
+  } catch (error) {
+    console.error('Error updating prompt_input:', error);
+  }
+
   console.log(`Processing ${toolOutputs.length} tool outputs`);
   
   return { 
