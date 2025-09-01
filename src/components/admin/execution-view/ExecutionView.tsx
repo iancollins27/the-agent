@@ -67,7 +67,8 @@ const ExecutionView: React.FC = () => {
             next_step,
             project_track,
             Address,
-            crm_id
+            crm_id,
+            project_name
           `)
           .eq('id', promptRun.project_id)
           .single();
@@ -195,6 +196,7 @@ const ExecutionView: React.FC = () => {
               </span>
             </CardTitle>
             <CardDescription>
+              {project.project_name && `${project.project_name} • `}
               {project.Address || 'No address available'}
               {project.crm_id && ` • CRM ID: ${project.crm_id}`}
             </CardDescription>
