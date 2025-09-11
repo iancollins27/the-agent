@@ -12,6 +12,9 @@ type FilterParams = {
   onlyPendingActions: boolean;
 };
 
+// Hard-coded TPO test track ID to exclude
+const TPO_TEST_TRACK_ID = '0519c61e-6df0-4151-91e3-e4eab3fe2b4c';
+
 export const usePromptRunFilters = () => {
   const applyFilters = async ({
     data,
@@ -23,6 +26,21 @@ export const usePromptRunFilters = () => {
     onlyPendingActions
   }: FilterParams): Promise<PromptRunWithRoofer[]> => {
     let filteredData = [...data];
+
+    // Filter out TPO test track projects
+    if (filteredData.length > 0) {
+      const { data: tpoProjects, error: tpoError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_track', TPO_TEST_TRACK_ID);
+      
+      if (!tpoError && tpoProjects) {
+        const tpoProjectIds = new Set(tpoProjects.map(p => p.id));
+        filteredData = filteredData.filter(run => 
+          !run.project_id || !tpoProjectIds.has(run.project_id)
+        );
+      }
+    }
 
     // Filter by project manager if selected
     if (projectManagerFilter && filteredData.length > 0) {
