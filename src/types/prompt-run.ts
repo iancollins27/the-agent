@@ -34,4 +34,5 @@ export interface PromptRunUI {
   workflow_type?: string | null;
   error: boolean;
   toolLogsCount?: number;
+  isReminderTriggered?: boolean;
 }

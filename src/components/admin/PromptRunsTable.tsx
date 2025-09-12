@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { RotateCw, ExternalLink } from 'lucide-react';
+import { RotateCw, ExternalLink, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -12,6 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { PromptRun, workflowTitles, WorkflowType } from './types';
 import PromptRunStatusBadge from './PromptRunStatusBadge';
 import { supabase } from "@/integrations/supabase/client";
@@ -100,12 +106,26 @@ const PromptRunsTable: React.FC<PromptRunsTableProps> = ({
           <TableRow key={run.id} className={run.reviewed ? 'opacity-75' : ''}>
             <TableCell>
               <div className="flex flex-col">
-                <span className="text-sm">
-                  {new Date(run.created_at).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">
+                    {new Date(run.created_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                   {run.isReminderTriggered && (
+                     <TooltipProvider>
+                       <Tooltip>
+                         <TooltipTrigger>
+                           <Clock className="h-3 w-3 text-orange-500" />
+                         </TooltipTrigger>
+                         <TooltipContent>
+                           <p>Reminder Check</p>
+                         </TooltipContent>
+                       </Tooltip>
+                     </TooltipProvider>
+                   )}
+                </div>
                 <span className="text-xs text-muted-foreground">
                   {formatRelativeTime(run.created_at)}
                 </span>

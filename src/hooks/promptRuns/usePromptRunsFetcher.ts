@@ -58,6 +58,9 @@ export const usePromptRunsFetcher = () => {
           const projectId = run.project_id;
           const rooferContact = projectId ? rooferContactMap.get(projectId) : null;
           
+          // Check if this is a reminder-triggered run
+          const isReminderTriggered = run.prompt_input?.includes('Is Reminder Check: true') || false;
+          
           // Generate a CRM URL if we have project data
           let crmUrl = null;
           if (projectId && project && 'crm_id' in project && 'company_id' in project) {
@@ -97,7 +100,8 @@ export const usePromptRunsFetcher = () => {
             workflow_type: workflowPrompt && 'type' in workflowPrompt ? String(workflowPrompt.type) : null, // Use workflow_prompt.type instead of run.workflow_prompt_type
             error: !!run.error_message,
             relative_time: formatRelativeTime(run.created_at),
-            toolLogsCount: 0 // Default value
+            toolLogsCount: 0, // Default value
+            isReminderTriggered
           };
         });
         

@@ -76,6 +76,9 @@ export interface PromptRun {
   
   // Tool logs related data
   toolLogsCount?: number;
+  
+  // Reminder triggered flag
+  isReminderTriggered?: boolean;
 }
 
 export type WorkflowType = 

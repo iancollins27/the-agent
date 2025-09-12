@@ -29,6 +29,7 @@ export interface PromptRunWithRoofer extends Record<string, any> {
   workflow_type?: string | null;
   error?: boolean;
   toolLogsCount?: number;
+  isReminderTriggered?: boolean;
 }
 
 export interface RerunPromptResult {

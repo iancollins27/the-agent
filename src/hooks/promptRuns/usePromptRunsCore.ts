@@ -77,7 +77,8 @@ export const usePromptRunsCore = ({
           relative_time: run.relative_time || '',
           workflow_type: run.workflow_type || null,
           error: !!run.error_message,
-          toolLogsCount: run.toolLogsCount || 0
+          toolLogsCount: run.toolLogsCount || 0,
+          isReminderTriggered: run.isReminderTriggered || false
         };
       });
 
