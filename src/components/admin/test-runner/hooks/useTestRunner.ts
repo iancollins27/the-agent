@@ -50,10 +50,6 @@ export const useTestRunner = (
       // If MCP orchestrator is selected, force MCP mode on
       if (isMCPOrchestratorSelected && !useMCP) {
         setUseMCP(true);
-        toast({
-          title: "MCP Mode Enabled",
-          description: "MCP Orchestrator prompt selected, enabling MCP mode automatically."
-        });
       }
       
       // Get the available tools based on MCP mode
