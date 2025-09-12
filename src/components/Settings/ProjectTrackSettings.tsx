@@ -50,10 +50,6 @@ const ProjectTrackSettings = () => {
       if (error) throw error;
       
       setProjectTracks(data || []);
-      if (data && data.length > 0) {
-        setSelectedTrack(data[0]);
-        setExpandedTrackId(data[0].id);
-      }
     } catch (error) {
       console.error('Error loading project tracks:', error);
       toast({
