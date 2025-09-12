@@ -66,33 +66,11 @@ export async function handleRequest(supabase: any, requestBody: any) {
     throw new Error("Prompt text is required");
   }
 
-  // Fetch milestone instructions if needed for the project
-  let milestoneInstructions = null;
-  if (projectId && contextData.next_step) {
-    try {
-      const projectTrackId = contextData.track_id || null;
-      
-      // Improve logging to diagnose the issue
-      if (!projectTrackId) {
-        console.warn(`Missing track_id for milestone: ${contextData.next_step}. Cannot fetch milestone instructions.`);
-      } else {
-        console.log(`Fetching milestone instructions for step "${contextData.next_step}" with track_id: ${projectTrackId}`);
-      }
-      
-      milestoneInstructions = await getMilestoneInstructions(supabase, contextData.next_step, projectTrackId);
-      
-      if (milestoneInstructions) {
-        console.log(`Found milestone instructions for step "${contextData.next_step}". Length: ${milestoneInstructions.length} chars`);
-        // Add milestone instructions to context data
-        contextData.milestone_instructions = milestoneInstructions;
-      } else {
-        console.log(`No milestone instructions found for step "${contextData.next_step}" with track_id: ${projectTrackId}`);
-        contextData.milestone_instructions = "No specific instructions available for this milestone.";
-      }
-    } catch (milestoneError) {
-      console.error("Error fetching milestone instructions:", milestoneError);
-      contextData.milestone_instructions = "Error retrieving milestone instructions.";
-    }
+  // Debug milestone instructions from context data
+  if (contextData.milestone_instructions) {
+    console.log(`Found milestone instructions from context: "${contextData.milestone_instructions.substring(0, 100)}..."`);
+  } else {
+    console.log(`No milestone instructions in context data for step: ${contextData.next_step}`);
   }
   
   // Store the original prompt text for MCP

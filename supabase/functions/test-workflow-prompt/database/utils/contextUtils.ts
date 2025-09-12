@@ -65,18 +65,27 @@ export async function prepareContextData(
     }
     
     // Get milestone instructions if this is a next step
-    let milestoneInstructions = "";
+    let milestoneInstructions = "No specific milestone instructions available.";
     if (projectData.next_step && projectData.project_track) {
-      const { data: milestoneData } = await supabase
+      console.log(`[DEBUG] ContextUtils: Fetching milestone instructions for step "${projectData.next_step}" with track_id: ${projectData.project_track}`);
+      
+      const { data: milestoneData, error: milestoneError } = await supabase
         .from('project_track_milestones')
         .select('prompt_instructions')
         .eq('track_id', projectData.project_track)
         .eq('step_title', projectData.next_step)
         .maybeSingle();
         
-      if (milestoneData) {
-        milestoneInstructions = milestoneData.prompt_instructions || '';
+      if (milestoneError) {
+        console.error(`[DEBUG] ContextUtils: Error fetching milestone instructions:`, milestoneError);
+      } else if (milestoneData && milestoneData.prompt_instructions) {
+        milestoneInstructions = milestoneData.prompt_instructions;
+        console.log(`[DEBUG] ContextUtils: Found milestone instructions (${milestoneInstructions.length} chars): ${milestoneInstructions.substring(0, 100)}...`);
+      } else {
+        console.log(`[DEBUG] ContextUtils: No milestone instructions found for step "${projectData.next_step}" with track_id: ${projectData.project_track}`);
       }
+    } else {
+      console.log(`[DEBUG] ContextUtils: Missing next_step (${projectData.next_step}) or project_track (${projectData.project_track}) for milestone lookup`);
     }
     
     // Prepare context data
