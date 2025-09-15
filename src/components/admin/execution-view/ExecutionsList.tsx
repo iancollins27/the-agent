@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PromptRun } from '@/components/admin/types';
 import { supabase } from '@/integrations/supabase/client';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { Loader2, Search, Filter, RefreshCw } from 'lucide-react';
 import { 
@@ -36,12 +36,27 @@ import { Badge } from '@/components/ui/badge';
 import { useDebounce } from '@/hooks/use-debounce';
 
 const ExecutionsList: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Initialize state from URL params or defaults
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = searchParams.get('page');
+    return page ? parseInt(page, 10) : 1;
+  });
+  const [pageSize, setPageSize] = useState(() => {
+    const size = searchParams.get('size');
+    return size ? parseInt(size, 10) : 10;
+  });
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [hasToolCalls, setHasToolCalls] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(() => {
+    return searchParams.get('status') || null;
+  });
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return searchParams.get('search') || '';
+  });
+  const [hasToolCalls, setHasToolCalls] = useState(() => {
+    return searchParams.get('toolCalls') === 'true';
+  });
 
   // Debounce search term to avoid too many queries
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -164,23 +179,48 @@ const ExecutionsList: React.FC = () => {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  // Function to update URL params
+  const updateURLParams = (updates: Partial<{
+    page: number;
+    size: number;
+    status: string | null;
+    search: string;
+    toolCalls: boolean;
+  }>) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === '' || (key === 'toolCalls' && !value)) {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, String(value));
+      }
+    });
+    
+    setSearchParams(newParams);
+  };
+
   // Handle filter changes
   const handleFilterChange = (value: string) => {
-    setStatusFilter(value === 'all' ? null : value);
-    setCurrentPage(1); // Reset to first page when filter changes
+    const newStatus = value === 'all' ? null : value;
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+    updateURLParams({ status: newStatus, page: 1 });
   };
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
+    const newSearchTerm = e.target.value;
+    setSearchTerm(newSearchTerm);
+    setCurrentPage(1);
+    updateURLParams({ search: newSearchTerm, page: 1 });
   };
 
   // Handle search form submission (for explicit search button)
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page when searching
-    // The debounced search term will trigger the query automatically
+    setCurrentPage(1);
+    updateURLParams({ search: searchTerm, page: 1 });
   };
 
   // Handle Enter key in search input
@@ -188,7 +228,7 @@ const ExecutionsList: React.FC = () => {
     if (e.key === 'Enter') {
       e.preventDefault();
       setCurrentPage(1);
-      // Force immediate search by updating the debounced term
+      updateURLParams({ search: searchTerm, page: 1 });
     }
   };
 
@@ -196,13 +236,15 @@ const ExecutionsList: React.FC = () => {
   const handlePageChange = (page: number) => {
     if (page > 0 && page <= totalPages) {
       setCurrentPage(page);
+      updateURLParams({ page });
     }
   };
 
   // Handle page size changes
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize);
-    setCurrentPage(1); // Reset to first page when changing page size
+    setCurrentPage(1);
+    updateURLParams({ size: newPageSize, page: 1 });
   };
 
   // Format the status for display
@@ -277,10 +319,15 @@ const ExecutionsList: React.FC = () => {
           </div>
           
           {/* Tool Calls Filter */}
-          <div>
+           <div>
             <Button 
               variant={hasToolCalls ? "default" : "outline"} 
-              onClick={() => setHasToolCalls(!hasToolCalls)}
+              onClick={() => {
+                const newHasToolCalls = !hasToolCalls;
+                setHasToolCalls(newHasToolCalls);
+                setCurrentPage(1);
+                updateURLParams({ toolCalls: newHasToolCalls, page: 1 });
+              }}
               size="sm"
               className="gap-2"
             >
@@ -353,9 +400,13 @@ const ExecutionsList: React.FC = () => {
                             <span className="text-muted-foreground">None</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
+                         <TableCell className="text-right">
                           <Button asChild variant="ghost" size="sm">
-                            <Link to={`/admin/executions/${execution.id}`}>View Details</Link>
+                            <Link 
+                              to={`/admin/executions/${execution.id}?${searchParams.toString()}`}
+                            >
+                              View Details
+                            </Link>
                           </Button>
                         </TableCell>
                       </TableRow>
