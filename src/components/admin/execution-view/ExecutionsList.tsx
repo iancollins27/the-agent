@@ -29,15 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import TablePagination from '@/components/admin/tables/TablePagination';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +37,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 
 const ExecutionsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,46 +199,10 @@ const ExecutionsList: React.FC = () => {
     }
   };
 
-  // Calculate page links to display
-  const getPageLinks = () => {
-    const pageLinks = [];
-    const maxPagesToShow = 5;
-    
-    // Always show first page
-    pageLinks.push(1);
-    
-    // Calculate start and end of page range around current page
-    let startPage = Math.max(2, currentPage - 1);
-    let endPage = Math.min(totalPages - 1, currentPage + 1);
-    
-    // Adjust if we're near the start or end
-    if (currentPage <= 3) {
-      endPage = Math.min(totalPages - 1, maxPagesToShow - 1);
-    } else if (currentPage >= totalPages - 2) {
-      startPage = Math.max(2, totalPages - maxPagesToShow + 2);
-    }
-    
-    // Add ellipsis after first page if needed
-    if (startPage > 2) {
-      pageLinks.push('ellipsis1');
-    }
-    
-    // Add pages in the middle
-    for (let i = startPage; i <= endPage; i++) {
-      pageLinks.push(i);
-    }
-    
-    // Add ellipsis before last page if needed
-    if (endPage < totalPages - 1) {
-      pageLinks.push('ellipsis2');
-    }
-    
-    // Always show last page if there's more than one page
-    if (totalPages > 1) {
-      pageLinks.push(totalPages);
-    }
-    
-    return pageLinks;
+  // Handle page size changes
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
   };
 
   // Format the status for display
@@ -420,40 +376,14 @@ const ExecutionsList: React.FC = () => {
               </Table>
             </CardContent>
             <CardFooter>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-accent'}
-                    />
-                  </PaginationItem>
-                  
-                  {getPageLinks().map((page, i) => (
-                    page === 'ellipsis1' || page === 'ellipsis2' ? (
-                      <PaginationItem key={`ellipsis-${i}`}>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    ) : (
-                      <PaginationItem key={`page-${page}`}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(page as number)}
-                          isActive={currentPage === page}
-                        >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    )
-                  ))}
-                  
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => handlePageChange(currentPage + 1)} 
-                      className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-accent'}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                onPageSizeChange={handlePageSizeChange}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
             </CardFooter>
           </Card>
         </>
