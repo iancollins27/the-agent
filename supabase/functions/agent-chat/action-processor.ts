@@ -4,6 +4,41 @@
  * Extracts and processes action requests from AI responses
  */
 
+/**
+ * Checks if a project meets the activation criteria for reminder actions
+ * @param recordRec The project record from CRM
+ * @returns Boolean indicating if the project meets activation criteria
+ */
+function checkActivationCriteria(recordRec: any): boolean {
+  if (!recordRec) {
+    return false;
+  }
+  
+  // Check entry criteria
+  let entryCheck = false;
+  if (
+    recordRec.Contract_Signed != null && 
+    recordRec.Roof_Install_Finalized == null && 
+    recordRec.Test_Record === false
+  ) {
+    entryCheck = true;
+  }
+
+  // Check status criteria
+  let statusCheck = false;
+  if (
+    recordRec.Status !== "Archived" && 
+    recordRec.Status !== "VOID" && 
+    recordRec.Status !== "Cancelled" && 
+    recordRec.Status !== "Canceled"
+  ) {
+    statusCheck = true;
+  }
+
+  // Both criteria must be met
+  return entryCheck && statusCheck;
+}
+
 export async function processActionRequest(
   supabase: any,
   finalAnswer: string,
@@ -113,29 +148,86 @@ export async function processActionRequest(
       }
     } 
     else if (actionData.action_type === "set_future_reminder" && actionData.days_until_check) {
-      const { data: actionRecord, error: actionError } = await supabase
-        .from('action_records')
-        .insert({
-          project_id: projectData.id,
-          action_type: 'set_future_reminder',
-          action_payload: {
-            days_until_check: actionData.days_until_check,
-            check_reason: actionData.check_reason || 'Follow-up check',
-            description: actionData.description || `Check project in ${actionData.days_until_check} days`
-          },
-          requires_approval: true,
-          status: 'pending'
-        })
-        .select()
-        .single();
+      // Check if we need to verify activation criteria
+      let shouldCreateReminder = true;
       
-      if (actionError) {
-        console.error('Error creating reminder action record:', actionError);
+      // If project data has CRM fields, check activation criteria
+      if (projectData.crm_data) {
+        shouldCreateReminder = checkActivationCriteria(projectData.crm_data);
+        if (!shouldCreateReminder) {
+          console.log(`Project ${projectData.id} does not meet activation criteria for reminder action.`);
+        }
       } else {
-        actionRecordId = actionRecord.id;
-        console.log('Created reminder action record:', actionRecord);
+        // Try to fetch CRM data to check activation criteria
+        try {
+          const { data: project } = await supabase
+            .from('projects')
+            .select('crm_id')
+            .eq('id', projectData.id)
+            .single();
+            
+          if (project?.crm_id) {
+            // We have a CRM ID, let's try to get the data
+            const { data: crmResponse } = await supabase.functions.invoke(
+              'agent-chat',
+              {
+                body: {
+                  tool: 'read_crm_data',
+                  args: {
+                    crm_id: project.crm_id,
+                    entity_type: 'project'
+                  },
+                  context: {
+                    project_id: projectData.id
+                  }
+                }
+              }
+            );
+            
+            if (crmResponse?.data) {
+              shouldCreateReminder = checkActivationCriteria(crmResponse.data);
+              if (!shouldCreateReminder) {
+                console.log(`Project ${projectData.id} does not meet activation criteria based on CRM data.`);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`Could not check activation criteria for project ${projectData.id}: ${error.message}`);
+          // Continue with reminder creation as a fallback
+          shouldCreateReminder = true;
+        }
+      }
+      
+      // Only create the reminder if activation criteria are met
+      if (shouldCreateReminder) {
+        const { data: actionRecord, error: actionError } = await supabase
+          .from('action_records')
+          .insert({
+            project_id: projectData.id,
+            action_type: 'set_future_reminder',
+            action_payload: {
+              days_until_check: actionData.days_until_check,
+              check_reason: actionData.check_reason || 'Follow-up check',
+              description: actionData.description || `Check project in ${actionData.days_until_check} days`
+            },
+            requires_approval: true,
+            status: 'pending'
+          })
+          .select()
+          .single();
         
+        if (actionError) {
+          console.error('Error creating reminder action record:', actionError);
+        } else {
+          actionRecordId = actionRecord.id;
+          console.log('Created reminder action record:', actionRecord);
+          
+          finalAnswer = finalAnswer.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+        }
+      } else {
+        console.log('Skipping reminder action creation due to activation criteria not being met.');
         finalAnswer = finalAnswer.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
+        finalAnswer += '\n\n**Note:** The reminder action was not created because the project does not meet the activation criteria.';
       }
     }
   } catch (parseError) {

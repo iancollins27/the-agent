@@ -2,6 +2,61 @@
 /**
  * Create action record tool for agent-chat
  */
+
+/**
+ * Checks if a project meets the activation criteria for reminder actions
+ * @param recordRec The project record from CRM
+ * @returns Object with result and reason
+ */
+function checkActivationCriteria(recordRec: any): { 
+  meetsActivationCriteria: boolean; 
+  reason?: string 
+} {
+  if (!recordRec) {
+    return { 
+      meetsActivationCriteria: false, 
+      reason: "No project data provided" 
+    };
+  }
+
+  // Check entry criteria
+  let entryCheck = false;
+  if (
+    recordRec.Contract_Signed != null && 
+    recordRec.Roof_Install_Finalized == null && 
+    recordRec.Test_Record === false
+  ) {
+    entryCheck = true;
+  }
+
+  // Check status criteria
+  let statusCheck = false;
+  if (
+    recordRec.Status !== "Archived" && 
+    recordRec.Status !== "VOID" && 
+    recordRec.Status !== "Cancelled" && 
+    recordRec.Status !== "Canceled"
+  ) {
+    statusCheck = true;
+  }
+
+  // Both criteria must be met
+  const meetsActivationCriteria = entryCheck && statusCheck;
+
+  // Return result with reason if criteria not met
+  if (!meetsActivationCriteria) {
+    let reason = "";
+    if (!entryCheck) {
+      reason = "Project does not meet entry criteria: Contract signed, roof install not finalized, and not a test record";
+    } else if (!statusCheck) {
+      reason = `Project status '${recordRec.Status}' is not eligible for reminders`;
+    }
+    
+    return { meetsActivationCriteria, reason };
+  }
+
+  return { meetsActivationCriteria: true };
+}
 import { Tool, ToolContext, ToolResult } from '../types.ts';
 
 // Schema for create_action_record
@@ -303,6 +358,63 @@ async function execute(args: any, context: ToolContext): Promise<ToolResult> {
         description: `Set reminder to check in ${daysUntilCheck} days: ${args.check_reason || actionPayload.check_reason || 'Follow-up check'}`,
         reminder_description: `Reminder set for ${daysUntilCheck} day${daysUntilCheck === 1 ? '' : 's'} from now`
       };
+      
+      // Check activation criteria for reminder actions if project_data is provided
+      if (args.project_data) {
+        const { meetsActivationCriteria, reason } = checkActivationCriteria(args.project_data);
+        if (!meetsActivationCriteria) {
+          console.log(`Project ${projectId} does not meet activation criteria: ${reason}`);
+          return {
+            status: "error",
+            error: reason || "Does not meet activation criteria",
+            message: `Reminder not set: ${reason}`
+          };
+        }
+      } else if (projectId) {
+        // If no project data provided but we have a project ID, try to fetch from CRM
+        try {
+          // Get CRM ID for this project
+          const { data: projectData, error: projectError } = await supabase
+            .from('projects')
+            .select('crm_id')
+            .eq('id', projectId)
+            .single();
+            
+          if (!projectError && projectData?.crm_id) {
+            // Call the CRM to get project details
+            const { data: crmResponse } = await supabase.functions.invoke(
+              'agent-chat',
+              {
+                body: {
+                  tool: 'read_crm_data',
+                  args: {
+                    crm_id: projectData.crm_id,
+                    entity_type: 'project'
+                  },
+                  context: {
+                    project_id: projectId
+                  }
+                }
+              }
+            );
+            
+            if (crmResponse?.data) {
+              const { meetsActivationCriteria, reason } = checkActivationCriteria(crmResponse.data);
+              if (!meetsActivationCriteria) {
+                console.log(`Project ${projectId} does not meet activation criteria: ${reason}`);
+                return {
+                  status: "error",
+                  error: reason || "Does not meet activation criteria",
+                  message: `Reminder not set: ${reason}`
+                };
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(`Could not check activation criteria for project ${projectId}: ${error.message}`);
+          // Continue with reminder creation as a fallback
+        }
+      }
     }
 
     // Prepare the action record data
