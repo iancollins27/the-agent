@@ -176,11 +176,11 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  model: 'gpt-4o',
+                  model: 'gpt-5-2025-08-07',
                   messages: openAIMessages,
                   tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
                   tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
-                  temperature: 0.7
+                  max_completion_tokens: 2000
                 })
               })
 
@@ -407,11 +407,11 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5-2025-08-07',
         messages: openAIMessages,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
         tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
-        temperature: 0.7
+        max_completion_tokens: 2000
       })
     })
 

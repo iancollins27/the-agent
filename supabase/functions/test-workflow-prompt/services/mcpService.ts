@@ -65,6 +65,11 @@ export async function executeMCPRequest(
         contextData
       );
 
+      // Only OpenAI provider is supported
+      if (aiProvider.toLowerCase() !== 'openai') {
+        throw new Error(`Only OpenAI provider is supported, received: ${aiProvider}`);
+      }
+      
       // Execute the OpenAI MCP request
       result = await processOpenAIRequest(
         enhancedSystemPrompt,
@@ -75,17 +80,8 @@ export async function executeMCPRequest(
         true, // Use MCP
         contextData
       );
-    } else if (aiProvider.toLowerCase() === 'claude') {
-      const { processClaudeRequest } = await import("./providers/claudeProvider.ts");
-      result = await processClaudeRequest(
-        "", // Claude doesn't use the MCP protocol yet
-        aiModel,
-        supabase,
-        promptRunId,
-        projectId
-      );
     } else {
-      throw new Error(`Unsupported AI provider for MCP: ${aiProvider}`);
+      throw new Error(`Only OpenAI provider is supported, received: ${aiProvider}`);
     }
 
     return result;

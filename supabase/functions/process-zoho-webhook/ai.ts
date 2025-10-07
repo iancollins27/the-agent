@@ -176,7 +176,7 @@ export async function generateSummary(
   }
 }
 
-async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-4o') {
+async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-5-2025-08-07') {
   console.log(`Making OpenAI API request with model: ${model}`);
   
   try {
@@ -194,8 +194,7 @@ async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-4
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 1500
+        max_completion_tokens: 1500
       })
     });
 

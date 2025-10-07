@@ -223,26 +223,9 @@ serve(async (req) => {
           available_tools: ['create_action_record', 'knowledge_base_lookup']
         };
         
-        // Get AI configuration
-        const { data: aiConfig, error: aiConfigError } = await supabase
-          .from('ai_config')
-          .select('provider, model')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-          
-        if (aiConfigError) {
-          console.error(`Error fetching AI config for project ${project.id}:`, aiConfigError);
-          results.push({
-            project_id: project.id,
-            success: false,
-            error: "Failed to fetch AI configuration"
-          });
-          continue;
-        }
-        
-        const aiProvider = aiConfig?.provider || 'openai';
-        const aiModel = aiConfig?.model || 'gpt-4o';
+        // Hardcode GPT-5 configuration
+        const aiProvider = 'openai';
+        const aiModel = 'gpt-5-2025-08-07';
         
         console.log(`Using MCP workflow for project ${project.id} with ${aiProvider} ${aiModel}`);
         console.log(`Invoking test-workflow-prompt with internal service call flag`);

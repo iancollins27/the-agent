@@ -387,7 +387,7 @@ async function handlePromptRequest(
     const openAiBody = {
       model: aiModel,
       messages: [{ role: "user", content: fullPrompt }],
-      temperature: 0.7,
+      max_completion_tokens: 2000,
     };
 
     const openAiResponse = await fetch(openAiUrl, {

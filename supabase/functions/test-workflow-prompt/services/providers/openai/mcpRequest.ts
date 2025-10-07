@@ -134,7 +134,7 @@ export async function processMCPRequest(
       const payload = {
         model: model,
         messages: context.messages,
-        temperature: 0.7
+        max_completion_tokens: 2000
       };
       
       if (context.tools && context.tools.length > 0) {

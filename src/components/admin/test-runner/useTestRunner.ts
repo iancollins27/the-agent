@@ -55,16 +55,9 @@ export const useTestRunner = (
       const { data: userData } = await supabase.auth.getUser();
       const userEmail = userData?.user?.email || 'unknown';
       
-      // Get AI configuration
-      const { data: aiConfig, error: aiConfigError } = await supabase
-        .from('ai_config')
-        .select('provider, model')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-        
-      const aiProvider = aiConfig?.provider || 'openai';
-      const aiModel = aiConfig?.model || 'gpt-4o';
+      // Hardcode GPT-5 configuration
+      const aiProvider = 'openai';
+      const aiModel = 'gpt-5-2025-08-07';
       
       // Check if any selected prompt is an MCP orchestrator
       const isMCPOrchestratorSelected = await hasMCPOrchestrator(selectedPromptIds);

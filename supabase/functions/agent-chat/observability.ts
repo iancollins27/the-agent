@@ -129,12 +129,13 @@ export async function logPromptCompletion(
 
 export function calculateOpenAICost(model: string, tokens: { prompt: number, completion: number }): number {
   const rates: Record<string, { prompt: number, completion: number }> = {
+    'gpt-5-2025-08-07': { prompt: 0.00003, completion: 0.00006 },
+    'gpt-5-mini-2025-08-07': { prompt: 0.00001, completion: 0.00003 },
+    'gpt-5-nano-2025-08-07': { prompt: 0.000005, completion: 0.000015 },
     'gpt-4o': { prompt: 0.000005, completion: 0.000015 },
-    'gpt-4o-mini': { prompt: 0.000001, completion: 0.000005 },
-    'gpt-4': { prompt: 0.00003, completion: 0.00006 },
-    'gpt-3.5-turbo': { prompt: 0.0000005, completion: 0.0000015 }
+    'gpt-4o-mini': { prompt: 0.000001, completion: 0.000005 }
   };
   
-  const rate = rates[model] || rates['gpt-4o-mini'];
+  const rate = rates[model] || rates['gpt-5-2025-08-07'];
   return (tokens.prompt * rate.prompt) + (tokens.completion * rate.completion);
 }

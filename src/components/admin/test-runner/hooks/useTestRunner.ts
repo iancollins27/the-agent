@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useMCPTools } from "./useMCPTools";
 import { useContextData } from "./useContextData";
-import { useAIConfig } from "./useAIConfig";
 import { testRunnerService } from "../services/testRunnerService";
 import { ProjectTestResult, TestRunnerHook } from "../types";
 
@@ -21,7 +20,6 @@ export const useTestRunner = (
   // Use our extracted hooks
   const { useMCP, setUseMCP, hasMCPOrchestrator, getAvailableTools } = useMCPTools();
   const { prepareContextData } = useContextData();
-  const { getAIConfig } = useAIConfig();
   
   const runTest = async () => {
     if (selectedPromptIds.length === 0 || selectedProjectIds.length === 0) {
@@ -41,8 +39,9 @@ export const useTestRunner = (
       const { data: userData } = await supabase.auth.getUser();
       const userEmail = userData?.user?.email || 'unknown';
       
-      // Get AI configuration
-      const { aiProvider, aiModel } = await getAIConfig();
+      // Hardcode GPT-5 configuration
+      const aiProvider = 'openai';
+      const aiModel = 'gpt-5-2025-08-07';
       
       // Check if any selected prompt is an MCP orchestrator
       const isMCPOrchestratorSelected = await hasMCPOrchestrator(selectedPromptIds);

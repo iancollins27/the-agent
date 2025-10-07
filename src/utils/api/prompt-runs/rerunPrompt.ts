@@ -59,17 +59,11 @@ export const rerunPrompt = async (promptRunId: string): Promise<RerunPromptResul
       };
     }
 
-    // Step 3: Get the latest AI configuration from company settings
-    const { data: aiConfig, error: configError } = await supabase
-      .from('ai_config')
-      .select('provider, model')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (configError) {
-      console.warn("Could not fetch AI configuration, using default values:", configError);
-    }
+    // Hardcode GPT-5 configuration
+    const aiConfig = {
+      provider: 'openai',
+      model: 'gpt-5-2025-08-07'
+    };
 
     // Step 4: Call the test-workflow-prompt edge function with the original parameters
     const promptType = workflowType;

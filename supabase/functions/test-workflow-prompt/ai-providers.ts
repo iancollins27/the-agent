@@ -1,15 +1,15 @@
 
 import { callOpenAI, callOpenAIWithMCP } from "./services/providers/openAIProvider.ts";
-import { callClaude, callClaudeWithMCP } from "./services/providers/claudeProvider.ts";
 
 /**
  * Cost per 1k tokens for different models (in USD)
  */
 const MODEL_COSTS = {
+  'gpt-5-2025-08-07': { prompt: 0.03, completion: 0.06 },
+  'gpt-5-mini-2025-08-07': { prompt: 0.01, completion: 0.03 },
+  'gpt-5-nano-2025-08-07': { prompt: 0.005, completion: 0.015 },
   'gpt-4o': { prompt: 0.03, completion: 0.06 },
-  'gpt-4o-mini': { prompt: 0.01, completion: 0.03 },
-  'claude-3-haiku-20240307': { prompt: 0.0025, completion: 0.0025 },
-  'claude-3-5-haiku-20241022': { prompt: 0.0025, completion: 0.0025 }
+  'gpt-4o-mini': { prompt: 0.01, completion: 0.03 }
 };
 
 export function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
@@ -23,14 +23,11 @@ export function calculateCost(model: string, promptTokens: number, completionTok
 export async function callAIProvider(aiProvider: string, aiModel: string, prompt: string): Promise<string> {
   console.log(`Calling ${aiProvider} with model ${aiModel}`);
   
-  switch (aiProvider) {
-    case "openai":
-      return await callOpenAI(prompt, aiModel);
-    case "claude":
-      return await callClaude(prompt, aiModel);
-    default:
-      throw new Error(`Unknown AI provider: ${aiProvider}`);
+  if (aiProvider !== "openai") {
+    throw new Error(`Only OpenAI provider is supported, received: ${aiProvider}`);
   }
+  
+  return await callOpenAI(prompt, aiModel);
 }
 
 export async function callAIProviderWithMCP(
@@ -40,12 +37,9 @@ export async function callAIProviderWithMCP(
 ): Promise<any> {
   console.log(`Calling ${aiProvider} with MCP, using model ${aiModel}`);
   
-  switch (aiProvider) {
-    case "openai":
-      return await callOpenAIWithMCP(mcpContext, aiModel);
-    case "claude":
-      return await callClaudeWithMCP(mcpContext, aiModel);
-    default:
-      throw new Error(`MCP not supported for provider: ${aiProvider}`);
+  if (aiProvider !== "openai") {
+    throw new Error(`Only OpenAI provider is supported for MCP, received: ${aiProvider}`);
   }
+  
+  return await callOpenAIWithMCP(mcpContext, aiModel);
 }

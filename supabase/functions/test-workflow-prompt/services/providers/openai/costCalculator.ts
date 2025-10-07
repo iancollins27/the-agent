@@ -7,22 +7,21 @@ export function calculateCost(model: string, usage: any): number {
   let completionCost = 0;
 
   switch (model) {
-    case "gpt-4o":
-      promptCost = (promptTokens / 1000) * 0.01;
-      completionCost = (completionTokens / 1000) * 0.03;
-      break;
-    case "gpt-4-32k":
-      promptCost = (promptTokens / 1000) * 0.06;
-      completionCost = (completionTokens / 1000) * 0.12;
-      break;
-    case "gpt-4":
+    case "gpt-5-2025-08-07":
       promptCost = (promptTokens / 1000) * 0.03;
       completionCost = (completionTokens / 1000) * 0.06;
       break;
-    case "gpt-3.5-turbo-16k":
-    case "gpt-3.5-turbo":
-      promptCost = (promptTokens / 1000) * 0.001;
-      completionCost = (completionTokens / 1000) * 0.002;
+    case "gpt-5-mini-2025-08-07":
+      promptCost = (promptTokens / 1000) * 0.01;
+      completionCost = (completionTokens / 1000) * 0.03;
+      break;
+    case "gpt-5-nano-2025-08-07":
+      promptCost = (promptTokens / 1000) * 0.005;
+      completionCost = (completionTokens / 1000) * 0.015;
+      break;
+    case "gpt-4o":
+      promptCost = (promptTokens / 1000) * 0.01;
+      completionCost = (completionTokens / 1000) * 0.03;
       break;
     default:
       console.warn(`Unknown model for cost calculation: ${model}`);

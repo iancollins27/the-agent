@@ -27,7 +27,7 @@ export async function processStandardRequest(
       body: JSON.stringify({
         model: model,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
+        max_completion_tokens: 2000,
       }),
     });
 

@@ -93,16 +93,9 @@ export async function processMultiProjectCommunication(supabase: any, communicat
       `;
     }
     
-    // Get AI configuration
-    const { data: aiConfig, error: aiConfigError } = await supabase
-      .from('ai_config')
-      .select('provider, model')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-      
-    const aiProvider = aiConfig?.provider || 'openai';
-    const aiModel = aiConfig?.model || 'gpt-4o';
+    // Hardcode GPT-5 configuration
+    const aiProvider = 'openai';
+    const aiModel = 'gpt-5-2025-08-07';
     
     // If we have a dedicated multi-project analysis prompt, use it
     if (multiProjectPrompt) {
