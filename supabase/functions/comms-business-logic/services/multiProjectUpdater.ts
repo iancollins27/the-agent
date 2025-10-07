@@ -1,6 +1,5 @@
 
 import { formatCommunicationData } from "../utils/communicationFormatter.ts";
-import { getAIConfiguration } from "./aiService.ts";
 import { getLatestWorkflowPrompt } from "./workflowPromptService.ts";
 
 /**
@@ -47,11 +46,10 @@ export async function updateProjectWithSpecificInfo(
       return;
     }
     
-    // If AI provider and model weren't provided, get them
+    // If AI provider and model weren't provided, use defaults
     if (!aiProvider || !aiModel) {
-      const aiConfig = await getAIConfiguration(supabase);
-      aiProvider = aiConfig.provider;
-      aiModel = aiConfig.model;
+      aiProvider = 'openai';
+      aiModel = 'gpt-5-2025-08-07';
     }
     
     // Create a formatted communication object with the relevant content
