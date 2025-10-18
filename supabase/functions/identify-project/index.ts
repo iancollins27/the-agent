@@ -381,10 +381,6 @@ async function identifyProject(
           project_id: projects[0].id
         };
       }
-      }
-    } else {
-      console.log(`Vector search skipped - no company ID provided for security context`);
-    }
     
     // Return the final result
     if (projects.length > 0) {
