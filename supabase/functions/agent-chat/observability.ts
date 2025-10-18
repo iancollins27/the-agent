@@ -55,7 +55,6 @@ export async function logObservability(params: LogObservabilityParams): Promise<
     // Create a prompt run record for observability
     const promptRunData = {
       project_id: projectId,
-      contact_id: userProfile?.id,
       model: model,
       prompt_input: JSON.stringify({
         messages: messages,
