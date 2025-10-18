@@ -381,7 +381,7 @@ async function identifyProject(
           project_id: projects[0].id
         };
       }
-    
+    }
     // Return the final result
     if (projects.length > 0) {
       // Fetch contacts for the first project
