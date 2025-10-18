@@ -43,6 +43,42 @@ export async function processToolCalls(
     processedToolCallIds.add(call.id); // Mark as processed
   
     try {
+      // GUARD: Skip identify_project if we already have projectId in context
+      if (call.name === 'identify_project' && context.projectId) {
+        console.log(`Skipping identify_project - project already identified: ${context.projectId}`);
+        
+        // Return the existing project data
+        const knownProjectResult = {
+          status: "success",
+          projects: context.projectData ? [context.projectData] : [],
+          project_id: context.projectId,
+          message: "Project already identified"
+        };
+        
+        // Add tool message to context
+        context.messages.push({
+          role: 'assistant',
+          content: null,
+          tool_calls: [{
+            id: call.id,
+            type: 'function',
+            function: {
+              name: call.name,
+              arguments: JSON.stringify(call.arguments)
+            }
+          }]
+        });
+        
+        // Add the result
+        context.messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: JSON.stringify(knownProjectResult)
+        });
+        
+        continue; // Skip to next tool call
+      }
+      
       // Log detailed information about the arguments
       if (call.name === 'identify_project') {
         console.log(`identify_project query: "${call.arguments.query}", type: ${call.arguments.type || 'any'}, enforcing company filter: ${companyId || 'none'}`);

@@ -55,7 +55,8 @@ export async function logObservability(params: LogObservabilityParams): Promise<
     // Create a prompt run record for observability
     const promptRunData = {
       project_id: projectId,
-      model: model,
+      ai_model: model,
+      ai_provider: 'openai',
       prompt_input: JSON.stringify({
         messages: messages,
         model: model,
@@ -66,8 +67,6 @@ export async function logObservability(params: LogObservabilityParams): Promise<
       prompt_tokens: metrics.promptTokens,
       completion_tokens: metrics.completionTokens,
       usd_cost: metrics.cost,
-      tool_calls: metrics.toolCalls,
-      created_at: new Date().toISOString(),
       completed_at: new Date().toISOString()
     };
 
@@ -84,9 +83,9 @@ export async function logObservability(params: LogObservabilityParams): Promise<
 
     // Log tool usage if any tools were called
     if (toolCalls && toolCalls.length > 0) {
-      console.log(`Logged conversation with ${toolCalls.length} tool calls, ${metrics.totalTokens} tokens, cost: $${metrics.cost?.toFixed(4) || '0.0000'}`);
+      console.log(`Logged conversation with ${toolCalls.length} tool calls, ${metrics.totalTokens || 0} tokens, cost: $${metrics.cost?.toFixed(4) || '0.0000'}`);
     } else {
-      console.log(`Logged conversation with ${metrics.totalTokens} tokens, cost: $${metrics.cost?.toFixed(4) || '0.0000'}`);
+      console.log(`Logged conversation with ${metrics.totalTokens || 0} tokens, cost: $${metrics.cost?.toFixed(4) || '0.0000'}`);
     }
 
   } catch (error) {

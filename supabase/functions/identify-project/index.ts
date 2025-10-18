@@ -338,72 +338,49 @@ async function identifyProject(
       
       console.log(`Vector search parameters: ${JSON.stringify(vectorSearchBody)}`);
       
-      // Use the vector search edge function
-      const vectorSearchResponse = await supabase.functions.invoke('search-projects-by-vector', {
-        body: vectorSearchBody
+      // Call the Postgres RPC function directly instead of edge function to avoid JWT issues
+      const { data: vectorProjects, error: rpcError } = await supabase.rpc('search_projects_by_vector', {
+        search_embedding: embedding,
+        match_threshold: 0.2,
+        match_count: 3,
+        p_company_id: companyId
       });
       
-      if (vectorSearchResponse.error) {
-        console.error('Vector search error:', vectorSearchResponse.error);
+      if (rpcError) {
+        console.error('Vector search RPC error:', rpcError);
         return {
           status: "error",
-          error: `Vector search failed: ${vectorSearchResponse.error.message}`
+          error: `Vector search failed: ${rpcError.message}`
         };
       }
       
       // Log vector search details
-      console.log(`Vector search status: ${vectorSearchResponse.data?.status}`);
-      console.log(`Vector search found: ${vectorSearchResponse.data?.projects?.length > 0}`);
-      console.log(`Vector search count: ${vectorSearchResponse.data?.projects?.length}`);
+      console.log(`Vector search RPC found: ${vectorProjects?.length || 0} projects`);
       
-      if (vectorSearchResponse.data?.status === 'success' && 
-          vectorSearchResponse.data?.projects?.length > 0) {
+      if (vectorProjects && vectorProjects.length > 0) {
+        // Combine with any previously found projects, ensuring no duplicates
+        const existingIds = new Set(projects.map(p => p.id));
+        const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
+        projects = [...projects, ...newProjects];
         
-        // Get the full project details for the top matching projects
-        const projectIds = vectorSearchResponse.data.projects
-          .slice(0, 3) // Limit to top 3 matches
-          .map(p => p.id);
+        console.log(`Found ${vectorProjects.length} projects via vector search`);
         
-        // Add company filter if available
-        let projectQuery = supabase
-          .from('projects')
-          .select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
-          .in('id', projectIds);
-          
-        if (companyId) {
-          projectQuery = projectQuery.eq('company_id', companyId);
+        // Make sure we have only 3 projects total
+        if (projects.length > 3) {
+          projects = projects.slice(0, 3);
         }
         
-        const { data: vectorProjects, error } = await projectQuery;
+        // Fetch contacts for the first project
+        projectContacts = await fetchProjectContacts(projects[0].id);
         
-        if (error) {
-          console.error(`Error fetching full project details: ${error.message}`);
-        }
-        
-        if (vectorProjects && vectorProjects.length > 0) {
-          // Combine with any previously found projects, ensuring no duplicates
-          const existingIds = new Set(projects.map(p => p.id));
-          const newProjects = vectorProjects.filter(p => !existingIds.has(p.id));
-          projects = [...projects, ...newProjects];
-          
-          console.log(`Found ${vectorProjects.length} projects via vector search`);
-          
-          // Make sure we have only 3 projects total
-          if (projects.length > 3) {
-            projects = projects.slice(0, 3);
-          }
-          
-          // Fetch contacts for the first project
-          projectContacts = await fetchProjectContacts(projects[0].id);
-          
-          return {
-            status: "success",
-            projects: projects,
-            contacts: projectContacts,
-            company_id: projects[0].company_id,
-            project_id: projects[0].id
-          };
-        }
+        return {
+          status: "success",
+          projects: projects,
+          contacts: projectContacts,
+          company_id: projects[0].company_id,
+          project_id: projects[0].id
+        };
+      }
       }
     } else {
       console.log(`Vector search skipped - no company ID provided for security context`);
