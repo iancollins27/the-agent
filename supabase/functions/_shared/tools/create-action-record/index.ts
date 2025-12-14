@@ -1,6 +1,7 @@
 
 /**
  * Create action record tool implementation
+ * Shared between agent-chat and test-workflow-prompt
  */
 import { Tool } from '../types.ts';
 import { createActionRecordSchema } from './schema.ts';
