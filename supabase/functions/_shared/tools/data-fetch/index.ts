@@ -87,7 +87,7 @@ export const dataFetchTool: Tool = {
       console.error("Error executing data_fetch tool:", error);
       return {
         status: "error",
-        error: error.message || "An unexpected error occurred"
+        error: error instanceof Error ? error.message : "An unexpected error occurred"
       };
     }
   }

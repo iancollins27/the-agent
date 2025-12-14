@@ -172,7 +172,7 @@ async function handleOtherActionTypes(
     console.error("Error in handleOtherActionTypes:", error);
     return {
       status: "error",
-      error: error.message || "An unexpected error occurred"
+      error: error instanceof Error ? error.message : "An unexpected error occurred"
     };
   }
 }
@@ -316,7 +316,7 @@ async function createActionRecord(
     console.error("Error in create_action_record tool:", error);
     return {
       status: "error",
-      error: error.message || "An unexpected error occurred"
+      error: error instanceof Error ? error.message : "An unexpected error occurred"
     };
   }
 }

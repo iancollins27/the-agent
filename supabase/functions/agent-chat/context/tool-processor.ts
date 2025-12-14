@@ -157,10 +157,11 @@ export async function processToolCalls(
       console.error(`Error executing tool ${call.name}: ${toolError}`);
       
       // Add error result
+      const errorMessage = toolError instanceof Error ? toolError.message : "Unknown tool execution error";
       const errorResult = { 
         status: "error", 
-        error: toolError.message || "Unknown tool execution error",
-        message: `Tool execution failed: ${toolError.message || "Unknown error"}`
+        error: errorMessage,
+        message: `Tool execution failed: ${errorMessage}`
       };
       
       // Add tool message to context

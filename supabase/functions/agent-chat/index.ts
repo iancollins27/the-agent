@@ -217,16 +217,18 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                     
                     console.log(`Tool ${toolCall.function.name} execution completed for homeowner`)
                   } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    const errorStack = error instanceof Error ? error.stack : undefined;
                     console.error(`Tool execution error for homeowner ${toolCall.function.name}:`, {
-                      error: error.message,
-                      stack: error.stack,
+                      error: errorMessage,
+                      stack: errorStack,
                       args: toolCall.function.arguments
                     })
                     toolResponses.push({
                       tool_call_id: toolCall.id,
                       content: JSON.stringify({
                         status: "error",
-                        error: error.message
+                        error: errorMessage
                       })
                     })
                   }
@@ -272,14 +274,16 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
               })
             }
           } catch (projectError) {
+            const errorMessage = projectError instanceof Error ? projectError.message : 'Unknown error';
+            const errorStack = projectError instanceof Error ? projectError.stack : undefined;
             console.error(`Error fetching projects for homeowner ${contact.id}:`, {
-              error: projectError.message,
-              stack: projectError.stack,
+              error: errorMessage,
+              stack: errorStack,
               contact_id: contact.id
             })
             return new Response(JSON.stringify({ 
               error: 'Error accessing homeowner projects',
-              details: projectError.message,
+              details: errorMessage,
               contact_id: contact.id 
             }), {
               status: 500,
@@ -298,14 +302,16 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
           })
         }
       } catch (authError) {
+        const errorMessage = authError instanceof Error ? authError.message : 'Unknown error';
+        const errorStack = authError instanceof Error ? authError.stack : undefined;
         console.error(`Authentication error for contact ${contact_id}:`, {
-          error: authError.message,
-          stack: authError.stack,
+          error: errorMessage,
+          stack: errorStack,
           contact_id
         })
         return new Response(JSON.stringify({ 
           error: 'Contact authentication failed',
-          details: authError.message,
+          details: errorMessage,
           contact_id 
         }), {
           status: 401,
@@ -362,7 +368,8 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.schema
+        // Handle both schema (shared tools) and parameters (local tools)
+        parameters: (tool as any).schema || (tool as any).parameters
       }
     }))
 
@@ -448,12 +455,13 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
           
           console.log(`Tool ${toolCall.function.name} execution completed`)
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`Tool execution error for ${toolCall.function.name}:`, error)
           toolResponses.push({
             tool_call_id: toolCall.id,
             content: JSON.stringify({
               status: "error",
-              error: error.message
+              error: errorMessage
             })
           })
         }
@@ -491,14 +499,16 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
     })
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Error in agent-chat:', {
-      error: error.message,
-      stack: error.stack,
+      error: errorMessage,
+      stack: errorStack,
       timestamp: new Date().toISOString()
     })
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      details: error.message 
+      details: errorMessage 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
