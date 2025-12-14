@@ -178,9 +178,19 @@ async function getOrCreateUserToken(supabase: any, phoneNumber: string) {
     return { userToken: token };
   }
 
-  // Create new token
-  const newToken = await createUserToken(supabase, contact);
-  return { userToken: newToken };
+  // Create new token - double check contact is valid
+  if (!contact || !contact.id) {
+    console.error('Cannot create token: contact is invalid', contact);
+    return { userToken: null };
+  }
+  
+  try {
+    const newToken = await createUserToken(supabase, contact);
+    return { userToken: newToken };
+  } catch (tokenError) {
+    console.error('Error creating user token:', tokenError);
+    return { userToken: null };
+  }
 }
 
 async function getOrCreateContact(supabase: any, phoneNumber: string) {
@@ -212,14 +222,25 @@ async function getOrCreateContact(supabase: any, phoneNumber: string) {
     return null;
   }
 
+  if (!newContact || !newContact.id) {
+    console.error('Contact created but returned null or missing id:', newContact);
+    return null;
+  }
+
   return newContact;
 }
 
 async function createUserToken(supabase: any, contact: any) {
+  // Validate contact is not null/undefined
+  if (!contact || !contact.id) {
+    console.error('createUserToken called with invalid contact:', contact);
+    throw new Error('Cannot create token: contact is null or missing id');
+  }
+
   const tokenPayload = {
     contact_id: contact.id,
-    company_id: contact.company_id,
-    role: contact.role,
+    company_id: contact.company_id || null,
+    role: contact.role || 'HO',
     exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     iat: Math.floor(Date.now() / 1000)
   };
