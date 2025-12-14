@@ -198,30 +198,144 @@ async function getOrCreateUserToken(supabase: any, phoneNumber: string) {
 }
 
 async function getOrCreateContact(supabase: any, phoneNumber: string) {
-  // Try to find existing contact
-  const { data: existingContacts } = await supabase
+  // Normalize phone number for consistent searching
+  // Ensure it has the + prefix (E.164 format)
+  const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+  
+  console.log(`Looking up contact for phone: ${normalizedPhone}`);
+  
+  // Extract all possible format variations
+  const phoneWithoutPlus = normalizedPhone.startsWith('+') ? normalizedPhone.substring(1) : normalizedPhone;
+  const digitsOnly = normalizedPhone.replace(/\D/g, '');
+  const last10Digits = digitsOnly.length >= 10 ? digitsOnly.substring(digitsOnly.length - 10) : digitsOnly;
+  const last10DigitsWithPlus = `+1${last10Digits}`;
+  
+  // Build OR query to search all formats at once
+  const formatConditions = [
+    `phone_number.eq.${normalizedPhone}`,
+    `phone_number.eq.${phoneWithoutPlus}`
+  ];
+  
+  // Add 10-digit variations for US numbers
+  if (normalizedPhone.startsWith('+1') && normalizedPhone.length === 12) {
+    formatConditions.push(`phone_number.eq.${last10Digits}`);
+  }
+  
+  // Add ILIKE patterns for partial matching
+  formatConditions.push(`phone_number.ilike.%${last10Digits}%`);
+  if (digitsOnly.length > 10) {
+    formatConditions.push(`phone_number.ilike.%${digitsOnly}%`);
+  }
+  
+  // Try comprehensive OR query first
+  const orQuery = formatConditions.join(',');
+  console.log(`Searching with OR query: ${orQuery.substring(0, 100)}...`);
+  
+  let { data: existingContacts, error: lookupError } = await supabase
     .from('contacts')
     .select('*')
-    .eq('phone_number', phoneNumber)
-    .limit(1);
-
-  if (existingContacts && existingContacts.length > 0) {
-    return existingContacts[0];
+    .or(orQuery)
+    .limit(10); // Get multiple in case of duplicates
+  
+  if (lookupError) {
+    console.error('Error in OR query lookup:', lookupError);
+    // Fallback to individual queries
+    existingContacts = null;
   }
 
-  // Create new contact if it doesn't exist
-  console.log(`Creating new contact for phone number: ${phoneNumber}`);
+  // If OR query didn't work or returned nothing, try individual exact matches
+  if (!existingContacts || existingContacts.length === 0) {
+    console.log(`OR query found nothing, trying individual format searches...`);
+    
+    // Try exact matches one by one
+    const formatsToTry = [
+      { format: normalizedPhone, name: 'normalized (+ prefix)' },
+      { format: phoneWithoutPlus, name: 'without + prefix' }
+    ];
+    
+    if (normalizedPhone.startsWith('+1') && normalizedPhone.length === 12) {
+      formatsToTry.push({ format: last10Digits, name: 'last 10 digits' });
+    }
+    
+    for (const { format, name } of formatsToTry) {
+      if (existingContacts && existingContacts.length > 0) break;
+      
+      console.log(`Trying exact match: ${name} (${format})`);
+      const { data: altContacts } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('phone_number', format)
+        .limit(1);
+      
+      if (altContacts && altContacts.length > 0) {
+        existingContacts = altContacts;
+        console.log(`Found contact using ${name} format`);
+        break;
+      }
+    }
+  }
+
+  if (existingContacts && existingContacts.length > 0) {
+    // If multiple contacts found, prefer the one with normalized format, otherwise take first
+    const preferred = existingContacts.find(c => c.phone_number === normalizedPhone) || existingContacts[0];
+    console.log(`Found existing contact: ${preferred.id} (${preferred.full_name || 'Unnamed'})`);
+    console.log(`Contact phone_number in DB: ${preferred.phone_number}`);
+    
+    // If the stored format differs from normalized, log it (but don't update automatically to avoid data changes)
+    if (preferred.phone_number !== normalizedPhone) {
+      console.log(`Note: Contact phone format in DB (${preferred.phone_number}) differs from normalized format (${normalizedPhone})`);
+    }
+    
+    return preferred;
+  }
+
+  // No existing contact found - create new one
+  // But first, try one more comprehensive search to be absolutely sure
+  console.log(`No contact found after exhaustive search. Creating new contact for phone number: ${normalizedPhone}`);
+  
   const { data: newContact, error } = await supabase
     .from('contacts')
     .insert({
-      phone_number: phoneNumber,
-      full_name: `User ${phoneNumber}`,
+      phone_number: normalizedPhone, // Use normalized format for consistency
+      full_name: `User ${normalizedPhone}`,
       role: 'HO' // Use 'HO' to match the filter in resolveContactAndCompany
     })
     .select()
     .single();
 
   if (error) {
+    // If insert fails due to duplicate (unique constraint violation), retry comprehensive lookup
+    if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+      console.log(`Insert failed due to duplicate - contact may already exist. Retrying comprehensive lookup...`);
+      
+      // Retry with the same comprehensive search we did before
+      const retryOrQuery = formatConditions.join(',');
+      const { data: retryContacts } = await supabase
+        .from('contacts')
+        .select('*')
+        .or(retryOrQuery)
+        .limit(10);
+      
+      if (retryContacts && retryContacts.length > 0) {
+        const preferred = retryContacts.find(c => c.phone_number === normalizedPhone) || retryContacts[0];
+        console.log(`Found existing contact on retry: ${preferred.id}`);
+        return preferred;
+      }
+      
+      // If OR query didn't work, try individual formats
+      for (const format of [normalizedPhone, phoneWithoutPlus, last10Digits].filter(f => f)) {
+        const { data: altContacts } = await supabase
+          .from('contacts')
+          .select('*')
+          .eq('phone_number', format)
+          .limit(1);
+        
+        if (altContacts && altContacts.length > 0) {
+          console.log(`Found existing contact on retry with format: ${format}`);
+          return altContacts[0];
+        }
+      }
+    }
     console.error('Error creating contact:', error);
     return null;
   }
@@ -231,6 +345,7 @@ async function getOrCreateContact(supabase: any, phoneNumber: string) {
     return null;
   }
 
+  console.log(`Successfully created new contact: ${newContact.id}`);
   return newContact;
 }
 
@@ -319,7 +434,7 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
         .from('audit_log')
         .insert({
           contact_id: contactFromToken.id,
-          company_id: contactFromToken.company_id,
+          company_id: contactFromToken.company_id || null, // Normalize undefined to null for consistency
           action: 'sms_received',
           resource_type: 'communication',
           details: { phone_number: from, message_length: body.length }
@@ -382,7 +497,7 @@ async function handleProjectSelection(supabase: any, phoneNumber: string, messag
   }
 
   // Check if we have a pending project selection for this phone number
-  const { data: pendingSelection } = await supabase
+  const { data: pendingSelection, error: selectionError } = await supabase
     .from('chat_sessions')
     .select('*')
     .eq('channel_type', 'sms')
@@ -391,7 +506,11 @@ async function handleProjectSelection(supabase: any, phoneNumber: string, messag
     .eq('active', true)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  if (selectionError) {
+    console.error('Error checking for pending project selection:', selectionError);
+  }
 
   if (!pendingSelection) {
     return false; // No pending project selection
@@ -437,7 +556,7 @@ async function handleCompanySelection(supabase: any, phoneNumber: string, messag
   }
 
   // Check if we have a pending company selection for this phone number
-  const { data: pendingSelection } = await supabase
+  const { data: pendingSelection, error: selectionError } = await supabase
     .from('chat_sessions')
     .select('*')
     .eq('channel_type', 'sms')
@@ -446,7 +565,11 @@ async function handleCompanySelection(supabase: any, phoneNumber: string, messag
     .eq('active', true)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  if (selectionError) {
+    console.error('Error checking for pending company selection:', selectionError);
+  }
 
   if (!pendingSelection) {
     return false; // No pending company selection
@@ -485,18 +608,65 @@ async function handleCompanySelection(supabase: any, phoneNumber: string, messag
 }
 
 async function resolveContactAndCompany(supabase: any, phoneNumber: string, messageBody: string) {
-  // Get all contacts for this phone number
-  const { data: contacts } = await supabase
+  // Normalize phone number to match the format used in getOrCreateContact (E.164 format)
+  const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+  
+  // Extract format variations for comprehensive search (same as getOrCreateContact)
+  const phoneWithoutPlus = normalizedPhone.startsWith('+') ? normalizedPhone.substring(1) : normalizedPhone;
+  const digitsOnly = normalizedPhone.replace(/\D/g, '');
+  const last10Digits = digitsOnly.length >= 10 ? digitsOnly.substring(digitsOnly.length - 10) : digitsOnly;
+  
+  // Build OR query to search all formats (same approach as getOrCreateContact)
+  const formatConditions = [
+    `phone_number.eq.${normalizedPhone}`,
+    `phone_number.eq.${phoneWithoutPlus}`
+  ];
+  
+  // Add 10-digit variations for US numbers
+  if (normalizedPhone.startsWith('+1') && normalizedPhone.length === 12) {
+    formatConditions.push(`phone_number.eq.${last10Digits}`);
+  }
+  
+  // Add ILIKE patterns for partial matching
+  formatConditions.push(`phone_number.ilike.%${last10Digits}%`);
+  
+  const orQuery = formatConditions.join(',');
+  console.log(`Resolving contact and company for phone: ${normalizedPhone} (searching with OR query)`);
+  
+  // Get all contacts for this phone number using comprehensive format search
+  let { data: contacts, error: contactsError } = await supabase
     .from('contacts')
     .select('*, companies:company_id(id, name)')
-    .eq('phone_number', phoneNumber);
+    .or(orQuery);
+
+  if (contactsError) {
+    console.error('Error querying contacts with OR query:', contactsError);
+    // Fallback to exact match with normalized format
+    const { data: fallbackContacts, error: fallbackError } = await supabase
+      .from('contacts')
+      .select('*, companies:company_id(id, name)')
+      .eq('phone_number', normalizedPhone);
+    
+    if (fallbackError) {
+      console.error('Error in fallback query:', fallbackError);
+      return null;
+    }
+    
+    if (!fallbackContacts || fallbackContacts.length === 0) {
+      console.log(`No contacts found for phone ${normalizedPhone} (after fallback)`);
+      return null;
+    }
+    
+    // Use fallback results
+    contacts = fallbackContacts;
+  }
 
   if (!contacts || contacts.length === 0) {
-    console.log(`No contacts found for phone ${phoneNumber}`);
+    console.log(`No contacts found for phone ${normalizedPhone}`);
     return null;
   }
 
-  console.log(`Found ${contacts.length} contacts for phone ${phoneNumber}:`, contacts.map(c => ({ id: c.id, role: c.role, company_id: c.company_id, full_name: c.full_name })));
+  console.log(`Found ${contacts.length} contacts for phone ${normalizedPhone}:`, contacts.map(c => ({ id: c.id, role: c.role, company_id: c.company_id, full_name: c.full_name })));
 
   // Filter contacts: prioritize company contacts over homeowners
   const companyContacts = contacts.filter(c => c.role !== 'HO' && c.company_id);
@@ -509,7 +679,7 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
   // If we only have homeowner contacts, we need to look up their projects to find company_id
   if (relevantContacts.length > 0 && relevantContacts[0].role === 'HO') {
     console.log('Processing homeowner contacts - looking up projects');
-    return await resolveHomeownerCompany(supabase, phoneNumber, relevantContacts);
+    return await resolveHomeownerCompany(supabase, normalizedPhone, relevantContacts);
   }
 
   // Handle company contacts (existing logic)
