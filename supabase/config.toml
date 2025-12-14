@@ -31,3 +31,9 @@ verify_jwt = false
 
 [functions.test-workflow-prompt]
 verify_jwt = false
+
+[functions.agent-chat]
+verify_jwt = false
+
+[functions.send-channel-message]
+verify_jwt = false
