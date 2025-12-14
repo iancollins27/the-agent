@@ -2,9 +2,10 @@
  * Read CRM Data Tool
  * 
  * This tool allows the AI to read data from the CRM system based on a project CRM ID
+ * Shared between agent-chat and test-workflow-prompt
  */
 
-import { ToolContext } from '../types.ts';
+import { Tool, ToolContext, ToolResult } from '../types.ts';
 
 // Standard response interface for CRM data
 interface CRMResponse {
@@ -672,7 +673,21 @@ class ZohoConnector {
   }
 }
 
-export const readCrmDataTool = {
+// Helper function to get contact IDs for a project
+async function getContactIds(supabase: any, projectId: string): Promise<string[]> {
+  const { data: projectContacts, error } = await supabase
+    .from("project_contacts")
+    .select("contact_id")
+    .eq("project_id", projectId);
+    
+  if (error || !projectContacts) {
+    return [];
+  }
+  
+  return projectContacts.map((pc: any) => pc.contact_id);
+}
+
+export const readCrmDataTool: Tool = {
   name: "read_crm_data",
   description: "Retrieves comprehensive data from the CRM system for a project including details, notes, tasks, and contacts",
   schema: {
@@ -691,7 +706,7 @@ export const readCrmDataTool = {
     required: ["crm_id"]
   },
   
-  execute: async (args: any, context: ToolContext) => {
+  execute: async (args: any, context: ToolContext): Promise<ToolResult> => {
     const { supabase } = context;
     
     try {
@@ -849,17 +864,3 @@ export const readCrmDataTool = {
     }
   }
 };
-
-// Helper function to get contact IDs for a project
-async function getContactIds(supabase: any, projectId: string): Promise<string[]> {
-  const { data: projectContacts, error } = await supabase
-    .from("project_contacts")
-    .select("contact_id")
-    .eq("project_id", projectId);
-    
-  if (error || !projectContacts) {
-    return [];
-  }
-  
-  return projectContacts.map((pc: any) => pc.contact_id);
-}
