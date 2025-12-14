@@ -192,7 +192,7 @@ export async function processActionRequest(
             }
           }
         } catch (error) {
-          console.warn(`Could not check activation criteria for project ${projectData.id}: ${error.message}`);
+          console.warn(`Could not check activation criteria for project ${projectData.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
           // Continue with reminder creation as a fallback
           shouldCreateReminder = true;
         }

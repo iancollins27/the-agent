@@ -38,7 +38,8 @@ export const toolRegistry = {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.schema
+        // Handle both schema (shared tools) and parameters (local tools)
+        parameters: (tool as any).schema || (tool as any).parameters
       }
     }));
   },
@@ -49,14 +50,16 @@ export const toolRegistry = {
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.schema
+        // Handle both schema (shared tools) and parameters (local tools)
+        parameters: (tool as any).schema || (tool as any).parameters
       }
     }));
   },
   
   getFormattedToolDefinitions: () => {
     return tools.map(tool => {
-      const params = JSON.stringify(tool.schema, null, 2);
+      // Handle both schema (shared tools) and parameters (local tools)
+      const params = JSON.stringify((tool as any).schema || (tool as any).parameters, null, 2);
       return `Tool: ${tool.name}\nDescription: ${tool.description}\nParameters: ${params}`;
     }).join('\n\n');
   }
