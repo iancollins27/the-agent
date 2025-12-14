@@ -283,14 +283,9 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
           } else {
-            console.log(`No projects found for contact ${contact.id}`)
-            return new Response(JSON.stringify({ 
-              error: 'No projects found for this contact',
-              contact_id: contact.id 
-            }), {
-              status: 404,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
+            console.log(`No projects found for contact ${contact.id} - falling back to generic agent flow without project context`)
+            // We intentionally do NOT return here so the request can continue
+            // through the generic flow below using non-project-specific tools.
           }
         } catch (projectError) {
           const errorMessage = projectError instanceof Error ? projectError.message : 'Unknown error';
@@ -300,14 +295,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
             stack: errorStack,
             contact_id: contact.id
           })
-          return new Response(JSON.stringify({ 
-            error: 'Error accessing contact projects',
-            details: errorMessage,
-            contact_id: contact.id 
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
+          // Do not fail the entire request if project lookup fails; fall back to generic flow
         }
       } catch (authError) {
         const errorMessage = authError instanceof Error ? authError.message : 'Unknown error';
