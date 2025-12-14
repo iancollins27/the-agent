@@ -388,7 +388,7 @@ async function createUserToken(supabase: any, contact: any) {
 // OTP feature removed - unverified phones can now interact directly with the agent
 
 async function processAuthenticatedMessage(supabase: any, message: any, userToken: any) {
-  const { From: from, Body: body } = message;
+  const { From: from, Body: body, To: to } = message;
   
   // Check if this is a company selection response
   if (await handleCompanySelection(supabase, from, body)) {
@@ -418,14 +418,23 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     
     if (contactFromToken) {
       console.log(`Using contact from token (no company/project found): ${contactFromToken.id}`);
-      // Use the contact from token, even if it doesn't have a company_id
-      // The agent can still respond, it just won't have company context
+
+      // Try to determine a fallback company for this contact
+      const fallbackCompanyId = contactFromToken.company_id || await resolveCompanyIdForAgentPhone(supabase, to);
+
+      if (!fallbackCompanyId) {
+        console.error('Could not resolve company_id for contact from token');
+        await sendSMS(supabase, from, "Sorry, I couldn't determine which company you're associated with. Please contact support.");
+        return;
+      }
+
+      // Use the contact from token with the resolved company, even if original company_id was null
       const session = await getOrCreateChatSession(
         supabase, 
         from, 
         body, 
         contactFromToken, 
-        contactFromToken.company_id || null, 
+        fallbackCompanyId, 
         null
       );
       
@@ -434,7 +443,7 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
         .from('audit_log')
         .insert({
           contact_id: contactFromToken.id,
-          company_id: contactFromToken.company_id || null, // Normalize undefined to null for consistency
+          company_id: fallbackCompanyId,
           action: 'sms_received',
           resource_type: 'communication',
           details: { phone_number: from, message_length: body.length }
@@ -859,37 +868,38 @@ async function createProjectSelectionSession(supabase: any, phoneNumber: string,
   await sendSMS(supabase, phoneNumber, selectionMessage);
 }
 
-async function createCompanySelectionSession(supabase: any, phoneNumber: string, companies: any[]) {
-  // Create a special session for company selection
-  const { data: sessionId } = await supabase.rpc('find_or_create_chat_session', {
-    p_channel_type: 'sms',
-    p_channel_identifier: phoneNumber,
-    p_company_id: companies[0].id, // Use first company as placeholder
-    p_contact_id: companies[0].contact_id,
-    p_project_id: null,
-    p_memory_mode: 'company_selection'
-  });
+async function resolveCompanyIdForAgentPhone(supabase: any, agentPhone: string | undefined | null): Promise<string | null> {
+  try {
+    if (!agentPhone) {
+      return null;
+    }
 
-  // Store the companies in the session history for reference
-  await supabase
-    .from('chat_sessions')
-    .update({
-      conversation_history: [{
-        role: 'system',
-        content: 'Company selection in progress',
-        companies: companies
-      }]
-    })
-    .eq('id', sessionId);
+    const normalized = agentPhone.trim();
+    const phoneWithoutPlus = normalized.startsWith('+') ? normalized.substring(1) : normalized;
 
-  // Send company selection menu
-  let selectionMessage = "I see you're associated with multiple companies. Please select which company you're contacting about:\n\n";
-  companies.forEach((company, index) => {
-    selectionMessage += `${index + 1}. ${company.name}\n`;
-  });
-  selectionMessage += "\nReply with the number of your choice.";
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, agent_phone_number')
+      .or(`agent_phone_number.eq.${normalized},agent_phone_number.eq.${phoneWithoutPlus}`)
+      .limit(1)
+      .maybeSingle();
 
-  await sendSMS(supabase, phoneNumber, selectionMessage);
+    if (error) {
+      console.error('Error resolving company by agent phone:', error);
+      return null;
+    }
+
+    if (!data) {
+      console.log('No company found for agent phone:', normalized);
+      return null;
+    }
+
+    console.log(`Resolved company ${data.id} for agent phone ${normalized}`);
+    return data.id;
+  } catch (error) {
+    console.error('Exception in resolveCompanyIdForAgentPhone:', error);
+    return null;
+  }
 }
 
 async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any, companyId: string | null, projectId?: string) {
