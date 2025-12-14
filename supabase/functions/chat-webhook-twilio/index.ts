@@ -24,18 +24,18 @@ serve(async (req) => {
       throw new Error('Missing required fields: From and/or Body');
     }
 
-    // Check if phone number is verified
-    const authResult = await authenticatePhoneNumber(supabase, message.From);
+    // Get or create contact and user token (no OTP required)
+    const authResult = await getOrCreateUserToken(supabase, message.From);
     
-    if (!authResult.authenticated) {
-      await handleUnverifiedPhone(supabase, message.From, message.Body);
+    if (!authResult.userToken) {
+      console.error('Failed to get or create user token');
       return new Response(
         `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
         { headers: { ...corsHeaders, 'Content-Type': 'application/xml' } }
       );
     }
 
-    // Process the message with authenticated user context
+    // Process the message with user context
     await processAuthenticatedMessage(supabase, message, authResult.userToken);
 
     return new Response(
@@ -138,36 +138,65 @@ async function parseRequestBody(req: Request): Promise<Record<string, any>> {
   return requestBody;
 }
 
-async function authenticatePhoneNumber(supabase: any, phoneNumber: string) {
-  // Check if phone number is verified
-  const { data: verification } = await supabase
-    .from('phone_verifications')
-    .select('*, contacts(*)')
-    .eq('phone_number', phoneNumber)
-    .single();
-
-  if (!verification?.verified_at) {
-    return { authenticated: false };
+async function getOrCreateUserToken(supabase: any, phoneNumber: string) {
+  // Get or create contact for this phone number
+  let contact = await getOrCreateContact(supabase, phoneNumber);
+  
+  if (!contact) {
+    console.error(`Failed to get or create contact for ${phoneNumber}`);
+    return { userToken: null };
   }
 
   // Check for valid token
   const { data: token } = await supabase
     .from('user_tokens')
     .select('*')
-    .eq('contact_id', verification.contact_id)
+    .eq('contact_id', contact.id)
     .gt('expires_at', new Date().toISOString())
     .is('revoked_at', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (!token) {
-    // Need to create new token
-    const newToken = await createUserToken(supabase, verification.contacts);
-    return { authenticated: true, userToken: newToken };
+  if (token) {
+    return { userToken: token };
   }
 
-  return { authenticated: true, userToken: token };
+  // Create new token
+  const newToken = await createUserToken(supabase, contact);
+  return { userToken: newToken };
+}
+
+async function getOrCreateContact(supabase: any, phoneNumber: string) {
+  // Try to find existing contact
+  const { data: existingContacts } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('phone_number', phoneNumber)
+    .limit(1);
+
+  if (existingContacts && existingContacts.length > 0) {
+    return existingContacts[0];
+  }
+
+  // Create new contact if it doesn't exist
+  console.log(`Creating new contact for phone number: ${phoneNumber}`);
+  const { data: newContact, error } = await supabase
+    .from('contacts')
+    .insert({
+      phone_number: phoneNumber,
+      full_name: `User ${phoneNumber}`,
+      role: 'homeowner'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating contact:', error);
+    return null;
+  }
+
+  return newContact;
 }
 
 async function createUserToken(supabase: any, contact: any) {
@@ -200,75 +229,7 @@ async function createUserToken(supabase: any, contact: any) {
   return newToken;
 }
 
-async function handleUnverifiedPhone(supabase: any, phoneNumber: string, messageBody: string) {
-  console.log(`Handling unverified phone ${phoneNumber} with message: ${messageBody}`);
-  
-  // Check if this looks like an OTP
-  const otpRegex = /^\d{6}$/;
-  if (otpRegex.test(messageBody.trim())) {
-    console.log(`Attempting to verify OTP: ${messageBody.trim()}`);
-    
-    // Try to verify the OTP
-    try {
-      const verifyResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({
-          phone_number: phoneNumber,
-          verification_code: messageBody.trim(),
-          action: 'verify_otp'
-        })
-      });
-
-      const result = await verifyResponse.json();
-      
-      if (verifyResponse.ok) {
-        console.log('OTP verification successful');
-        // Send welcome message
-        await sendSMS(supabase, phoneNumber, "Welcome! Your phone number has been verified. You can now ask me questions about your projects.");
-      } else {
-        console.log('OTP verification failed:', result.error);
-        await sendSMS(supabase, phoneNumber, `Verification failed: ${result.error}. Please try again.`);
-      }
-    } catch (error) {
-      console.error('Error during OTP verification:', error);
-      await sendSMS(supabase, phoneNumber, "Sorry, there was an error verifying your code. Please try again.");
-    }
-  } else {
-    console.log(`Requesting new OTP for ${phoneNumber}`);
-    
-    // Request OTP for new phone number
-    try {
-      const otpResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/phone-auth`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({
-          phone_number: phoneNumber,
-          action: 'request_otp'
-        })
-      });
-
-      const result = await otpResponse.json();
-      
-      if (otpResponse.ok) {
-        console.log('OTP request successful');
-        await sendSMS(supabase, phoneNumber, "Welcome! For security, please reply with the 6-digit verification code I just sent you.");
-      } else {
-        console.error('OTP request failed:', result.error);
-        await sendSMS(supabase, phoneNumber, `Sorry, there was an error: ${result.error}. Please try again later.`);
-      }
-    } catch (error) {
-      console.error('Error during OTP request:', error);
-      await sendSMS(supabase, phoneNumber, "Sorry, there was an error processing your message. Please try again later.");
-    }
-  }
-}
+// OTP feature removed - unverified phones can now interact directly with the agent
 
 async function processAuthenticatedMessage(supabase: any, message: any, userToken: any) {
   const { From: from, Body: body } = message;
