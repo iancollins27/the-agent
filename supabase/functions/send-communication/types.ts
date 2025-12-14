@@ -22,6 +22,8 @@ export interface SendCommRequest {
   providerInfo?: {
     provider_name: string;
   };
+  isAgentMessage?: boolean;
+  agentPhone?: string;
 }
 
 export interface ProviderInfo {

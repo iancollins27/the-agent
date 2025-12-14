@@ -1,26 +1,82 @@
 
 import { ProviderInfo } from "../types.ts";
 
+/**
+ * Get the company's agent phone number for outbound agent communications
+ */
+async function getCompanyAgentPhone(supabase: any, companyId: string): Promise<string | null> {
+  try {
+    const { data: company, error } = await supabase
+      .from('companies')
+      .select('agent_phone_number')
+      .eq('id', companyId)
+      .single();
+    
+    if (error || !company?.agent_phone_number) {
+      console.log(`No agent phone number configured for company ${companyId}`);
+      return null;
+    }
+    
+    console.log(`Found agent phone number for company ${companyId}: ${company.agent_phone_number}`);
+    return company.agent_phone_number;
+  } catch (error) {
+    console.error(`Error fetching company agent phone: ${error}`);
+    return null;
+  }
+}
+
 export async function getProviderInfo(
   supabase: any,
   providerId: string | undefined,
   companyId: string | null,
   channel: string,
   actionId: string | undefined,
-  sourceIp: string
+  sourceIp: string,
+  isAgentMessage: boolean = false
 ): Promise<ProviderInfo> {
   console.log(`getProviderInfo called with: {
   providerId: ${providerId || 'undefined'},
   companyId: "${companyId}",
   channel: "${channel}",
   actionId: ${actionId || 'undefined'},
-  sourceIp: "${sourceIp}"
+  sourceIp: "${sourceIp}",
+  isAgentMessage: ${isAgentMessage}
 }`);
 
   // Handle "auto" provider selection - skip database lookup and go to auto-selection logic
   if (providerId === 'auto') {
     console.log('Auto provider selection requested - skipping provider ID lookup');
     providerId = undefined; // Treat as no specific provider requested
+  }
+
+  // For agent messages, use Twilio with the company's agent phone number
+  if (isAgentMessage && channel.toLowerCase() === 'sms' && companyId) {
+    console.log('Agent message detected - looking up company agent phone number');
+    
+    const agentPhone = await getCompanyAgentPhone(supabase, companyId);
+    
+    // Use system-level Twilio credentials with the company's agent phone
+    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+    
+    if (twilioAccountSid && twilioAuthToken) {
+      // Use agent phone if configured, otherwise fall back to system Twilio number
+      const fromPhone = agentPhone || twilioPhoneNumber;
+      
+      if (fromPhone) {
+        console.log(`Using Twilio for agent message with from number: ${fromPhone}`);
+        return {
+          provider_name: 'twilio',
+          api_key: twilioAccountSid,
+          api_secret: twilioAuthToken,
+          justcall_number: fromPhone,
+          account_id: twilioAccountSid
+        };
+      }
+    }
+    
+    console.warn('Agent message but no Twilio credentials or phone configured, falling through to normal logic');
   }
 
   // Check if this is a forced provider request (for agent responses)
