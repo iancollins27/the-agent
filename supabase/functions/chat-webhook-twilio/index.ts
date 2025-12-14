@@ -46,8 +46,12 @@ serve(async (req) => {
       } catch (smsError) {
         console.error('Error sending error message:', smsError);
       }
-      // Re-throw to be caught by outer try-catch
-      throw processError;
+      // Return 200 to prevent Twilio from retrying and sending duplicate error messages
+      // The user has already been notified via SMS
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
+        { headers: { ...corsHeaders, 'Content-Type': 'application/xml' } }
+      );
     }
 
     return new Response(
@@ -287,11 +291,15 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
   if (!contactAndCompany) {
     // If contact exists but has no company/project, use the contact from the token
     // This handles cases where a new contact was just created or has no company association
-    const { data: contactFromToken } = await supabase
+    const { data: contactFromToken, error: contactError } = await supabase
       .from('contacts')
       .select('*')
       .eq('id', userToken.contact_id)
-      .single();
+      .maybeSingle();
+    
+    if (contactError) {
+      console.error('Error fetching contact from token:', contactError);
+    }
     
     if (contactFromToken) {
       console.log(`Using contact from token (no company/project found): ${contactFromToken.id}`);

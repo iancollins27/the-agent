@@ -4,10 +4,10 @@
 
 ### 1. Get Your Supabase Keys
 
-Go to: https://supabase.com/dashboard/project/lvifsxsrbluehopamqpy/settings/api
+Go to: https://supabase.com/dashboard/project/YOUR_PROJECT_ID/settings/api
 
 Copy:
-- **Project URL**: `https://lvifsxsrbluehopamqpy.supabase.co`
+- **Project URL**: `https://YOUR_PROJECT_ID.supabase.co`
 - **Service Role Key** (⚠️ Keep secret!)
 - **Anon Key**
 
@@ -24,7 +24,7 @@ Copy:
       "command": "npx",
       "args": ["-y", "@supabase/mcp-server"],
       "env": {
-        "SUPABASE_URL": "https://lvifsxsrbluehopamqpy.supabase.co",
+        "SUPABASE_URL": "https://YOUR_PROJECT_ID.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "YOUR_KEY_HERE",
         "SUPABASE_ANON_KEY": "YOUR_KEY_HERE"
       }
@@ -45,7 +45,7 @@ Ask me: "Show me all tables in the Supabase database" or "Query the projects tab
 
 1. Create `.env` file (add to `.gitignore`):
 ```env
-SUPABASE_URL=https://lvifsxsrbluehopamqpy.supabase.co
+SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_key_here
 SUPABASE_ANON_KEY=your_key_here
 ```

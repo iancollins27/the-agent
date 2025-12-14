@@ -13,7 +13,7 @@ This guide will help you set up a Model Context Protocol (MCP) server to connect
 ### Step 1: Get Your Supabase Credentials
 
 You'll need:
-- **Supabase URL**: `https://lvifsxsrbluehopamqpy.supabase.co`
+- **Supabase URL**: `https://YOUR_PROJECT_ID.supabase.co`
 - **Service Role Key**: Get this from your Supabase dashboard → Settings → API
 - **Anon Key**: Also from Settings → API
 
@@ -39,7 +39,7 @@ You'll need:
         "@supabase/mcp-server"
       ],
       "env": {
-        "SUPABASE_URL": "https://lvifsxsrbluehopamqpy.supabase.co",
+        "SUPABASE_URL": "https://YOUR_PROJECT_ID.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "YOUR_SERVICE_ROLE_KEY_HERE",
         "SUPABASE_ANON_KEY": "YOUR_ANON_KEY_HERE"
       }
@@ -54,7 +54,7 @@ For better security, you can use environment variables instead of hardcoding key
 
 1. Create a `.env` file in your project root (add to `.gitignore`):
 ```env
-SUPABASE_URL=https://lvifsxsrbluehopamqpy.supabase.co
+SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 SUPABASE_ANON_KEY=your_anon_key_here
 ```
