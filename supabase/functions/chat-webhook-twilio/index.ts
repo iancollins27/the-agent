@@ -36,7 +36,19 @@ serve(async (req) => {
     }
 
     // Process the message with user context
-    await processAuthenticatedMessage(supabase, message, authResult.userToken);
+    try {
+      await processAuthenticatedMessage(supabase, message, authResult.userToken);
+    } catch (processError) {
+      console.error('Error in processAuthenticatedMessage:', processError);
+      // Try to send an error message to the user
+      try {
+        await sendSMS(supabase, message.From, "I'm sorry, I encountered an error processing your message. Please try again.");
+      } catch (smsError) {
+        console.error('Error sending error message:', smsError);
+      }
+      // Re-throw to be caught by outer try-catch
+      throw processError;
+    }
 
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`,
@@ -148,7 +160,7 @@ async function getOrCreateUserToken(supabase: any, phoneNumber: string) {
   }
 
   // Check for valid token
-  const { data: token } = await supabase
+  const { data: token, error: tokenError } = await supabase
     .from('user_tokens')
     .select('*')
     .eq('contact_id', contact.id)
@@ -156,7 +168,11 @@ async function getOrCreateUserToken(supabase: any, phoneNumber: string) {
     .is('revoked_at', null)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  if (tokenError) {
+    console.error('Error checking for existing token:', tokenError);
+  }
 
   if (token) {
     return { userToken: token };
@@ -186,7 +202,7 @@ async function getOrCreateContact(supabase: any, phoneNumber: string) {
     .insert({
       phone_number: phoneNumber,
       full_name: `User ${phoneNumber}`,
-      role: 'homeowner'
+      role: 'HO' // Use 'HO' to match the filter in resolveContactAndCompany
     })
     .select()
     .single();
@@ -248,6 +264,48 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
   const contactAndCompany = await resolveContactAndCompany(supabase, from, body);
   
   if (!contactAndCompany) {
+    // If contact exists but has no company/project, use the contact from the token
+    // This handles cases where a new contact was just created or has no company association
+    const { data: contactFromToken } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('id', userToken.contact_id)
+      .single();
+    
+    if (contactFromToken) {
+      console.log(`Using contact from token (no company/project found): ${contactFromToken.id}`);
+      // Use the contact from token, even if it doesn't have a company_id
+      // The agent can still respond, it just won't have company context
+      const session = await getOrCreateChatSession(
+        supabase, 
+        from, 
+        body, 
+        contactFromToken, 
+        contactFromToken.company_id || null, 
+        null
+      );
+      
+      // Log the message interaction
+      await supabase
+        .from('audit_log')
+        .insert({
+          contact_id: contactFromToken.id,
+          company_id: contactFromToken.company_id,
+          action: 'sms_received',
+          resource_type: 'communication',
+          details: { phone_number: from, message_length: body.length }
+        });
+      
+      await addMessageToSessionHistory(supabase, session.id, 'user', body);
+      const conversationHistory = await getConversationHistory(supabase, session.id);
+      const assistantMessage = await processMessageWithAgent(supabase, session.id, conversationHistory, userToken);
+      console.log(`Agent response: ${assistantMessage}`);
+      await addMessageToSessionHistory(supabase, session.id, 'assistant', assistantMessage);
+      await sendDirectChannelResponse(supabase, session.id, assistantMessage);
+      return;
+    }
+    
+    console.error(`Could not find contact ${userToken.contact_id} from token`);
     await sendSMS(supabase, from, "Sorry, I couldn't find your contact information. Please try again.");
     return;
   }
@@ -635,15 +693,15 @@ async function createCompanySelectionSession(supabase: any, phoneNumber: string,
   await sendSMS(supabase, phoneNumber, selectionMessage);
 }
 
-async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any, companyId: string, projectId?: string) {
+async function getOrCreateChatSession(supabase: any, from: string, body: string, contact: any, companyId: string | null, projectId?: string) {
   try {
-    console.log(`Creating chat session for contact ${contact.id} from ${from} with company ${companyId}${projectId ? ` and project ${projectId}` : ''}`);
+    console.log(`Creating chat session for contact ${contact.id} from ${from} with company ${companyId || 'none'}${projectId ? ` and project ${projectId}` : ''}`);
     
     // Use the database function directly instead of calling the edge function
     const { data: sessionId, error } = await supabase.rpc('find_or_create_chat_session', {
       p_channel_type: 'sms',
       p_channel_identifier: from,
-      p_company_id: companyId,
+      p_company_id: companyId, // Can be null for contacts without company
       p_contact_id: contact.id,
       p_project_id: projectId || null, // Will be determined later by the AI agent
       p_memory_mode: 'standard'
