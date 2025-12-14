@@ -1350,14 +1350,7 @@ export type Database = {
       }
     }
     Functions: {
-      binary_quantize: {
-        Args: { "": string } | { "": unknown }
-        Returns: unknown
-      }
-      cleanup_expired_tokens: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_tokens: { Args: never; Returns: undefined }
       contact_can_access_project: {
         Args: { contact_id: string; project_id: string }
         Returns: boolean
@@ -1373,10 +1366,7 @@ export type Database = {
         }
         Returns: string
       }
-      generate_otp: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_otp: { Args: never; Returns: string }
       get_column_info: {
         Args: { column_name: string; table_name: string }
         Returns: {
@@ -1405,20 +1395,11 @@ export type Database = {
           summary: string
         }[]
       }
-      get_current_contact_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_my_company_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_project_search_text: {
-        Args: { project_id: string }
-        Returns: string
-      }
+      get_current_contact_id: { Args: never; Returns: string }
+      get_my_company_id: { Args: never; Returns: string }
+      get_project_search_text: { Args: { project_id: string }; Returns: string }
       get_projects_due_for_check: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           Address: string | null
           company_id: string | null
@@ -1438,6 +1419,12 @@ export type Database = {
           search_vector: string | null
           summary: string | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_table_info: {
         Args: { table_name: string }
@@ -1448,74 +1435,19 @@ export type Database = {
         }[]
       }
       get_user_accessible_project_contacts: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           contact_id: string
           project_id: string
         }[]
       }
       get_user_accessible_projects: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           project_id: string
         }[]
       }
-      get_user_company_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      halfvec_avg: {
-        Args: { "": number[] }
-        Returns: unknown
-      }
-      halfvec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      halfvec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      halfvec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      hnsw_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_sparsevec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnswhandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflat_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflat_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflathandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      l2_norm: {
-        Args: { "": unknown } | { "": unknown }
-        Returns: number
-      }
-      l2_normalize: {
-        Args: { "": string } | { "": unknown } | { "": unknown }
-        Returns: string
-      }
+      get_user_company_id: { Args: never; Returns: string }
       log_integration_key_access: {
         Args: {
           p_access_reason: string
@@ -1556,18 +1488,6 @@ export type Database = {
           summary: string
         }[]
       }
-      sparsevec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      sparsevec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      sparsevec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
       update_session_history: {
         Args: { p_content: string; p_role: string; p_session_id: string }
         Returns: boolean
@@ -1579,30 +1499,6 @@ export type Database = {
       user_can_access_project: {
         Args: { project_id: string }
         Returns: boolean
-      }
-      vector_avg: {
-        Args: { "": number[] }
-        Returns: string
-      }
-      vector_dims: {
-        Args: { "": string } | { "": unknown }
-        Returns: number
-      }
-      vector_norm: {
-        Args: { "": string }
-        Returns: number
-      }
-      vector_out: {
-        Args: { "": string }
-        Returns: unknown
-      }
-      vector_send: {
-        Args: { "": string }
-        Returns: string
-      }
-      vector_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
       }
     }
     Enums: {
