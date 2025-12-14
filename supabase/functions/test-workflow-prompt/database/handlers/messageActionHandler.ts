@@ -92,6 +92,38 @@ async function resolveContactId(
 }
 
 /**
+ * Get company info including agent configuration
+ */
+async function getCompanyAgentInfo(supabase: SupabaseClient, projectId: string): Promise<{ name: string; agentName: string | null; agentPhone: string | null }> {
+  try {
+    const { data: project } = await supabase
+      .from('projects')
+      .select('company_id')
+      .eq('id', projectId)
+      .single();
+    
+    if (!project?.company_id) {
+      return { name: 'Unknown Company', agentName: null, agentPhone: null };
+    }
+    
+    const { data: company } = await supabase
+      .from('companies')
+      .select('name, agent_name, agent_phone_number')
+      .eq('id', project.company_id)
+      .single();
+    
+    return {
+      name: company?.name || 'Unknown Company',
+      agentName: company?.agent_name || null,
+      agentPhone: company?.agent_phone_number || null
+    };
+  } catch (error) {
+    console.error('Error fetching company agent info:', error);
+    return { name: 'Unknown Company', agentName: null, agentPhone: null };
+  }
+}
+
+/**
  * Handle the message action type
  */
 export async function handleMessageAction(
@@ -103,10 +135,14 @@ export async function handleMessageAction(
   console.log("handleMessageAction called with data:", JSON.stringify({
     action_type: actionData.action_type,
     recipient: actionData.recipient,
-    recipient_id: actionData.recipient_id,
-    sender: actionData.sender,
-    sender_ID: actionData.sender_ID || actionData.sender_id
+    recipient_id: actionData.recipient_id
   }));
+  
+  // Get company agent info - agent is always the sender
+  const companyInfo = await getCompanyAgentInfo(supabase, projectId);
+  const agentName = companyInfo.agentName || `${companyInfo.name} Agent`;
+  
+  console.log(`Agent sender: ${agentName}`);
   
   // Extract message content from all possible locations with detailed logging
   let messageContent = null;
@@ -143,36 +179,19 @@ export async function handleMessageAction(
     console.log("Final message content:", messageContent);
   }
   
-  // Extract sender and recipient info
-  const rawSenderId = actionData.sender_ID || actionData.sender_id || 
-                     (actionData.action_payload && (actionData.action_payload.sender_ID || actionData.action_payload.sender_id));
-  
+  // Extract recipient info (sender is always the agent now)
   const rawRecipientId = actionData.recipient_id || 
                         (actionData.action_payload && actionData.action_payload.recipient_id);
-  
-  const senderName = actionData.sender || 
-                    (actionData.action_payload && actionData.action_payload.sender) || 
-                    "BidList Project Manager";
   
   const recipientName = actionData.recipient || 
                        (actionData.action_payload && actionData.action_payload.recipient) || 
                        "Project team";
   
-  console.log("Resolving contact IDs...");
-  console.log("Raw sender ID:", rawSenderId, "Sender name:", senderName);
+  console.log("Resolving recipient contact ID...");
   console.log("Raw recipient ID:", rawRecipientId, "Recipient name:", recipientName);
   
-  // Resolve sender and recipient IDs with improved error handling
-  let senderId: string | null = null;
+  // Resolve recipient ID
   let recipientId: string | null = null;
-  
-  try {
-    senderId = await resolveContactId(supabase, rawSenderId, senderName, projectId, 'sender');
-    console.log("Resolved sender ID:", senderId);
-  } catch (error) {
-    console.error("Error resolving sender ID:", error);
-    senderId = null;
-  }
   
   try {
     recipientId = await resolveContactId(supabase, rawRecipientId, recipientName, projectId, 'recipient');
@@ -182,28 +201,23 @@ export async function handleMessageAction(
     recipientId = null;
   }
   
-  // Additional validation to ensure we have valid UUIDs or null
-  if (senderId && !isValidUUID(senderId)) {
-    console.error("Sender ID is not a valid UUID after resolution:", senderId);
-    senderId = null;
-  }
-  
+  // Additional validation to ensure we have valid UUID or null
   if (recipientId && !isValidUUID(recipientId)) {
     console.error("Recipient ID is not a valid UUID after resolution:", recipientId);
     recipientId = null;
   }
 
-  // Prepare the action payload
+  // Prepare the action payload - agent is sender, no sender_ID (agent isn't a person)
   const actionPayload = {
     recipient: recipientName,
-    sender: senderName,
+    sender: agentName,
+    sender_type: 'agent',
     message_content: messageContent,
     recipient_id: recipientId,
-    sender_ID: senderId
+    agent_phone: companyInfo.agentPhone
   };
   
   console.log("Creating message action with payload:", JSON.stringify(actionPayload));
-  console.log("Final validation - senderId valid:", senderId ? isValidUUID(senderId) : 'null');
   console.log("Final validation - recipientId valid:", recipientId ? isValidUUID(recipientId) : 'null');
   
   try {
@@ -216,7 +230,7 @@ export async function handleMessageAction(
         action_payload: actionPayload,
         message: messageContent,
         recipient_id: recipientId,
-        sender_ID: senderId,
+        sender_ID: null, // Agent is not a person - no UUID
         requires_approval: true,
         status: 'pending'
       })
@@ -234,9 +248,7 @@ export async function handleMessageAction(
   } catch (insertError) {
     console.error("Exception during action record insert:", insertError);
     console.error("Insert error details:", {
-      senderId,
       recipientId,
-      senderIdValid: senderId ? isValidUUID(senderId) : 'null',
       recipientIdValid: recipientId ? isValidUUID(recipientId) : 'null'
     });
     throw insertError;

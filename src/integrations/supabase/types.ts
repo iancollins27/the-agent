@@ -388,6 +388,8 @@ export type Database = {
       companies: {
         Row: {
           action_approval_settings: Json | null
+          agent_name: string | null
+          agent_phone_number: string | null
           company_project_base_URL: string | null
           default_email_provider: string | null
           default_phone_provider: string | null
@@ -399,6 +401,8 @@ export type Database = {
         }
         Insert: {
           action_approval_settings?: Json | null
+          agent_name?: string | null
+          agent_phone_number?: string | null
           company_project_base_URL?: string | null
           default_email_provider?: string | null
           default_phone_provider?: string | null
@@ -410,6 +414,8 @@ export type Database = {
         }
         Update: {
           action_approval_settings?: Json | null
+          agent_name?: string | null
+          agent_phone_number?: string | null
           company_project_base_URL?: string | null
           default_email_provider?: string | null
           default_phone_provider?: string | null

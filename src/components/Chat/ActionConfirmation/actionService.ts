@@ -45,6 +45,9 @@ export async function executeAction(action: ActionRecord): Promise<void> {
   else if (action.action_type === 'message') {
     const actionPayload = action.action_payload as Record<string, any>;
     
+    // Check if this is an agent message (sender_type === 'agent')
+    const isAgentMessage = actionPayload.sender_type === 'agent';
+    
     // Prepare recipient data
     const recipient = {
       id: action.recipient_id,
@@ -69,7 +72,7 @@ export async function executeAction(action: ActionRecord): Promise<void> {
 
     toast({
       title: "Sending Message",
-      description: "Initiating communication...",
+      description: `Initiating ${isAgentMessage ? 'agent ' : ''}communication...`,
     });
 
     try {
@@ -79,7 +82,9 @@ export async function executeAction(action: ActionRecord): Promise<void> {
           messageContent,
           recipient,
           channel,
-          projectId: action.project_id
+          projectId: action.project_id,
+          isAgentMessage, // Pass flag to use agent phone number
+          agentPhone: actionPayload.agent_phone // Pass the agent phone if stored in payload
         }
       });
       

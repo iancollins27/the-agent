@@ -48,13 +48,16 @@ serve(async (req) => {
       companyId, 
       isTest,
       sender,
-      providerInfo: forcedProviderInfo
+      providerInfo: forcedProviderInfo,
+      isAgentMessage,
+      agentPhone
     } = requestData;
 
     console.log(`Processing communication request${actionId ? ` for action ID: ${actionId}` : ''}`);
     console.log(`Recipient details:`, recipient);
     console.log(`Sender details:`, sender || 'Not provided');
     console.log(`Channel: ${channel}, Requested provider ID: ${providerId || 'not specified'}`);
+    console.log(`Is agent message: ${isAgentMessage || false}`);
     
     // Check if provider is forced (for agent responses)
     if (forcedProviderInfo && forcedProviderInfo.provider_name) {
@@ -74,7 +77,8 @@ serve(async (req) => {
         targetCompanyId, 
         channel, 
         actionId, 
-        req.headers.get('x-real-ip') || 'unknown'
+        req.headers.get('x-real-ip') || 'unknown',
+        isAgentMessage || false
       );
     } else {
       // Normal provider selection logic
@@ -84,8 +88,15 @@ serve(async (req) => {
         targetCompanyId, 
         channel, 
         actionId, 
-        req.headers.get('x-real-ip') || 'unknown'
+        req.headers.get('x-real-ip') || 'unknown',
+        isAgentMessage || false
       );
+    }
+    
+    // If agent phone is provided in the request, override the provider's from number
+    if (isAgentMessage && agentPhone && providerInfo) {
+      console.log(`Overriding from number with agent phone from request: ${agentPhone}`);
+      providerInfo.justcall_number = agentPhone;
     }
 
     // Validate required fields
