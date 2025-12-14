@@ -1024,13 +1024,35 @@ async function sendDirectChannelResponse(userSupabase: any, sessionId: string, a
       }
     });
     
-    if (!channelResponse.data) {
-      throw new Error('Failed to send message');
+    if (channelResponse.data) {
+      console.log(`Message sent successfully via ${channelResponse.data.channel_type}`, channelResponse.data);
+      return;
     }
     
-    console.log(`Message sent successfully via ${channelResponse.data.channel_type}`, channelResponse.data);
+    console.warn('send-channel-message returned no data', channelResponse.error);
   } catch (error) {
     console.error('Error in sendDirectChannelResponse:', error);
+  }
+
+  // Fallback: if channel-message failed, try to send SMS directly for SMS sessions
+  try {
+    const { data: session, error: sessionError } = await userSupabase
+      .from('chat_sessions')
+      .select('channel_type, channel_identifier')
+      .eq('id', sessionId)
+      .maybeSingle();
+    
+    if (sessionError) {
+      console.error('Fallback: error fetching session for direct SMS:', sessionError);
+      return;
+    }
+
+    if (session && session.channel_type === 'sms' && session.channel_identifier) {
+      console.log('Fallback: sending SMS directly via Twilio for session', sessionId);
+      await sendSMS(userSupabase, session.channel_identifier, assistantMessage);
+    }
+  } catch (fallbackError) {
+    console.error('Fallback: error in direct SMS send:', fallbackError);
   }
 }
 
