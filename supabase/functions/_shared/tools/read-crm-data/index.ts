@@ -2,9 +2,10 @@
  * Read CRM Data Tool
  * 
  * This tool allows the AI to read data from the CRM system based on a project CRM ID
+ * Shared between agent-chat and test-workflow-prompt
  */
 
-import { ToolContext } from '../types.ts';
+import { Tool, ToolContext, ToolResult } from '../types.ts';
 
 // Standard response interface for CRM data
 interface CRMResponse {
@@ -158,7 +159,7 @@ class ZohoConnector {
       console.error("Error fetching all CRM data:", error);
       return { 
         data: null, 
-        error: error.message || "Unknown error occurred" 
+        error: error instanceof Error ? error.message : "Unknown error occurred" 
       };
     }
   }
@@ -189,7 +190,7 @@ class ZohoConnector {
       console.error(`Error in ZohoConnector.fetchResource:`, error);
       return {
         data: null,
-        error: error.message || "Unknown error occurred"
+        error: error instanceof Error ? error.message : "Unknown error occurred"
       };
     }
   }
@@ -243,7 +244,7 @@ class ZohoConnector {
       console.error("Error fetching contacts:", error);
       return {
         data: [],
-        error: error.message || "Unknown error fetching contacts"
+        error: error instanceof Error ? error.message : "Unknown error fetching contacts"
       };
     }
   }
@@ -330,11 +331,11 @@ class ZohoConnector {
       // Set token expiry (typically 1 hour for Zoho, minus 5 min buffer)
       this.tokenExpiresAt = now + ((tokenData.expires_in || 3600) - 300) * 1000;
       
-      console.log(`New access token obtained (length: ${this.accessToken.length}), expires at ${new Date(this.tokenExpiresAt).toISOString()}`);
-      return this.accessToken;
+      console.log(`New access token obtained (length: ${this.accessToken!.length}), expires at ${new Date(this.tokenExpiresAt).toISOString()}`);
+      return this.accessToken!;
     } catch (error) {
       console.error("Error getting Zoho access token:", error);
-      throw new Error(`Zoho authentication failed: ${error.message}`);
+      throw new Error(`Zoho authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   
@@ -460,7 +461,7 @@ class ZohoConnector {
       console.error("Error fetching project from Zoho:", error);
       return {
         data: null,
-        error: error.message || "Failed to fetch project from CRM"
+        error: error instanceof Error ? error.message : "Failed to fetch project from CRM"
       };
     }
   }
@@ -530,7 +531,7 @@ class ZohoConnector {
       console.error("Error fetching tasks from Zoho:", error);
       return {
         data: [],
-        error: error.message || "Failed to fetch tasks from CRM"
+        error: error instanceof Error ? error.message : "Failed to fetch tasks from CRM"
       };
     }
   }
@@ -597,7 +598,7 @@ class ZohoConnector {
       console.error("Error fetching notes from Zoho:", error);
       return {
         data: [],
-        error: error.message || "Failed to fetch notes from CRM"
+        error: error instanceof Error ? error.message : "Failed to fetch notes from CRM"
       };
     }
   }
@@ -666,13 +667,27 @@ class ZohoConnector {
       console.error("Error fetching communications from Zoho:", error);
       return {
         data: [],
-        error: error.message || "Failed to fetch communications from CRM"
+        error: error instanceof Error ? error.message : "Failed to fetch communications from CRM"
       };
     }
   }
 }
 
-export const readCrmDataTool = {
+// Helper function to get contact IDs for a project
+async function getContactIds(supabase: any, projectId: string): Promise<string[]> {
+  const { data: projectContacts, error } = await supabase
+    .from("project_contacts")
+    .select("contact_id")
+    .eq("project_id", projectId);
+    
+  if (error || !projectContacts) {
+    return [];
+  }
+  
+  return projectContacts.map((pc: any) => pc.contact_id);
+}
+
+export const readCrmDataTool: Tool = {
   name: "read_crm_data",
   description: "Retrieves comprehensive data from the CRM system for a project including details, notes, tasks, and contacts",
   schema: {
@@ -691,7 +706,7 @@ export const readCrmDataTool = {
     required: ["crm_id"]
   },
   
-  execute: async (args: any, context: ToolContext) => {
+  execute: async (args: any, context: ToolContext): Promise<ToolResult> => {
     const { supabase } = context;
     
     try {
@@ -843,23 +858,9 @@ export const readCrmDataTool = {
       console.error("Error in read_crm_data tool:", error);
       return {
         status: "error",
-        error: error.message || "Unknown error occurred while reading CRM data",
+        error: error instanceof Error ? error.message : "Unknown error occurred while reading CRM data",
         message: "Failed to read data from CRM system"
       };
     }
   }
 };
-
-// Helper function to get contact IDs for a project
-async function getContactIds(supabase: any, projectId: string): Promise<string[]> {
-  const { data: projectContacts, error } = await supabase
-    .from("project_contacts")
-    .select("contact_id")
-    .eq("project_id", projectId);
-    
-  if (error || !projectContacts) {
-    return [];
-  }
-  
-  return projectContacts.map((pc: any) => pc.contact_id);
-}

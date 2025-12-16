@@ -10,6 +10,25 @@ import { createContactAuthenticatedClient, getContactProjects } from './utils/co
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
+// Helper function to generate role-specific description for system prompt
+function getRoleDescription(role: string, name: string): string {
+  switch (role) {
+    case 'HO':
+    case 'homeowner':
+      return `- You are speaking with ${name}, a homeowner`
+    case 'Roofer':
+      return `- You are speaking with ${name}, a roofing contractor/subcontractor`
+    case 'BidList Project Manager':
+      return `- You are speaking with ${name}, a BidList Project Manager who manages multiple projects`
+    case 'Solar':
+    case 'Solar Ops':
+    case 'Solar Sales Rep':
+      return `- You are speaking with ${name}, a solar industry professional (${role})`
+    default:
+      return `- You are speaking with ${name}, a ${role}`
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -98,9 +117,9 @@ serve(async (req) => {
         authenticatedContact = contact
         userProfile = contact
         companyId = contact.company_id
-        authContext = 'contact'
+        authContext = 'homeowner'
         
-        // Role-agnostic: fetch projects for any contact type
+        // Fetch projects for any contact role using RLS-enabled functions
         console.log(`Fetching projects for contact ${contact.id} (role: ${contact.role})`)
         
         try {
@@ -112,195 +131,183 @@ serve(async (req) => {
             projects: contactProjects
           })
           
-          // Determine the project context (use first project if available)
-          const projectData = contactProjects && contactProjects.length > 0 ? contactProjects[0] : null
-          
-          // Build role-appropriate system prompt
-          const rolePromptMap: Record<string, string> = {
-            'HO': `You are speaking with ${contact.full_name}, a homeowner.`,
-            'homeowner': `You are speaking with ${contact.full_name}, a homeowner.`,
-            'Roofer': `You are speaking with ${contact.full_name}, a roofing contractor.`,
-            'BidList Project Manager': `You are speaking with ${contact.full_name}, a project manager.`,
-            'Solar': `You are speaking with ${contact.full_name}, a solar contractor.`,
-            'Solar Ops': `You are speaking with ${contact.full_name}, from solar operations.`,
-            'Solar Sales Rep': `You are speaking with ${contact.full_name}, a solar sales representative.`
-          }
-          
-          const roleContext = rolePromptMap[contact.role] || `You are speaking with ${contact.full_name} (${contact.role}).`
-          
-          let projectContext = ''
-          if (projectData) {
-            projectContext = `
-Their project: ${projectData.project_name || projectData.address || 'Project'}
-Project status: ${projectData.project_status || 'Active'}
-You can help them with updates about their project.
-
-IMPORTANT: Use tools like data_fetch with project_id: ${projectData.id} to get current project information.`
-          } else {
-            projectContext = `
-No specific project is currently selected. You can help them find their projects or answer general questions.`
-          }
-          
-          // Set up the context for tool execution
-          const toolContext = {
-            supabase,
-            userProfile: contact,
-            companyId: projectData?.company_id || contact.company_id,
-            projectId: projectData?.id,
-            projectData: projectData,
-            authContext: 'contact',
-            authenticatedContact: contact,
-            req
-          }
-          
-          // Enhanced system prompt for any contact role
-          const contactPrompt = `${customPrompt || 'You are a helpful AI assistant.'}
+          if (contactProjects && contactProjects.length > 0) {
+            const contactProjectData = contactProjects[0]
+            console.log(`Using project for contact chat:`, {
+              projectId: contactProjectData.id,
+              projectName: contactProjectData.project_name,
+              address: contactProjectData.address
+            })
+            
+            // Set up the context for the contact's project
+            const toolContext = {
+              supabase,
+              userProfile: contact,
+              companyId: contactProjectData.company_id,
+              projectId: contactProjectData.id,
+              projectData: contactProjectData,
+              authContext: 'contact',
+              authenticatedContact: contact,
+              req
+            }
+            
+            // Build role-aware system prompt
+            const roleDescription = getRoleDescription(contact.role, contact.full_name)
+            const contactPrompt = `${customPrompt || 'You are a helpful AI assistant.'}
 
 CONTACT CONTEXT:
-${roleContext}
-${projectContext}
+${roleDescription}
+- Their project: ${contactProjectData.project_name || contactProjectData.address || 'Project'}
+- Project status: ${contactProjectData.project_status || 'Active'}
+- You can help them with updates about their specific project
 
-Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record', 'identify_project'].includes(t.name)).map(t => t.name).join(', ')}`
+IMPORTANT: You are speaking with ${contact.full_name} directly. Use tools like data_fetch with project_id: ${contactProjectData.id} to get current project information.
 
-          // Filter tools to appropriate ones for contacts
-          const contactTools = toolRegistry.getAllTools().filter(tool => 
-            ['data_fetch', 'create_action_record', 'identify_project'].includes(tool.name)
-          )
-          
-          const toolDefinitions = contactTools.map(tool => ({
-            type: "function",
-            function: {
-              name: tool.name,
-              description: tool.description,
-              parameters: tool.schema
-            }
-          }))
+Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record'].includes(t.name)).map(t => t.name).join(', ')}`
 
-          // Prepare messages for OpenAI
-          const openAIMessages = [
-            { role: "system", content: contactPrompt },
-            ...messages
-          ]
-
-          console.log(`Sending OpenAI request for contact (${contact.role}) with ${toolDefinitions.length} tools`)
-
-          // Call OpenAI
-          const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: 'gpt-5-2025-08-07',
-              messages: openAIMessages,
-              tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
-              tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
-              max_completion_tokens: 2000
-            })
-          })
-
-          if (!openAIResponse.ok) {
-            const errorData = await openAIResponse.text()
-            console.error('OpenAI API error for contact:', errorData)
-            throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
-          }
-
-          const openAIData = await openAIResponse.json()
-          const assistantMessage = openAIData.choices[0].message
-
-          // Handle tool calls if present
-          if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-            console.log(`Processing ${assistantMessage.tool_calls.length} tool calls for contact`)
+            // Filter tools to contact-appropriate ones
+            const contactTools = toolRegistry.getAllTools().filter(tool => 
+              ['data_fetch', 'create_action_record'].includes(tool.name)
+            )
             
-            const toolResponses = []
-            
-            for (const toolCall of assistantMessage.tool_calls) {
-              console.log(`Executing tool ${toolCall.function.name} for contact with args:`, toolCall.function.arguments)
-              
-              try {
-                const args = JSON.parse(toolCall.function.arguments)
-                const result = await toolExecutor.executeTool(
-                  toolCall.function.name,
-                  args,
-                  toolContext
-                )
-                
-                toolResponses.push({
-                  tool_call_id: toolCall.id,
-                  content: JSON.stringify(result)
-                })
-                
-                console.log(`Tool ${toolCall.function.name} execution completed for contact`)
-              } catch (error) {
-                console.error(`Tool execution error for contact ${toolCall.function.name}:`, {
-                  error: error.message,
-                  stack: error.stack,
-                  args: toolCall.function.arguments
-                })
-                toolResponses.push({
-                  tool_call_id: toolCall.id,
-                  content: JSON.stringify({
-                    status: "error",
-                    error: error.message
-                  })
-                })
+            const toolDefinitions = contactTools.map(tool => ({
+              type: "function",
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: tool.schema
               }
-            }
-            
-            assistantMessage.tool_responses = toolResponses
-          }
+            }))
 
-          // Log observability data for contact
-          try {
-            await logObservability({
-              supabase,
-              projectId: projectData?.id,
-              userProfile: contact,
-              companyId: projectData?.company_id || contact.company_id,
-              messages: openAIMessages,
-              response: assistantMessage,
-              toolCalls: assistantMessage.tool_calls || [],
-              model: 'gpt-5-2025-08-07',
-              usage: openAIData.usage
+            // Prepare messages for OpenAI
+            const openAIMessages = [
+              { role: "system", content: contactPrompt },
+              ...messages
+            ]
+
+            console.log(`Sending OpenAI request for contact with ${toolDefinitions.length} tools`)
+
+            // Call OpenAI
+            const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'gpt-5-2025-08-07',
+                messages: openAIMessages,
+                tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+                tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
+                max_completion_tokens: 2000
+              })
             })
-          } catch (obsError) {
-            console.error('Observability logging failed for contact:', obsError)
-            // Don't fail the request for observability errors
-          }
 
-          return new Response(JSON.stringify({
-            choices: [{
-              message: assistantMessage
-            }],
-            usage: openAIData.usage
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
+            if (!openAIResponse.ok) {
+              const errorData = await openAIResponse.text()
+              console.error('OpenAI API error for contact:', errorData)
+              throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
+            }
+
+            const openAIData = await openAIResponse.json()
+            const assistantMessage = openAIData.choices[0].message
+
+            // Handle tool calls if present
+            if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+              console.log(`Processing ${assistantMessage.tool_calls.length} tool calls for contact`)
+              
+              const toolResponses = []
+              
+              for (const toolCall of assistantMessage.tool_calls) {
+                console.log(`Executing tool ${toolCall.function.name} for contact with args:`, toolCall.function.arguments)
+                
+                try {
+                  const args = JSON.parse(toolCall.function.arguments)
+                  const result = await toolExecutor.executeTool(
+                    toolCall.function.name,
+                    args,
+                    toolContext
+                  )
+                  
+                  toolResponses.push({
+                    tool_call_id: toolCall.id,
+                    content: JSON.stringify(result)
+                  })
+                  
+                  console.log(`Tool ${toolCall.function.name} execution completed for contact`)
+                } catch (error) {
+                  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                  const errorStack = error instanceof Error ? error.stack : undefined;
+                  console.error(`Tool execution error for contact ${toolCall.function.name}:`, {
+                    error: errorMessage,
+                    stack: errorStack,
+                    args: toolCall.function.arguments
+                  })
+                  toolResponses.push({
+                    tool_call_id: toolCall.id,
+                    content: JSON.stringify({
+                      status: "error",
+                      error: errorMessage
+                    })
+                  })
+                }
+              }
+              
+              assistantMessage.tool_responses = toolResponses
+            }
+
+            // Log observability data for contact
+            try {
+              await logObservability({
+                supabase,
+                projectId: contactProjectData.id,
+                userProfile: contact,
+                companyId: contactProjectData.company_id,
+                messages: openAIMessages,
+                response: assistantMessage,
+                toolCalls: assistantMessage.tool_calls || [],
+                model: 'gpt-4o',
+                usage: openAIData.usage
+              })
+            } catch (obsError) {
+              console.error('Observability logging failed for contact:', obsError)
+              // Don't fail the request for observability errors
+            }
+
+            return new Response(JSON.stringify({
+              choices: [{
+                message: assistantMessage
+              }],
+              usage: openAIData.usage
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          } else {
+            console.log(`No projects found for contact ${contact.id} - falling back to generic agent flow without project context`)
+            // We intentionally do NOT return here so the request can continue
+            // through the generic flow below using non-project-specific tools.
+          }
         } catch (projectError) {
-          console.error(`Error processing contact ${contact.id}:`, {
-            error: projectError.message,
-            stack: projectError.stack,
+          const errorMessage = projectError instanceof Error ? projectError.message : 'Unknown error';
+          const errorStack = projectError instanceof Error ? projectError.stack : undefined;
+          console.error(`Error fetching projects for contact ${contact.id}:`, {
+            error: errorMessage,
+            stack: errorStack,
             contact_id: contact.id
           })
-          return new Response(JSON.stringify({ 
-            error: 'Error processing contact request',
-            details: projectError.message,
-            contact_id: contact.id 
-          }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
+          // Do not fail the entire request if project lookup fails; fall back to generic flow
         }
       } catch (authError) {
+        const errorMessage = authError instanceof Error ? authError.message : 'Unknown error';
+        const errorStack = authError instanceof Error ? authError.stack : undefined;
         console.error(`Authentication error for contact ${contact_id}:`, {
-          error: authError.message,
-          stack: authError.stack,
+          error: errorMessage,
+          stack: errorStack,
           contact_id
         })
         return new Response(JSON.stringify({ 
           error: 'Contact authentication failed',
-          details: authError.message,
+          details: errorMessage,
           contact_id 
         }), {
           status: 401,
@@ -357,7 +364,8 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.schema
+        // Handle both schema (shared tools) and parameters (local tools)
+        parameters: (tool as any).schema || (tool as any).parameters
       }
     }))
 
@@ -443,12 +451,13 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
           
           console.log(`Tool ${toolCall.function.name} execution completed`)
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`Tool execution error for ${toolCall.function.name}:`, error)
           toolResponses.push({
             tool_call_id: toolCall.id,
             content: JSON.stringify({
               status: "error",
-              error: error.message
+              error: errorMessage
             })
           })
         }
@@ -486,14 +495,16 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
     })
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Error in agent-chat:', {
-      error: error.message,
-      stack: error.stack,
+      error: errorMessage,
+      stack: errorStack,
       timestamp: new Date().toISOString()
     })
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      details: error.message 
+      details: errorMessage 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
