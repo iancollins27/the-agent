@@ -114,25 +114,43 @@ async function verifyUserCompanyAccess(userId: string | null, companyId: string 
   try {
     console.log(`Verifying user ${userId} belongs to company ${companyId}`);
     
-    // Check if the user belongs to the specified company
-    const { data: profile, error } = await supabase
+    // First, check if this is a profile user (authenticated web users)
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('company_id')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
       
-    if (error || !profile) {
-      console.error(`User verification failed for ${userId}: ${error?.message || 'User not found'}`);
-      return false;
+    if (profile) {
+      if (profile.company_id !== companyId) {
+        console.error(`Company mismatch: Profile ${userId} belongs to company ${profile.company_id}, not ${companyId}`);
+        return false;
+      }
+      console.log(`Successfully verified profile ${userId} belongs to company ${companyId}`);
+      return true;
     }
     
-    if (profile.company_id !== companyId) {
-      console.error(`Company mismatch: User ${userId} belongs to company ${profile.company_id}, not ${companyId}`);
-      return false;
+    // If not found in profiles, check the contacts table (SMS chat contacts)
+    console.log(`User ${userId} not found in profiles, checking contacts table...`);
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('company_id')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (contact) {
+      if (contact.company_id !== companyId) {
+        console.error(`Company mismatch: Contact ${userId} belongs to company ${contact.company_id}, not ${companyId}`);
+        return false;
+      }
+      console.log(`Successfully verified contact ${userId} belongs to company ${companyId}`);
+      return true;
     }
     
-    console.log(`Successfully verified user ${userId} belongs to company ${companyId}`);
-    return true;
+    // Not found in either table
+    console.error(`User ${userId} not found in profiles or contacts tables`);
+    return false;
+    
   } catch (error) {
     console.error(`Error in verifyUserCompanyAccess: ${error}`);
     return false;
