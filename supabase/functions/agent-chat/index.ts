@@ -98,202 +98,197 @@ serve(async (req) => {
         authenticatedContact = contact
         userProfile = contact
         companyId = contact.company_id
-        authContext = 'homeowner'
+        authContext = 'contact'
         
-        // For homeowners, directly fetch their projects using RLS-enabled functions
-        if (contact.role === 'homeowner' || contact.role === 'HO') {
-          console.log(`Fetching projects for homeowner ${contact.id}`)
+        // Role-agnostic: fetch projects for any contact type
+        console.log(`Fetching projects for contact ${contact.id} (role: ${contact.role})`)
+        
+        try {
+          // Get contact's projects using security definer function
+          const contactProjects = await getContactProjects(supabase, contact.id)
           
-          try {
-            // Get homeowner's projects using security definer function
-            const homeownerProjects = await getContactProjects(supabase, contact.id)
-            
-            console.log(`Project fetch result:`, {
-              projectCount: homeownerProjects?.length || 0,
-              projects: homeownerProjects
-            })
-            
-            if (homeownerProjects && homeownerProjects.length > 0) {
-              const homeownerProjectData = homeownerProjects[0]
-              console.log(`Using project for homeowner chat:`, {
-                projectId: homeownerProjectData.id,
-                projectName: homeownerProjectData.project_name,
-                address: homeownerProjectData.address
-              })
-              
-              // Set up the context for the homeowner's project
-              const toolContext = {
-                supabase,
-                userProfile: contact,
-                companyId: homeownerProjectData.company_id,
-                projectId: homeownerProjectData.id,
-                projectData: homeownerProjectData,
-                authContext: 'homeowner',
-                authenticatedContact: contact,
-                req
-              }
-              
-              // Enhanced system prompt for homeowners
-              const homeownerPrompt = `${customPrompt || 'You are a helpful AI assistant.'}
-
-HOMEOWNER CONTEXT:
-- You are speaking with ${contact.full_name}, a homeowner
-- Their project: ${homeownerProjectData.project_name || homeownerProjectData.address || 'Your Project'}
-- Project status: ${homeownerProjectData.project_status || 'Active'}
-- You can help them with updates about their specific project
-
-IMPORTANT: You are speaking with the homeowner directly. Use tools like data_fetch with project_id: ${homeownerProjectData.id} to get current project information.
-
-Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record'].includes(t.name)).map(t => t.name).join(', ')}`
-
-              // Filter tools to only homeowner-appropriate ones
-              const homeownerTools = toolRegistry.getAllTools().filter(tool => 
-                ['data_fetch', 'create_action_record'].includes(tool.name)
-              )
-              
-              const toolDefinitions = homeownerTools.map(tool => ({
-                type: "function",
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.schema
-                }
-              }))
-
-              // Prepare messages for OpenAI
-              const openAIMessages = [
-                { role: "system", content: homeownerPrompt },
-                ...messages
-              ]
-
-              console.log(`Sending OpenAI request for homeowner with ${toolDefinitions.length} tools`)
-
-              // Call OpenAI
-              const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  model: 'gpt-5-2025-08-07',
-                  messages: openAIMessages,
-                  tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
-                  tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
-                  max_completion_tokens: 2000
-                })
-              })
-
-              if (!openAIResponse.ok) {
-                const errorData = await openAIResponse.text()
-                console.error('OpenAI API error for homeowner:', errorData)
-                throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
-              }
-
-              const openAIData = await openAIResponse.json()
-              const assistantMessage = openAIData.choices[0].message
-
-              // Handle tool calls if present
-              if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-                console.log(`Processing ${assistantMessage.tool_calls.length} tool calls for homeowner`)
-                
-                const toolResponses = []
-                
-                for (const toolCall of assistantMessage.tool_calls) {
-                  console.log(`Executing tool ${toolCall.function.name} for homeowner with args:`, toolCall.function.arguments)
-                  
-                  try {
-                    const args = JSON.parse(toolCall.function.arguments)
-                    const result = await toolExecutor.executeTool(
-                      toolCall.function.name,
-                      args,
-                      toolContext
-                    )
-                    
-                    toolResponses.push({
-                      tool_call_id: toolCall.id,
-                      content: JSON.stringify(result)
-                    })
-                    
-                    console.log(`Tool ${toolCall.function.name} execution completed for homeowner`)
-                  } catch (error) {
-                    console.error(`Tool execution error for homeowner ${toolCall.function.name}:`, {
-                      error: error.message,
-                      stack: error.stack,
-                      args: toolCall.function.arguments
-                    })
-                    toolResponses.push({
-                      tool_call_id: toolCall.id,
-                      content: JSON.stringify({
-                        status: "error",
-                        error: error.message
-                      })
-                    })
-                  }
-                }
-                
-                assistantMessage.tool_responses = toolResponses
-              }
-
-              // Log observability data for homeowner
-              try {
-                await logObservability({
-                  supabase,
-                  projectId: homeownerProjectData.id,
-                  userProfile: contact,
-                  companyId: homeownerProjectData.company_id,
-                  messages: openAIMessages,
-                  response: assistantMessage,
-                  toolCalls: assistantMessage.tool_calls || [],
-                  model: 'gpt-4o',
-                  usage: openAIData.usage
-                })
-              } catch (obsError) {
-                console.error('Observability logging failed for homeowner:', obsError)
-                // Don't fail the request for observability errors
-              }
-
-              return new Response(JSON.stringify({
-                choices: [{
-                  message: assistantMessage
-                }],
-                usage: openAIData.usage
-              }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              })
-            } else {
-              console.log(`No projects found for homeowner ${contact.id}`)
-              return new Response(JSON.stringify({ 
-                error: 'No projects found for this homeowner',
-                contact_id: contact.id 
-              }), {
-                status: 404,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              })
-            }
-          } catch (projectError) {
-            console.error(`Error fetching projects for homeowner ${contact.id}:`, {
-              error: projectError.message,
-              stack: projectError.stack,
-              contact_id: contact.id
-            })
-            return new Response(JSON.stringify({ 
-              error: 'Error accessing homeowner projects',
-              details: projectError.message,
-              contact_id: contact.id 
-            }), {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            })
+          console.log(`Project fetch result:`, {
+            projectCount: contactProjects?.length || 0,
+            projects: contactProjects
+          })
+          
+          // Determine the project context (use first project if available)
+          const projectData = contactProjects && contactProjects.length > 0 ? contactProjects[0] : null
+          
+          // Build role-appropriate system prompt
+          const rolePromptMap: Record<string, string> = {
+            'HO': `You are speaking with ${contact.full_name}, a homeowner.`,
+            'homeowner': `You are speaking with ${contact.full_name}, a homeowner.`,
+            'Roofer': `You are speaking with ${contact.full_name}, a roofing contractor.`,
+            'BidList Project Manager': `You are speaking with ${contact.full_name}, a project manager.`,
+            'Solar': `You are speaking with ${contact.full_name}, a solar contractor.`,
+            'Solar Ops': `You are speaking with ${contact.full_name}, from solar operations.`,
+            'Solar Sales Rep': `You are speaking with ${contact.full_name}, a solar sales representative.`
           }
-        } else {
-          console.log(`Contact ${contact.id} is not a homeowner (role: ${contact.role})`)
+          
+          const roleContext = rolePromptMap[contact.role] || `You are speaking with ${contact.full_name} (${contact.role}).`
+          
+          let projectContext = ''
+          if (projectData) {
+            projectContext = `
+Their project: ${projectData.project_name || projectData.address || 'Project'}
+Project status: ${projectData.project_status || 'Active'}
+You can help them with updates about their project.
+
+IMPORTANT: Use tools like data_fetch with project_id: ${projectData.id} to get current project information.`
+          } else {
+            projectContext = `
+No specific project is currently selected. You can help them find their projects or answer general questions.`
+          }
+          
+          // Set up the context for tool execution
+          const toolContext = {
+            supabase,
+            userProfile: contact,
+            companyId: projectData?.company_id || contact.company_id,
+            projectId: projectData?.id,
+            projectData: projectData,
+            authContext: 'contact',
+            authenticatedContact: contact,
+            req
+          }
+          
+          // Enhanced system prompt for any contact role
+          const contactPrompt = `${customPrompt || 'You are a helpful AI assistant.'}
+
+CONTACT CONTEXT:
+${roleContext}
+${projectContext}
+
+Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record', 'identify_project'].includes(t.name)).map(t => t.name).join(', ')}`
+
+          // Filter tools to appropriate ones for contacts
+          const contactTools = toolRegistry.getAllTools().filter(tool => 
+            ['data_fetch', 'create_action_record', 'identify_project'].includes(tool.name)
+          )
+          
+          const toolDefinitions = contactTools.map(tool => ({
+            type: "function",
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.schema
+            }
+          }))
+
+          // Prepare messages for OpenAI
+          const openAIMessages = [
+            { role: "system", content: contactPrompt },
+            ...messages
+          ]
+
+          console.log(`Sending OpenAI request for contact (${contact.role}) with ${toolDefinitions.length} tools`)
+
+          // Call OpenAI
+          const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-5-2025-08-07',
+              messages: openAIMessages,
+              tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+              tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
+              max_completion_tokens: 2000
+            })
+          })
+
+          if (!openAIResponse.ok) {
+            const errorData = await openAIResponse.text()
+            console.error('OpenAI API error for contact:', errorData)
+            throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
+          }
+
+          const openAIData = await openAIResponse.json()
+          const assistantMessage = openAIData.choices[0].message
+
+          // Handle tool calls if present
+          if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+            console.log(`Processing ${assistantMessage.tool_calls.length} tool calls for contact`)
+            
+            const toolResponses = []
+            
+            for (const toolCall of assistantMessage.tool_calls) {
+              console.log(`Executing tool ${toolCall.function.name} for contact with args:`, toolCall.function.arguments)
+              
+              try {
+                const args = JSON.parse(toolCall.function.arguments)
+                const result = await toolExecutor.executeTool(
+                  toolCall.function.name,
+                  args,
+                  toolContext
+                )
+                
+                toolResponses.push({
+                  tool_call_id: toolCall.id,
+                  content: JSON.stringify(result)
+                })
+                
+                console.log(`Tool ${toolCall.function.name} execution completed for contact`)
+              } catch (error) {
+                console.error(`Tool execution error for contact ${toolCall.function.name}:`, {
+                  error: error.message,
+                  stack: error.stack,
+                  args: toolCall.function.arguments
+                })
+                toolResponses.push({
+                  tool_call_id: toolCall.id,
+                  content: JSON.stringify({
+                    status: "error",
+                    error: error.message
+                  })
+                })
+              }
+            }
+            
+            assistantMessage.tool_responses = toolResponses
+          }
+
+          // Log observability data for contact
+          try {
+            await logObservability({
+              supabase,
+              projectId: projectData?.id,
+              userProfile: contact,
+              companyId: projectData?.company_id || contact.company_id,
+              messages: openAIMessages,
+              response: assistantMessage,
+              toolCalls: assistantMessage.tool_calls || [],
+              model: 'gpt-5-2025-08-07',
+              usage: openAIData.usage
+            })
+          } catch (obsError) {
+            console.error('Observability logging failed for contact:', obsError)
+            // Don't fail the request for observability errors
+          }
+
+          return new Response(JSON.stringify({
+            choices: [{
+              message: assistantMessage
+            }],
+            usage: openAIData.usage
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        } catch (projectError) {
+          console.error(`Error processing contact ${contact.id}:`, {
+            error: projectError.message,
+            stack: projectError.stack,
+            contact_id: contact.id
+          })
           return new Response(JSON.stringify({ 
-            error: 'Contact is not a homeowner',
-            role: contact.role,
+            error: 'Error processing contact request',
+            details: projectError.message,
             contact_id: contact.id 
           }), {
-            status: 403,
+            status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           })
         }
