@@ -955,12 +955,25 @@ async function getConversationHistory(userSupabase: any, sessionId: string) {
     }
     
     const history = session.conversation_history || [];
-    console.log(`Retrieved ${history.length} messages from conversation history`);
     
-    return history.map((msg: any) => ({
-      role: msg.role,
-      content: msg.content
-    }));
+    // Filter out messages with null/undefined content (happens when AI responds with tool calls only)
+    // Also deduplicate consecutive messages with same role and content
+    const filteredHistory = history
+      .filter((msg: any) => msg.content !== null && msg.content !== undefined && msg.content !== '')
+      .reduce((acc: any[], msg: any) => {
+        const lastMsg = acc[acc.length - 1];
+        // Skip if this is a duplicate of the previous message
+        if (lastMsg && lastMsg.role === msg.role && lastMsg.content === msg.content) {
+          console.log(`Skipping duplicate ${msg.role} message`);
+          return acc;
+        }
+        acc.push({ role: msg.role, content: msg.content });
+        return acc;
+      }, []);
+    
+    console.log(`Retrieved ${history.length} messages, filtered to ${filteredHistory.length} valid messages`);
+    
+    return filteredHistory;
   } catch (error) {
     console.error('Exception in getConversationHistory:', error);
     return [];
@@ -969,6 +982,12 @@ async function getConversationHistory(userSupabase: any, sessionId: string) {
 
 async function addMessageToSessionHistory(userSupabase: any, sessionId: string, role: 'user' | 'assistant', content: string) {
   try {
+    // Skip storing null/empty content messages
+    if (!content || content.trim() === '') {
+      console.log(`Skipping storage of ${role} message with empty content`);
+      return;
+    }
+    
     const { error } = await userSupabase.rpc('update_session_history', {
       p_session_id: sessionId, 
       p_role: role, 
