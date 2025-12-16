@@ -1,6 +1,30 @@
 
 import { ProviderInfo } from "../types.ts";
 
+// Normalize phone number to E.164 format
+function normalizeToE164(phone: string): string {
+  // Remove any non-digit characters except leading +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // If it starts with +, assume it's already E.164
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  
+  // If it's a 10-digit US number, add +1
+  if (cleaned.length === 10) {
+    return `+1${cleaned}`;
+  }
+  
+  // If it's 11 digits starting with 1 (US with country code), add +
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return `+${cleaned}`;
+  }
+  
+  // Default: just add + prefix
+  return `+${cleaned}`;
+}
+
 export async function sendViaTwilio(
   providerInfo: ProviderInfo, 
   channel: string, 
@@ -16,8 +40,9 @@ export async function sendViaTwilio(
       throw new Error('Missing Twilio credentials (api_key or api_secret)');
     }
 
-    // Format phone numbers (ensure they have the + prefix for E.164 format)
-    const toPhone = recipient.phone.startsWith('+') ? recipient.phone : `+${recipient.phone}`;
+    // Format phone numbers to E.164 format
+    const toPhone = normalizeToE164(recipient.phone);
+    console.log(`Normalized recipient phone: ${recipient.phone} -> ${toPhone}`);
     
     // Determine the 'from' number
     let fromPhone;
