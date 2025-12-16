@@ -28,8 +28,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders, status: 200 });
   }
   
-  // Note: JWT verification is disabled in config.toml for internal calls
-  // This function is called internally by chat-webhook-twilio and agent-chat
+  // Verify authentication
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ 
+        error: 'Missing or invalid authorization header',
+        message: 'This endpoint requires authentication'
+      }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
 
   try {
     const { session_id, message, project_id, sender } = await req.json() as ChannelMessageRequest;
@@ -122,21 +134,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         );
-    }
-
-    // Check if SMS sending failed (communicationId is null for SMS channel)
-    if (session.channel_type === 'sms' && communicationId === null) {
-      console.error('SMS send failed - communication_id is null');
-      return new Response(
-        JSON.stringify({
-          error: "Failed to send SMS",
-          message: "The SMS could not be sent via send-communication"
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
     }
 
     return new Response(

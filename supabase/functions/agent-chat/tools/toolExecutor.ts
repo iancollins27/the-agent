@@ -1,9 +1,7 @@
-// Shared tools
-import { createActionRecordTool } from '../../_shared/tools/create-action-record/index.ts';
-import { dataFetchTool } from '../../_shared/tools/data-fetch/index.ts';
-import { readCrmDataTool } from '../../_shared/tools/read-crm-data/index.ts';
 
-// Local tools (unique to agent-chat)
+import { createActionRecordTool } from "./create-action-record/index.ts";
+import { dataFetchTool } from "./data-fetch/index.ts";
+import { readCrmDataTool } from "./read-crm-data/index.ts";
 import { sessionManagerTool } from "./session-manager/index.ts";
 import { channelResponseTool } from "./channel-response/index.ts";
 import { escalationTool } from "./escalation/index.ts";

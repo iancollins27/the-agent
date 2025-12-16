@@ -1,31 +1,8 @@
 // Quick test script to verify Supabase MCP server can connect
 // Run with: node test-mcp-connection.js
 
-import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
-
-// Read MCP config to get credentials (same approach as other test scripts)
-const userProfile = process.env.USERPROFILE || process.env.HOME;
-const mcpConfigPath = path.join(userProfile, '.cursor', 'mcp.json');
-let mcpConfig;
-
-try {
-  mcpConfig = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf8'));
-} catch (error) {
-  console.error('Could not read MCP config:', error.message);
-  console.error('Please ensure MCP is configured at:', mcpConfigPath);
-  process.exit(1);
-}
-
-const SUPABASE_URL = mcpConfig.mcpServers?.supabase?.env?.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = mcpConfig.mcpServers?.supabase?.env?.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Missing Supabase credentials in MCP config');
-  console.error('Please configure MCP at:', mcpConfigPath);
-  process.exit(1);
-}
+const SUPABASE_URL = "https://lvifsxsrbluehopamqpy.supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aWZzeHNyYmx1ZWhvcGFtcXB5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczOTgzMDQ2MiwiZXhwIjoyMDU1NDA2NDYyfQ.Q19b7GTy1CwZL1SLyl4eZz7iNYPsWw3PRqcDtZk9imI";
 
 async function testConnection() {
   try {
@@ -35,11 +12,11 @@ async function testConnection() {
     console.log("Service Role Key starts with:", SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + "...");
     
     // Test if we can import the package
-    const childProcess = await import('child_process');
+    const { execSync } = require('child_process');
     
     console.log("\n1. Testing if @supabase/mcp-server can be installed...");
     try {
-      childProcess.execSync('npx -y @supabase/mcp-server --version', { stdio: 'inherit' });
+      execSync('npx -y @supabase/mcp-server --version', { stdio: 'inherit' });
       console.log("✓ Package is accessible");
     } catch (error) {
       console.log("✗ Package installation test failed");
@@ -47,6 +24,7 @@ async function testConnection() {
     }
     
     console.log("\n2. Testing direct Supabase connection...");
+    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     // Try a simple query

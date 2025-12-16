@@ -1,11 +1,9 @@
 
 /**
- * Data fetch tool implementation
- * Fetches comprehensive data for a specific project including details, contacts, communications, tasks and notes.
- * Shared between agent-chat and test-workflow-prompt
+ * Tool to fetch project data from Zoho and other sources
  */
 
-import { Tool, ToolResult, ToolContext } from '../types.ts';
+import { Tool, ToolResult } from '../types.ts';
 
 export const dataFetchTool: Tool = {
   name: "data_fetch",
@@ -25,7 +23,7 @@ export const dataFetchTool: Tool = {
     required: ["project_id"]
   },
   
-  async execute(args: any, context: ToolContext): Promise<ToolResult> {
+  async execute(args: any, context: any): Promise<ToolResult> {
     try {
       const { project_id, include_raw = false } = args;
       
@@ -87,7 +85,7 @@ export const dataFetchTool: Tool = {
       console.error("Error executing data_fetch tool:", error);
       return {
         status: "error",
-        error: error instanceof Error ? error.message : "An unexpected error occurred"
+        error: error.message || "An unexpected error occurred"
       };
     }
   }

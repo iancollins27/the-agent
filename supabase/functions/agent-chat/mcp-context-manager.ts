@@ -97,7 +97,7 @@ export function createMCPContextManager(
             // Add tool message to context
             this.messages.push({
               role: 'assistant',
-              content: '',
+              content: null,
               tool_calls: [
                 {
                   id: call.id,
@@ -108,14 +108,14 @@ export function createMCPContextManager(
                   }
                 }
               ]
-            } as any);
+            });
             
             // Add the tool result
             this.messages.push({
               role: 'tool',
               tool_call_id: call.id,
               content: JSON.stringify(toolResult)
-            } as any);
+            });
             
             // If this is a successful project identification, add a system message to prevent repeated lookups
             if (call.name === 'identify_project' && 
