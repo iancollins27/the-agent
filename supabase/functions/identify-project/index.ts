@@ -130,15 +130,21 @@ async function verifyUserCompanyAccess(userId: string | null, companyId: string 
       return true;
     }
     
-    // If not found in profiles, check the contacts table (SMS chat contacts)
+// If not found in profiles, check the contacts table (SMS chat contacts)
     console.log(`User ${userId} not found in profiles, checking contacts table...`);
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('company_id')
+      .select('company_id, role')
       .eq('id', userId)
       .maybeSingle();
       
     if (contact) {
+      // BidList Project Managers have access to all companies' data
+      if (contact.role === 'BidList Project Manager') {
+        console.log(`Contact ${userId} is a BidList Project Manager - granting access to all companies`);
+        return true;
+      }
+      
       if (contact.company_id !== companyId) {
         console.error(`Company mismatch: Contact ${userId} belongs to company ${contact.company_id}, not ${companyId}`);
         return false;
@@ -155,6 +161,21 @@ async function verifyUserCompanyAccess(userId: string | null, companyId: string 
     console.error(`Error in verifyUserCompanyAccess: ${error}`);
     return false;
   }
+}
+
+/**
+ * Check if a user is a BidList Project Manager (has access to all companies)
+ */
+async function isBidListProjectManager(userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  
+  const { data: contact } = await supabase
+    .from('contacts')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle();
+    
+  return contact?.role === 'BidList Project Manager';
 }
 
 /**
@@ -177,8 +198,14 @@ async function identifyProject(
     // Enhanced security logging
     console.log(`Executing identify_project: query="${query}", type=${type}, companyId=${companyId || 'none'}, userId=${userId || 'none'}`);
     
-    // STRICT SECURITY CHECK: Company ID is now REQUIRED
-    if (!companyId) {
+    // Check if user is a BidList Project Manager (has access to all companies)
+    const isBidListPM = await isBidListProjectManager(userId);
+    if (isBidListPM) {
+      console.log(`User ${userId} is a BidList Project Manager - allowing cross-company search`);
+    }
+    
+    // STRICT SECURITY CHECK: Company ID is required unless user is BidList PM
+    if (!companyId && !isBidListPM) {
       console.error(`Security violation: No company ID provided for project identification`);
       return {
         status: "error",
@@ -187,8 +214,8 @@ async function identifyProject(
       };
     }
     
-    // If both user ID and company ID are provided, verify the association
-    if (userId) {
+    // If both user ID and company ID are provided, verify the association (skip for BidList PM)
+    if (userId && !isBidListPM) {
       const isAuthorized = await verifyUserCompanyAccess(userId, companyId);
       if (!isAuthorized) {
         console.error(`User ${userId} not authorized to access company ${companyId} data`);
@@ -199,17 +226,22 @@ async function identifyProject(
         };
       }
       console.log(`User ${userId} authorized to access company ${companyId} data`);
-    } else {
+    } else if (!isBidListPM) {
       console.log(`No user ID provided, but company ID ${companyId} is present - proceeding with company-level access only`);
     }
     
     let projects = [];
     let projectContacts = [];
     
-    // Build the base query - ALWAYS filter by company ID for security
-    console.log(`Applying mandatory company filter: ${companyId}`);
-    let baseQuery = supabase.from('projects').select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status')
-      .eq('company_id', companyId);
+    // Build the base query - filter by company ID unless user is BidList PM
+    let baseQuery = supabase.from('projects').select('id, crm_id, company_id, project_name, summary, next_step, Address, Project_status');
+    
+    if (!isBidListPM && companyId) {
+      console.log(`Applying company filter: ${companyId}`);
+      baseQuery = baseQuery.eq('company_id', companyId);
+    } else {
+      console.log(`BidList PM - searching across all companies`);
+    }
     
     // First try exact matches
     if (type === "id" || type === "any") {
@@ -333,9 +365,10 @@ async function identifyProject(
       };
     }
     
-    // If no matches found yet and companyId is provided, try a vector search
-    if (companyId) {
-      console.log(`Performing semantic vector search for: "${query}" within company ${companyId}`);
+// If no matches found yet, try a vector search
+    if (companyId || isBidListPM) {
+      const searchScope = isBidListPM ? 'all companies' : `company ${companyId}`;
+      console.log(`Performing semantic vector search for: "${query}" within ${searchScope}`);
       
       // Get embedding for the query text
       const embedding = await generateEmbedding(query);
@@ -346,12 +379,12 @@ async function identifyProject(
         };
       }
       
-      // Build vector search parameters - always include companyId if available
+      // Build vector search parameters - include companyId only if not BidList PM
       const vectorSearchBody: any = {
         searchEmbedding: embedding,
         matchThreshold: 0.2,
         matchCount: 3,
-        companyId: companyId  // Always include companyId for security
+        companyId: isBidListPM ? null : companyId
       };
       
       console.log(`Vector search parameters: ${JSON.stringify(vectorSearchBody)}`);
@@ -361,7 +394,7 @@ async function identifyProject(
         search_embedding: embedding,
         match_threshold: 0.2,
         match_count: 3,
-        p_company_id: companyId
+        p_company_id: isBidListPM ? null : companyId
       });
       
       if (rpcError) {
