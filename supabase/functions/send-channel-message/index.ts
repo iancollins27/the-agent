@@ -124,6 +124,21 @@ serve(async (req) => {
         );
     }
 
+    // Check if SMS sending failed (communicationId is null for SMS channel)
+    if (session.channel_type === 'sms' && communicationId === null) {
+      console.error('SMS send failed - communication_id is null');
+      return new Response(
+        JSON.stringify({
+          error: "Failed to send SMS",
+          message: "The SMS could not be sent via send-communication"
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         message: "Message sent successfully",
