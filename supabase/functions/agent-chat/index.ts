@@ -308,7 +308,7 @@ IMPORTANT: You are speaking with ${contact.full_name} directly.`
 
             // Filter tools to contact-appropriate ones (NO session_manager)
             const contactTools = toolRegistry.getAllTools().filter(tool => 
-              ['data_fetch', 'create_action_record'].includes(tool.name)
+              ['identify_project', 'data_fetch', 'create_action_record'].includes(tool.name)
             )
             
             const toolDefinitions = contactTools.map(tool => ({
