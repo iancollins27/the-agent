@@ -175,7 +175,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
               function: {
                 name: tool.name,
                 description: tool.description,
-                parameters: tool.schema
+                parameters: (tool as any).schema || (tool as any).parameters
               }
             }))
 
@@ -283,9 +283,114 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
           } else {
-            console.log(`No projects found for contact ${contact.id} - falling back to generic agent flow without project context`)
-            // We intentionally do NOT return here so the request can continue
-            // through the generic flow below using non-project-specific tools.
+            console.log(`No projects found for contact ${contact.id} - using limited tools for contact without project`)
+            
+            // For contacts without projects, still use limited contact-appropriate tools
+            const toolContext = {
+              supabase,
+              userProfile: contact,
+              companyId: contact.company_id,
+              projectId: null,
+              projectData: null,
+              authContext: 'contact',
+              authenticatedContact: contact,
+              req
+            }
+            
+            const contactPrompt = `${customPrompt || 'You are a helpful AI assistant.'}
+
+CONTACT CONTEXT:
+${getRoleDescription(contact.role, contact.full_name)}
+- No specific project is currently associated with this conversation
+- You can help them with general questions
+
+IMPORTANT: You are speaking with ${contact.full_name} directly.`
+
+            // Filter tools to contact-appropriate ones (NO session_manager)
+            const contactTools = toolRegistry.getAllTools().filter(tool => 
+              ['data_fetch', 'create_action_record'].includes(tool.name)
+            )
+            
+            const toolDefinitions = contactTools.map(tool => ({
+              type: "function",
+              function: {
+                name: tool.name,
+                description: tool.description,
+                parameters: (tool as any).schema || (tool as any).parameters
+              }
+            }))
+
+            const openAIMessages = [
+              { role: "system", content: contactPrompt },
+              ...messages
+            ]
+
+            console.log(`Sending OpenAI request for contact (no project) with ${toolDefinitions.length} tools`)
+
+            const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'gpt-5-2025-08-07',
+                messages: openAIMessages,
+                tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+                tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
+                max_completion_tokens: 2000
+              })
+            })
+
+            if (!openAIResponse.ok) {
+              const errorData = await openAIResponse.text()
+              console.error('OpenAI API error for contact (no project):', errorData)
+              throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorData}`)
+            }
+
+            const openAIData = await openAIResponse.json()
+            const assistantMessage = openAIData.choices[0].message
+
+            // Handle tool calls if present
+            if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+              console.log(`Processing ${assistantMessage.tool_calls.length} tool calls for contact (no project)`)
+              
+              const toolResponses = []
+              
+              for (const toolCall of assistantMessage.tool_calls) {
+                console.log(`Executing tool ${toolCall.function.name} for contact (no project)`)
+                
+                try {
+                  const args = JSON.parse(toolCall.function.arguments)
+                  const result = await toolExecutor.executeTool(
+                    toolCall.function.name,
+                    args,
+                    toolContext
+                  )
+                  
+                  toolResponses.push({
+                    tool_call_id: toolCall.id,
+                    content: JSON.stringify(result)
+                  })
+                } catch (error) {
+                  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                  console.error(`Tool execution error for contact (no project):`, errorMessage)
+                  toolResponses.push({
+                    tool_call_id: toolCall.id,
+                    content: JSON.stringify({ status: "error", error: errorMessage })
+                  })
+                }
+              }
+              
+              assistantMessage.tool_responses = toolResponses
+            }
+
+            return new Response(JSON.stringify({
+              choices: [{ message: assistantMessage }],
+              usage: openAIData.usage
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
           }
         } catch (projectError) {
           const errorMessage = projectError instanceof Error ? projectError.message : 'Unknown error';
@@ -295,7 +400,15 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
             stack: errorStack,
             contact_id: contact.id
           })
-          // Do not fail the entire request if project lookup fails; fall back to generic flow
+          
+          // Return a helpful error message instead of falling through to generic flow
+          return new Response(JSON.stringify({ 
+            error: 'Unable to process request',
+            details: 'Could not load project information for this contact'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
         }
       } catch (authError) {
         const errorMessage = authError instanceof Error ? authError.message : 'Unknown error';
