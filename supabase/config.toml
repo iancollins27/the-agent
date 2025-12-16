@@ -37,3 +37,6 @@ verify_jwt = false
 
 [functions.send-channel-message]
 verify_jwt = false
+
+[functions.send-communication]
+verify_jwt = false
