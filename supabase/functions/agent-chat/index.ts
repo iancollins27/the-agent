@@ -253,10 +253,69 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                 }
               }
               
-              assistantMessage.tool_responses = toolResponses
+              // Make follow-up call to OpenAI with tool results
+              const followUpMessages = [
+                ...openAIMessages,
+                { role: 'assistant', content: null, tool_calls: assistantMessage.tool_calls },
+                ...toolResponses.map(tr => ({
+                  role: 'tool' as const,
+                  tool_call_id: tr.tool_call_id,
+                  content: tr.content
+                }))
+              ]
+
+              console.log(`Making follow-up OpenAI call for contact with project after ${toolResponses.length} tool results`)
+
+              const followUpResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'gpt-5-2025-08-07',
+                  messages: followUpMessages,
+                  max_completion_tokens: 2000
+                })
+              })
+
+              if (!followUpResponse.ok) {
+                const errorData = await followUpResponse.text()
+                console.error('OpenAI follow-up API error for contact:', errorData)
+                throw new Error(`OpenAI follow-up API error: ${followUpResponse.status} ${errorData}`)
+              }
+
+              const followUpData = await followUpResponse.json()
+              const finalMessage = followUpData.choices[0].message
+              finalMessage.tool_calls = assistantMessage.tool_calls
+              finalMessage.tool_responses = toolResponses
+
+              // Log observability data for contact
+              try {
+                await logObservability({
+                  supabase,
+                  projectId: contactProjectData.id,
+                  userProfile: contact,
+                  companyId: contactProjectData.company_id,
+                  messages: followUpMessages,
+                  response: finalMessage,
+                  toolCalls: assistantMessage.tool_calls || [],
+                  model: 'gpt-5-2025-08-07',
+                  usage: followUpData.usage
+                })
+              } catch (obsError) {
+                console.error('Observability logging failed for contact:', obsError)
+              }
+
+              return new Response(JSON.stringify({
+                choices: [{ message: finalMessage }],
+                usage: followUpData.usage
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              })
             }
 
-            // Log observability data for contact
+            // Log observability data for contact (no tool calls)
             try {
               await logObservability({
                 supabase,
@@ -382,7 +441,49 @@ IMPORTANT: You are speaking with ${contact.full_name} directly.`
                 }
               }
               
-              assistantMessage.tool_responses = toolResponses
+              // Make follow-up call to OpenAI with tool results
+              const followUpMessages = [
+                ...openAIMessages,
+                { role: 'assistant', content: null, tool_calls: assistantMessage.tool_calls },
+                ...toolResponses.map(tr => ({
+                  role: 'tool' as const,
+                  tool_call_id: tr.tool_call_id,
+                  content: tr.content
+                }))
+              ]
+
+              console.log(`Making follow-up OpenAI call for contact (no project) after ${toolResponses.length} tool results`)
+
+              const followUpResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'gpt-5-2025-08-07',
+                  messages: followUpMessages,
+                  max_completion_tokens: 2000
+                })
+              })
+
+              if (!followUpResponse.ok) {
+                const errorData = await followUpResponse.text()
+                console.error('OpenAI follow-up API error for contact (no project):', errorData)
+                throw new Error(`OpenAI follow-up API error: ${followUpResponse.status} ${errorData}`)
+              }
+
+              const followUpData = await followUpResponse.json()
+              const finalMessage = followUpData.choices[0].message
+              finalMessage.tool_calls = assistantMessage.tool_calls
+              finalMessage.tool_responses = toolResponses
+
+              return new Response(JSON.stringify({
+                choices: [{ message: finalMessage }],
+                usage: followUpData.usage
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              })
             }
 
             return new Response(JSON.stringify({
@@ -576,11 +677,69 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
         }
       }
       
-      // Add tool responses to the message
-      assistantMessage.tool_responses = toolResponses
+      // Make follow-up call to OpenAI with tool results
+      const followUpMessages = [
+        ...openAIMessages,
+        { role: 'assistant', content: null, tool_calls: assistantMessage.tool_calls },
+        ...toolResponses.map(tr => ({
+          role: 'tool' as const,
+          tool_call_id: tr.tool_call_id,
+          content: tr.content
+        }))
+      ]
+
+      console.log(`Making follow-up OpenAI call for web user after ${toolResponses.length} tool results`)
+
+      const followUpResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-2025-08-07',
+          messages: followUpMessages,
+          max_completion_tokens: 2000
+        })
+      })
+
+      if (!followUpResponse.ok) {
+        const errorData = await followUpResponse.text()
+        console.error('OpenAI follow-up API error for web user:', errorData)
+        throw new Error(`OpenAI follow-up API error: ${followUpResponse.status} ${errorData}`)
+      }
+
+      const followUpData = await followUpResponse.json()
+      const finalMessage = followUpData.choices[0].message
+      finalMessage.tool_calls = assistantMessage.tool_calls
+      finalMessage.tool_responses = toolResponses
+
+      // Log observability data
+      try {
+        await logObservability({
+          supabase,
+          projectId,
+          userProfile,
+          companyId,
+          messages: followUpMessages,
+          response: finalMessage,
+          toolCalls: assistantMessage.tool_calls || [],
+          model: 'gpt-5-2025-08-07',
+          usage: followUpData.usage
+        })
+      } catch (obsError) {
+        console.error('Observability logging failed:', obsError)
+      }
+
+      return new Response(JSON.stringify({
+        choices: [{ message: finalMessage }],
+        usage: followUpData.usage
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    // Log observability data
+    // Log observability data (no tool calls)
     try {
       await logObservability({
         supabase,
