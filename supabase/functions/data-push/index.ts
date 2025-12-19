@@ -14,7 +14,7 @@ interface DataPushRequest {
   resourceType: string;
   resourceId?: string;
   data: Record<string, any>;
-  operationType: 'write' | 'update' | 'delete';
+  operationType: 'write' | 'update' | 'delete' | 'append_note';
   jobId?: string;
 }
 

@@ -17,6 +17,11 @@ export class JobProgressWriter implements JobProgressWriter {
     const { resourceType, operationType, resourceId, data } = request;
 
     try {
+      // Handle append_note as a special case
+      if (operationType === 'append_note' && resourceType === 'project') {
+        return await this.handleAppendNoteOperation(resourceId, data);
+      }
+
       switch (resourceType) {
         case 'project':
           return await this.handleProjectOperation(operationType, resourceId, data);
@@ -29,6 +34,44 @@ export class JobProgressWriter implements JobProgressWriter {
       }
     } catch (error) {
       console.error(`JobProgress write error for ${resourceType}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handles appending a note to a project's existing notes field
+   * Reads current notes, appends new content, then updates
+   */
+  private async handleAppendNoteOperation(projectCrmId: string, data: any): Promise<any> {
+    console.log(`Appending note to JobProgress project ${projectCrmId}`);
+    
+    try {
+      // First, fetch the current project to get existing notes
+      const currentProject = await this.makeRequest(`/jobs/${projectCrmId}`, 'GET');
+      
+      // Get existing notes (field name may vary - common ones are 'notes', 'description', 'job_notes')
+      const existingNotes = currentProject?.notes || currentProject?.description || currentProject?.job_notes || '';
+      
+      // Append new note with separator
+      const separator = existingNotes ? '\n\n---\n\n' : '';
+      const updatedNotes = existingNotes + separator + data.note_content;
+      
+      // Update the project with appended notes
+      const updateData = {
+        notes: updatedNotes
+      };
+      
+      console.log(`Updating JobProgress project ${projectCrmId} with appended note`);
+      const result = await this.makeRequest(`/jobs/${projectCrmId}`, 'PUT', updateData);
+      
+      return {
+        success: true,
+        message: 'Note appended successfully',
+        project_id: projectCrmId,
+        result
+      };
+    } catch (error) {
+      console.error(`Error appending note to JobProgress project ${projectCrmId}:`, error);
       throw error;
     }
   }
