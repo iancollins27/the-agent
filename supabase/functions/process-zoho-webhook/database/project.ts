@@ -37,14 +37,18 @@ export async function updateProject(
   supabase: any,
   projectId: string,
   data: {
-    summary: string;
+    summary?: string;
     next_step: string;
     last_action_check: string;
     company_id: string;
     project_track?: string | null;
     next_check_date?: string | null;
     Address?: string;
-    project_manager?: string | null; // Added project_manager field
+    project_manager?: string | null;
+    Contract_Signed?: string | null;
+    Roof_Install_Finalized?: string | null;
+    Test_Record?: boolean;
+    crm_status?: string | null;
   }
 ) {
   const { error } = await supabase
@@ -66,7 +70,7 @@ export async function updateProject(
 export async function createProject(
   supabase: any,
   data: {
-    summary: string;
+    summary?: string;
     next_step: string;
     last_action_check: string;
     company_id: string;
@@ -74,7 +78,11 @@ export async function createProject(
     project_track?: string | null;
     next_check_date?: string | null;
     Address?: string;
-    project_manager?: string | null; // Added project_manager field
+    project_manager?: string | null;
+    Contract_Signed?: string | null;
+    Roof_Install_Finalized?: string | null;
+    Test_Record?: boolean;
+    crm_status?: string | null;
   }
 ) {
   console.log('Creating new project with CRM ID:', data.crm_id);

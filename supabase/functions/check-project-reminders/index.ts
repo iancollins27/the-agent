@@ -1,7 +1,5 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { meetsActivationCriteria } from "./utils/activationCriteria.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -60,113 +58,19 @@ serve(async (req) => {
     const serviceRoleClient = createClient(supabaseUrl, supabaseServiceKey);
     
     // Process each project that's due for a check
+    // NOTE: get_projects_due_for_check() already filters by activation criteria:
+    // - Contract_Signed IS NOT NULL
+    // - Roof_Install_Finalized IS NULL
+    // - Test_Record = false
+    // - Project_status/crm_status NOT IN ('Archived', 'VOID', 'Cancelled', 'Canceled')
+    // So we can skip the CRM fetch and activation criteria check entirely!
+    
     for (const project of projectsDue || []) {
       console.log(`Processing project ${project.id} with next_check_date: ${project.next_check_date}`);
+      console.log(`Project ${project.id} passed DB-level activation criteria filter, proceeding...`);
       
       try {
-        // First, fetch the project data from CRM to check activation criteria
-        console.log(`Fetching CRM data for project ${project.id} to check activation criteria`);
-        
-        // Get CRM ID for this project
-        const { data: projectData, error: projectDataError } = await supabase
-          .from('projects')
-          .select('crm_id')
-          .eq('id', project.id)
-          .single();
-          
-        if (projectDataError || !projectData?.crm_id) {
-          console.error(`Error fetching project CRM ID for project ${project.id}:`, projectDataError);
-          results.push({
-            project_id: project.id,
-            success: false,
-            error: "Failed to fetch project CRM ID"
-          });
-          continue;
-        }
-        
-        // Call the CRM to get project details
-        const { data: crmData, error: crmError } = await serviceRoleClient.functions.invoke(
-          'agent-chat',
-          {
-            body: {
-              tool: 'read_crm_data',
-              args: {
-                crm_id: projectData.crm_id,
-                entity_type: 'project'
-              },
-              context: {
-                project_id: project.id
-              }
-            }
-          }
-        );
-        
-        if (crmError || !crmData?.data) {
-          console.error(`Error fetching CRM data for project ${project.id}:`, crmError || "No data returned");
-          results.push({
-            project_id: project.id,
-            success: false,
-            error: "Failed to fetch CRM data"
-          });
-          continue;
-        }
-        
-        // Log the CRM data to verify we have the required fields
-        const projectFields = crmData.data.project?.fields || crmData.data;
-        console.log(`Project ${project.id} CRM data fields:`, {
-          Contract_Signed: projectFields.Contract_Signed,
-          Roof_Install_Finalized: projectFields.Roof_Install_Finalized,
-          Test_Record: projectFields.Test_Record,
-          Status: projectFields.Status,
-          zoho_fields: projectFields.zoho_fields ? 'Present' : 'Missing'
-        });
-        
-        // If the fields are in zoho_fields, we need to extract them
-        let isActive = false;
-        let reason = "";
-        
-        if (projectFields.zoho_fields && !projectFields.Contract_Signed) {
-          // Create a new object with both direct fields and zoho_fields combined
-          const enrichedData = {
-            ...projectFields,
-            ...projectFields.zoho_fields
-          };
-          console.log(`Enriched project data with zoho_fields for project ${project.id}`);
-          
-          // Check if project meets activation criteria with enriched data
-          const result = meetsActivationCriteria(enrichedData);
-          isActive = result.meetsActivationCriteria;
-          reason = result.reason || "";
-        } else {
-          // Check if project meets activation criteria
-          const result = meetsActivationCriteria(crmData.data);
-          isActive = result.meetsActivationCriteria;
-          reason = result.reason || "";
-        }
-        
-        if (!isActive) {
-          console.log(`Project ${project.id} does not meet activation criteria: ${reason}`);
-          results.push({
-            project_id: project.id,
-            success: true,
-            skipped: true,
-            reason: reason || "Does not meet activation criteria"
-          });
-          
-          // Update the project's last action check even if skipped
-          await supabase
-            .from('projects')
-            .update({
-              last_action_check: new Date().toISOString()
-            })
-            .eq('id', project.id);
-            
-          continue;
-        }
-        
-        console.log(`Project ${project.id} meets activation criteria, proceeding with reminder action`);
-        
-        // Get the MCP orchestrator prompt instead of action detection
+        // Get the MCP orchestrator prompt
         const { data: prompt, error: promptError } = await supabase
           .from('workflow_prompts')
           .select('*')
