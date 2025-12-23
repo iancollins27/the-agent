@@ -94,31 +94,13 @@ export async function processWebhookBusinessLogic(
     
     // For now, we'll return an empty summary, and let the workflow prompt service handle it
     let projectId: string;
-    // Parse timeline dates for caching activation criteria fields
-    const contractSigned = projectData.timeline?.contractSigned 
-      ? new Date(projectData.timeline.contractSigned).toISOString() 
-      : null;
-    const roofInstallFinalized = projectData.timeline?.roofInstallFinalized 
-      ? new Date(projectData.timeline.roofInstallFinalized).toISOString() 
-      : null;
-    
-    // Get Test_Record and Status from raw payload
-    const rawData = standardData.rawPayload?.rawData || standardData.rawPayload || {};
-    const testRecord = rawData.Test_Record === true || rawData.Test_Record === 'true';
-    const crmStatus = rawData.Status || null;
-    
     const projectUpdateData = {
       next_step: projectData.nextStep,
       last_action_check: new Date().toISOString(),
       company_id: companyUuid,
       project_track: projectTrackId,
       Address: projectData.propertyAddress,
-      project_manager: projectManagerId,
-      // Cache activation criteria fields locally
-      Contract_Signed: contractSigned,
-      Roof_Install_Finalized: roofInstallFinalized,
-      Test_Record: testRecord,
-      crm_status: crmStatus
+      project_manager: projectManagerId
     };
 
     console.log('Project update data:', projectUpdateData);

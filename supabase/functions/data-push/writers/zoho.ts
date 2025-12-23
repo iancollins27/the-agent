@@ -34,11 +34,6 @@ export class ZohoWriter {
     // Ensure we have valid authentication
     await this.ensureAuthentication();
     
-    // Handle append_note as a special case
-    if (request.operationType === 'append_note' as any && request.resourceType === 'project') {
-      return await this.handleAppendNoteOperation(request);
-    }
-    
     // Get the configuration for the resource type
     const config = this.getResourceConfig(request.resourceType, 'write');
     
@@ -54,60 +49,6 @@ export class ZohoWriter {
     
     // Make the API call
     return await this.makeZohoRequest(endpoint, method, mappedData);
-  }
-
-  /**
-   * Handles appending a note to a project's existing notes field in Zoho
-   * Reads current notes, appends new content, then updates
-   */
-  private async handleAppendNoteOperation(request: WriteRequest): Promise<any> {
-    const projectCrmId = request.resourceId;
-    const noteContent = request.data.note_content;
-    
-    console.log(`Appending note to Zoho project ${projectCrmId}`);
-    
-    try {
-      // Get API configuration
-      const apiConfig = this.integration.api_call_json || {};
-      const baseUrl = apiConfig.base_url || "www.zohoapis.com";
-      const accountOwnerName = apiConfig.account_owner_name;
-      const appLinkName = apiConfig.app_link_name;
-      const reportLinkName = apiConfig.report_link_name || "All_Bids";
-      
-      // First, fetch the current project to get existing notes
-      const getEndpoint = `https://${baseUrl}/creator/v2.1/data/${accountOwnerName}/${appLinkName}/report/${reportLinkName}/${projectCrmId}`;
-      const currentProject = await this.makeZohoRequest(getEndpoint, 'GET', null);
-      
-      // Get existing notes (field name configured in api_call_json or defaults)
-      const notesFieldName = apiConfig.notes_field || 'Notes' || 'Description';
-      const existingNotes = currentProject?.data?.[notesFieldName] || '';
-      
-      // Append new note with separator
-      const separator = existingNotes ? '\n\n---\n\n' : '';
-      const updatedNotes = existingNotes + separator + noteContent;
-      
-      // Prepare update payload with the notes field
-      const updatePayload = {
-        data: {
-          [notesFieldName]: updatedNotes
-        }
-      };
-      
-      // Update the project with appended notes
-      const updateEndpoint = `https://${baseUrl}/creator/v2.1/data/${accountOwnerName}/${appLinkName}/report/${reportLinkName}/${projectCrmId}`;
-      console.log(`Updating Zoho project ${projectCrmId} with appended note`);
-      const result = await this.makeZohoRequest(updateEndpoint, 'PATCH', updatePayload);
-      
-      return {
-        success: true,
-        message: 'Note appended successfully',
-        project_id: projectCrmId,
-        result
-      };
-    } catch (error) {
-      console.error(`Error appending note to Zoho project ${projectCrmId}:`, error);
-      throw error;
-    }
   }
 
   private getResourceConfig(resourceType: string, operationType: 'read' | 'write'): any {

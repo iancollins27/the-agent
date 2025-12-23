@@ -2,8 +2,6 @@
 import { createActionRecordTool } from '../../_shared/tools/create-action-record/index.ts';
 import { dataFetchTool } from '../../_shared/tools/data-fetch/index.ts';
 import { readCrmDataTool } from '../../_shared/tools/read-crm-data/index.ts';
-import { appendCrmNoteTool } from '../../_shared/tools/append-crm-note/index.ts';
-import { crmDataWriteTool } from '../../_shared/tools/crm-data-write/index.ts';
 
 // Local tools (unique to agent-chat)
 import { sessionManagerTool } from "./session-manager/index.ts";
@@ -16,8 +14,6 @@ const tools = [
   createActionRecordTool,
   dataFetchTool,
   readCrmDataTool,
-  appendCrmNoteTool,
-  crmDataWriteTool,
   sessionManagerTool,
   channelResponseTool,
   escalationTool,

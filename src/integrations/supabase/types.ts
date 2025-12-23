@@ -980,10 +980,8 @@ export type Database = {
         Row: {
           Address: string | null
           company_id: string | null
-          Contract_Signed: string | null
           created_at: string
           crm_id: string | null
-          crm_status: string | null
           email_summary: string | null
           id: string
           last_action_check: string | null
@@ -995,18 +993,14 @@ export type Database = {
           project_name: string | null
           Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
-          Roof_Install_Finalized: string | null
           search_vector: string | null
           summary: string | null
-          Test_Record: boolean | null
         }
         Insert: {
           Address?: string | null
           company_id?: string | null
-          Contract_Signed?: string | null
           created_at?: string
           crm_id?: string | null
-          crm_status?: string | null
           email_summary?: string | null
           id?: string
           last_action_check?: string | null
@@ -1018,18 +1012,14 @@ export type Database = {
           project_name?: string | null
           Project_status?: Database["public"]["Enums"]["project_status"] | null
           project_track?: string | null
-          Roof_Install_Finalized?: string | null
           search_vector?: string | null
           summary?: string | null
-          Test_Record?: boolean | null
         }
         Update: {
           Address?: string | null
           company_id?: string | null
-          Contract_Signed?: string | null
           created_at?: string
           crm_id?: string | null
-          crm_status?: string | null
           email_summary?: string | null
           id?: string
           last_action_check?: string | null
@@ -1041,10 +1031,8 @@ export type Database = {
           project_name?: string | null
           Project_status?: Database["public"]["Enums"]["project_status"] | null
           project_track?: string | null
-          Roof_Install_Finalized?: string | null
           search_vector?: string | null
           summary?: string | null
-          Test_Record?: boolean | null
         }
         Relationships: [
           {
@@ -1421,10 +1409,8 @@ export type Database = {
         Returns: {
           Address: string | null
           company_id: string | null
-          Contract_Signed: string | null
           created_at: string
           crm_id: string | null
-          crm_status: string | null
           email_summary: string | null
           id: string
           last_action_check: string | null
@@ -1436,10 +1422,8 @@ export type Database = {
           project_name: string | null
           Project_status: Database["public"]["Enums"]["project_status"] | null
           project_track: string | null
-          Roof_Install_Finalized: string | null
           search_vector: string | null
           summary: string | null
-          Test_Record: boolean | null
         }[]
         SetofOptions: {
           from: "*"
