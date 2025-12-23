@@ -61,14 +61,26 @@ export async function parseZohoData(rawData: any): Promise<ParsedProjectData> {
   );
   console.log('Extracted project manager ID:', projectManagerId);
   
+  // Parse Test_Record - handle various formats (boolean, string "true"/"false", etc.)
+  const testRecordValue = data.Test_Record ?? data.test_record ?? false;
+  const testRecord = testRecordValue === true || testRecordValue === 'true' || testRecordValue === 1;
+  
+  // Parse Status field
+  const status = data.Status || data.status || '';
+  
+  console.log('Parsed Test_Record:', testRecord, 'from value:', testRecordValue);
+  console.log('Parsed Status:', status);
+  
   const result = {
-    crmId: idValueString, // Using the string version of the ID
+    crmId: idValueString,
     zohoCompanyId: companyIdFromZoho,
     lastMilestone: data.Last_Milestone || '',
     nextStep: data.Next_Step || '',
-    propertyAddress: propertyAddress, // Enhanced address extraction
-    notes: data.Notes || '', // Adding the notes field
-    projectManagerId: projectManagerId, // Fixed to get the ID from either format
+    propertyAddress: propertyAddress,
+    notes: data.Notes || '',
+    projectManagerId: projectManagerId,
+    testRecord: testRecord,
+    status: status,
     timeline: {
       contractSigned: String(data.Contract_Signed || ''),
       siteVisitScheduled: String(data.Site_Visit_Scheduled || ''),

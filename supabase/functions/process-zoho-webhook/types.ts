@@ -6,7 +6,9 @@ export interface ParsedProjectData {
   nextStep: string;
   propertyAddress: string;
   notes: string;
-  projectManagerId?: string; // Add the project manager ID field
+  projectManagerId?: string;
+  testRecord?: boolean;
+  status?: string;
   timeline: {
     contractSigned: string;
     siteVisitScheduled: string;

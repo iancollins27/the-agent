@@ -92,7 +92,7 @@ export async function processWebhookBusinessLogic(
     // At this point in a real implementation, we would update project records
     // For now, let's use our existing functions but optimize later
     
-    // For now, we'll return an empty summary, and let the workflow prompt service handle it
+    // Build project update data including activation criteria fields
     let projectId: string;
     const projectUpdateData = {
       next_step: projectData.nextStep,
@@ -100,7 +100,12 @@ export async function processWebhookBusinessLogic(
       company_id: companyUuid,
       project_track: projectTrackId,
       Address: projectData.propertyAddress,
-      project_manager: projectManagerId
+      project_manager: projectManagerId,
+      // Sync activation criteria fields from CRM
+      Contract_Signed: projectData.timeline.contractSigned || null,
+      Roof_Install_Finalized: projectData.timeline.roofInstallFinalized || null,
+      Test_Record: projectData.testRecord ?? false,
+      crm_status: projectData.status || null
     };
 
     console.log('Project update data:', projectUpdateData);
