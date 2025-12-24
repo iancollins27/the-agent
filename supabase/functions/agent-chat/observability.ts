@@ -3,6 +3,17 @@
  * Handles logging, metrics, and other observability concerns
  */
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// Create service role client for internal logging (bypasses RLS)
+function getServiceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    { auth: { persistSession: false } }
+  )
+}
+
 export interface ConversationMetrics {
   promptTokens: number;
   completionTokens: number;
@@ -27,16 +38,16 @@ export interface LogObservabilityParams {
 export async function logObservability(params: LogObservabilityParams): Promise<void> {
   try {
     const {
-      supabase,
       projectId,
-      userProfile,
-      companyId,
       messages,
       response,
       toolCalls,
       model,
       usage
     } = params;
+
+    // Use service role client for logging (internal operation, bypasses RLS)
+    const serviceClient = getServiceClient();
 
     // Calculate metrics
     const metrics: Partial<ConversationMetrics> = {};
@@ -70,8 +81,8 @@ export async function logObservability(params: LogObservabilityParams): Promise<
       completed_at: new Date().toISOString()
     };
 
-    // Insert the prompt run record
-    const { error: promptRunError } = await supabase
+    // Insert using service role client (bypasses RLS)
+    const { error: promptRunError } = await serviceClient
       .from('prompt_runs')
       .insert(promptRunData);
 
@@ -101,6 +112,9 @@ export async function logPromptCompletion(
   metrics?: Partial<ConversationMetrics>
 ): Promise<void> {
   try {
+    // Use service role client for logging (internal operation, bypasses RLS)
+    const serviceClient = getServiceClient();
+    
     const updateData: any = {
       prompt_output: finalAnswer,
       status: 'COMPLETED',
@@ -114,7 +128,7 @@ export async function logPromptCompletion(
       if (metrics.cost !== undefined) updateData.usd_cost = metrics.cost;
     }
     
-    await supabase
+    await serviceClient
       .from('prompt_runs')
       .update(updateData)
       .eq('id', promptRunId);
