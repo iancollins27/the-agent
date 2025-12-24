@@ -11,11 +11,8 @@ import {
   ToolResponse 
 } from '../../_shared/tool-types/index.ts';
 import { getEdgeFunctionName } from '../../_shared/tool-definitions/index.ts';
-
 // Legacy in-process imports for tools not yet migrated
-import { createActionRecordTool } from '../../_shared/tools/create-action-record/index.ts';
 import { dataFetchTool } from '../../_shared/tools/data-fetch/index.ts';
-
 /**
  * Tools that have been migrated to edge functions
  */
