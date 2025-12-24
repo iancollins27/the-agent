@@ -163,11 +163,11 @@ ${roleDescription}
 
 IMPORTANT: You are speaking with ${contact.full_name} directly. Use tools like data_fetch with project_id: ${contactProjectData.id} to get current project information.
 
-Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record'].includes(t.name)).map(t => t.name).join(', ')}`
+Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create_action_record', 'crm_write'].includes(t.name)).map(t => t.name).join(', ')}`
 
             // Filter tools to contact-appropriate ones
             const contactTools = toolRegistry.getAllTools().filter(tool => 
-              ['data_fetch', 'create_action_record'].includes(tool.name)
+              ['data_fetch', 'create_action_record', 'crm_write'].includes(tool.name)
             )
             
             const toolDefinitions = contactTools.map(tool => ({
@@ -367,7 +367,7 @@ IMPORTANT: You are speaking with ${contact.full_name} directly.`
 
             // Filter tools to contact-appropriate ones (NO session_manager)
             const contactTools = toolRegistry.getAllTools().filter(tool => 
-              ['identify_project', 'data_fetch', 'create_action_record'].includes(tool.name)
+              ['identify_project', 'data_fetch', 'create_action_record', 'crm_write'].includes(tool.name)
             )
             
             const toolDefinitions = contactTools.map(tool => ({
