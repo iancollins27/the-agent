@@ -148,7 +148,7 @@ serve(async (req) => {
     }
 
     // Create or update the chat session for this email
-    const sessionResponse = await fetch(`${supabaseUrl}/functions/v1/chat-session-manager`, {
+    const sessionResponse = await fetch(`${supabaseUrl}/functions/v1/tool-session-manager`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
