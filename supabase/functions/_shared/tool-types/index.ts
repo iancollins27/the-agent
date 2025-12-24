@@ -16,3 +16,10 @@ export {
   errorResponse,
   noActionResponse
 } from './request-response.ts';
+
+export {
+  invokeTool,
+  buildSystemSecurityContext,
+  buildContactSecurityContext,
+  buildAdminSecurityContext
+} from './tool-invoker.ts';

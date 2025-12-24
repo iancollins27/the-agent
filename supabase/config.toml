@@ -54,3 +54,15 @@ verify_jwt = false
 
 [functions.tool-email-summary]
 verify_jwt = false
+
+[functions.tool-identify-project]
+verify_jwt = false
+
+[functions.tool-session-manager]
+verify_jwt = false
+
+[functions.tool-channel-response]
+verify_jwt = false
+
+[functions.tool-escalation]
+verify_jwt = false
