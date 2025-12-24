@@ -2,19 +2,25 @@
  * Shared tool types - main export file
  */
 
-export {
+export type {
   ToolSecurityContext,
-  SecurityValidationResult,
+  SecurityValidationResult
+} from './security-context.ts';
+
+export {
   validateSecurityContext,
   buildSystemSecurityContext,
   buildContactSecurityContext,
   buildAdminSecurityContext
 } from './security-context.ts';
 
-export {
+export type {
   ToolRequest,
   ToolRequestMetadata,
-  ToolResponse,
+  ToolResponse
+} from './request-response.ts';
+
+export {
   successResponse,
   errorResponse,
   noActionResponse
