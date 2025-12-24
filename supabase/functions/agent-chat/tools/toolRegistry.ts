@@ -17,6 +17,7 @@ const AGENT_CHAT_TOOLS = [
   'channel_response',
   'escalation',
   'crm_read',
+  'crm_write',
   'knowledge_lookup'
 ];
 

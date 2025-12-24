@@ -14,7 +14,8 @@ export const ENABLED_TOOLS = [
   'identify_project',
   'session_manager',
   'channel_response',
-  'escalation'
+  'escalation',
+  'crm_write'
 ] as const;
 
 export type EnabledTool = typeof ENABLED_TOOLS[number];
