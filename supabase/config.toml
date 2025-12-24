@@ -1,4 +1,3 @@
-
 project_id = "lvifsxsrbluehopamqpy"
 
 [api]
@@ -39,4 +38,19 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-communication]
+verify_jwt = false
+
+[functions.tool-create-action-record]
+verify_jwt = false
+
+[functions.tool-crm-read]
+verify_jwt = false
+
+[functions.tool-crm-write]
+verify_jwt = false
+
+[functions.tool-knowledge-lookup]
+verify_jwt = false
+
+[functions.tool-email-summary]
 verify_jwt = false
