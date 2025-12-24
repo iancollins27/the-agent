@@ -1,13 +1,112 @@
-
 /**
- * Execute tool calls using the registry
+ * Tool executor for test-workflow-prompt orchestrator
+ * Executes tools via edge function invocation with authorization and logging
  */
 
 import { getTool } from './toolRegistry.ts';
 import { logToolCall } from '../database/tool-logs.ts';
 import { ToolContext } from './types.ts';
+import { 
+  buildSystemSecurityContext, 
+  buildAdminSecurityContext,
+  ToolRequest,
+  ToolResponse 
+} from '../../_shared/tool-types/index.ts';
+import { getEdgeFunctionName } from '../../_shared/tool-definitions/index.ts';
 
-// Authorization check function
+/**
+ * Tools that have been migrated to edge functions
+ */
+const EDGE_FUNCTION_TOOLS = [
+  'identify_project',
+  'session_manager', 
+  'channel_response',
+  'escalation',
+  'create_action_record',
+  'crm_read',
+  'crm_write',
+  'knowledge_lookup',
+  'email_summary'
+];
+
+/**
+ * Check if a tool should be executed via edge function
+ */
+function shouldUseEdgeFunction(toolName: string): boolean {
+  return EDGE_FUNCTION_TOOLS.includes(toolName);
+}
+
+/**
+ * Execute a tool via edge function invocation
+ */
+async function invokeToolEdgeFunction(
+  supabase: any,
+  toolName: string,
+  args: any,
+  context: ToolContext,
+  promptRunId: string
+): Promise<ToolResponse> {
+  const edgeFunctionName = getEdgeFunctionName(toolName);
+  
+  if (!edgeFunctionName) {
+    console.error(`[toolExecutor] No edge function mapping for tool: ${toolName}`);
+    return {
+      status: 'error',
+      error: `No edge function mapping for tool: ${toolName}`
+    };
+  }
+
+  // Build security context based on user profile
+  let securityContext;
+  if (context.userProfile?.id) {
+    securityContext = buildAdminSecurityContext(
+      context.companyId || '',
+      context.userProfile.id,
+      context.projectId
+    );
+  } else {
+    securityContext = buildSystemSecurityContext(
+      context.companyId || '',
+      context.projectId
+    );
+  }
+
+  const request: ToolRequest = {
+    securityContext,
+    args,
+    metadata: {
+      orchestrator: 'test-workflow-prompt',
+      prompt_run_id: promptRunId,
+      timestamp: new Date().toISOString()
+    }
+  };
+
+  console.log(`[toolExecutor] Invoking edge function ${edgeFunctionName} for tool ${toolName}`);
+
+  try {
+    const { data, error } = await supabase.functions.invoke(edgeFunctionName, {
+      body: request
+    });
+
+    if (error) {
+      console.error(`[toolExecutor] Edge function error for ${toolName}:`, error);
+      return {
+        status: 'error',
+        error: error.message || 'Edge function invocation failed'
+      };
+    }
+
+    return data as ToolResponse;
+  } catch (err) {
+    console.error(`[toolExecutor] Exception invoking ${edgeFunctionName}:`, err);
+    return {
+      status: 'error',
+      error: err.message || 'Tool invocation exception'
+    };
+  }
+}
+
+// Authorization check function (used for in-process execution fallback)
 async function authorizeToolAccess(
   supabase: any,
   toolName: string,
@@ -66,24 +165,6 @@ export async function executeToolCall(
   companyId?: string,
   userProfile?: any
 ) {
-  const tool = getTool(toolName);
-  if (!tool) {
-    console.error(`Unknown tool requested: ${toolName}`);
-    return {
-      status: "error",
-      error: `Unknown tool: ${toolName}`
-    };
-  }
-  
-  // Create tool context with company ID for access control
-  const context: ToolContext = {
-    supabase,
-    promptRunId,
-    projectId,
-    companyId,
-    userProfile
-  };
-  
   // Generate a consistent tool call ID
   const toolCallId = `call_${Math.random().toString(36).substring(2, 15)}`;
   const startTime = Date.now();
@@ -97,36 +178,68 @@ export async function executeToolCall(
       argsString = "Error stringifying args";
     }
     
-    console.log(`Executing tool ${toolName} with args: ${argsString.substring(0, 100)}${argsString.length > 100 ? '...' : ''}`);
+    console.log(`[toolExecutor] Executing tool ${toolName} (edge function: ${shouldUseEdgeFunction(toolName)})`);
     
-    // Perform authorization check before execution
-    if (companyId) {
-      const isAuthorized = await authorizeToolAccess(supabase, toolName, companyId, userProfile, projectId);
-      if (!isAuthorized) {
-        const authError = {
+    let result;
+    
+    if (shouldUseEdgeFunction(toolName)) {
+      // Execute via edge function
+      const context: ToolContext = {
+        supabase,
+        promptRunId,
+        projectId,
+        companyId,
+        userProfile
+      };
+      
+      result = await invokeToolEdgeFunction(supabase, toolName, args, context, promptRunId);
+    } else {
+      // Fall back to in-process execution for non-migrated tools
+      const tool = getTool(toolName);
+      if (!tool) {
+        console.error(`Unknown tool requested: ${toolName}`);
+        return {
           status: "error",
-          error: "Unauthorized access",
-          details: "You don't have permission to use this tool with the provided data"
+          error: `Unknown tool: ${toolName}`
         };
-        
-        // Log the unauthorized attempt
-        await logToolCall(
-          supabase, 
-          promptRunId, 
-          toolName, 
-          toolCallId, 
-          argsString, 
-          JSON.stringify(authError), 
-          403, 
-          Date.now() - startTime
-        );
-        
-        return authError;
       }
+      
+      // Create tool context with company ID for access control
+      const context: ToolContext = {
+        supabase,
+        promptRunId,
+        projectId,
+        companyId,
+        userProfile
+      };
+      
+      // Perform authorization check before execution (for in-process only)
+      if (companyId) {
+        const isAuthorized = await authorizeToolAccess(supabase, toolName, companyId, userProfile, projectId);
+        if (!isAuthorized) {
+          const authError = {
+            status: "error",
+            error: "Unauthorized access",
+            details: "You don't have permission to use this tool with the provided data"
+          };
+          
+          await logToolCall(
+            supabase, 
+            promptRunId, 
+            toolName, 
+            toolCallId, 
+            argsString, 
+            JSON.stringify(authError), 
+            403, 
+            Date.now() - startTime
+          );
+          
+          return authError;
+        }
+      }
+      
+      result = await tool.execute(args, context);
     }
-    
-    // Execute the tool first - don't log until we have results
-    const result = await tool.execute(args, context);
     
     // Calculate duration
     const duration = Date.now() - startTime;
@@ -139,9 +252,9 @@ export async function executeToolCall(
       resultString = "Error stringifying result";
     }
     
-    console.log(`Tool ${toolName} completed in ${duration}ms with status: ${result.status || 'unknown'}`);
+    console.log(`[toolExecutor] Tool ${toolName} completed in ${duration}ms with status: ${result.status || 'unknown'}`);
     
-    // Log the tool call with complete information - only log ONCE after execution
+    // Log the tool call
     await logToolCall(
       supabase, 
       promptRunId, 
@@ -149,13 +262,13 @@ export async function executeToolCall(
       toolCallId, 
       argsString, 
       resultString, 
-      200, 
+      result.status === 'error' ? 500 : 200, 
       duration
     );
     
     return result;
   } catch (error) {
-    console.error(`Error executing tool ${toolName}:`, error);
+    console.error(`[toolExecutor] Error executing tool ${toolName}:`, error);
     
     const duration = Date.now() - startTime;
     const errorResult = {
@@ -171,7 +284,6 @@ export async function executeToolCall(
       errorResultString = `{"status":"error","error":"Failed to stringify error"}`;
     }
     
-    // Only log once with the error information
     await logToolCall(
       supabase, 
       promptRunId, 
