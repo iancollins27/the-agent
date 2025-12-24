@@ -60,3 +60,49 @@ export function validateSecurityContext(
   
   return { valid: true };
 }
+
+/**
+ * Build security context for system orchestrators (no specific user)
+ */
+export function buildSystemSecurityContext(
+  companyId: string,
+  projectId?: string
+): ToolSecurityContext {
+  return {
+    company_id: companyId,
+    user_type: 'system',
+    project_id: projectId
+  };
+}
+
+/**
+ * Build security context for customer-facing orchestrators
+ */
+export function buildContactSecurityContext(
+  companyId: string,
+  contactId: string,
+  projectId?: string
+): ToolSecurityContext {
+  return {
+    company_id: companyId,
+    contact_id: contactId,
+    user_type: 'contact',
+    project_id: projectId
+  };
+}
+
+/**
+ * Build security context for admin users
+ */
+export function buildAdminSecurityContext(
+  companyId: string,
+  userId: string,
+  projectId?: string
+): ToolSecurityContext {
+  return {
+    company_id: companyId,
+    user_id: userId,
+    user_type: 'admin',
+    project_id: projectId
+  };
+}

@@ -5,7 +5,10 @@
 export {
   ToolSecurityContext,
   SecurityValidationResult,
-  validateSecurityContext
+  validateSecurityContext,
+  buildSystemSecurityContext,
+  buildContactSecurityContext,
+  buildAdminSecurityContext
 } from './security-context.ts';
 
 export {
@@ -16,10 +19,3 @@ export {
   errorResponse,
   noActionResponse
 } from './request-response.ts';
-
-export {
-  invokeTool,
-  buildSystemSecurityContext,
-  buildContactSecurityContext,
-  buildAdminSecurityContext
-} from './tool-invoker.ts';
