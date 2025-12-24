@@ -92,7 +92,7 @@ export async function getSessionContext(
     }
     
     // Create a new session via the session manager edge function
-    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-session-manager`, {
+    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/tool-session-manager`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
