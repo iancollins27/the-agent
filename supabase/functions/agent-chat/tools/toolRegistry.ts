@@ -1,73 +1,59 @@
-// Shared tools
-import { createActionRecordTool } from '../../_shared/tools/create-action-record/index.ts';
-import { dataFetchTool } from '../../_shared/tools/data-fetch/index.ts';
-import { readCrmDataTool } from '../../_shared/tools/read-crm-data/index.ts';
+/**
+ * Tool registry for agent-chat
+ * Uses centralized tool definitions from _shared/tool-definitions
+ */
 
-// Local tools (unique to agent-chat)
-import { sessionManagerTool } from "./session-manager/index.ts";
-import { channelResponseTool } from "./channel-response/index.ts";
-import { escalationTool } from "./escalation/index.ts";
-import { identifyProjectTool } from "./identify-project/index.ts";
+import { 
+  TOOL_DEFINITIONS, 
+  getToolDefinitionsForLLM,
+  ToolDefinition 
+} from '../../_shared/tool-definitions/index.ts';
 
-// Register all available tools
-const tools = [
-  createActionRecordTool,
-  dataFetchTool,
-  readCrmDataTool,
-  sessionManagerTool,
-  channelResponseTool,
-  escalationTool,
-  identifyProjectTool
+// Tools available to agent-chat
+const AGENT_CHAT_TOOLS = [
+  'create_action_record',
+  'identify_project',
+  'session_manager',
+  'channel_response',
+  'escalation',
+  'crm_read',
+  'knowledge_lookup'
 ];
 
 // Create the toolRegistry object that agent-chat expects
 export const toolRegistry = {
-  getAllTools: () => tools,
+  getAllTools: () => AGENT_CHAT_TOOLS.map(name => TOOL_DEFINITIONS[name]).filter(Boolean),
   
-  getToolNames: () => tools.map(tool => tool.name),
+  getToolNames: () => AGENT_CHAT_TOOLS,
   
   filterTools: (toolNames: string[]) => {
-    const selectedTools = tools.filter(tool => 
-      toolNames.includes(tool.name)
+    const selectedTools = toolNames.filter(name => 
+      AGENT_CHAT_TOOLS.includes(name) && name in TOOL_DEFINITIONS
     );
     
-    console.log(`Filtered ${selectedTools.length} tools from ${tools.length} available`);
+    console.log(`Filtered ${selectedTools.length} tools from ${toolNames.length} requested`);
     
-    return selectedTools.map(tool => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description,
-        // Handle both schema (shared tools) and parameters (local tools)
-        parameters: (tool as any).schema || (tool as any).parameters
-      }
-    }));
+    return getToolDefinitionsForLLM(selectedTools);
   },
   
   getToolDefinitions: () => {
-    return tools.map(tool => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description,
-        // Handle both schema (shared tools) and parameters (local tools)
-        parameters: (tool as any).schema || (tool as any).parameters
-      }
-    }));
+    return getToolDefinitionsForLLM(AGENT_CHAT_TOOLS);
   },
   
   getFormattedToolDefinitions: () => {
-    return tools.map(tool => {
-      // Handle both schema (shared tools) and parameters (local tools)
-      const params = JSON.stringify((tool as any).schema || (tool as any).parameters, null, 2);
-      return `Tool: ${tool.name}\nDescription: ${tool.description}\nParameters: ${params}`;
-    }).join('\n\n');
+    return AGENT_CHAT_TOOLS
+      .filter(name => name in TOOL_DEFINITIONS)
+      .map(name => {
+        const def = TOOL_DEFINITIONS[name];
+        const params = JSON.stringify(def.schema, null, 2);
+        return `Tool: ${def.name}\nDescription: ${def.description}\nParameters: ${params}`;
+      }).join('\n\n');
   }
 };
 
 // Keep backward compatibility exports
 export function getToolNames(): string[] {
-  return tools.map(tool => tool.name);
+  return AGENT_CHAT_TOOLS;
 }
 
 export function filterTools(toolNames: string[]) {
