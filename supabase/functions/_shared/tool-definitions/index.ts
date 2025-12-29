@@ -236,7 +236,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 
   crm_write: {
     name: 'crm_write',
-    description: 'Writes data to the CRM system for projects, tasks, or contacts. Supports multiple CRM providers including Zoho and JobProgress.',
+    description: 'Writes data to the CRM system for projects, tasks, notes, or contacts. For notes/activities, use resource_type "note" with the note content in data.content or data.message. This will create an activity record in Zoho.',
     schema: {
       type: 'object',
       properties: {
@@ -247,7 +247,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         resource_type: {
           type: 'string',
           enum: ['project', 'task', 'note', 'contact'],
-          description: 'The type of resource to write'
+          description: 'The type of resource to write. Use "note" to create activities/notes in the CRM.'
         },
         operation_type: {
           type: 'string',
@@ -260,7 +260,7 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
         },
         data: {
           type: 'object',
-          description: 'The data to write to the CRM, with keys matching the fields in our canonical model'
+          description: 'The data to write. For notes, include "content" or "message" with the note text.'
         },
         requires_approval: {
           type: 'boolean',
@@ -314,30 +314,6 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       required: ['project_id']
     },
     edge_function: 'tool-email-summary'
-  },
-
-  create_zoho_note: {
-    name: 'create_zoho_note',
-    description: 'Creates an activity/note on the Zoho Creator record for a project. Use this when you need to leave a note, log an activity, or record information about a project in the CRM.',
-    schema: {
-      type: 'object',
-      properties: {
-        projectId: {
-          type: 'string',
-          description: 'The UUID of the project to add the note to'
-        },
-        message: {
-          type: 'string',
-          description: 'The content of the note/activity to create'
-        },
-        actionId: {
-          type: 'string',
-          description: 'Optional action record ID to update with the result'
-        }
-      },
-      required: ['projectId', 'message']
-    },
-    edge_function: 'create-zoho-note'
   }
 };
 

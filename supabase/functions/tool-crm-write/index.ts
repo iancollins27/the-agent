@@ -82,6 +82,41 @@ serve(async (req) => {
       );
     }
     
+    // Handle note creation by routing to create-zoho-note function
+    if (args.resource_type === 'note' && args.operation_type === 'create') {
+      const noteContent = args.data.content || args.data.message || args.data.notes || args.data.text;
+      
+      if (!noteContent) {
+        return new Response(
+          JSON.stringify(errorResponse('Note content is required. Provide content in data.content or data.message')),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log(`[tool-crm-write] Routing note creation to create-zoho-note for project ${projectId}`);
+      
+      const { data: noteResult, error: noteError } = await supabase.functions.invoke('create-zoho-note', {
+        body: {
+          projectId: projectId,
+          message: noteContent
+        }
+      });
+      
+      if (noteError) {
+        console.error(`[tool-crm-write] Note creation failed:`, noteError);
+        return new Response(
+          JSON.stringify(errorResponse(`Failed to create note: ${noteError.message}`)),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log(`[tool-crm-write] Note created successfully in Zoho`);
+      return new Response(
+        JSON.stringify(successResponse(noteResult, 'Note created successfully in Zoho CRM')),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // For update/delete, resource_id is required
     if ((args.operation_type === 'update' || args.operation_type === 'delete') && !args.resource_id) {
       return new Response(
