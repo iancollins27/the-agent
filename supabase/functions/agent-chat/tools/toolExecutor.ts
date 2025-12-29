@@ -25,8 +25,7 @@ const EDGE_FUNCTION_TOOLS = [
   'crm_read',
   'crm_write',
   'knowledge_lookup',
-  'email_summary',
-  'create_zoho_note'
+  'email_summary'
 ];
 
 /**

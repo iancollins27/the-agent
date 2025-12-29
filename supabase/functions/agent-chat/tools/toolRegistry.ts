@@ -18,8 +18,7 @@ const AGENT_CHAT_TOOLS = [
   'escalation',
   'crm_read',
   'crm_write',
-  'knowledge_lookup',
-  'create_zoho_note'
+  'knowledge_lookup'
 ];
 
 // Create the toolRegistry object that agent-chat expects
