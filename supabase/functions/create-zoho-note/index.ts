@@ -37,7 +37,12 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { projectId, message, actionId } = await req.json() as RequestBody;
+    const body = await req.json();
+    
+    // Support both direct calls and ToolRequest format (from agent-chat toolExecutor)
+    const projectId = body.args?.projectId || body.projectId;
+    const message = body.args?.message || body.message;
+    const actionId = body.args?.actionId || body.actionId;
 
     if (!projectId || !message) {
       return new Response(
@@ -45,6 +50,8 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log(`[create-zoho-note] Creating note for project ${projectId}: ${message.substring(0, 50)}...`);
 
     // Create a Supabase client
     // @ts-ignore: Deno namespace

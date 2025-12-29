@@ -314,6 +314,30 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
       required: ['project_id']
     },
     edge_function: 'tool-email-summary'
+  },
+
+  create_zoho_note: {
+    name: 'create_zoho_note',
+    description: 'Creates an activity/note on the Zoho Creator record for a project. Use this when you need to leave a note, log an activity, or record information about a project in the CRM.',
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'The UUID of the project to add the note to'
+        },
+        message: {
+          type: 'string',
+          description: 'The content of the note/activity to create'
+        },
+        actionId: {
+          type: 'string',
+          description: 'Optional action record ID to update with the result'
+        }
+      },
+      required: ['projectId', 'message']
+    },
+    edge_function: 'create-zoho-note'
   }
 };
 
