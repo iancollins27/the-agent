@@ -84,7 +84,10 @@ serve(async (req) => {
     
     // Handle note creation by routing to create-zoho-note function
     if (args.resource_type === 'note' && args.operation_type === 'create') {
-      const noteContent = args.data.content || args.data.message || args.data.notes || args.data.text;
+      // Check multiple possible locations for note content
+      const noteContent = args.data?.content || args.data?.message || args.data?.notes || args.data?.text 
+        || (args as Record<string, unknown>).content || (args as Record<string, unknown>).message 
+        || (args as Record<string, unknown>).body || (args as Record<string, unknown>).note;
       
       if (!noteContent) {
         return new Response(
