@@ -66,3 +66,6 @@ verify_jwt = false
 
 [functions.tool-escalation]
 verify_jwt = false
+
+[functions.create-zoho-note]
+verify_jwt = false
