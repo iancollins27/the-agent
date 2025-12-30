@@ -31,6 +31,27 @@ export async function processMCPRequest(
     throw new Error("OpenAI API key not configured");
   }
 
+  // Extract or fetch company_id for security context
+  let companyId = contextData.company_id;
+  
+  if (!companyId && projectId) {
+    // Fetch company_id from project if not in contextData
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('company_id')
+      .eq('id', projectId)
+      .single();
+    
+    if (projectData?.company_id) {
+      companyId = projectData.company_id;
+      console.log(`Fetched company_id ${companyId} from project ${projectId}`);
+    } else if (projectError) {
+      console.warn(`Failed to fetch company_id from project: ${projectError.message}`);
+    }
+  }
+  
+  console.log(`Using companyId: ${companyId || 'none'} for tool execution`);
+
   // Get or create a conversation ID
   const conversationId = contextData.conversationId || generateConversationId();
   console.log(`Using conversation ID: ${conversationId}`);
@@ -241,7 +262,8 @@ export async function processMCPRequest(
               call.name, 
               call.arguments, 
               promptRunId, 
-              projectId
+              projectId,
+              companyId
             );
             
             // Store the tool output for later processing
