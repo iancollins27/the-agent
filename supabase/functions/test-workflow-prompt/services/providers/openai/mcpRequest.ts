@@ -155,7 +155,7 @@ export async function processMCPRequest(
       const payload = {
         model: model,
         messages: context.messages,
-        max_completion_tokens: 2000
+        max_completion_tokens: 16000
       };
       
       if (context.tools && context.tools.length > 0) {
@@ -184,6 +184,15 @@ export async function processMCPRequest(
 
       const data = await response.json();
       const message = data.choices[0].message;
+      const finishReason = data.choices[0].finish_reason;
+      
+      // Log completion stats for monitoring
+      console.log(`OpenAI completion: finish_reason=${finishReason}, tokens=${data.usage?.completion_tokens || 0}/${data.usage?.total_tokens || 0}, tool_calls=${message.tool_calls?.length || 0}`);
+      
+      // Warn if response was truncated
+      if (finishReason === 'length') {
+        console.warn(`Response truncated at ${data.usage?.completion_tokens} completion tokens - model may not have completed reasoning`);
+      }
       
       // Add the assistant message to our context
       context.messages.push(message);
