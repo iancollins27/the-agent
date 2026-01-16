@@ -57,9 +57,27 @@ const ExecutionsList: React.FC = () => {
   const [hasToolCalls, setHasToolCalls] = useState(() => {
     return searchParams.get('toolCalls') === 'true';
   });
+  const [trackFilter, setTrackFilter] = useState<string | null>(() => {
+    return searchParams.get('track') || null;
+  });
 
   // Debounce search term to avoid too many queries
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
+  // Fetch available project tracks
+  const { data: projectTracks } = useQuery({
+    queryKey: ['project-tracks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_tracks')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 1000 * 60 * 30, // 30 minutes - tracks rarely change
+  });
 
   // Function to fetch executions
   const fetchExecutions = async () => {
@@ -94,7 +112,12 @@ const ExecutionsList: React.FC = () => {
         projects:project_id (
           id, 
           crm_id, 
-          Address
+          Address,
+          project_track,
+          project_tracks:project_track (
+            id,
+            name
+          )
         ),
         prompt_tokens,
         completion_tokens,
@@ -107,6 +130,20 @@ const ExecutionsList: React.FC = () => {
     // Apply filters
     if (statusFilter) {
       query = query.eq('status', statusFilter);
+    }
+
+    // Apply track filter
+    if (trackFilter) {
+      const { data: projectsWithTrack } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('project_track', trackFilter);
+      
+      if (projectsWithTrack && projectsWithTrack.length > 0) {
+        query = query.in('project_id', projectsWithTrack.map(p => p.id));
+      } else {
+        return { data: [], count: 0 };
+      }
     }
     
     // Apply search filters
@@ -174,7 +211,7 @@ const ExecutionsList: React.FC = () => {
 
   // Query for executions
   const { data: executions, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['executions', currentPage, pageSize, statusFilter, debouncedSearchTerm, hasToolCalls],
+    queryKey: ['executions', currentPage, pageSize, statusFilter, debouncedSearchTerm, hasToolCalls, trackFilter],
     queryFn: fetchExecutions,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
@@ -186,6 +223,7 @@ const ExecutionsList: React.FC = () => {
     status: string | null;
     search: string;
     toolCalls: boolean;
+    track: string | null;
   }>) => {
     const newParams = new URLSearchParams(searchParams);
     
@@ -206,6 +244,14 @@ const ExecutionsList: React.FC = () => {
     setStatusFilter(newStatus);
     setCurrentPage(1);
     updateURLParams({ status: newStatus, page: 1 });
+  };
+
+  // Handle track filter changes
+  const handleTrackFilterChange = (value: string) => {
+    const newTrack = value === 'all' ? null : value;
+    setTrackFilter(newTrack);
+    setCurrentPage(1);
+    updateURLParams({ track: newTrack, page: 1 });
   };
 
   // Handle search input change
@@ -314,6 +360,23 @@ const ExecutionsList: React.FC = () => {
                 <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="COMPLETED">Completed</SelectItem>
                 <SelectItem value="ERROR">Error</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Project Track Filter */}
+          <div className="flex items-center space-x-2">
+            <Select value={trackFilter || 'all'} onValueChange={handleTrackFilterChange}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Filter by track" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tracks</SelectItem>
+                {projectTracks?.map((track) => (
+                  <SelectItem key={track.id} value={track.id}>
+                    {track.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
