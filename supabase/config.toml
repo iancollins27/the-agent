@@ -69,3 +69,6 @@ verify_jwt = false
 
 [functions.create-zoho-note]
 verify_jwt = false
+
+[functions.mcp-tools-server]
+verify_jwt = false
