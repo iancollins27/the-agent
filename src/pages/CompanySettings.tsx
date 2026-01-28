@@ -6,6 +6,7 @@ import KnowledgeBaseSettings from "../components/Settings/KnowledgeBaseSettings"
 import CommunicationSettings from "../components/Settings/CommunicationSettings";
 import ProjectTrackSettings from "../components/Settings/ProjectTrackSettings";
 import EscalationSettings from "../components/Settings/EscalationSettings";
+import ExternalAccessSettings from "../components/Settings/ExternalAccessSettings";
 import { SettingsProvider } from "@/providers/SettingsProvider";
 
 const CompanySettings: React.FC = () => {
@@ -20,11 +21,12 @@ const CompanySettings: React.FC = () => {
           <h1 className="text-3xl font-bold mb-6">Company Settings</h1>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-            <TabsList className="grid grid-cols-4 w-full sm:w-[800px]">
+            <TabsList className="grid grid-cols-5 w-full sm:w-[1000px]">
               <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
               <TabsTrigger value="communications">Communication</TabsTrigger>
               <TabsTrigger value="project-tracks">Project Tracks</TabsTrigger>
               <TabsTrigger value="escalations">Escalations</TabsTrigger>
+              <TabsTrigger value="api-keys">API Keys</TabsTrigger>
             </TabsList>
             
             <TabsContent value="knowledge-base">
@@ -41,6 +43,10 @@ const CompanySettings: React.FC = () => {
             
             <TabsContent value="escalations">
               <EscalationSettings />
+            </TabsContent>
+            
+            <TabsContent value="api-keys">
+              <ExternalAccessSettings />
             </TabsContent>
           </Tabs>
         </div>
