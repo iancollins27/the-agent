@@ -1,75 +1,43 @@
-## MCP Server for External Agent Access - IMPLEMENTED ✅
 
-This plan creates an MCP server edge function that exposes your CRM tools (and other tools) to external AI agents like Claude Desktop, Cursor, or custom applications.
 
-**Status: COMPLETE**
+## Fix: API Key Creation - Profile Query Bug
 
----
+### Problem
+The profile query in `createKeyMutation` doesn't filter by the current user's ID. Due to RLS policies that allow viewing all company profiles, the query returns multiple rows, causing `.single()` to fail.
 
-## What Was Built
+### Solution
+Add an explicit filter for the current user's ID before calling `.single()`.
 
-### Database Table: `mcp_external_access_keys`
-- Stores hashed API keys for external agent authentication
-- Maps keys to company_id for multi-tenant isolation
-- Whitelists tools per key via `enabled_tools` array
-- RLS policies for company-scoped access
+### File to Modify
 
-### Edge Function: `mcp-tools-server`
-- Uses mcp-lite and Hono for MCP protocol support
-- Validates API keys against the database
-- Dynamically registers tools based on key permissions
-- Invokes existing tool edge functions with security context
+| File | Change |
+|------|--------|
+| `src/components/Settings/ExternalAccessSettings.tsx` | Fix the profile query to filter by `auth.uid()` |
 
----
+### Code Change
 
-## Usage
-
-**MCP Server URL:**
-```
-https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/mcp-tools-server
+**Before:**
+```typescript
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('company_id')
+  .single();
 ```
 
-**Headers:**
-```
-Authorization: Bearer <api_key>
-```
+**After:**
+```typescript
+const { data: { user } } = await supabase.auth.getUser();
 
-### Creating an API Key
+if (!user) {
+  throw new Error('Not authenticated');
+}
 
-To create an API key, generate a random key and store its SHA-256 hash:
-
-```sql
--- Example: Insert a new key (you'd generate the hash in code)
-INSERT INTO mcp_external_access_keys (
-  company_id,
-  key_hash,
-  key_name,
-  enabled_tools
-) VALUES (
-  'your-company-uuid',
-  'sha256-hash-of-your-key',
-  'Claude Desktop - My Mac',
-  ARRAY['crm_read', 'crm_write']
-);
+const { data: profile } = await supabase
+  .from('profiles')
+  .select('company_id')
+  .eq('id', user.id)
+  .single();
 ```
 
----
-
-## Files Created
-
-| File | Purpose |
-|------|---------|
-| `supabase/functions/mcp-tools-server/index.ts` | MCP server entry point |
-| `supabase/functions/mcp-tools-server/auth.ts` | API key validation |
-| `supabase/functions/mcp-tools-server/tool-invoker.ts` | Delegates to existing tools |
-| `supabase/functions/mcp-tools-server/deno.json` | Import map for mcp-lite |
-
----
-
-## Future Enhancements
-
-- Admin UI page to create/manage API keys
-- Rate limiting enforcement
-- More detailed audit logging to `audit_log` table
-- OAuth flow for more complex auth scenarios
+This ensures we only fetch the current user's profile, which will return exactly one row.
 
