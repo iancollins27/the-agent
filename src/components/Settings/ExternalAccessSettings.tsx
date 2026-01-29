@@ -86,9 +86,16 @@ const ExternalAccessSettings: React.FC = () => {
     mutationFn: async ({ keyName, tools }: { keyName: string; tools: string[] }) => {
       const { key, hash } = await generateApiKey();
       
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('company_id')
+        .eq('id', user.id)
         .single();
       
       if (!profile?.company_id) {
