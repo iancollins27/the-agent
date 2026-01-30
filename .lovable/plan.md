@@ -1,127 +1,65 @@
 
+Goal
+- Stop the recurring 500 error during MCP “initialize/handshake” where the server crashes with:
+  - {"error":"Internal server error","details":"Cannot read properties of undefined (reading 'inputSchema')"}
+- Make the server resilient to MCP client handshake patterns and easier to debug when it happens again.
 
-## Fix: MCP Server Tool Registration - Schema Format Mismatch
+What I found (from code + prior logs)
+- The crash is thrown inside `mcp-lite` at `McpServer.tool(...)` while reading `inputSchema`.
+- In our edge function we register tools like this:
 
-### Problem Identified
-The error `{"error":"Internal server error","details":"Cannot read properties of undefined (reading 'inputSchema')"}` occurs because:
+  - `mcpServer.tool({ name, description, inputSchema, handler })`
 
-1. The current tool definitions in `TOOL_DEFINITIONS` use **plain JSON Schema objects**
-2. The `mcp-lite` library's `.tool()` method expects **Zod schemas** (or other Standard Schema libraries)
-3. When `mcp-lite` tries to convert the schema, it fails because it doesn't know how to handle raw JSON Schema
+- The specific error (“reading 'inputSchema' of undefined”) is highly consistent with a signature mismatch where the library expects something like:
+  - `mcpServer.tool(name, { description, inputSchema, handler })`
+  but receives the “single object” form. In that case, the library treats the first argument as `name` and the second argument (options) becomes `undefined`, then tries to read `options.inputSchema`.
 
-### Root Cause
-In `supabase/functions/mcp-tools-server/index.ts`, line 69-72:
-```typescript
-mcpServer.tool({
-  name: def.name,
-  description: def.description,
-  inputSchema: def.schema,  // This is a JSON Schema object, not a Zod schema
-  handler: async (args) => {...}
-});
-```
+Why it “came back”
+- This can reappear depending on which `mcp-lite` build/runtime path is being executed (or if the deployed function isn’t the version we think it is).
+- Also, because we create the `McpServer` inside the request handler, every handshake recreates and re-registers tools. Any mismatch will fail every time.
 
-### Solution Options
+Implementation approach (safe + forward-compatible)
+1) Make tool registration compatible with both possible `mcpServer.tool` call signatures.
+   - Register tools using a small helper that tries the “(object)” signature first, and if it throws, falls back to “(name, options)” signature (or vice versa).
+   - This avoids guessing the exact API while guaranteeing compatibility.
 
-**Option A: Convert TOOL_DEFINITIONS to use Zod schemas** (Recommended)
-- More idiomatic for `mcp-lite`
-- Provides runtime validation and type inference
-- Requires importing Zod in the edge function
+2) Add version logging (proven technique) so we can confirm what code is actually running when an external agent hits the endpoint.
+   - Add constants like `VERSION` and `DEPLOYED_AT`.
+   - Log them at the start of every request and include them in error responses (and optionally in `/health`).
 
-**Option B: Use mcp-lite's low-level API with JSON Schema**
-- Register tools using the raw JSON-RPC method handler
-- More complex but keeps existing JSON Schema definitions
+3) Improve logging around tool registration to identify exactly which tool name triggered a failure.
+   - Log: toolName, whether def exists, whether schema exists, and the registration method used.
+   - If registration fails, log the toolName and error, then return a 500 with diagnostic info (while not leaking secrets).
 
-I recommend **Option A** as it aligns with how `mcp-lite` is designed to work.
+4) (Optional but recommended) Move MCP server construction/registration outside the request handler to avoid repeating work and reduce chances of per-request variance.
+   - If `authResult.enabledTools` differs per key, we can still keep it per-request; but we can create a per-request server while making registration robust.
+   - For correctness with per-key enabled tools, we’ll keep per-request creation but ensure it can’t crash on signature mismatch.
 
-### Implementation Plan
+Files to change
+- `supabase/functions/mcp-tools-server/index.ts`
+  - Add VERSION/DEPLOYED_AT logging
+  - Add a `registerTool(server, def, schema, toolName)` helper
+  - Use try/fallback registration signatures:
+    - Attempt A: `server.tool({ name, description, inputSchema, handler })`
+    - Attempt B: `server.tool(def.name, { description: def.description, inputSchema: schema, handler })`
+  - Wrap each tool registration in its own try/catch to capture which tool fails.
+  - Include `_version` info in 500 responses (and possibly in normal responses during debugging).
 
-| Step | File | Change |
-|------|------|--------|
-| 1 | `supabase/functions/mcp-tools-server/schemas.ts` | Create Zod schemas for each tool, mirroring the existing JSON Schema definitions |
-| 2 | `supabase/functions/mcp-tools-server/index.ts` | Update tool registration to use Zod schemas and add `schemaAdapter` to McpServer |
-| 3 | `supabase/functions/mcp-tools-server/deno.json` | Add Zod import |
+How we’ll verify (end-to-end)
+- Trigger the MCP “initialize” handshake from your external agent / SDK.
+- Confirm:
+  - No more 500 during handshake
+  - Tools list is returned properly
+  - Logs show the version string we expect
+- If it still fails:
+  - The error response will include `_version` and a `failed_tool` field (or similar) so we can pinpoint it immediately.
+  - We’ll check Supabase function logs for `[MCP Server][VERSION] ...` lines to confirm deployment.
 
-### Detailed Changes
+Notes / edge cases
+- If a key enables a tool that exists in `TOOL_DEFINITIONS` but not `TOOL_SCHEMAS`, we already `continue`; we’ll keep that but also log clearly.
+- If `z.toJSONSchema` isn’t available in the deployed Zod build, it would throw a different error than “inputSchema undefined”. The version logging + improved error body will make that obvious quickly.
 
-**1. Create `schemas.ts` with Zod schemas:**
-```typescript
-import { z } from "npm:zod@3.23.8";
-
-export const CrmReadSchema = z.object({
-  resource_type: z.enum(['project', 'contact', 'activity', 'note']),
-  project_id: z.string().optional(),
-  crm_id: z.string().optional(),
-  limit: z.number().optional()
-});
-
-export const CrmWriteSchema = z.object({
-  project_id: z.string(),
-  resource_type: z.enum(['project', 'task', 'note', 'contact']),
-  operation_type: z.enum(['create', 'update', 'delete']),
-  resource_id: z.string().optional(),
-  data: z.record(z.unknown()),
-  requires_approval: z.boolean().optional()
-});
-
-// ... other tool schemas
-```
-
-**2. Update `index.ts` to use Zod schemas:**
-```typescript
-import { z } from "npm:zod@3.23.8";
-import { CrmReadSchema, CrmWriteSchema, ... } from "./schemas.ts";
-
-const mcpServer = new McpServer({
-  name: "external-tools-server",
-  version: "1.0.0",
-  schemaAdapter: (schema) => {
-    // Convert Zod schema to JSON Schema for MCP protocol
-    if (schema && typeof schema === 'object' && '_def' in schema) {
-      return z.toJSONSchema(schema as z.ZodType);
-    }
-    return schema;
-  },
-});
-
-// Map tool names to Zod schemas
-const TOOL_SCHEMAS = {
-  crm_read: CrmReadSchema,
-  crm_write: CrmWriteSchema,
-  // ...
-};
-
-// Register tools with Zod schemas
-for (const toolName of authResult.enabledTools || []) {
-  const def = TOOL_DEFINITIONS[toolName];
-  const schema = TOOL_SCHEMAS[toolName];
-  
-  if (!def || !schema) continue;
-
-  mcpServer.tool(def.name, {
-    description: def.description,
-    inputSchema: schema,
-    handler: async (args) => {
-      // ... existing handler logic
-    }
-  });
-}
-```
-
-**3. Update `deno.json` imports:**
-```json
-{
-  "imports": {
-    "hono": "jsr:@hono/hono",
-    "mcp-lite": "npm:mcp-lite@^0.10.0",
-    "zod": "npm:zod@3.23.8"
-  }
-}
-```
-
-### Technical Notes
-
-- Zod schemas provide automatic TypeScript type inference for the handler's `args` parameter
-- The `schemaAdapter` converts Zod schemas to JSON Schema format for the MCP protocol wire format
-- This approach maintains compatibility with the existing `TOOL_DEFINITIONS` structure (used elsewhere) while adding proper schema handling for `mcp-lite`
-- The Claude Agent SDK will now be able to discover tools correctly during the `initialize` handshake
-
+Deliverable
+- A patched `mcp-tools-server` edge function that:
+  - Registers tools successfully regardless of which `mcp-lite` tool-registration signature is active
+  - Produces actionable logs and version markers so we can confirm deployments and diagnose any future handshake failures fast
