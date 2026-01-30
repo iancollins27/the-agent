@@ -8,9 +8,11 @@
 
 import { Hono } from "jsr:@hono/hono";
 import { McpServer, StreamableHttpTransport } from "npm:mcp-lite@^0.10.0";
-import { validateApiKey, AuthResult } from "./auth.ts";
+import { z } from "npm:zod@3.23.8";
+import { validateApiKey } from "./auth.ts";
 import { invokeToolFunction } from "./tool-invoker.ts";
 import { TOOL_DEFINITIONS } from "../_shared/tool-definitions/index.ts";
+import { TOOL_SCHEMAS } from "./schemas.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,17 +52,31 @@ app.all("/*", async (c) => {
   console.log(`[MCP Server] Enabled tools: ${authResult.enabledTools?.join(", ")}`);
 
   try {
-    // Create MCP server instance
+    // Create MCP server instance with schema adapter for Zod -> JSON Schema conversion
     const mcpServer = new McpServer({
       name: "external-tools-server",
       version: "1.0.0",
+      schemaAdapter: (schema: unknown) => {
+        // Convert Zod schema to JSON Schema for MCP protocol
+        if (schema && typeof schema === 'object' && '_def' in schema) {
+          return z.toJSONSchema(schema as z.ZodType);
+        }
+        return schema;
+      },
     });
 
     // Register only the enabled tools for this API key
     for (const toolName of authResult.enabledTools || []) {
       const def = TOOL_DEFINITIONS[toolName];
+      const schema = TOOL_SCHEMAS[toolName];
+      
       if (!def) {
         console.log(`[MCP Server] Tool not found in definitions: ${toolName}`);
+        continue;
+      }
+      
+      if (!schema) {
+        console.log(`[MCP Server] Schema not found for tool: ${toolName}`);
         continue;
       }
 
@@ -69,7 +85,7 @@ app.all("/*", async (c) => {
       mcpServer.tool({
         name: def.name,
         description: def.description,
-        inputSchema: def.schema,
+        inputSchema: schema,
         handler: async (args: Record<string, unknown>) => {
           console.log(`[MCP Server] Executing tool: ${toolName}`, args);
           
