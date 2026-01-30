@@ -15,7 +15,7 @@ import { TOOL_DEFINITIONS } from "../_shared/tool-definitions/index.ts";
 import { TOOL_SCHEMAS } from "./schemas.ts";
 
 // Version tracking for deployment verification
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const DEPLOYED_AT = new Date().toISOString();
 
 const corsHeaders = {
@@ -43,7 +43,6 @@ app.get("/health", (c) => {
 
 /**
  * Register a tool with mcp-lite using signature-agnostic approach.
- * Tries both known signatures to ensure compatibility across mcp-lite versions.
  */
 function registerTool(
   server: McpServer,
@@ -52,7 +51,7 @@ function registerTool(
   schema: z.ZodType,
   handler: (args: Record<string, unknown>) => Promise<{ content: { type: "text"; text: string }[]; isError?: boolean }>
 ): { success: boolean; method?: string; error?: string } {
-  // Attempt A: Single object signature { name, description, inputSchema, handler }
+  // Attempt A: Single object signature
   try {
     server.tool({
       name: toolName,
@@ -64,7 +63,7 @@ function registerTool(
   } catch (errorA) {
     console.log(`[MCP Server][v${VERSION}] Object signature failed for ${toolName}:`, errorA);
     
-    // Attempt B: Two-argument signature (name, { description, inputSchema, handler })
+    // Attempt B: Two-argument signature
     try {
       (server as any).tool(toolName, {
         description: description,
@@ -81,6 +80,83 @@ function registerTool(
         success: false, 
         error: `Object: ${errorA instanceof Error ? errorA.message : String(errorA)}; TwoArg: ${errorB instanceof Error ? errorB.message : String(errorB)}`
       };
+    }
+  }
+}
+
+/**
+ * Bind transport to server using signature-agnostic approach.
+ */
+function bindTransport(
+  transport: StreamableHttpTransport,
+  server: McpServer
+): { success: boolean; method?: string; error?: string } {
+  console.log(`[MCP Server][v${VERSION}] Attempting transport binding...`);
+  
+  // Attempt A: transport.bind(server)
+  if (typeof (transport as any).bind === 'function') {
+    try {
+      (transport as any).bind(server);
+      console.log(`[MCP Server][v${VERSION}] Transport bound via: transport.bind(server)`);
+      return { success: true, method: "transport.bind" };
+    } catch (errorA) {
+      console.log(`[MCP Server][v${VERSION}] transport.bind failed:`, errorA instanceof Error ? errorA.message : String(errorA));
+    }
+  } else {
+    console.log(`[MCP Server][v${VERSION}] transport.bind not available`);
+  }
+
+  // Attempt B: server.connect(transport)
+  if (typeof (server as any).connect === 'function') {
+    try {
+      (server as any).connect(transport);
+      console.log(`[MCP Server][v${VERSION}] Transport bound via: server.connect(transport)`);
+      return { success: true, method: "server.connect" };
+    } catch (errorB) {
+      console.log(`[MCP Server][v${VERSION}] server.connect failed:`, errorB instanceof Error ? errorB.message : String(errorB));
+    }
+  } else {
+    console.log(`[MCP Server][v${VERSION}] server.connect not available`);
+  }
+
+  // Attempt C: await server.connect(transport) - async version
+  // Note: We can't await in a sync function, so we'll handle this in the main handler
+
+  // If no binding method worked, we'll try to proceed without explicit binding
+  // Some versions might not require it
+  console.log(`[MCP Server][v${VERSION}] No explicit binding method succeeded, will try handleRequest directly`);
+  return { success: false, method: "none", error: "No binding method available" };
+}
+
+/**
+ * Handle MCP request using signature-agnostic approach.
+ */
+async function handleMcpRequest(
+  transport: StreamableHttpTransport,
+  request: Request,
+  server: McpServer
+): Promise<{ response: Response; method: string }> {
+  console.log(`[MCP Server][v${VERSION}] Attempting handleRequest...`);
+
+  // Attempt A: handleRequest(request) - for bound transports
+  try {
+    const response = await transport.handleRequest(request);
+    console.log(`[MCP Server][v${VERSION}] handleRequest succeeded via: handleRequest(request)`);
+    return { response, method: "single-arg" };
+  } catch (errorA) {
+    console.log(`[MCP Server][v${VERSION}] handleRequest(request) failed:`, errorA instanceof Error ? errorA.message : String(errorA));
+    
+    // Attempt B: handleRequest(request, server) - legacy signature
+    try {
+      const response = await (transport as any).handleRequest(request, server);
+      console.log(`[MCP Server][v${VERSION}] handleRequest succeeded via: handleRequest(request, server)`);
+      return { response, method: "two-arg" };
+    } catch (errorB) {
+      console.error(`[MCP Server][v${VERSION}] Both handleRequest signatures failed:`, {
+        singleArgError: errorA instanceof Error ? errorA.message : String(errorA),
+        twoArgError: errorB instanceof Error ? errorB.message : String(errorB)
+      });
+      throw new Error(`handleRequest failed: single-arg: ${errorA instanceof Error ? errorA.message : String(errorA)}; two-arg: ${errorB instanceof Error ? errorB.message : String(errorB)}`);
     }
   }
 }
@@ -110,7 +186,6 @@ app.all("/*", async (c) => {
       name: "external-tools-server",
       version: "1.0.0",
       schemaAdapter: (schema: unknown) => {
-        // Convert Zod schema to JSON Schema for MCP protocol
         if (schema && typeof schema === 'object' && '_def' in schema) {
           return z.toJSONSchema(schema as z.ZodType);
         }
@@ -139,7 +214,6 @@ app.all("/*", async (c) => {
 
       console.log(`[MCP Server][v${VERSION}] Registering tool: ${toolName}`);
 
-      // Create the handler for this tool
       const handler = async (args: Record<string, unknown>) => {
         console.log(`[MCP Server][v${VERSION}] Executing tool: ${toolName}`, args);
         
@@ -176,7 +250,6 @@ app.all("/*", async (c) => {
         }
       };
 
-      // Use signature-agnostic registration
       const result = registerTool(mcpServer, def.name, def.description, schema, handler);
       registrationResults.push({ tool: toolName, ...result });
       
@@ -187,7 +260,6 @@ app.all("/*", async (c) => {
       }
     }
 
-    // Check if any tools failed to register
     const failedTools = registrationResults.filter(r => !r.success);
     if (failedTools.length > 0) {
       console.error(`[MCP Server][v${VERSION}] Some tools failed to register:`, failedTools);
@@ -195,9 +267,16 @@ app.all("/*", async (c) => {
 
     console.log(`[MCP Server][v${VERSION}] Tool registration complete. Success: ${registrationResults.filter(r => r.success).length}, Failed: ${failedTools.length}`);
 
-    // Handle MCP request using StreamableHttpTransport
+    // Create transport and attempt binding
     const transport = new StreamableHttpTransport();
-    const response = await transport.handleRequest(c.req.raw, mcpServer);
+    const bindResult = bindTransport(transport, mcpServer);
+    
+    console.log(`[MCP Server][v${VERSION}] Bind result:`, bindResult);
+
+    // Handle MCP request with signature-agnostic approach
+    const { response, method: handleMethod } = await handleMcpRequest(transport, c.req.raw, mcpServer);
+    
+    console.log(`[MCP Server][v${VERSION}] Request handled successfully via: ${handleMethod}`);
     
     // Add CORS headers to the response
     const headers = new Headers(response.headers);
@@ -216,6 +295,7 @@ app.all("/*", async (c) => {
       { 
         error: "Internal server error", 
         details: error instanceof Error ? error.message : "Unknown error",
+        phase: "request_handling",
         _version: VERSION,
         _deployed_at: DEPLOYED_AT
       },
