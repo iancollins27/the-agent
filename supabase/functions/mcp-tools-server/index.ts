@@ -15,7 +15,7 @@ import { TOOL_DEFINITIONS } from "../_shared/tool-definitions/index.ts";
 import { TOOL_SCHEMAS } from "./schemas.ts";
 
 // Version tracking for deployment verification
-const VERSION = "2.2.0";
+const VERSION = "2.3.0";
 const DEPLOYED_AT = new Date().toISOString();
 
 const corsHeaders = {
@@ -24,22 +24,20 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-const app = new Hono();
+// Cache servers by enabled-tools fingerprint for session persistence
+const serverCache = new Map<string, { 
+  mcpServer: McpServer; 
+  httpHandler: (req: Request) => Promise<Response>;
+  companyId: string;
+  createdAt: string;
+}>();
 
-// Handle CORS preflight
-app.options("/*", (c) => {
-  return new Response("ok", { headers: corsHeaders });
-});
-
-// Health check endpoint with version info
-app.get("/health", (c) => {
-  return c.json({ 
-    status: "ok", 
-    service: "mcp-tools-server",
-    version: VERSION,
-    deployed_at: DEPLOYED_AT
-  }, 200, corsHeaders);
-});
+/**
+ * Generate a fingerprint from the enabled tools list for caching
+ */
+function getToolsFingerprint(tools: string[]): string {
+  return [...tools].sort().join(',');
+}
 
 /**
  * Register a tool with mcp-lite using signature-agnostic approach.
@@ -85,81 +83,120 @@ function registerTool(
 }
 
 /**
- * Bind transport to server using signature-agnostic approach.
+ * Create and configure an MCP server with the specified tools
  */
-function bindTransport(
-  transport: StreamableHttpTransport,
-  server: McpServer
-): { success: boolean; method?: string; error?: string } {
-  console.log(`[MCP Server][v${VERSION}] Attempting transport binding...`);
+function createMcpServer(
+  enabledTools: string[],
+  companyId: string
+): { mcpServer: McpServer; httpHandler: (req: Request) => Promise<Response>; registrationResults: Array<{ tool: string; success: boolean; method?: string; error?: string }> } {
   
-  // Attempt A: transport.bind(server)
-  if (typeof (transport as any).bind === 'function') {
-    try {
-      (transport as any).bind(server);
-      console.log(`[MCP Server][v${VERSION}] Transport bound via: transport.bind(server)`);
-      return { success: true, method: "transport.bind" };
-    } catch (errorA) {
-      console.log(`[MCP Server][v${VERSION}] transport.bind failed:`, errorA instanceof Error ? errorA.message : String(errorA));
-    }
-  } else {
-    console.log(`[MCP Server][v${VERSION}] transport.bind not available`);
-  }
+  console.log(`[MCP Server][v${VERSION}] Creating new MCP server for company ${companyId} with tools: ${enabledTools.join(', ')}`);
+  
+  // Create MCP server instance with schema adapter for Zod -> JSON Schema conversion
+  const mcpServer = new McpServer({
+    name: "external-tools-server",
+    version: "1.0.0",
+    schemaAdapter: (schema: unknown) => {
+      if (schema && typeof schema === 'object' && '_def' in schema) {
+        return z.toJSONSchema(schema as z.ZodType);
+      }
+      return schema;
+    },
+  });
 
-  // Attempt B: server.connect(transport)
-  if (typeof (server as any).connect === 'function') {
-    try {
-      (server as any).connect(transport);
-      console.log(`[MCP Server][v${VERSION}] Transport bound via: server.connect(transport)`);
-      return { success: true, method: "server.connect" };
-    } catch (errorB) {
-      console.log(`[MCP Server][v${VERSION}] server.connect failed:`, errorB instanceof Error ? errorB.message : String(errorB));
-    }
-  } else {
-    console.log(`[MCP Server][v${VERSION}] server.connect not available`);
-  }
+  const registrationResults: Array<{ tool: string; success: boolean; method?: string; error?: string }> = [];
 
-  // Attempt C: await server.connect(transport) - async version
-  // Note: We can't await in a sync function, so we'll handle this in the main handler
-
-  // If no binding method worked, we'll try to proceed without explicit binding
-  // Some versions might not require it
-  console.log(`[MCP Server][v${VERSION}] No explicit binding method succeeded, will try handleRequest directly`);
-  return { success: false, method: "none", error: "No binding method available" };
-}
-
-/**
- * Handle MCP request using signature-agnostic approach.
- */
-async function handleMcpRequest(
-  transport: StreamableHttpTransport,
-  request: Request,
-  server: McpServer
-): Promise<{ response: Response; method: string }> {
-  console.log(`[MCP Server][v${VERSION}] Attempting handleRequest...`);
-
-  // Attempt A: handleRequest(request) - for bound transports
-  try {
-    const response = await transport.handleRequest(request);
-    console.log(`[MCP Server][v${VERSION}] handleRequest succeeded via: handleRequest(request)`);
-    return { response, method: "single-arg" };
-  } catch (errorA) {
-    console.log(`[MCP Server][v${VERSION}] handleRequest(request) failed:`, errorA instanceof Error ? errorA.message : String(errorA));
+  // Register the enabled tools
+  for (const toolName of enabledTools) {
+    const def = TOOL_DEFINITIONS[toolName];
+    const schema = TOOL_SCHEMAS[toolName];
     
-    // Attempt B: handleRequest(request, server) - legacy signature
-    try {
-      const response = await (transport as any).handleRequest(request, server);
-      console.log(`[MCP Server][v${VERSION}] handleRequest succeeded via: handleRequest(request, server)`);
-      return { response, method: "two-arg" };
-    } catch (errorB) {
-      console.error(`[MCP Server][v${VERSION}] Both handleRequest signatures failed:`, {
-        singleArgError: errorA instanceof Error ? errorA.message : String(errorA),
-        twoArgError: errorB instanceof Error ? errorB.message : String(errorB)
-      });
-      throw new Error(`handleRequest failed: single-arg: ${errorA instanceof Error ? errorA.message : String(errorA)}; two-arg: ${errorB instanceof Error ? errorB.message : String(errorB)}`);
+    if (!def) {
+      console.log(`[MCP Server][v${VERSION}] Tool definition not found: ${toolName}`);
+      registrationResults.push({ tool: toolName, success: false, error: "definition_not_found" });
+      continue;
+    }
+    
+    if (!schema) {
+      console.log(`[MCP Server][v${VERSION}] Schema not found for tool: ${toolName}`);
+      registrationResults.push({ tool: toolName, success: false, error: "schema_not_found" });
+      continue;
+    }
+
+    console.log(`[MCP Server][v${VERSION}] Registering tool: ${toolName}`);
+
+    const handler = async (args: Record<string, unknown>) => {
+      console.log(`[MCP Server][v${VERSION}] Executing tool: ${toolName}`, args);
+      
+      try {
+        const result = await invokeToolFunction(
+          def.edge_function,
+          args,
+          {
+            company_id: companyId,
+            user_type: 'system'
+          }
+        );
+
+        console.log(`[MCP Server][v${VERSION}] Tool ${toolName} completed successfully`);
+        
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        console.error(`[MCP Server][v${VERSION}] Tool ${toolName} failed:`, error);
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              error: true,
+              message: error instanceof Error ? error.message : "Unknown error"
+            })
+          }],
+          isError: true
+        };
+      }
+    };
+
+    const result = registerTool(mcpServer, def.name, def.description, schema, handler);
+    registrationResults.push({ tool: toolName, ...result });
+    
+    if (result.success) {
+      console.log(`[MCP Server][v${VERSION}] Successfully registered ${toolName} using ${result.method}`);
+    } else {
+      console.error(`[MCP Server][v${VERSION}] Failed to register ${toolName}: ${result.error}`);
     }
   }
+
+  // Create transport and bind to get the handler function
+  const transport = new StreamableHttpTransport();
+  const httpHandler = transport.bind(mcpServer);
+  
+  console.log(`[MCP Server][v${VERSION}] Transport bound, httpHandler created`);
+
+  return { mcpServer, httpHandler, registrationResults };
 }
+
+const app = new Hono();
+
+// Handle CORS preflight
+app.options("/*", (c) => {
+  return new Response("ok", { headers: corsHeaders });
+});
+
+// Health check endpoint with version info
+app.get("/health", (c) => {
+  return c.json({ 
+    status: "ok", 
+    service: "mcp-tools-server",
+    version: VERSION,
+    deployed_at: DEPLOYED_AT,
+    cached_servers: serverCache.size
+  }, 200, corsHeaders);
+});
 
 // Main MCP handler
 app.all("/*", async (c) => {
@@ -181,102 +218,45 @@ app.all("/*", async (c) => {
   console.log(`[MCP Server][v${VERSION}] Enabled tools: ${authResult.enabledTools?.join(", ")}`);
 
   try {
-    // Create MCP server instance with schema adapter for Zod -> JSON Schema conversion
-    const mcpServer = new McpServer({
-      name: "external-tools-server",
-      version: "1.0.0",
-      schemaAdapter: (schema: unknown) => {
-        if (schema && typeof schema === 'object' && '_def' in schema) {
-          return z.toJSONSchema(schema as z.ZodType);
-        }
-        return schema;
-      },
-    });
-
-    const registrationResults: Array<{ tool: string; success: boolean; method?: string; error?: string }> = [];
-
-    // Register only the enabled tools for this API key
-    for (const toolName of authResult.enabledTools || []) {
-      const def = TOOL_DEFINITIONS[toolName];
-      const schema = TOOL_SCHEMAS[toolName];
+    const enabledTools = authResult.enabledTools || [];
+    const fingerprint = getToolsFingerprint(enabledTools);
+    
+    // Check if we have a cached server for this tool configuration
+    let cached = serverCache.get(fingerprint);
+    
+    if (cached) {
+      console.log(`[MCP Server][v${VERSION}] Using cached server for fingerprint: ${fingerprint} (created: ${cached.createdAt})`);
+    } else {
+      console.log(`[MCP Server][v${VERSION}] Creating new server for fingerprint: ${fingerprint}`);
       
-      if (!def) {
-        console.log(`[MCP Server][v${VERSION}] Tool definition not found: ${toolName}`);
-        registrationResults.push({ tool: toolName, success: false, error: "definition_not_found" });
-        continue;
+      const { mcpServer, httpHandler, registrationResults } = createMcpServer(
+        enabledTools,
+        authResult.companyId!
+      );
+      
+      const failedTools = registrationResults.filter(r => !r.success);
+      if (failedTools.length > 0) {
+        console.error(`[MCP Server][v${VERSION}] Some tools failed to register:`, failedTools);
       }
       
-      if (!schema) {
-        console.log(`[MCP Server][v${VERSION}] Schema not found for tool: ${toolName}`);
-        registrationResults.push({ tool: toolName, success: false, error: "schema_not_found" });
-        continue;
-      }
-
-      console.log(`[MCP Server][v${VERSION}] Registering tool: ${toolName}`);
-
-      const handler = async (args: Record<string, unknown>) => {
-        console.log(`[MCP Server][v${VERSION}] Executing tool: ${toolName}`, args);
-        
-        try {
-          const result = await invokeToolFunction(
-            def.edge_function,
-            args,
-            {
-              company_id: authResult.companyId!,
-              user_type: 'system'
-            }
-          );
-
-          console.log(`[MCP Server][v${VERSION}] Tool ${toolName} completed successfully`);
-          
-          return {
-            content: [{
-              type: "text" as const,
-              text: JSON.stringify(result, null, 2)
-            }]
-          };
-        } catch (error) {
-          console.error(`[MCP Server][v${VERSION}] Tool ${toolName} failed:`, error);
-          return {
-            content: [{
-              type: "text" as const,
-              text: JSON.stringify({
-                error: true,
-                message: error instanceof Error ? error.message : "Unknown error"
-              })
-            }],
-            isError: true
-          };
-        }
+      console.log(`[MCP Server][v${VERSION}] Tool registration complete. Success: ${registrationResults.filter(r => r.success).length}, Failed: ${failedTools.length}`);
+      
+      cached = {
+        mcpServer,
+        httpHandler,
+        companyId: authResult.companyId!,
+        createdAt: new Date().toISOString()
       };
-
-      const result = registerTool(mcpServer, def.name, def.description, schema, handler);
-      registrationResults.push({ tool: toolName, ...result });
       
-      if (result.success) {
-        console.log(`[MCP Server][v${VERSION}] Successfully registered ${toolName} using ${result.method}`);
-      } else {
-        console.error(`[MCP Server][v${VERSION}] Failed to register ${toolName}: ${result.error}`);
-      }
+      serverCache.set(fingerprint, cached);
+      console.log(`[MCP Server][v${VERSION}] Server cached. Total cached servers: ${serverCache.size}`);
     }
 
-    const failedTools = registrationResults.filter(r => !r.success);
-    if (failedTools.length > 0) {
-      console.error(`[MCP Server][v${VERSION}] Some tools failed to register:`, failedTools);
-    }
-
-    console.log(`[MCP Server][v${VERSION}] Tool registration complete. Success: ${registrationResults.filter(r => r.success).length}, Failed: ${failedTools.length}`);
-
-    // Create transport and attempt binding
-    const transport = new StreamableHttpTransport();
-    const bindResult = bindTransport(transport, mcpServer);
+    // Use the cached httpHandler to process the request
+    console.log(`[MCP Server][v${VERSION}] Processing request with cached httpHandler`);
+    const response = await cached.httpHandler(c.req.raw);
     
-    console.log(`[MCP Server][v${VERSION}] Bind result:`, bindResult);
-
-    // Handle MCP request with signature-agnostic approach
-    const { response, method: handleMethod } = await handleMcpRequest(transport, c.req.raw, mcpServer);
-    
-    console.log(`[MCP Server][v${VERSION}] Request handled successfully via: ${handleMethod}`);
+    console.log(`[MCP Server][v${VERSION}] Request handled successfully, status: ${response.status}`);
     
     // Add CORS headers to the response
     const headers = new Headers(response.headers);
