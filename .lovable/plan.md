@@ -1,65 +1,91 @@
 
-Goal
-- Stop the recurring 500 error during MCP “initialize/handshake” where the server crashes with:
-  - {"error":"Internal server error","details":"Cannot read properties of undefined (reading 'inputSchema')"}
-- Make the server resilient to MCP client handshake patterns and easier to debug when it happens again.
+## What the new logs show (different from last time)
 
-What I found (from code + prior logs)
-- The crash is thrown inside `mcp-lite` at `McpServer.tool(...)` while reading `inputSchema`.
-- In our edge function we register tools like this:
+Yes — the logs are different now. The prior failure was the `inputSchema` issue during tool registration. With the signature-agnostic registration in place, the logs show:
 
-  - `mcpServer.tool({ name, description, inputSchema, handler })`
+- `Object signature failed ... reading 'inputSchema'` (expected, because the library version wants the 2-arg signature)
+- Then: `Successfully registered crm_read/crm_write using two-arg-signature` (good)
+- Then the **new hard failure**:
+  - `Error: Transport not bound to a server`
+  - Stack: `StreamableHttpTransport.handleRequest` (mcp-lite) → our `index.ts`
 
-- The specific error (“reading 'inputSchema' of undefined”) is highly consistent with a signature mismatch where the library expects something like:
-  - `mcpServer.tool(name, { description, inputSchema, handler })`
-  but receives the “single object” form. In that case, the library treats the first argument as `name` and the second argument (options) becomes `undefined`, then tries to read `options.inputSchema`.
+So tool registration is now succeeding; the crash is happening later when handling the MCP HTTP request because the transport instance isn’t “connected/bound” to the server in the way this mcp-lite version expects.
 
-Why it “came back”
-- This can reappear depending on which `mcp-lite` build/runtime path is being executed (or if the deployed function isn’t the version we think it is).
-- Also, because we create the `McpServer` inside the request handler, every handshake recreates and re-registers tools. Any mismatch will fail every time.
+## Likely root cause
 
-Implementation approach (safe + forward-compatible)
-1) Make tool registration compatible with both possible `mcpServer.tool` call signatures.
-   - Register tools using a small helper that tries the “(object)” signature first, and if it throws, falls back to “(name, options)” signature (or vice versa).
-   - This avoids guessing the exact API while guaranteeing compatibility.
+Our edge function currently does something equivalent to:
 
-2) Add version logging (proven technique) so we can confirm what code is actually running when an external agent hits the endpoint.
-   - Add constants like `VERSION` and `DEPLOYED_AT`.
-   - Log them at the start of every request and include them in error responses (and optionally in `/health`).
+- `const transport = new StreamableHttpTransport()`
+- `await transport.handleRequest(req, mcpServer)`
 
-3) Improve logging around tool registration to identify exactly which tool name triggered a failure.
-   - Log: toolName, whether def exists, whether schema exists, and the registration method used.
-   - If registration fails, log the toolName and error, then return a 500 with diagnostic info (while not leaking secrets).
+But in the mcp-lite build actually running in Supabase, `StreamableHttpTransport.handleRequest(...)` appears to require that the transport be bound/connected first (e.g., `transport.bind(server)` or `await server.connect(transport)`), and then called with only the request (or with different args). If it isn’t bound, it throws: **“Transport not bound to a server”**.
 
-4) (Optional but recommended) Move MCP server construction/registration outside the request handler to avoid repeating work and reduce chances of per-request variance.
-   - If `authResult.enabledTools` differs per key, we can still keep it per-request; but we can create a per-request server while making registration robust.
-   - For correctness with per-key enabled tools, we’ll keep per-request creation but ensure it can’t crash on signature mismatch.
+This explains why external clients (Claude Agent SDK / custom framework) fail during handshake: the very first request hits `handleRequest` and the transport refuses to proceed.
 
-Files to change
-- `supabase/functions/mcp-tools-server/index.ts`
-  - Add VERSION/DEPLOYED_AT logging
-  - Add a `registerTool(server, def, schema, toolName)` helper
-  - Use try/fallback registration signatures:
-    - Attempt A: `server.tool({ name, description, inputSchema, handler })`
-    - Attempt B: `server.tool(def.name, { description: def.description, inputSchema: schema, handler })`
-  - Wrap each tool registration in its own try/catch to capture which tool fails.
-  - Include `_version` info in 500 responses (and possibly in normal responses during debugging).
+## Implementation approach
 
-How we’ll verify (end-to-end)
-- Trigger the MCP “initialize” handshake from your external agent / SDK.
-- Confirm:
-  - No more 500 during handshake
-  - Tools list is returned properly
-  - Logs show the version string we expect
-- If it still fails:
-  - The error response will include `_version` and a `failed_tool` field (or similar) so we can pinpoint it immediately.
-  - We’ll check Supabase function logs for `[MCP Server][VERSION] ...` lines to confirm deployment.
+We’ll update the edge function to be compatible with both mcp-lite variants by adding a “bind/connect” step before handling the request, and by calling `handleRequest` using whichever signature works.
 
-Notes / edge cases
-- If a key enables a tool that exists in `TOOL_DEFINITIONS` but not `TOOL_SCHEMAS`, we already `continue`; we’ll keep that but also log clearly.
-- If `z.toJSONSchema` isn’t available in the deployed Zod build, it would throw a different error than “inputSchema undefined”. The version logging + improved error body will make that obvious quickly.
+### Key change: robust transport binding
 
-Deliverable
-- A patched `mcp-tools-server` edge function that:
-  - Registers tools successfully regardless of which `mcp-lite` tool-registration signature is active
-  - Produces actionable logs and version markers so we can confirm deployments and diagnose any future handshake failures fast
+In `supabase/functions/mcp-tools-server/index.ts`:
+
+1. After creating `mcpServer`, create `transport`.
+2. Attempt to bind/connect using multiple known patterns:
+   - Pattern A: `transport.bind(mcpServer)`
+   - Pattern B: `await mcpServer.connect(transport)`
+3. Then handle the request using multiple known patterns:
+   - Pattern A: `await transport.handleRequest(c.req.raw)` (bound transport)
+   - Pattern B (fallback): `await transport.handleRequest(c.req.raw, mcpServer)` (older signature)
+
+We’ll wrap these in try/catch with clear logs indicating which method worked, similar to the tool-registration helper you already have.
+
+### Improve diagnostics (so we never guess again)
+
+Add explicit logs around:
+- “transport bind/connect started”
+- “transport bound via: ___”
+- “handleRequest succeeded via: ___”
+- If it fails, return 500 including `_version`, `_deployed_at`, and a short `phase` field like `"phase": "transport_bind"` or `"phase": "handle_request"` (no secrets).
+
+### Optional safety improvement (if needed)
+
+If mcp-lite’s transport maintains per-connection state, we may need to instantiate/bind the transport **per request** (which we already do), not globally. We’ll keep it per-request unless logs indicate otherwise.
+
+## Step-by-step plan
+
+1. **Inspect current edge function implementation**
+   - Confirm current call is `transport.handleRequest(c.req.raw, mcpServer)` and that we never call `bind()` / `connect()`.
+
+2. **Update `mcp-tools-server/index.ts`**
+   - Add a `bindTransport()` helper that tries:
+     - `transport.bind(mcpServer)` (if present)
+     - `await mcpServer.connect(transport)` (if present)
+   - Add a `handleMcpRequest()` helper that tries:
+     - `transport.handleRequest(c.req.raw)` first
+     - fallback `transport.handleRequest(c.req.raw, mcpServer)`
+   - Add logs for which methods were used.
+   - Ensure CORS behavior remains unchanged.
+
+3. **Deploy and verify using logs**
+   - Trigger the handshake again from the Claude Agent SDK/custom agent.
+   - Confirm the function logs show:
+     - tool registration success
+     - transport bound
+     - no “Transport not bound” error
+   - If it still fails, the returned JSON error will show `phase` and the logs will show which bind/handle signature failed.
+
+## Acceptance criteria
+
+- External MCP client can complete the initial handshake (initialize/tools discovery) without HTTP 500.
+- The edge function logs show a successful transport binding method and a successful handleRequest method.
+- Existing API-key auth behavior remains unchanged.
+
+## Files involved
+
+- `supabase/functions/mcp-tools-server/index.ts` (edit only)
+
+## Notes / risks
+
+- mcp-lite’s API has changed across versions; this plan intentionally avoids “assuming” one signature by trying both.
+- If the client requires specific MCP protocol version negotiation, we may need to set server protocol options, but the current error is clearly pre-protocol (transport setup), so binding is the correct next fix.
