@@ -9,6 +9,7 @@
 import { Hono } from "jsr:@hono/hono";
 import { McpServer, StreamableHttpTransport } from "npm:mcp-lite@^0.10.0";
 import { z } from "npm:zod@3.23.8";
+import { zodToJsonSchema } from "npm:zod-to-json-schema@3.24.1";
 import { validateApiKey } from "./auth.ts";
 import { invokeToolFunction } from "./tool-invoker.ts";
 import { TOOL_DEFINITIONS } from "../_shared/tool-definitions/index.ts";
@@ -98,7 +99,10 @@ function createMcpServer(
     version: "1.0.0",
     schemaAdapter: (schema: unknown) => {
       if (schema && typeof schema === 'object' && '_def' in schema) {
-        return z.toJSONSchema(schema as z.ZodType);
+        // Convert Zod schema to JSON Schema for MCP clients.
+        return zodToJsonSchema(schema as z.ZodType, {
+          $refStrategy: "none",
+        });
       }
       return schema;
     },
