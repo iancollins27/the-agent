@@ -7,13 +7,10 @@
         "@supabase/mcp-server"
       ],
       "env": {
-        "SUPABASE_URL": "https://YOUR_PROJECT_ID.supabase.co",
+        "SUPABASE_URL": "//lvifsxsrbluehopamqpy.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "${SUPABASE_SERVICE_ROLE_KEY}",
         "SUPABASE_ANON_KEY": "${SUPABASE_ANON_KEY}"
       }
     }
   }
 }
-
-
-
