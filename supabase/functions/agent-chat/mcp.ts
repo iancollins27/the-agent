@@ -36,7 +36,7 @@ export async function loadMCPContext(conversationId: string): Promise<any | null
     console.log(`No existing context found for conversation ID: ${conversationId}`);
     return null;
   } catch (error) {
-    console.error(`Error loading conversation context: ${error.message}`);
+    console.error(`Error loading conversation context: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -59,7 +59,7 @@ export async function saveMCPContext(conversationId: string, context: any): Prom
     console.log(`Saved conversation context for ID: ${conversationId}, expires at ${expireAt.toISOString()}`);
     return true;
   } catch (error) {
-    console.error(`Error saving conversation context: ${error.message}`);
+    console.error(`Error saving conversation context: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -78,16 +78,16 @@ export function addToolResult(
   const resultString = typeof result === 'string' ? result : JSON.stringify(result);
   
   // Find if this assistant message already exists in the context
-  let assistantMessageIndex = context.messages.findIndex(m => 
+  let assistantMessageIndex = context.messages.findIndex((m: any) => 
     m.role === 'assistant' && 
     m.tool_calls && 
-    m.tool_calls.some(tc => tc.id === toolId)
+    m.tool_calls.some((tc: any) => tc.id === toolId)
   );
 
   if (assistantMessageIndex !== -1) {
     // The assistant message already exists, so we should just add the tool response
     // First check if the tool response already exists
-    const toolResponseExists = context.messages.some(m => 
+    const toolResponseExists = context.messages.some((m: any) => 
       m.role === 'tool' && 
       m.tool_call_id === toolId
     );
@@ -107,10 +107,10 @@ export function addToolResult(
     // First check if we're already adding a duplicate
     const argsString = JSON.stringify(toolArgs || {});
 
-    const duplicateCall = context.messages.some(m => 
+    const duplicateCall = context.messages.some((m: any) => 
       m.role === 'assistant' && 
       m.tool_calls && 
-      m.tool_calls.some(tc => 
+      m.tool_calls.some((tc: any) => 
         tc.function && 
         tc.function.name === toolName && 
         tc.function.arguments === argsString
