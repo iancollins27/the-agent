@@ -1,141 +1,210 @@
 
 
-## Fix: MCP Server Returns Empty Tools List
+## Plan: Fix TypeScript Build Errors and Redeploy MCP Server
 
-### Problem Identified
+### Overview
 
-The logs show tool registration succeeds but the external agent sees `mcpTools: []` (empty). This is caused by **incorrect usage of the mcp-lite API**:
+This plan fixes TypeScript build errors in 3 edge functions while preserving all existing functionality. The errors are primarily type safety issues (`error` is of type `unknown`, implicit `any` types, and missing type annotations). The MCP server will also be redeployed to ensure v2.3.0 with the Cursor changes (two-argument signature) is live.
 
-1. **Wrong pattern for handling requests**: The official Supabase documentation shows `transport.bind(mcp)` returns a **handler function** that should be used to process requests. Our code calls `bind()` but ignores the return value, then calls `handleRequest()` separately.
+### Files to Modify
 
-2. **Per-request server creation**: Our code creates a new `McpServer` instance for every HTTP request. The MCP protocol involves multiple request-response cycles (initialize → tools/list → tool calls). If each request creates a new server, the tools registered in request #1 are lost when request #2 arrives.
+| File | Error Count | Issue Types |
+|------|-------------|-------------|
+| `supabase/functions/comms-webhook-twilio/index.ts` | 6 | `unknown` error type, implicit `any`, missing property types |
+| `supabase/functions/chat-webhook-twilio/index.ts` | 21+ | `unknown` error type, implicit `any`, `null` assignment issues |
+| `supabase/functions/agent-chat/mcp-context-manager.ts` | 9 | `unknown` error type, `content: null`, `tool_call_id` property |
+| `supabase/functions/agent-chat/mcp.ts` | 6+ | `unknown` error type, implicit `any` |
+| `supabase/functions/agent-chat/context/mcp-context-manager.ts` | 2 | `projectData?.id` access on wrong type |
 
-### Evidence from Logs
+### Changes Summary
 
-The logs show the pattern repeating for every request:
-```
-Registering tool: crm_read
-Registering tool: crm_write
-Tool registration complete. Success: 2, Failed: 0
-Transport bound via: transport.bind(server)
-Request handled successfully
-```
+All changes are type annotations or safe type casts only - no logic changes.
 
-This happens 3+ times in quick succession - each initialize/tools/list cycle is hitting a fresh server instance.
+---
 
-### Root Cause: API Misuse
+### 1. `comms-webhook-twilio/index.ts`
 
-**Current code (incorrect)**:
+**Error 1-2**: `requestBody[key] = value` - object has no index signature
+
 ```typescript
-app.all("/*", async (c) => {
-  // Creates NEW server every request
-  const mcpServer = new McpServer({...});
-  
-  // Register tools on this ephemeral server
-  for (const toolName of enabledTools) {
-    mcpServer.tool(...);
-  }
-  
-  const transport = new StreamableHttpTransport();
-  transport.bind(mcpServer);  // Ignores returned handler!
-  
-  await transport.handleRequest(c.req.raw);  // Wrong - should use returned handler
-});
+// Line 23: Change from
+let requestBody = {};
+// To
+let requestBody: Record<string, unknown> = {};
 ```
 
-**Official Supabase pattern (correct)**:
+**Error 3-5**: `requestBody.CallSid`, `MessageSid`, `SmsSid` do not exist
+
 ```typescript
-// Module level - created once
-const mcp = new McpServer({...});
-mcp.tool('sum', {...});  // Tools registered once
-
-const transport = new StreamableHttpTransport();
-const httpHandler = transport.bind(mcp);  // Capture the handler!
-
-// Request handler uses the pre-built httpHandler
-mcpApp.all('/mcp', async (c) => {
-  const response = await httpHandler(c.req.raw);
-  return response;
-});
+// Line 66: Cast to access properties
+webhook_id: (requestBody as Record<string, unknown>).CallSid || 
+            (requestBody as Record<string, unknown>).MessageSid || 
+            (requestBody as Record<string, unknown>).SmsSid,
 ```
 
-### Challenge: Per-API-Key Tool Filtering
+**Error 6**: `error` is of type `unknown`
 
-Our server needs to filter tools based on which API key is used. We can't create a single global server because different API keys have different `enabledTools` lists.
-
-### Solution: Session-Based Server Caching
-
-We'll implement a session-aware pattern that:
-1. Creates one `McpServer` + `httpHandler` per unique `enabledTools` configuration
-2. Caches these servers so the same API key reuses the same server instance
-3. Falls back to per-request creation if needed, but uses the **correct** `httpHandler` pattern
-
-### Implementation Plan
-
-| Step | File | Change |
-|------|------|--------|
-| 1 | `mcp-tools-server/index.ts` | Update to use `transport.bind()` return value correctly |
-| 2 | `mcp-tools-server/index.ts` | Add server caching by tools fingerprint |
-| 3 | `mcp-tools-server/index.ts` | Bump version to 2.3.0 for tracking |
-
-### Detailed Code Changes
-
-**1. Fix the httpHandler pattern:**
 ```typescript
-// Create transport and get handler function
-const transport = new StreamableHttpTransport();
-const httpHandler = transport.bind(mcpServer);  // THIS returns the handler!
-
-// Use the handler to process the request
-const response = await httpHandler(c.req.raw);
+// Line 122: Change from
+JSON.stringify({ error: error.message }),
+// To
+JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
 ```
 
-**2. Add server caching by enabled-tools fingerprint:**
+---
+
+### 2. `chat-webhook-twilio/index.ts`
+
+**Error at lines 113-114, 151**: `parseError` is of type `unknown`
+
 ```typescript
-// Cache servers by enabled-tools hash
-const serverCache = new Map<string, { 
-  mcpServer: McpServer; 
-  httpHandler: (req: Request) => Promise<Response>;
-}>();
-
-function getToolsFingerprint(tools: string[]): string {
-  return [...tools].sort().join(',');
-}
-
-// In request handler:
-const fingerprint = getToolsFingerprint(authResult.enabledTools || []);
-let cached = serverCache.get(fingerprint);
-
-if (!cached) {
-  const mcpServer = new McpServer({...});
-  // Register tools...
-  const transport = new StreamableHttpTransport();
-  const httpHandler = transport.bind(mcpServer);
-  cached = { mcpServer, httpHandler };
-  serverCache.set(fingerprint, cached);
-}
-
-return cached.httpHandler(c.req.raw);
+// Lines 113-114: Change from
+console.error(`Error parsing Twilio response: ${parseError.message}`);
+throw new Error(`Twilio API response parsing error: ${parseError.message}`);
+// To
+console.error(`Error parsing Twilio response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+throw new Error(`Twilio API response parsing error: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
 ```
 
-### Why This Will Work
+**Error at lines 280, 320**: `c` implicitly has `any` type
 
-1. **Persistent servers**: The same `McpServer` instance handles all requests for a given API key, so tools registered during initialization are still there when `tools/list` is called.
+```typescript
+// Line 280: Add type annotation
+const preferred = existingContacts.find((c: any) => c.phone_number === normalizedPhone) || existingContacts[0];
 
-2. **Correct API usage**: Using `transport.bind()` return value as the request handler matches the official documentation.
+// Line 320: Add type annotation
+const preferred = retryContacts.find((c: any) => c.phone_number === normalizedPhone) || retryContacts[0];
+```
 
-3. **Multi-tenant support**: Different API keys with different tool configurations get their own cached servers.
+**Error at line 438**: `null` not assignable to `string | undefined`
+
+```typescript
+// Line 438: Change null to undefined
+undefined  // instead of null
+```
+
+**Error at line 466**: `projectId` does not exist on type
+
+```typescript
+// Line 466: Add type cast and handle optional
+const { contact, companyId, projectId } = contactAndCompany as { contact: any; companyId: any; projectId?: any };
+```
+
+**Error at lines 678, 681, 682, 719**: `c` implicitly has `any` type
+
+```typescript
+// Add (c: any) annotations to all filter/map callbacks
+```
+
+**Error at line 745**: Cannot find name `createCompanySelectionSession`
+
+This appears to be a missing function - need to check if it exists elsewhere or needs to be defined (will investigate if referenced).
+
+**Error at lines 791, 803**: `pd` implicitly has `any` type
+
+```typescript
+// Add (pd: any) annotations
+```
+
+**Error at lines 820-827**: `projectCompany` is of type `unknown`
+
+```typescript
+// Cast uniqueProjectCompanies to proper type or use type assertion
+```
+
+**Error at line 1115**: `error` is of type `unknown`
+
+```typescript
+// Use: error instanceof Error ? error.message : String(error)
+```
+
+---
+
+### 3. `agent-chat/mcp-context-manager.ts`
+
+**Error at lines 133-134**: `toolError` is of type `unknown`
+
+```typescript
+// Lines 133-134: Already fixed in context/tool-processor.ts but not in root mcp-context-manager.ts
+error: toolError instanceof Error ? toolError.message : "Unknown tool execution error",
+message: `Tool execution failed: ${toolError instanceof Error ? toolError.message : "Unknown error"}`
+```
+
+**Error at line 140**: `content: null` not assignable to `string`
+
+```typescript
+// Change from
+content: null,
+// To
+content: '',
+```
+
+**Error at line 156**: `tool_call_id` does not exist on type
+
+```typescript
+// Use type assertion
+this.messages.push({
+  role: 'tool',
+  tool_call_id: call.id,
+  content: JSON.stringify(errorResult)
+} as any);
+```
+
+**Error at lines 72, 169, 181, 237, 266**: `projectData?.id` - `id` does not exist on type `never`
+
+```typescript
+// This is a type inference issue - projectData is initialized as null but then conditionally assigned
+// Fix by properly typing projectData
+let projectData: { id: string; [key: string]: any } | null = null;
+```
+
+---
+
+### 4. `agent-chat/mcp.ts`
+
+**Error at lines 39, 62**: `error` is of type `unknown`
+
+```typescript
+// Use: error instanceof Error ? error.message : String(error)
+```
+
+**Error at lines 81, 84, 90, 110+**: `m`, `tc` implicitly have `any` type
+
+```typescript
+// Add type annotations: (m: any), (tc: any)
+```
+
+---
+
+### 5. `agent-chat/context/mcp-context-manager.ts`
+
+**Error at line 72**: `projectData?.id` on wrong type
+
+```typescript
+// The projectData variable is typed through the processActionData call
+// Need to update the condition to handle the typing properly
+```
+
+---
+
+### Deployment Steps
+
+1. Fix all TypeScript errors in the files listed above
+2. Ensure the build passes without errors
+3. The edge functions will auto-deploy with the next build
+4. Verify `mcp-tools-server` shows v2.3.0 at `/health` endpoint
+
+### Preservation Notes
+
+- The `mcp-tools-server/index.ts` changes from Cursor (two-argument signature) are already in place and will not be modified
+- All fixes are type annotations only - no logic changes
+- Function behavior remains identical
 
 ### Technical Details
 
-- The cache is per-Deno-isolate, which means each edge function instance maintains its own cache
-- If an isolate restarts, servers are recreated on first request (this is fine)
-- Cache entries are keyed by sorted tool names, so `['crm_read', 'crm_write']` and `['crm_write', 'crm_read']` use the same server
-
-### Testing
-
-After deployment:
-1. External agent should see `mcpTools: [crm_read, crm_write]` (or whatever tools are enabled)
-2. Logs should show "Using cached server" on subsequent requests from the same API key
-3. Tool invocation should work end-to-end
+The fixes follow TypeScript best practices:
+- Using `instanceof Error` checks for proper error handling
+- Using `Record<string, unknown>` for dynamic object types
+- Using `as any` type assertions only where necessary for external library compatibility
+- Using explicit type annotations for callback parameters
 
