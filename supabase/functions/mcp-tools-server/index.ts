@@ -51,9 +51,12 @@ function registerTool(
   handler: (args: Record<string, unknown>) => Promise<{ content: { type: "text"; text: string }[]; isError?: boolean }>
 ): { success: boolean; method?: string; error?: string } {
   try {
+    const inputSchema = zodToJsonSchema(schema as z.ZodType, {
+      $refStrategy: "none",
+    });
     (server as any).tool(toolName, {
       description: description,
-      inputSchema: schema,
+      inputSchema: inputSchema,
       handler: handler
     });
     return { success: true, method: "two-arg-signature" };
