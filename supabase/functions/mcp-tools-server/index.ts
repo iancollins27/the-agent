@@ -41,7 +41,7 @@ function getToolsFingerprint(tools: string[]): string {
 }
 
 /**
- * Register a tool with mcp-lite using signature-agnostic approach.
+ * Register a tool with mcp-lite (two-argument signature).
  */
 function registerTool(
   server: McpServer,
@@ -50,36 +50,19 @@ function registerTool(
   schema: z.ZodType,
   handler: (args: Record<string, unknown>) => Promise<{ content: { type: "text"; text: string }[]; isError?: boolean }>
 ): { success: boolean; method?: string; error?: string } {
-  // Attempt A: Single object signature
   try {
-    server.tool({
-      name: toolName,
+    (server as any).tool(toolName, {
       description: description,
       inputSchema: schema,
       handler: handler
     });
-    return { success: true, method: "object-signature" };
-  } catch (errorA) {
-    console.log(`[MCP Server][v${VERSION}] Object signature failed for ${toolName}:`, errorA);
-    
-    // Attempt B: Two-argument signature
-    try {
-      (server as any).tool(toolName, {
-        description: description,
-        inputSchema: schema,
-        handler: handler
-      });
-      return { success: true, method: "two-arg-signature" };
-    } catch (errorB) {
-      console.error(`[MCP Server][v${VERSION}] Both signatures failed for ${toolName}:`, {
-        objectSignatureError: errorA instanceof Error ? errorA.message : String(errorA),
-        twoArgSignatureError: errorB instanceof Error ? errorB.message : String(errorB)
-      });
-      return { 
-        success: false, 
-        error: `Object: ${errorA instanceof Error ? errorA.message : String(errorA)}; TwoArg: ${errorB instanceof Error ? errorB.message : String(errorB)}`
-      };
-    }
+    return { success: true, method: "two-arg-signature" };
+  } catch (error) {
+    console.error(`[MCP Server][v${VERSION}] Tool registration failed for ${toolName}:`, error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
