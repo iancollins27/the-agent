@@ -61,7 +61,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error processing chat webhook:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
@@ -110,8 +110,8 @@ async function sendTwilioSMS(phoneNumber: string, message: string) {
   try {
     responseData = JSON.parse(responseText);
   } catch (parseError) {
-    console.error(`Error parsing Twilio response: ${parseError.message}`);
-    throw new Error(`Twilio API response parsing error: ${parseError.message}`);
+    console.error(`Error parsing Twilio response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    throw new Error(`Twilio API response parsing error: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
   }
 
   if (!response.ok) {
@@ -148,7 +148,7 @@ async function parseRequestBody(req: Request): Promise<Record<string, any>> {
     }
   } catch (parseError) {
     console.error('Error parsing request body:', parseError);
-    throw new Error(`Failed to parse request: ${parseError.message}`);
+    throw new Error(`Failed to parse request: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
   }
   
   return requestBody;
@@ -277,7 +277,7 @@ async function getOrCreateContact(supabase: any, phoneNumber: string) {
 
   if (existingContacts && existingContacts.length > 0) {
     // If multiple contacts found, prefer the one with normalized format, otherwise take first
-    const preferred = existingContacts.find(c => c.phone_number === normalizedPhone) || existingContacts[0];
+    const preferred = existingContacts.find((c: any) => c.phone_number === normalizedPhone) || existingContacts[0];
     console.log(`Found existing contact: ${preferred.id} (${preferred.full_name || 'Unnamed'})`);
     console.log(`Contact phone_number in DB: ${preferred.phone_number}`);
     
@@ -317,7 +317,7 @@ async function getOrCreateContact(supabase: any, phoneNumber: string) {
         .limit(10);
       
       if (retryContacts && retryContacts.length > 0) {
-        const preferred = retryContacts.find(c => c.phone_number === normalizedPhone) || retryContacts[0];
+        const preferred = retryContacts.find((c: any) => c.phone_number === normalizedPhone) || retryContacts[0];
         console.log(`Found existing contact on retry: ${preferred.id}`);
         return preferred;
       }
@@ -435,7 +435,7 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
         body, 
         contactFromToken, 
         fallbackCompanyId, 
-        null
+        undefined
       );
       
       // Log the message interaction
@@ -463,7 +463,7 @@ async function processAuthenticatedMessage(supabase: any, message: any, userToke
     return;
   }
 
-  const { contact, companyId, projectId } = contactAndCompany;
+  const { contact, companyId, projectId } = contactAndCompany as { contact: any; companyId: string; projectId?: string };
 
   console.log(`Processing message from authenticated contact: ${contact.full_name} (${contact.id}) for company: ${companyId}${projectId ? ` and project: ${projectId}` : ''}`);
 
@@ -675,11 +675,11 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
     return null;
   }
 
-  console.log(`Found ${contacts.length} contacts for phone ${normalizedPhone}:`, contacts.map(c => ({ id: c.id, role: c.role, company_id: c.company_id, full_name: c.full_name })));
+  console.log(`Found ${contacts.length} contacts for phone ${normalizedPhone}:`, contacts.map((c: any) => ({ id: c.id, role: c.role, company_id: c.company_id, full_name: c.full_name })));
 
   // Filter contacts: prioritize company contacts over homeowners
-  const companyContacts = contacts.filter(c => c.role !== 'HO' && c.company_id);
-  const homeownerContacts = contacts.filter(c => c.role === 'HO');
+  const companyContacts = contacts.filter((c: any) => c.role !== 'HO' && c.company_id);
+  const homeownerContacts = contacts.filter((c: any) => c.role === 'HO');
 
   console.log(`Company contacts: ${companyContacts.length}, Homeowner contacts: ${homeownerContacts.length}`);
 
@@ -716,7 +716,7 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
 
   // Multiple company contacts - need to ask user to select
   const uniqueCompanies = Array.from(
-    new Map(relevantContacts.map(c => [c.company_id, { 
+    new Map(relevantContacts.map((c: any) => [c.company_id, { 
       id: c.company_id, 
       name: c.companies?.name || 'Unknown Company',
       contact_id: c.id 
@@ -745,6 +745,39 @@ async function resolveContactAndCompany(supabase: any, phoneNumber: string, mess
   await createCompanySelectionSession(supabase, phoneNumber, uniqueCompanies);
   
   return null; // Will be handled by company selection flow
+}
+
+async function createCompanySelectionSession(supabase: any, phoneNumber: string, companies: any[]) {
+  // Create a special session for company selection
+  const { data: sessionId } = await supabase.rpc('find_or_create_chat_session', {
+    p_channel_type: 'sms',
+    p_channel_identifier: phoneNumber,
+    p_company_id: companies[0].id, // Use first company as placeholder
+    p_contact_id: companies[0].contact_id,
+    p_project_id: null,
+    p_memory_mode: 'company_selection'
+  });
+
+  // Store the company options in the session history for reference
+  await supabase
+    .from('chat_sessions')
+    .update({
+      conversation_history: [{
+        role: 'system',
+        content: 'Company selection in progress',
+        companies: companies
+      }]
+    })
+    .eq('id', sessionId);
+
+  // Send company selection menu
+  let selectionMessage = "I see you're associated with multiple companies. Please select which company you're contacting:\n\n";
+  companies.forEach((company: any, index: number) => {
+    selectionMessage += `${index + 1}. ${company.name}\n`;
+  });
+  selectionMessage += "\nReply with the number of your choice.";
+
+  await sendSMS(supabase, phoneNumber, selectionMessage);
 }
 
 async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeownerContacts: any[]) {
@@ -788,7 +821,7 @@ async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeo
   console.log(`Found ${projectData.length} project associations for homeowner`);
 
   // Filter out any projects without valid company data
-  const validProjects = projectData.filter(pd => pd.projects && pd.projects.company_id && pd.projects.companies);
+  const validProjects = projectData.filter((pd: any) => pd.projects && pd.projects.company_id && pd.projects.companies);
   
   if (validProjects.length === 0) {
     console.log('No projects with valid company data found');
@@ -799,8 +832,8 @@ async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeo
   console.log(`Found ${validProjects.length} valid project associations`);
 
   // Get unique project-company combinations
-  const uniqueProjectCompanies = Array.from(
-    new Map(validProjects.map(pd => [
+  const uniqueProjectCompanies: Array<{ projectId: string; projectName: string; companyId: string; companyName: string; contactId: string }> = Array.from(
+    new Map(validProjects.map((pd: any) => [
       `${pd.projects.id}-${pd.projects.company_id}`,
       {
         projectId: pd.projects.id,
@@ -817,7 +850,7 @@ async function resolveHomeownerCompany(supabase: any, phoneNumber: string, homeo
   if (uniqueProjectCompanies.length === 1) {
     // Only one project/company combination
     const projectCompany = uniqueProjectCompanies[0];
-    const contact = homeownerContacts.find(c => c.id === projectCompany.contactId);
+    const contact = homeownerContacts.find((c: any) => c.id === projectCompany.contactId);
     
     console.log(`Using single project ${projectCompany.projectName} for company ${projectCompany.companyName}`);
     
@@ -1112,7 +1145,7 @@ async function sendSMS(supabase: any, phoneNumber: string, message: string) {
         resource_type: 'communication',
         details: { 
           phone_number: phoneNumber, 
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           message_type: 'system_response'
         }
       });

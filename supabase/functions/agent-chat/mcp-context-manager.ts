@@ -130,14 +130,14 @@ export function createMCPContextManager(
             // Add error result
             const errorResult = { 
               status: "error", 
-              error: toolError.message || "Unknown tool execution error",
-              message: `Tool execution failed: ${toolError.message || "Unknown error"}`
+              error: toolError instanceof Error ? toolError.message : "Unknown tool execution error",
+              message: `Tool execution failed: ${toolError instanceof Error ? toolError.message : "Unknown error"}`
             };
             
             // Add tool message to context
             this.messages.push({
               role: 'assistant',
-              content: null,
+              content: '',
               tool_calls: [
                 {
                   id: call.id,
@@ -155,7 +155,7 @@ export function createMCPContextManager(
               role: 'tool',
               tool_call_id: call.id,
               content: JSON.stringify(errorResult)
-            });
+            } as any);
           }
         }
         

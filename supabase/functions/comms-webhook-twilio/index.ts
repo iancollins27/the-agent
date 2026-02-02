@@ -20,7 +20,7 @@ serve(async (req) => {
     );
 
     // Parse request body based on content type
-    let requestBody = {};
+    let requestBody: Record<string, unknown> = {};
     const contentType = req.headers.get('content-type') || '';
     
     try {
@@ -63,7 +63,7 @@ serve(async (req) => {
       .from('raw_comms_webhooks')
       .insert({
         service_name: 'twilio',
-        webhook_id: requestBody.CallSid || requestBody.MessageSid || requestBody.SmsSid,
+        webhook_id: (requestBody as Record<string, unknown>).CallSid as string || (requestBody as Record<string, unknown>).MessageSid as string || (requestBody as Record<string, unknown>).SmsSid as string,
         raw_payload: requestBody,
       })
       .select()
@@ -119,7 +119,7 @@ serve(async (req) => {
     console.error('Error processing Twilio webhook:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500

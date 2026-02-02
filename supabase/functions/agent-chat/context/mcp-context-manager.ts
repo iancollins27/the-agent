@@ -36,8 +36,8 @@ export function createMCPContextManager(
     ) {
       const message = response.choices[0].message;
       let finalAnswer = '';
-      let actionRecordId = null;
-      let projectData = null;
+      let actionRecordId: string | null = null;
+      let projectData: { id: string; [key: string]: any } | null = null;
       const processedToolCallIds = new Set<string>();
       
       // Add the assistant message to our context
