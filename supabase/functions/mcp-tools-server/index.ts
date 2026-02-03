@@ -16,7 +16,7 @@ import { TOOL_DEFINITIONS } from "../_shared/tool-definitions/index.ts";
 import { TOOL_SCHEMAS } from "./schemas.ts";
 
 // Version tracking for deployment verification
-const VERSION = "2.3.0";
+const VERSION = "2.4.0";
 const DEPLOYED_AT = new Date().toISOString();
 
 const corsHeaders = {
@@ -51,9 +51,27 @@ function registerTool(
   handler: (args: Record<string, unknown>) => Promise<{ content: { type: "text"; text: string }[]; isError?: boolean }>
 ): { success: boolean; method?: string; error?: string } {
   try {
+    // Log raw Zod schema before conversion
+    console.log(`[MCP Server][v${VERSION}] Raw Zod schema for ${toolName}:`, {
+      zodType: (schema as any)._def?.typeName,
+      shape: (schema as any)._def?.shape ? Object.keys((schema as any)._def.shape()) : 'not an object schema'
+    });
+
     const inputSchema = zodToJsonSchema(schema as z.ZodType, {
       $refStrategy: "none",
     });
+    
+    // Log the converted JSON Schema
+    console.log(`[MCP Server][v${VERSION}] Converted JSON Schema for ${toolName}:`, JSON.stringify(inputSchema, null, 2));
+
+    // Log what's being passed to server.tool()
+    console.log(`[MCP Server][v${VERSION}] Registering ${toolName} with config keys: description, inputSchema, handler`);
+    console.log(`[MCP Server][v${VERSION}] Full tool config for ${toolName}:`, JSON.stringify({
+      description: description,
+      inputSchema: inputSchema,
+      handlerType: typeof handler
+    }, null, 2));
+
     (server as any).tool(toolName, {
       description: description,
       inputSchema: inputSchema,
@@ -161,6 +179,25 @@ function createMcpServer(
     }
   }
 
+  // Inspect McpServer internal state after registration
+  console.log(`[MCP Server][v${VERSION}] Inspecting McpServer state after registration:`);
+  try {
+    const serverAny = mcpServer as any;
+    console.log(`[MCP Server][v${VERSION}] McpServer keys: ${Object.keys(serverAny).join(', ')}`);
+    
+    if (serverAny._tools) {
+      console.log(`[MCP Server][v${VERSION}] _tools property:`, JSON.stringify(Object.keys(serverAny._tools)));
+    }
+    if (serverAny.tools) {
+      console.log(`[MCP Server][v${VERSION}] tools property:`, JSON.stringify(Object.keys(serverAny.tools)));
+    }
+    if (serverAny._handlers) {
+      console.log(`[MCP Server][v${VERSION}] _handlers property keys:`, Object.keys(serverAny._handlers));
+    }
+  } catch (inspectError) {
+    console.log(`[MCP Server][v${VERSION}] Could not inspect McpServer:`, inspectError);
+  }
+
   // Create transport and bind to get the handler function
   const transport = new StreamableHttpTransport();
   const httpHandler = transport.bind(mcpServer);
@@ -191,6 +228,18 @@ app.get("/health", (c) => {
 // Main MCP handler
 app.all("/*", async (c) => {
   console.log(`[MCP Server][v${VERSION}] Received ${c.req.method} request at ${new Date().toISOString()}`);
+  console.log(`[MCP Server][v${VERSION}] Request headers:`, JSON.stringify(Object.fromEntries(c.req.raw.headers.entries()), null, 2));
+
+  // Log request body for POST requests
+  if (c.req.method === 'POST') {
+    try {
+      const bodyClone = c.req.raw.clone();
+      const bodyText = await bodyClone.text();
+      console.log(`[MCP Server][v${VERSION}] Request body:`, bodyText);
+    } catch (e) {
+      console.log(`[MCP Server][v${VERSION}] Could not read request body:`, e);
+    }
+  }
   
   // Validate API key
   const authResult = await validateApiKey(c.req.header("Authorization"));
@@ -246,18 +295,38 @@ app.all("/*", async (c) => {
     console.log(`[MCP Server][v${VERSION}] Processing request with cached httpHandler`);
     const response = await cached.httpHandler(c.req.raw);
     
-    console.log(`[MCP Server][v${VERSION}] Request handled successfully, status: ${response.status}`);
-    
-    // Add CORS headers to the response
-    const headers = new Headers(response.headers);
-    Object.entries(corsHeaders).forEach(([key, value]) => {
-      headers.set(key, value);
-    });
-    
-    return new Response(response.body, {
-      status: response.status,
-      headers
-    });
+    console.log(`[MCP Server][v${VERSION}] Response status: ${response.status}`);
+
+    // Log response body for debugging tools/list responses
+    try {
+      const responseClone = response.clone();
+      const responseText = await responseClone.text();
+      console.log(`[MCP Server][v${VERSION}] Response body:`, responseText);
+      
+      // Add CORS headers and return
+      const headers = new Headers(response.headers);
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+      
+      return new Response(responseText, {
+        status: response.status,
+        headers
+      });
+    } catch (bodyError) {
+      console.log(`[MCP Server][v${VERSION}] Could not read response body:`, bodyError);
+      
+      // Fallback: return original response with CORS headers
+      const headers = new Headers(response.headers);
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        headers.set(key, value);
+      });
+      
+      return new Response(response.body, {
+        status: response.status,
+        headers
+      });
+    }
 
   } catch (error) {
     console.error(`[MCP Server][v${VERSION}] Error handling request:`, error);
