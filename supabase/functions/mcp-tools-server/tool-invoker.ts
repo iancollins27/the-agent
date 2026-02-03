@@ -41,10 +41,10 @@ export async function invokeToolFunction(
   
   const supabase = getSupabaseClient();
   
-  // Build the request body according to the tool's expected format
+  // Build the request body according to ToolRequest<T> interface
   const requestBody = {
-    // Pass args directly - tools expect their parameters at the top level
-    ...args,
+    // Wrap args in 'args' property - tools expect ToolRequest format
+    args,
     // Include security context for access control
     securityContext,
     // Metadata for logging/debugging
