@@ -1,136 +1,86 @@
 
-
-## Plan: Add Full Debug Logging to MCP Tools Server
+## Plan: Fix Request Body Structure Mismatch in Tool Invoker
 
 ### Summary
 
-Add comprehensive debug logging throughout the tool registration process in `mcp-tools-server/index.ts` to diagnose why external agents aren't seeing the registered tools. The logging will include request headers, raw Zod schemas, converted JSON schemas, and internal McpServer state.
+The `tool-crm-read` edge function is failing because the `mcp-tools-server` is sending the request body in a flat structure, but the tool expects a nested `args` object. This is a simple fix in `tool-invoker.ts`.
 
-### Changes to Make
+### Root Cause
 
-#### File: `supabase/functions/mcp-tools-server/index.ts`
-
-**1. Version bump to 2.4.0** (for tracking)
-```typescript
-const VERSION = "2.4.0";
-```
-
-**2. Log incoming request headers** (lines ~193)
-```typescript
-console.log(`[MCP Server][v${VERSION}] Received ${c.req.method} request at ${new Date().toISOString()}`);
-console.log(`[MCP Server][v${VERSION}] Request headers:`, JSON.stringify(Object.fromEntries(c.req.raw.headers.entries()), null, 2));
-
-// Also try to log request body for POST requests
-if (c.req.method === 'POST') {
-  try {
-    const bodyClone = c.req.raw.clone();
-    const bodyText = await bodyClone.text();
-    console.log(`[MCP Server][v${VERSION}] Request body:`, bodyText);
-  } catch (e) {
-    console.log(`[MCP Server][v${VERSION}] Could not read request body:`, e);
-  }
+**What `tool-invoker.ts` currently sends:**
+```json
+{
+  "resource_type": "contact",
+  "limit": 5,
+  "securityContext": { "company_id": "...", "user_type": "system" },
+  "metadata": { "orchestrator": "mcp-tools-server" }
 }
 ```
 
-**3. Log raw Zod schema before conversion** (inside `registerTool` function, ~line 53-56)
-```typescript
-console.log(`[MCP Server][v${VERSION}] Raw Zod schema for ${toolName}:`, {
-  zodType: schema._def?.typeName,
-  shape: schema._def?.shape ? Object.keys(schema._def.shape()) : 'not an object schema'
-});
+**What `tool-crm-read` expects (per `ToolRequest` interface):**
+```json
+{
+  "args": { "resource_type": "contact", "limit": 5 },
+  "securityContext": { "company_id": "...", "user_type": "system" },
+  "metadata": { "orchestrator": "mcp-tools-server" }
+}
 ```
 
-**4. Log the converted JSON Schema** (after zodToJsonSchema call, ~line 56)
-```typescript
-const inputSchema = zodToJsonSchema(schema as z.ZodType, {
-  $refStrategy: "none",
-});
-console.log(`[MCP Server][v${VERSION}] Converted JSON Schema for ${toolName}:`, JSON.stringify(inputSchema, null, 2));
-```
+The tool destructures `{ securityContext, args, metadata }` from the request body, so when `args` is not present, it's `undefined`, causing `args.project_id` to throw.
 
-**5. Log what's being passed to server.tool()** (before the call, ~line 57)
+### The Fix
+
+Change `tool-invoker.ts` line 45-56 from:
+
 ```typescript
-const toolConfig = {
-  description: description,
-  inputSchema: inputSchema,
-  handler: handler
+const requestBody = {
+  ...args,  // WRONG: spreads at top level
+  securityContext,
+  metadata: { ... }
 };
-console.log(`[MCP Server][v${VERSION}] Registering ${toolName} with config keys: ${Object.keys(toolConfig).join(', ')}`);
-console.log(`[MCP Server][v${VERSION}] Full tool config for ${toolName}:`, JSON.stringify({
-  description: description,
-  inputSchema: inputSchema,
-  handlerType: typeof handler
-}, null, 2));
 ```
 
-**6. Inspect McpServer internal state after registration** (after tool registration loop, ~line 162)
+To:
+
 ```typescript
-// Try to inspect registered tools on the server
-console.log(`[MCP Server][v${VERSION}] Inspecting McpServer state after registration:`);
-try {
-  // Check for common internal properties where tools might be stored
-  const serverAny = mcpServer as any;
-  console.log(`[MCP Server][v${VERSION}] McpServer keys: ${Object.keys(serverAny).join(', ')}`);
-  
-  if (serverAny._tools) {
-    console.log(`[MCP Server][v${VERSION}] _tools property:`, JSON.stringify(Object.keys(serverAny._tools)));
-  }
-  if (serverAny.tools) {
-    console.log(`[MCP Server][v${VERSION}] tools property:`, JSON.stringify(Object.keys(serverAny.tools)));
-  }
-  if (serverAny._handlers) {
-    console.log(`[MCP Server][v${VERSION}] _handlers property keys:`, Object.keys(serverAny._handlers));
-  }
-} catch (inspectError) {
-  console.log(`[MCP Server][v${VERSION}] Could not inspect McpServer:`, inspectError);
-}
+const requestBody = {
+  args,     // CORRECT: nested under 'args' key
+  securityContext,
+  metadata: { ... }
+};
 ```
 
-**7. Log the response from httpHandler** (after transport.bind, ~line 247-249)
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `supabase/functions/mcp-tools-server/tool-invoker.ts` | Wrap `args` in nested object instead of spreading |
+
+### Implementation Details
+
 ```typescript
-const response = await cached.httpHandler(c.req.raw);
-console.log(`[MCP Server][v${VERSION}] Response status: ${response.status}`);
-
-// Log response body for debugging tools/list responses
-try {
-  const responseClone = response.clone();
-  const responseText = await responseClone.text();
-  console.log(`[MCP Server][v${VERSION}] Response body:`, responseText);
-  // Re-create response since we consumed the body
-  return new Response(responseText, {
-    status: response.status,
-    headers: new Headers([...response.headers.entries(), ...Object.entries(corsHeaders)])
-  });
-} catch (bodyError) {
-  console.log(`[MCP Server][v${VERSION}] Could not read response body:`, bodyError);
-}
+// Line 44-56 in tool-invoker.ts
+const requestBody = {
+  // Wrap args in 'args' property - tools expect ToolRequest format
+  args,
+  // Include security context for access control
+  securityContext,
+  // Metadata for logging/debugging
+  metadata: {
+    orchestrator: 'mcp-tools-server',
+    company_id: securityContext.company_id,
+    timestamp: new Date().toISOString()
+  }
+};
 ```
 
-### Technical Considerations
+### Post-Fix Verification
 
-1. **No functionality changes** - Only adding console.log statements
-2. **Headers included** - Per your request, we'll log request headers (but still not the raw API key value, just presence of Authorization header)
-3. **Full schema output** - JSON.stringify with formatting for complete visibility
-4. **McpServer internals** - Inspecting the server object to see where tools are actually stored
-5. **Response body logging** - Critical for seeing what tools/list actually returns
+After deploying, the external agent should be able to:
+1. Call `crm_read` with `{ resource_type: 'project', limit: 10 }` successfully
+2. Call `crm_read` with `{ resource_type: 'contact', limit: 5 }` successfully
+3. Receive actual data instead of the "Edge Function returned a non-2xx status code" error
 
-### Post-Deployment Testing
+### Technical Note
 
-After deploying, make a `tools/list` request from your external agent and check the edge function logs for:
-1. The request body (should show `{"method": "tools/list", ...}`)
-2. The converted JSON Schema for each tool
-3. The McpServer internal state
-4. The actual response body
-
-This will reveal whether:
-- Tools are being registered correctly
-- JSON Schema conversion is working
-- The McpServer is storing tools properly
-- The response is being formatted correctly
-
-### Files Modified
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/mcp-tools-server/index.ts` | Add 7 debug logging blocks |
-
+The comment in the current code says "Pass args directly - tools expect their parameters at the top level" but this is incorrect. The `ToolRequest<T>` interface in `_shared/tool-types/request-response.ts` clearly shows that tools expect `{ securityContext, args, metadata }` structure.
