@@ -1,7 +1,7 @@
 /**
- * API Key Authentication for MCP Tools Server
- * 
- * Validates API keys against mcp_external_access_keys table and returns
+ * API Key Authentication for Tool API server.
+ *
+ * Validates API keys against tool_external_access_keys table and returns
  * the associated company_id and enabled tools.
  */
 
@@ -66,7 +66,7 @@ export async function validateApiKey(authHeader: string | undefined): Promise<Au
     
     // Look up the key in the database
     const { data: keyRecord, error } = await supabase
-      .from("mcp_external_access_keys")
+      .from("tool_external_access_keys")
       .select("id, company_id, enabled_tools, is_active, expires_at")
       .eq("key_hash", keyHash)
       .maybeSingle();
@@ -95,7 +95,7 @@ export async function validateApiKey(authHeader: string | undefined): Promise<Au
     
     // Update last_used_at asynchronously (don't wait for it)
     supabase
-      .from("mcp_external_access_keys")
+      .from("tool_external_access_keys")
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", keyRecord.id)
       .then(({ error: updateError }) => {

@@ -1,4 +1,4 @@
-
+﻿
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -43,10 +43,10 @@ export const useTestRunner = (
       const aiProvider = 'openai';
       const aiModel = 'gpt-5-2025-08-07';
       
-      // Check if any selected prompt is an MCP orchestrator
+      // Check if any selected prompt is an Tool Orchestrator
       const isMCPOrchestratorSelected = await hasMCPOrchestrator(selectedPromptIds);
       
-      // If MCP orchestrator is selected, force MCP mode on
+      // If Tool Orchestrator is selected, force MCP mode on
       if (isMCPOrchestratorSelected && !useMCP) {
         setUseMCP(true);
       }
@@ -82,12 +82,12 @@ export const useTestRunner = (
             if (promptError) throw promptError;
             
             // If using MCP with a non-orchestrator prompt, provide a warning
-            if (useMCP && promptData.type !== 'mcp_orchestrator') {
+            if (useMCP && promptData.type !== 'tool_orchestrator') {
               console.warn(`Using MCP mode with a non-orchestrator prompt type: ${promptData.type}`);
             }
             
-            // For MCP orchestrator prompts, ensure tools are enabled
-            const shouldUseMCP = useMCP || promptData.type === 'mcp_orchestrator';
+            // For Tool Orchestrator prompts, ensure tools are enabled
+            const shouldUseMCP = useMCP || promptData.type === 'tool_orchestrator';
             const toolsForThisPrompt = shouldUseMCP ? availableTools : [];
             
             console.log(`Running prompt ${promptData.type} with MCP: ${shouldUseMCP}, Tools count: ${toolsForThisPrompt.length}`);

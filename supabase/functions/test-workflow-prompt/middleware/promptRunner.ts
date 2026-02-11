@@ -1,4 +1,4 @@
-
+﻿
 import { logPromptRun } from '../database/prompt-runs.ts';
 import { handleAIResponse } from '../services/aiResponseHandler.ts';
 import { replaceVariables } from '../utils.ts';
@@ -78,7 +78,7 @@ export async function runPrompt(
   
   // Process the AI response
   try {
-    const isMCPRequest = useMCP || promptType === 'mcp_orchestrator';
+    const isMCPRequest = useMCP || promptType === 'tool_orchestrator';
     
     const result = await handleAIResponse(
       supabase,

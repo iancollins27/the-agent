@@ -1,4 +1,4 @@
-
+﻿
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -14,7 +14,7 @@ export const useTestRunner = (
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check if MCP Orchestrator prompt is selected
+  // Check if Tool Orchestrator prompt is selected
   const hasMCPOrchestrator = async (promptIds: string[]): Promise<boolean> => {
     if (promptIds.length === 0) return false;
     
@@ -23,7 +23,7 @@ export const useTestRunner = (
       .select('type')
       .in('id', promptIds);
       
-    return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
+    return data?.some(prompt => prompt.type === 'tool_orchestrator') || false;
   };
   
   // Get available tools based on MCP mode
@@ -59,10 +59,10 @@ export const useTestRunner = (
       const aiProvider = 'openai';
       const aiModel = 'gpt-5-2025-08-07';
       
-      // Check if any selected prompt is an MCP orchestrator
+      // Check if any selected prompt is an Tool Orchestrator
       const isMCPOrchestratorSelected = await hasMCPOrchestrator(selectedPromptIds);
       
-      // If MCP orchestrator is selected, force MCP mode on
+      // If Tool Orchestrator is selected, force MCP mode on
       if (isMCPOrchestratorSelected && !useMCP) {
         setUseMCP(true);
       }
@@ -143,7 +143,7 @@ export const useTestRunner = (
           if (promptError) throw promptError;
           
           // If using MCP with a non-orchestrator prompt, provide a warning in the console
-          if (useMCP && promptData.type !== 'mcp_orchestrator') {
+          if (useMCP && promptData.type !== 'tool_orchestrator') {
             console.warn(`Using MCP mode with a non-orchestrator prompt type: ${promptData.type}`);
           }
           
@@ -151,7 +151,7 @@ export const useTestRunner = (
             console.log("Calling test-workflow-prompt function with:", {
               promptType: promptData.type,
               projectId: projectData.id,
-              useMCP: useMCP || promptData.type === 'mcp_orchestrator'
+              useMCP: useMCP || promptData.type === 'tool_orchestrator'
             });
             
             // Call the edge function to test the prompt with improved error handling
@@ -166,7 +166,7 @@ export const useTestRunner = (
                 workflowPromptId: promptData.id,
                 initiatedBy: userEmail,
                 isMultiProjectTest: isMultiProjectTest,
-                useMCP: useMCP || promptData.type === 'mcp_orchestrator' // Force MCP for orchestrator prompts
+                useMCP: useMCP || promptData.type === 'tool_orchestrator' // Force MCP for orchestrator prompts
               }
             });
             
@@ -200,7 +200,7 @@ export const useTestRunner = (
               promptType: promptData.type,
               projectId: projectData.id,
               error: functionError.message || "Unknown error",
-              useMCP: useMCP || promptData.type === 'mcp_orchestrator'
+              useMCP: useMCP || promptData.type === 'tool_orchestrator'
             };
             
             // Set a user-friendly error message

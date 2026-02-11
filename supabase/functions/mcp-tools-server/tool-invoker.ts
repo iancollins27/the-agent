@@ -1,6 +1,6 @@
 /**
  * Tool Invoker - Delegates tool execution to existing edge functions
- * 
+ *
  * This module invokes existing tool edge functions with the appropriate
  * security context for multi-tenant isolation.
  */
@@ -41,15 +41,15 @@ export async function invokeToolFunction(
   
   const supabase = getSupabaseClient();
   
-  // Build the request body according to ToolRequest<T> interface
+  // Build the request body according to the tool edge-function contract.
+  // Tool functions expect args nested under `args`.
   const requestBody = {
-    // Wrap args in 'args' property - tools expect ToolRequest format
     args,
     // Include security context for access control
     securityContext,
     // Metadata for logging/debugging
     metadata: {
-      orchestrator: 'mcp-tools-server',
+      orchestrator: 'tool-api-server',
       company_id: securityContext.company_id,
       timestamp: new Date().toISOString()
     }

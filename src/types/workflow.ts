@@ -1,11 +1,11 @@
-
+﻿
 export type WorkflowType =
   | 'summary_generation'
   | 'summary_update'
   | 'action_detection_execution'
   | 'multi_project_analysis'
   | 'multi_project_message_generation'
-  | 'mcp_orchestrator';
+  | 'tool_orchestrator';
 
 export const workflowTitles: Record<WorkflowType, string> = {
   summary_generation: 'Summary Generation',
@@ -13,7 +13,7 @@ export const workflowTitles: Record<WorkflowType, string> = {
   action_detection_execution: 'Action Detection & Execution',
   multi_project_analysis: 'Multi-Project Analysis',
   multi_project_message_generation: 'Multi-Project Message Generation',
-  mcp_orchestrator: 'MCP Orchestrator'
+  tool_orchestrator: 'Tool Orchestrator'
 };
 
 export interface WorkflowPrompt {
@@ -51,7 +51,7 @@ export const availableVariables: Record<WorkflowType, VariableDefinition[]> = {
     { name: "projectData", description: "Combined project data and statuses" },
     { name: "rooferName", description: "Name of the roofer to address in message" }
   ],
-  mcp_orchestrator: [
+  tool_orchestrator: [
     { name: "summary", description: "Project summary" },
     { name: "project_id", description: "Unique identifier for the project" },
     { name: "track_name", description: "Name of the project track" },

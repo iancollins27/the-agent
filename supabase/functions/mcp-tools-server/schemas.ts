@@ -1,7 +1,7 @@
 /**
- * Zod schemas for MCP tool definitions
- * These mirror the JSON Schema definitions in TOOL_DEFINITIONS but use Zod
- * for proper mcp-lite compatibility
+ * Zod schemas for tool definitions
+ * These mirror the JSON Schema definitions in TOOL_DEFINITIONS and are used
+ * for request validation in the Tool API.
  */
 
 import { z } from "npm:zod@3.23.8";

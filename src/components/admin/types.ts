@@ -1,4 +1,4 @@
-
+﻿
 export interface ActionRecord {
   id: string;
   project_id?: string;
@@ -89,7 +89,7 @@ export type WorkflowType =
   | 'action_detection_execution' 
   | 'multi_project_analysis' 
   | 'multi_project_message_generation'
-  | 'mcp_orchestrator';
+  | 'tool_orchestrator';
 
 export const workflowTitles: Record<WorkflowType, string> = {
   summary_generation: 'Summary Generation',
@@ -99,7 +99,7 @@ export const workflowTitles: Record<WorkflowType, string> = {
   action_detection_execution: 'Action Detection & Execution',
   multi_project_analysis: 'Multi-Project Analysis',
   multi_project_message_generation: 'Multi-Project Message',
-  mcp_orchestrator: 'MCP Orchestrator'
+  tool_orchestrator: 'Tool Orchestrator'
 };
 
 export interface CrmData {

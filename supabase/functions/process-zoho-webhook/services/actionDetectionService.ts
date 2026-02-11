@@ -1,4 +1,4 @@
-
+﻿
 /**
  * Service for handling MCP-based action detection
  */
@@ -37,24 +37,24 @@ export async function runActionDetectionWithMCP(
   try {
     console.log('Running MCP-based action detection...');
     
-    // Get the MCP orchestrator prompt
+    // Get the Tool Orchestrator prompt
     const { data: mcpPrompt, error: mcpPromptError } = await supabase
       .from('workflow_prompts')
       .select('*')
-      .eq('type', 'mcp_orchestrator')
+      .eq('type', 'tool_orchestrator')
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
     
     if (mcpPromptError || !mcpPrompt || !mcpPrompt.prompt_text) {
-      console.error('No MCP orchestrator prompt found in the database:', mcpPromptError);
+      console.error('No Tool Orchestrator prompt found in the database:', mcpPromptError);
       return {
-        error: 'No MCP orchestrator prompt available',
+        error: 'No Tool Orchestrator prompt available',
         status: 'error'
       };
     }
     
-    // Format the context for the MCP orchestrator prompt
+    // Format the context for the Tool Orchestrator prompt
     const mcpContext = {
       summary: summary,
       track_name: trackName || 'Default Track',
@@ -79,7 +79,7 @@ export async function runActionDetectionWithMCP(
     
     console.log('Service role client created, invoking test-workflow-prompt...');
     console.log('Function invocation payload:', {
-      promptType: 'mcp_orchestrator',
+      promptType: 'tool_orchestrator',
       projectId: projectId,
       contextData: Object.keys(mcpContext),
       aiProvider: aiProvider,
@@ -95,7 +95,7 @@ export async function runActionDetectionWithMCP(
       'test-workflow-prompt',
       {
         body: {
-          promptType: 'mcp_orchestrator',
+          promptType: 'tool_orchestrator',
           promptText: mcpPrompt.prompt_text,
           projectId: projectId,
           contextData: mcpContext,

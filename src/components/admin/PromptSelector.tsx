@@ -1,4 +1,4 @@
-
+﻿
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,13 +15,13 @@ const PromptSelector = ({ selectedPromptIds, setSelectedPromptIds }: PromptSelec
   const [prompts, setPrompts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // List of allowed prompt types - now including mcp_orchestrator
+  // List of allowed prompt types - now including tool_orchestrator
   const allowedPromptTypes = [
     'summary_generation', 
     'summary_update', 
     'action_detection_execution',
     'multi_project_analysis',
-    'mcp_orchestrator' // Added MCP orchestrator to allowed types
+    'tool_orchestrator' // Added Tool Orchestrator to allowed types
   ];
   
   useEffect(() => {

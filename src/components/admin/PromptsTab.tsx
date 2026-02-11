@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Loader2, AlertCircle, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,7 +20,7 @@ const PromptsTab = () => {
     'action_detection_execution',
     'multi_project_analysis',
     'multi_project_message_generation',
-    'mcp_orchestrator'
+    'tool_orchestrator'
   ];
 
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
@@ -104,7 +104,7 @@ Your task:
    - ONLY includes actionable items that require the roofer's attention
 
 Return ONLY the final message text, with no additional explanations.`;
-      } else if (promptType === 'mcp_orchestrator') {
+      } else if (promptType === 'tool_orchestrator') {
         defaultPromptText = `You are an AI orchestrator using the Model Context Protocol. Your job is to analyze the project and determine what actions need to be taken.
 
 Project Summary:
@@ -194,9 +194,9 @@ Remember:
     );
   }
 
-  // Filter out the MCP orchestrator prompt from the display, but keep it in the missing prompts list
-  const displayPrompts = prompts?.filter(prompt => prompt.type !== 'mcp_orchestrator');
-  const hasMcpPrompt = prompts?.some(prompt => prompt.type === 'mcp_orchestrator');
+  // Filter out the Tool Orchestrator prompt from the display, but keep it in the missing prompts list
+  const displayPrompts = prompts?.filter(prompt => prompt.type !== 'tool_orchestrator');
+  const hasMcpPrompt = prompts?.some(prompt => prompt.type === 'tool_orchestrator');
 
   return (
     <div className="grid gap-6">
@@ -227,12 +227,12 @@ Remember:
         </Alert>
       )}
 
-      {/* Information about MCP Orchestrator prompt */}
+      {/* Information about Tool Orchestrator prompt */}
       {hasMcpPrompt && (
         <Alert className="mb-6 border-blue-100 bg-blue-50">
           <Info className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            The MCP Orchestrator prompt is configured in the dedicated MCP tab. Please go to the MCP tab to view or edit it.
+            The Tool Orchestrator prompt is configured in the dedicated MCP tab. Please go to the MCP tab to view or edit it.
           </AlertDescription>
         </Alert>
       )}

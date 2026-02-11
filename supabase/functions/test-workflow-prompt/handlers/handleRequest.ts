@@ -1,4 +1,4 @@
-
+﻿
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { corsHeaders } from '../utils/cors.ts';
 import { handleEscalation } from "../database/handlers/escalationHandler.ts";
@@ -266,7 +266,7 @@ async function handlePromptRequest(
       const actualPromptRunId = dbPromptRunId;
       
       // Check if we should use MCP based on prompt type or explicit flag
-      const shouldUseMCP = useMCP || promptType === 'mcp_orchestrator';
+      const shouldUseMCP = useMCP || promptType === 'tool_orchestrator';
       
       logWithTime(`MCP decision: useMCP=${useMCP}, promptType=${promptType}, shouldUseMCP=${shouldUseMCP}`);
 

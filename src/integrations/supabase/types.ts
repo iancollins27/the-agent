@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -779,7 +779,7 @@ export type Database = {
           },
         ]
       }
-      mcp_external_access_keys: {
+      tool_external_access_keys: {
         Row: {
           company_id: string
           created_at: string
@@ -821,14 +821,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "mcp_external_access_keys_company_id_fkey"
+            foreignKeyName: "tool_external_access_keys_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "mcp_external_access_keys_created_by_fkey"
+            foreignKeyName: "tool_external_access_keys_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -1600,7 +1600,7 @@ export type Database = {
         | "action_detection_execution"
         | "multi_project_analysis"
         | "multi_project_message_generation"
-        | "mcp_orchestrator"
+        | "tool_orchestrator"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1748,7 +1748,7 @@ export const Constants = {
         "action_detection_execution",
         "multi_project_analysis",
         "multi_project_message_generation",
-        "mcp_orchestrator",
+        "tool_orchestrator",
       ],
     },
   },

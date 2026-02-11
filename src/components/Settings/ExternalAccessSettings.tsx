@@ -70,10 +70,10 @@ const ExternalAccessSettings: React.FC = () => {
   const [selectedTools, setSelectedTools] = useState<string[]>(['crm_read', 'crm_write']);
 
   const { data: keys, isLoading } = useQuery({
-    queryKey: ['mcp-access-keys'],
+    queryKey: ['tool-api-access-keys'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('mcp_external_access_keys')
+        .from('tool_external_access_keys')
         .select('id, key_name, enabled_tools, is_active, created_at, last_used_at, expires_at')
         .order('created_at', { ascending: false });
       
@@ -103,7 +103,7 @@ const ExternalAccessSettings: React.FC = () => {
       }
 
       const { error } = await supabase
-        .from('mcp_external_access_keys')
+        .from('tool_external_access_keys')
         .insert({
           key_name: keyName,
           key_hash: hash,
@@ -119,7 +119,7 @@ const ExternalAccessSettings: React.FC = () => {
       setShowCreateDialog(false);
       setShowNewKeyDialog(true);
       setNewKeyName('');
-      queryClient.invalidateQueries({ queryKey: ['mcp-access-keys'] });
+      queryClient.invalidateQueries({ queryKey: ['tool-api-access-keys'] });
       toast({ title: "API key created successfully" });
     },
     onError: (error) => {
@@ -130,14 +130,14 @@ const ExternalAccessSettings: React.FC = () => {
   const toggleKeyMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
       const { error } = await supabase
-        .from('mcp_external_access_keys')
+        .from('tool_external_access_keys')
         .update({ is_active: isActive })
         .eq('id', id);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mcp-access-keys'] });
+      queryClient.invalidateQueries({ queryKey: ['tool-api-access-keys'] });
       toast({ title: "API key updated" });
     }
   });
@@ -145,14 +145,14 @@ const ExternalAccessSettings: React.FC = () => {
   const deleteKeyMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('mcp_external_access_keys')
+        .from('tool_external_access_keys')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mcp-access-keys'] });
+      queryClient.invalidateQueries({ queryKey: ['tool-api-access-keys'] });
       setDeleteKeyId(null);
       toast({ title: "API key deleted" });
     }
@@ -185,9 +185,9 @@ const ExternalAccessSettings: React.FC = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>External API Keys</CardTitle>
+              <CardTitle>External Tool API Keys</CardTitle>
               <CardDescription>
-                Manage API keys for external AI agents (Claude Desktop, Cursor, etc.) to access your tools via MCP.
+                Manage API keys for external clients to access your tools via HTTP JSON endpoints.
               </CardDescription>
             </div>
             <Button onClick={() => setShowCreateDialog(true)}>
@@ -200,7 +200,7 @@ const ExternalAccessSettings: React.FC = () => {
           {keys && keys.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>No API keys created yet.</p>
-              <p className="text-sm mt-1">Create a key to allow external AI agents to access your tools.</p>
+              <p className="text-sm mt-1">Create a key to allow external clients to access your tools.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -247,9 +247,9 @@ const ExternalAccessSettings: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>MCP Server Endpoint</CardTitle>
+          <CardTitle>Tool API Endpoint</CardTitle>
           <CardDescription>
-            Use this URL to connect external AI agents to your tools.
+            Base endpoint for external tool access. Use <code>/tools</code> to list tools and <code>/execute</code> to invoke one.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -274,7 +274,7 @@ const ExternalAccessSettings: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Create API Key</DialogTitle>
             <DialogDescription>
-              Create a new API key for external AI agent access.
+              Create a new API key for external tool API access.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

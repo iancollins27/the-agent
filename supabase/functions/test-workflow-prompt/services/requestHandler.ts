@@ -1,4 +1,4 @@
-
+﻿
 import { corsHeaders } from "../utils/cors.ts";
 import { logPromptRun } from "../database/index.ts";
 import { replaceVariables } from "../utils.ts";
@@ -46,19 +46,19 @@ export async function handleRequest(supabase: any, requestBody: any) {
     }
   }
   
-  // For MCP orchestrator prompts, always get the latest prompt from database
+  // For Tool Orchestrator prompts, always get the latest prompt from database
   let finalPromptText = promptText;
-  if (promptType === 'mcp_orchestrator' && !finalPromptText) {
+  if (promptType === 'tool_orchestrator' && !finalPromptText) {
     try {
-      const mcpPrompt = await getLatestWorkflowPrompt(supabase, 'mcp_orchestrator');
+      const mcpPrompt = await getLatestWorkflowPrompt(supabase, 'tool_orchestrator');
       if (mcpPrompt && mcpPrompt.prompt_text) {
-        console.log("Using MCP orchestrator prompt from database instead of provided prompt");
+        console.log("Using Tool Orchestrator prompt from database instead of provided prompt");
         finalPromptText = mcpPrompt.prompt_text;
       } else {
-        console.warn("No MCP orchestrator prompt found in database");
+        console.warn("No Tool Orchestrator prompt found in database");
       }
     } catch (err) {
-      console.error("Error fetching MCP orchestrator prompt:", err);
+      console.error("Error fetching Tool Orchestrator prompt:", err);
     }
   }
   
@@ -79,11 +79,11 @@ export async function handleRequest(supabase: any, requestBody: any) {
   // Perform the variable replacement only for non-MCP requests
   // For MCP, we'll do the variable replacement in the getMCPOrchestratorPrompt function
   let finalPrompt = finalPromptText;
-  if (!useMCP || promptType !== 'mcp_orchestrator') {
+  if (!useMCP || promptType !== 'tool_orchestrator') {
     finalPrompt = replaceVariables(finalPromptText, contextData);
     console.log("Final prompt after variable replacement:", finalPrompt.substring(0, 200) + "...");
   } else {
-    console.log("Skipping variable replacement in handler for MCP orchestrator - will be handled by MCP processor");
+    console.log("Skipping variable replacement in handler for Tool Orchestrator - will be handled by MCP processor");
   }
   
   let promptRunId = null;

@@ -16,7 +16,6 @@ port = 54324
 
 [auth]
 enabled = true
-port = 54322
 
 [storage]
 enabled = true

@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,18 +16,18 @@ const MCPConfigTab = () => {
   const [editingPrompt, setEditingPrompt] = useState<WorkflowPrompt | null>(null);
   const [toolDefinitions, setToolDefinitions] = useState("[]");
 
-  // Fetch the MCP orchestrator prompt
+  // Fetch the Tool Orchestrator prompt
   const { data: prompts, isLoading: isLoadingPrompts, error: promptsError } = useQuery({
     queryKey: ['mcp-orchestrator-prompt'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('workflow_prompts')
         .select('*')
-        .eq('type', 'mcp_orchestrator')
+        .eq('type', 'tool_orchestrator')
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching MCP orchestrator prompt:', error);
+        console.error('Error fetching Tool Orchestrator prompt:', error);
         throw error;
       }
       
@@ -171,7 +171,7 @@ Remember:
       const { data, error } = await supabase
         .from('workflow_prompts')
         .insert({
-          type: 'mcp_orchestrator',
+          type: 'tool_orchestrator',
           prompt_text: defaultPrompt
         })
         .select();
@@ -222,7 +222,7 @@ Remember:
           
           {!mcpPrompt ? (
             <div className="flex flex-col items-center justify-center p-6 border rounded-md">
-              <p className="mb-4 text-muted-foreground">No MCP orchestrator prompt configured.</p>
+              <p className="mb-4 text-muted-foreground">No Tool Orchestrator prompt configured.</p>
               <Button 
                 onClick={() => createPromptMutation.mutate()}
                 disabled={createPromptMutation.isPending}
@@ -245,7 +245,7 @@ Remember:
               />
               {editingPrompt && (
                 <PromptVariablesReference
-                  promptType="mcp_orchestrator"
+                  promptType="tool_orchestrator"
                   isEditing={!!editingPrompt}
                   onInsertVariable={(variable) => {
                     const textarea = document.querySelector('textarea[name="prompt_text"]') as HTMLTextAreaElement;

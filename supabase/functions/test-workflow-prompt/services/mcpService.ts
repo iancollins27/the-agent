@@ -1,4 +1,4 @@
-
+﻿
 /**
  * Centralized service for MCP (Model Context Protocol) operations
  * This centralizes all MCP-related functionality to avoid redundancy
@@ -33,16 +33,16 @@ export async function executeMCPRequest(
     if (aiProvider.toLowerCase() === 'openai') {
       const { processOpenAIRequest } = await import("./providers/openai/index.ts");
       
-      // Fetch the MCP orchestrator prompt if we need it
+      // Fetch the Tool Orchestrator prompt if we need it
       let orchestratorPrompt = null;
       try {
-        const mcpPrompt = await getLatestWorkflowPrompt(supabase, 'mcp_orchestrator');
+        const mcpPrompt = await getLatestWorkflowPrompt(supabase, 'tool_orchestrator');
         if (mcpPrompt && mcpPrompt.prompt_text) {
-          console.log("Using MCP orchestrator prompt from database");
+          console.log("Using Tool Orchestrator prompt from database");
           orchestratorPrompt = mcpPrompt.prompt_text;
         }
       } catch (err) {
-        console.error("Error fetching MCP orchestrator prompt:", err);
+        console.error("Error fetching Tool Orchestrator prompt:", err);
       }
 
       // Prepare tool definitions

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -70,21 +70,21 @@ serve(async (req) => {
       console.log(`Project ${project.id} passed DB-level activation criteria filter, proceeding...`);
       
       try {
-        // Get the MCP orchestrator prompt
+        // Get the Tool Orchestrator prompt
         const { data: prompt, error: promptError } = await supabase
           .from('workflow_prompts')
           .select('*')
-          .eq('type', 'mcp_orchestrator')
+          .eq('type', 'tool_orchestrator')
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
           
         if (promptError) {
-          console.error(`Error fetching MCP orchestrator prompt for project ${project.id}:`, promptError);
+          console.error(`Error fetching Tool Orchestrator prompt for project ${project.id}:`, promptError);
           results.push({
             project_id: project.id,
             success: false,
-            error: "Failed to fetch MCP orchestrator prompt"
+            error: "Failed to fetch Tool Orchestrator prompt"
           });
           continue;
         }
@@ -113,7 +113,7 @@ serve(async (req) => {
           continue;
         }
         
-        // Prepare context for the MCP orchestrator
+        // Prepare context for the Tool Orchestrator
         const context = {
           project_id: project.id,
           summary: contextData.summary,
@@ -139,7 +139,7 @@ serve(async (req) => {
           'test-workflow-prompt',
           {
             body: {
-              promptType: 'mcp_orchestrator',
+              promptType: 'tool_orchestrator',
               promptText: prompt.prompt_text,
               projectId: project.id,
               contextData: context,

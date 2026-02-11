@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -11,7 +11,7 @@ export const useMCPTools = () => {
     // Tool limits can be added here if needed in the future
   });
 
-  // Check if MCP Orchestrator prompt is selected
+  // Check if Tool Orchestrator prompt is selected
   const hasMCPOrchestrator = async (promptIds: string[]): Promise<boolean> => {
     if (promptIds.length === 0) return false;
     
@@ -20,7 +20,7 @@ export const useMCPTools = () => {
       .select('type')
       .in('id', promptIds);
       
-    return data?.some(prompt => prompt.type === 'mcp_orchestrator') || false;
+    return data?.some(prompt => prompt.type === 'tool_orchestrator') || false;
   };
   
   // Fetch available tools when MCP mode changes
