@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -779,62 +779,41 @@ export type Database = {
           },
         ]
       }
-      tool_external_access_keys: {
+      mcp_external_access_keys: {
         Row: {
-          company_id: string
           created_at: string
-          created_by: string | null
-          enabled_tools: string[]
           expires_at: string | null
           id: string
           is_active: boolean
           key_hash: string
-          key_name: string
           last_used_at: string | null
-          rate_limit_per_minute: number | null
+          metadata: Json
+          name: string | null
+          updated_at: string
         }
         Insert: {
-          company_id: string
           created_at?: string
-          created_by?: string | null
-          enabled_tools?: string[]
           expires_at?: string | null
           id?: string
           is_active?: boolean
           key_hash: string
-          key_name: string
           last_used_at?: string | null
-          rate_limit_per_minute?: number | null
+          metadata?: Json
+          name?: string | null
+          updated_at?: string
         }
         Update: {
-          company_id?: string
           created_at?: string
-          created_by?: string | null
-          enabled_tools?: string[]
           expires_at?: string | null
           id?: string
           is_active?: boolean
           key_hash?: string
-          key_name?: string
           last_used_at?: string | null
-          rate_limit_per_minute?: number | null
+          metadata?: Json
+          name?: string | null
+          updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "tool_external_access_keys_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tool_external_access_keys_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       phone_verifications: {
         Row: {
@@ -1247,6 +1226,63 @@ export type Database = {
           webhook_id?: string | null
         }
         Relationships: []
+      }
+      tool_external_access_keys: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          enabled_tools: string[]
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key_hash: string
+          key_name: string
+          last_used_at: string | null
+          rate_limit_per_minute: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          enabled_tools?: string[]
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash: string
+          key_name: string
+          last_used_at?: string | null
+          rate_limit_per_minute?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          enabled_tools?: string[]
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key_hash?: string
+          key_name?: string
+          last_used_at?: string | null
+          rate_limit_per_minute?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_external_access_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_external_access_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tool_logs: {
         Row: {
