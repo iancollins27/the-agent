@@ -31,6 +31,13 @@ interface ExecuteBody {
   contact_id?: string;
 }
 
+interface JsonRpcRequest {
+  jsonrpc?: string;
+  id?: string | number | null;
+  method?: string;
+  params?: Record<string, unknown>;
+}
+
 const app = new Hono();
 
 app.options("/*", () => new Response("ok", { headers: corsHeaders }));
@@ -187,6 +194,149 @@ app.post("/execute", async (c) => {
         version: VERSION,
       },
       500,
+      corsHeaders
+    );
+  }
+});
+
+// MCP JSON-RPC compatibility adapter.
+// This keeps a single internal tool execution model while supporting MCP clients at the edge.
+app.post("/", async (c) => {
+  const auth = await authenticate(c);
+  if (!auth.ok) return auth.response;
+
+  const requestId = crypto.randomUUID();
+  try {
+    const rpc = (await c.req.json()) as JsonRpcRequest;
+    const method = rpc.method;
+    const id = rpc.id ?? null;
+
+    if (method === "tools/list") {
+      const tools = auth.enabledTools
+        .filter((name) => name in TOOL_DEFINITIONS)
+        .map((name) => {
+          const def = TOOL_DEFINITIONS[name];
+          return {
+            name: def.name,
+            description: def.description,
+            inputSchema: def.schema,
+          };
+        });
+
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          id,
+          result: { tools },
+        },
+        200,
+        corsHeaders
+      );
+    }
+
+    if (method === "tools/call") {
+      const params = (rpc.params || {}) as {
+        name?: string;
+        arguments?: Record<string, unknown>;
+      };
+
+      const toolName = params.name;
+      const rawArgs = params.arguments || {};
+
+      if (!toolName) {
+        return c.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32602, message: "Missing required field: params.name" },
+          },
+          200,
+          corsHeaders
+        );
+      }
+
+      if (!auth.enabledTools.includes(toolName)) {
+        return c.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32603, message: `Tool not enabled: ${toolName}` },
+          },
+          200,
+          corsHeaders
+        );
+      }
+
+      const def = TOOL_DEFINITIONS[toolName];
+      const schema = TOOL_SCHEMAS[toolName];
+      if (!def || !schema) {
+        return c.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            error: { code: -32601, message: `Unknown tool: ${toolName}` },
+          },
+          200,
+          corsHeaders
+        );
+      }
+
+      const parseResult = schema.safeParse(rawArgs);
+      if (!parseResult.success) {
+        return c.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            error: {
+              code: -32602,
+              message: "Invalid tool arguments",
+              data: parseResult.error.issues,
+            },
+          },
+          200,
+          corsHeaders
+        );
+      }
+
+      const result = await invokeToolFunction(def.edge_function, parseResult.data as Record<string, unknown>, {
+        tenant_id: auth.tenantId,
+        company_id: auth.companyId || auth.tenantId,
+        ...(auth.orgId ? { org_id: auth.orgId } : {}),
+        user_type: "system",
+      });
+
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            isError: false,
+          },
+        },
+        200,
+        corsHeaders
+      );
+    }
+
+    return c.json(
+      {
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32601, message: `Method not found: ${method || "(missing)"}` },
+      },
+      200,
+      corsHeaders
+    );
+  } catch (error) {
+    console.error("[Tool API][MCP Adapter] Error:", error, { requestId });
+    return c.json(
+      {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32603, message: error instanceof Error ? error.message : "Internal error" },
+      },
+      200,
       corsHeaders
     );
   }
