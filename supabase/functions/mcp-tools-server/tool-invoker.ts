@@ -8,7 +8,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 interface SecurityContext {
-  company_id: string;
+  tenant_id: string;
+  company_id?: string;
+  org_id?: string;
   user_type: 'system' | 'admin' | 'contact';
   user_id?: string;
   contact_id?: string;
@@ -50,7 +52,9 @@ export async function invokeToolFunction(
     // Metadata for logging/debugging
     metadata: {
       orchestrator: 'tool-api-server',
-      company_id: securityContext.company_id,
+      tenant_id: securityContext.tenant_id,
+      ...(securityContext.company_id ? { company_id: securityContext.company_id } : {}),
+      ...(securityContext.org_id ? { org_id: securityContext.org_id } : {}),
       timestamp: new Date().toISOString()
     }
   };

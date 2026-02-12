@@ -1,8 +1,8 @@
 /**
  * API Key Authentication for Tool API server.
  *
- * Validates API keys against tool_external_access_keys table and returns
- * the associated company_id and enabled tools.
+ * Validates API keys against external access key tables and returns
+ * a canonical tenant identity plus enabled tools.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -10,8 +10,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 export interface AuthResult {
   valid: boolean;
   error?: string;
+  tenantId?: string;
   companyId?: string;
+  orgId?: string;
   enabledTools?: string[];
+}
+
+interface KeyRecord {
+  id: string;
+  enabled_tools: string[] | null;
+  is_active: boolean;
+  expires_at: string | null;
+  company_id?: string | null;
+  org_id?: string | null;
+}
+
+interface KeyRecordWithSource {
+  record: KeyRecord;
+  table: "tool_external_access_keys" | "mcp_external_access_keys";
 }
 
 /**
@@ -40,6 +56,70 @@ function getSupabaseClient() {
 }
 
 /**
+ * Lookup access key across known schema variants.
+ *
+ * This is an edge adapter: it normalizes storage differences
+ * (table name + tenant column) into a single internal record shape.
+ */
+async function lookupKeyRecord(
+  keyHash: string
+): Promise<{ result?: KeyRecordWithSource; fatalError?: unknown }> {
+  const supabase = getSupabaseClient();
+
+  const candidates: Array<{
+    table: "tool_external_access_keys" | "mcp_external_access_keys";
+    select: string;
+  }> = [
+    {
+      table: "tool_external_access_keys",
+      select: "id, company_id, enabled_tools, is_active, expires_at",
+    },
+    {
+      table: "tool_external_access_keys",
+      select: "id, org_id, enabled_tools, is_active, expires_at",
+    },
+    {
+      table: "mcp_external_access_keys",
+      select: "id, company_id, enabled_tools, is_active, expires_at",
+    },
+    {
+      table: "mcp_external_access_keys",
+      select: "id, org_id, enabled_tools, is_active, expires_at",
+    },
+  ];
+
+  for (const candidate of candidates) {
+    const { data, error } = await supabase
+      .from(candidate.table)
+      .select(candidate.select)
+      .eq("key_hash", keyHash)
+      .maybeSingle();
+
+    if (error) {
+      const code = (error as { code?: string }).code;
+      // Missing table/column for this candidate; keep trying known variants.
+      if (code === "42P01" || code === "42703") {
+        continue;
+      }
+
+      console.error("[Auth] Database error:", error);
+      return { fatalError: error };
+    }
+
+    if (data) {
+      return {
+        result: {
+          table: candidate.table,
+          record: data as KeyRecord,
+        },
+      };
+    }
+  }
+
+  return {};
+}
+
+/**
  * Validate an API key from the Authorization header
  */
 export async function validateApiKey(authHeader: string | undefined): Promise<AuthResult> {
@@ -61,23 +141,25 @@ export async function validateApiKey(authHeader: string | undefined): Promise<Au
   try {
     // Hash the key for lookup
     const keyHash = await hashKey(apiKey);
-    
-    const supabase = getSupabaseClient();
-    
-    // Look up the key in the database
-    const { data: keyRecord, error } = await supabase
-      .from("tool_external_access_keys")
-      .select("id, company_id, enabled_tools, is_active, expires_at")
-      .eq("key_hash", keyHash)
-      .maybeSingle();
-    
-    if (error) {
-      console.error("[Auth] Database error:", error);
+
+    const lookup = await lookupKeyRecord(keyHash);
+    if (lookup.fatalError) {
       return { valid: false, error: "Authentication failed" };
     }
-    
-    if (!keyRecord) {
+
+    if (!lookup.result?.record) {
       return { valid: false, error: "Invalid API key" };
+    }
+
+    const { record: keyRecord, table } = lookup.result;
+    const tenantId = keyRecord.company_id ?? keyRecord.org_id ?? null;
+
+    if (!tenantId) {
+      console.error("[Auth] Access key record missing tenant identifier:", {
+        keyId: keyRecord.id,
+        table,
+      });
+      return { valid: false, error: "Authentication failed" };
     }
     
     // Check if key is active
@@ -94,8 +176,9 @@ export async function validateApiKey(authHeader: string | undefined): Promise<Au
     }
     
     // Update last_used_at asynchronously (don't wait for it)
+    const supabase = getSupabaseClient();
     supabase
-      .from("tool_external_access_keys")
+      .from(table)
       .update({ last_used_at: new Date().toISOString() })
       .eq("id", keyRecord.id)
       .then(({ error: updateError }) => {
@@ -106,7 +189,9 @@ export async function validateApiKey(authHeader: string | undefined): Promise<Au
     
     return {
       valid: true,
-      companyId: keyRecord.company_id,
+      tenantId,
+      companyId: keyRecord.company_id ?? tenantId,
+      ...(keyRecord.org_id ? { orgId: keyRecord.org_id } : {}),
       enabledTools: keyRecord.enabled_tools || []
     };
     

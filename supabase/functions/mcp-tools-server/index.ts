@@ -49,11 +49,11 @@ app.get("/health", (c) => {
 });
 
 async function authenticate(c: any): Promise<
-  | { ok: true; companyId: string; enabledTools: string[] }
+  | { ok: true; tenantId: string; companyId?: string; orgId?: string; enabledTools: string[] }
   | { ok: false; response: Response }
 > {
   const authResult = await validateApiKey(c.req.header("Authorization"));
-  if (!authResult.valid || !authResult.companyId) {
+  if (!authResult.valid || !authResult.tenantId) {
     return {
       ok: false,
       response: c.json(
@@ -65,7 +65,9 @@ async function authenticate(c: any): Promise<
   }
   return {
     ok: true,
+    tenantId: authResult.tenantId,
     companyId: authResult.companyId,
+    orgId: authResult.orgId,
     enabledTools: authResult.enabledTools || [],
   };
 }
@@ -151,7 +153,11 @@ app.post("/execute", async (c) => {
     }
 
     const result = await invokeToolFunction(def.edge_function, parseResult.data as Record<string, unknown>, {
-      company_id: auth.companyId,
+      // Canonical tenant context for the internal model.
+      tenant_id: auth.tenantId,
+      // Backward-compat for existing tool functions that still expect company_id.
+      company_id: auth.companyId || auth.tenantId,
+      ...(auth.orgId ? { org_id: auth.orgId } : {}),
       user_type: body.user_type || "system",
       ...(body.user_id ? { user_id: body.user_id } : {}),
       ...(body.contact_id ? { contact_id: body.contact_id } : {}),
