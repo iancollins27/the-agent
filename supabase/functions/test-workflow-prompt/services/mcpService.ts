@@ -7,6 +7,7 @@ import { updatePromptRunWithResult } from "../database/prompt-runs.ts";
 import { getMCPOrchestratorPrompt } from "../mcp-system-prompts.ts";
 import { getToolDefinitions, filterTools } from "../tools/toolRegistry.ts";
 import { getLatestWorkflowPrompt } from "../database/workflow-prompts.ts";
+import { AI_CONFIG } from '../../_shared/aiConfig.ts';
 
 /**
  * Executes an MCP request with the given parameters
@@ -16,8 +17,8 @@ export async function executeMCPRequest(
   supabase: any,
   projectId: string,
   contextData: any,
-  aiProvider: string = 'openai',
-  aiModel: string = 'gpt-4o',
+  aiProvider: string = AI_CONFIG.provider,
+  aiModel: string = AI_CONFIG.model,
   promptRunId: string
 ) {
   try {

@@ -6,6 +6,7 @@ import { normalizeWebhookData } from '../services/normalizer.ts'
 import { processWebhookBusinessLogic } from '../services/businessLogic.ts'
 import { generateWorkflowPrompt, runWorkflowPrompt } from '../services/workflowPrompt.ts'
 import { runActionDetectionWithMCP } from '../services/actionDetectionService.ts'
+import { AI_CONFIG } from '../../_shared/aiConfig.ts'
 
 /**
  * Main handler for processing the Zoho webhook
@@ -95,8 +96,8 @@ export async function handleZohoWebhook(req: Request) {
         supabase,
         businessLogicResult.projectId,
         formattedPrompt,
-        businessLogicResult.aiProvider || 'openai',
-        businessLogicResult.aiModel || 'gpt-4o',
+        businessLogicResult.aiProvider || AI_CONFIG.provider,
+        businessLogicResult.aiModel || AI_CONFIG.model,
         workflowPromptId
       );
       

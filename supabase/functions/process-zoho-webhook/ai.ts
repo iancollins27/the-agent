@@ -1,11 +1,12 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { AI_CONFIG } from '../_shared/aiConfig.ts'
 
 export async function generateSummary(
   prompt: string, 
   apiKey: string, 
-  provider: string = 'openai', 
-  model: string = 'gpt-4o', 
+  provider: string = AI_CONFIG.provider, 
+  model: string = AI_CONFIG.model, 
   existingPromptRunId: string | null = null
 ) {
   console.log(`Generating summary using ${provider} model: ${model}`);
@@ -61,7 +62,7 @@ export async function generateSummary(
         if (provider === 'openai') {
           console.log(`Attempt ${retries + 1} to call OpenAI API with model ${model}`);
           response = await callOpenAI(prompt, apiKey, model);
-          break; // Success, exit the retry loop
+          break;
         } else if (provider === 'claude') {
           response = await callClaude(prompt, apiKey, model);
           break;
@@ -75,7 +76,6 @@ export async function generateSummary(
         lastError = error;
         console.error(`Attempt ${retries + 1} failed with error:`, error.message || error);
         
-        // Check if this is a rate limit error or server error (which may benefit from a retry)
         const shouldRetry = error.message?.includes('rate limit') || 
                            error.message?.includes('server had an error') ||
                            error.message?.includes('timeout') ||
@@ -89,7 +89,6 @@ export async function generateSummary(
         
         retries++;
         if (retries < maxRetries) {
-          // Exponential backoff: 1s, 2s, 4s, etc.
           const backoffTime = Math.pow(2, retries) * 1000;
           console.log(`Retrying in ${backoffTime}ms...`);
           await new Promise(resolve => setTimeout(resolve, backoffTime));
@@ -97,12 +96,10 @@ export async function generateSummary(
       }
     }
     
-    // If we've exhausted retries and still have an error, throw it
     if (retries === maxRetries && lastError) {
       throw lastError;
     }
     
-    // If we have a response, attempt a fallback provider if enabled
     if (!response && provider === 'openai') {
       console.log('OpenAI failed after retries, attempting to use Claude as fallback...');
       try {
@@ -115,7 +112,6 @@ export async function generateSummary(
         }
       } catch (fallbackError) {
         console.error('Error using Claude as fallback:', fallbackError);
-        // Continue with the original error if fallback fails
       }
     }
     
@@ -123,7 +119,6 @@ export async function generateSummary(
       throw new Error('Failed to generate response from any AI provider');
     }
     
-    // Update the prompt run with the result
     if (promptRunId) {
       await supabase
         .from('prompt_runs')
@@ -141,7 +136,6 @@ export async function generateSummary(
   } catch (error) {
     console.error(`Error generating summary with ${provider}:`, error);
     
-    // Update the prompt run with the error
     if (promptRunId) {
       await supabase
         .from('prompt_runs')
@@ -153,7 +147,6 @@ export async function generateSummary(
         .eq('id', promptRunId);
     }
     
-    // Generate a fallback simple summary if the AI service fails
     try {
       const fallbackSummary = `Unable to generate AI summary due to service error: ${error.message}. This is a basic fallback summary based on the raw data provided.`;
       
@@ -171,12 +164,12 @@ export async function generateSummary(
       return fallbackSummary;
     } catch (fallbackError) {
       console.error('Error generating fallback summary:', fallbackError);
-      throw error; // Throw the original error
+      throw error;
     }
   }
 }
 
-async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-5-2025-08-07') {
+async function callOpenAI(prompt: string, apiKey: string, model: string = AI_CONFIG.model) {
   console.log(`Making OpenAI API request with model: ${model}`);
   
   try {
@@ -198,7 +191,6 @@ async function callOpenAI(prompt: string, apiKey: string, model: string = 'gpt-5
       })
     });
 
-    // Enhanced error handling with status code and response body
     if (!response.ok) {
       const errorBody = await response.text();
       let errorMessage;

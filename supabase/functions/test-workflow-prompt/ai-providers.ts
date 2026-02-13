@@ -1,24 +1,8 @@
 
 import { callOpenAI, callOpenAIWithMCP } from "./services/providers/openAIProvider.ts";
+import { AI_CONFIG, MODEL_COSTS, calculateModelCost } from '../_shared/aiConfig.ts';
 
-/**
- * Cost per 1k tokens for different models (in USD)
- */
-const MODEL_COSTS = {
-  'gpt-5-2025-08-07': { prompt: 0.03, completion: 0.06 },
-  'gpt-5-mini-2025-08-07': { prompt: 0.01, completion: 0.03 },
-  'gpt-5-nano-2025-08-07': { prompt: 0.005, completion: 0.015 },
-  'gpt-4o': { prompt: 0.03, completion: 0.06 },
-  'gpt-4o-mini': { prompt: 0.01, completion: 0.03 }
-};
-
-export function calculateCost(model: string, promptTokens: number, completionTokens: number): number {
-  const costs = MODEL_COSTS[model] || { prompt: 0, completion: 0 };
-  return (
-    (promptTokens * costs.prompt) / 1000 +
-    (completionTokens * costs.completion) / 1000
-  );
-}
+export { calculateModelCost as calculateCost };
 
 export async function callAIProvider(aiProvider: string, aiModel: string, prompt: string): Promise<string> {
   console.log(`Calling ${aiProvider} with model ${aiModel}`);
