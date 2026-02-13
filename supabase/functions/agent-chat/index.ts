@@ -6,6 +6,7 @@ import { toolRegistry } from './tools/toolRegistry.ts'
 import { toolExecutor } from './tools/toolExecutor.ts'
 import { logObservability } from './observability.ts'
 import { createContactAuthenticatedClient, getContactProjects } from './utils/contactAuth.ts'
+import { AI_CONFIG } from '../_shared/aiConfig.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -195,7 +196,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                model: 'gpt-5-2025-08-07',
+                model: AI_CONFIG.model,
                 messages: openAIMessages,
                 tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
                 tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
@@ -273,7 +274,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  model: 'gpt-5-2025-08-07',
+                  model: AI_CONFIG.model,
                   messages: followUpMessages,
                   max_completion_tokens: 2000
                 })
@@ -300,7 +301,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                   messages: followUpMessages,
                   response: finalMessage,
                   toolCalls: assistantMessage.tool_calls || [],
-                  model: 'gpt-5-2025-08-07',
+                  model: AI_CONFIG.model,
                   usage: followUpData.usage
                 })
               } catch (obsError) {
@@ -325,7 +326,7 @@ Available tools: ${toolRegistry.getAllTools().filter(t => ['data_fetch', 'create
                 messages: openAIMessages,
                 response: assistantMessage,
                 toolCalls: assistantMessage.tool_calls || [],
-                model: 'gpt-4o',
+                model: AI_CONFIG.model,
                 usage: openAIData.usage
               })
             } catch (obsError) {
@@ -393,7 +394,7 @@ IMPORTANT: You are speaking with ${contact.full_name} directly.`
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                model: 'gpt-5-2025-08-07',
+                model: AI_CONFIG.model,
                 messages: openAIMessages,
                 tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
                 tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
@@ -461,7 +462,7 @@ IMPORTANT: You are speaking with ${contact.full_name} directly.`
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  model: 'gpt-5-2025-08-07',
+                  model: AI_CONFIG.model,
                   messages: followUpMessages,
                   max_completion_tokens: 2000
                 })
@@ -624,7 +625,7 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: AI_CONFIG.model,
         messages: openAIMessages,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
         tool_choice: toolDefinitions.length > 0 ? "auto" : undefined,
@@ -697,7 +698,7 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
+          model: AI_CONFIG.model,
           messages: followUpMessages,
           max_completion_tokens: 2000
         })
@@ -724,7 +725,7 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
           messages: followUpMessages,
           response: finalMessage,
           toolCalls: assistantMessage.tool_calls || [],
-          model: 'gpt-5-2025-08-07',
+          model: AI_CONFIG.model,
           usage: followUpData.usage
         })
       } catch (obsError) {
@@ -749,7 +750,7 @@ Available tools: ${filteredTools.map(t => t.name).join(', ')}`
         messages: openAIMessages,
         response: assistantMessage,
         toolCalls: assistantMessage.tool_calls || [],
-        model: 'gpt-4o',
+        model: AI_CONFIG.model,
         usage: openAIData.usage
       })
     } catch (obsError) {

@@ -1,6 +1,7 @@
 
 import { updateProjectWithSpecificInfo } from "./multiProjectUpdater.ts";
 import { updateProjectWithAI } from "./singleProjectUpdater.ts";
+import { AI_CONFIG } from '../../_shared/aiConfig.ts';
 
 /**
  * Process a communication that might reference multiple projects
@@ -93,9 +94,9 @@ export async function processMultiProjectCommunication(supabase: any, communicat
       `;
     }
     
-    // Hardcode GPT-5 configuration
-    const aiProvider = 'openai';
-    const aiModel = 'gpt-5-2025-08-07';
+    // Use centralized AI configuration
+    const aiProvider = AI_CONFIG.provider;
+    const aiModel = AI_CONFIG.model;
     
     // If we have a dedicated multi-project analysis prompt, use it
     if (multiProjectPrompt) {

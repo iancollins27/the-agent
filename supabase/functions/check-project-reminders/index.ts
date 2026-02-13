@@ -1,5 +1,6 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { AI_CONFIG } from '../_shared/aiConfig.ts';
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -127,9 +128,9 @@ serve(async (req) => {
           available_tools: ['create_action_record', 'knowledge_base_lookup']
         };
         
-        // Hardcode GPT-5 configuration
-        const aiProvider = 'openai';
-        const aiModel = 'gpt-5-2025-08-07';
+        // Use centralized AI configuration
+        const aiProvider = AI_CONFIG.provider;
+        const aiModel = AI_CONFIG.model;
         
         console.log(`Using MCP workflow for project ${project.id} with ${aiProvider} ${aiModel}`);
         console.log(`Invoking test-workflow-prompt with internal service call flag`);

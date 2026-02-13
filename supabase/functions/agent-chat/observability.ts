@@ -4,6 +4,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AI_CONFIG, MODEL_COSTS, calculateModelCost } from '../_shared/aiConfig.ts'
 
 // Create service role client for internal logging (bypasses RLS)
 function getServiceClient() {
@@ -55,10 +56,7 @@ export async function logObservability(params: LogObservabilityParams): Promise<
       metrics.promptTokens = usage.prompt_tokens || 0;
       metrics.completionTokens = usage.completion_tokens || 0;
       metrics.totalTokens = usage.total_tokens || 0;
-      metrics.cost = calculateOpenAICost(model, {
-        prompt: metrics.promptTokens,
-        completion: metrics.completionTokens
-      });
+      metrics.cost = calculateModelCost(model, metrics.promptTokens, metrics.completionTokens);
     }
     
     metrics.toolCalls = toolCalls?.length || 0;
@@ -67,7 +65,7 @@ export async function logObservability(params: LogObservabilityParams): Promise<
     const promptRunData = {
       project_id: projectId,
       ai_model: model,
-      ai_provider: 'openai',
+      ai_provider: AI_CONFIG.provider,
       prompt_input: JSON.stringify({
         messages: messages,
         model: model,
@@ -140,14 +138,5 @@ export async function logPromptCompletion(
 }
 
 export function calculateOpenAICost(model: string, tokens: { prompt: number, completion: number }): number {
-  const rates: Record<string, { prompt: number, completion: number }> = {
-    'gpt-5-2025-08-07': { prompt: 0.00003, completion: 0.00006 },
-    'gpt-5-mini-2025-08-07': { prompt: 0.00001, completion: 0.00003 },
-    'gpt-5-nano-2025-08-07': { prompt: 0.000005, completion: 0.000015 },
-    'gpt-4o': { prompt: 0.000005, completion: 0.000015 },
-    'gpt-4o-mini': { prompt: 0.000001, completion: 0.000005 }
-  };
-  
-  const rate = rates[model] || rates['gpt-5-2025-08-07'];
-  return (tokens.prompt * rate.prompt) + (tokens.completion * rate.completion);
+  return calculateModelCost(model, tokens.prompt, tokens.completion);
 }

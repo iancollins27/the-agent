@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { ImapFlow } from "https://esm.sh/imapflow@1.0.157";
 import { simpleParser } from "https://esm.sh/mailparser@3.6.5";
+import { AI_CONFIG } from '../_shared/aiConfig.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -166,7 +167,7 @@ Content: ${email.text || email.html}
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-5-2025-08-07",
+        model: AI_CONFIG.model,
         messages: [
           {
             role: "system",

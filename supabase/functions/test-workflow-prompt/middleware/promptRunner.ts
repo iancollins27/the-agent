@@ -2,6 +2,7 @@
 import { logPromptRun } from '../database/prompt-runs.ts';
 import { handleAIResponse } from '../services/aiResponseHandler.ts';
 import { replaceVariables } from '../utils.ts';
+import { AI_CONFIG } from '../../_shared/aiConfig.ts';
 
 /**
  * Middleware to run the prompt and process the AI response
@@ -15,8 +16,8 @@ export async function runPrompt(
     promptText,
     projectId,
     contextData = {},
-    aiProvider = 'openai',
-    aiModel = 'gpt-4o',
+    aiProvider = AI_CONFIG.provider,
+    aiModel = AI_CONFIG.model,
     workflowPromptId,
     useMCP = false,
     initiatedBy = 'manual'

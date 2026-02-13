@@ -1,6 +1,7 @@
 
 import { formatCommunicationData } from "../utils/communicationFormatter.ts";
 import { getLatestWorkflowPrompt } from "./workflowPromptService.ts";
+import { AI_CONFIG } from '../../_shared/aiConfig.ts';
 
 /**
  * Update a specific project with its relevant information extracted from a multi-project communication
@@ -48,8 +49,8 @@ export async function updateProjectWithSpecificInfo(
     
     // If AI provider and model weren't provided, use defaults
     if (!aiProvider || !aiModel) {
-      aiProvider = 'openai';
-      aiModel = 'gpt-5-2025-08-07';
+      aiProvider = AI_CONFIG.provider;
+      aiModel = AI_CONFIG.model;
     }
     
     // Create a formatted communication object with the relevant content
