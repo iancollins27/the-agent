@@ -1,86 +1,81 @@
 
-## Plan: Fix Request Body Structure Mismatch in Tool Invoker
 
-### Summary
+## Centralize AI Model Configuration
 
-The `tool-crm-read` edge function is failing because the `mcp-tools-server` is sending the request body in a flat structure, but the tool expects a nested `args` object. This is a simple fix in `tool-invoker.ts`.
+### Problem
 
-### Root Cause
+The AI model name is hardcoded in **19+ locations** across **11 edge function directories**, with two different values:
+- `gpt-5-2025-08-07` in 11 files (the "current" model)
+- `gpt-4o` still lingering as defaults in 8 files (stale/inconsistent)
 
-**What `tool-invoker.ts` currently sends:**
-```json
-{
-  "resource_type": "contact",
-  "limit": 5,
-  "securityContext": { "company_id": "...", "user_type": "system" },
-  "metadata": { "orchestrator": "mcp-tools-server" }
-}
-```
+Every model change requires editing 10+ files and risks missing some, leading to inconsistency.
 
-**What `tool-crm-read` expects (per `ToolRequest` interface):**
-```json
-{
-  "args": { "resource_type": "contact", "limit": 5 },
-  "securityContext": { "company_id": "...", "user_type": "system" },
-  "metadata": { "orchestrator": "mcp-tools-server" }
-}
-```
+### Solution
 
-The tool destructures `{ securityContext, args, metadata }` from the request body, so when `args` is not present, it's `undefined`, causing `args.project_id` to throw.
+Create a single shared config file that all edge functions import from, and replace every hardcoded model string with a reference to that config.
 
-### The Fix
+### Implementation
 
-Change `tool-invoker.ts` line 45-56 from:
+**1. Create shared AI config: `supabase/functions/_shared/aiConfig.ts`**
 
 ```typescript
-const requestBody = {
-  ...args,  // WRONG: spreads at top level
-  securityContext,
-  metadata: { ... }
+// Central AI model configuration
+// Change the model here and it applies everywhere
+export const AI_CONFIG = {
+  provider: 'openai',
+  model: Deno.env.get('AI_MODEL') || 'gpt-5-nano-2025-08-07',
+  apiKeyEnvVar: 'OPENAI_API_KEY',
+} as const;
+
+export const MODEL_COSTS: Record<string, { prompt: number; completion: number }> = {
+  'gpt-5-2025-08-07': { prompt: 0.03, completion: 0.06 },
+  'gpt-5-mini-2025-08-07': { prompt: 0.01, completion: 0.03 },
+  'gpt-5-nano-2025-08-07': { prompt: 0.005, completion: 0.015 },
+  'gpt-4o': { prompt: 0.03, completion: 0.06 },
+  'gpt-4o-mini': { prompt: 0.01, completion: 0.03 },
 };
 ```
 
-To:
+This uses an environment variable `AI_MODEL` with a fallback default, so you can switch models via Supabase secrets without any code changes at all.
 
-```typescript
-const requestBody = {
-  args,     // CORRECT: nested under 'args' key
-  securityContext,
-  metadata: { ... }
-};
-```
+**2. Update all edge functions to import from shared config**
 
-### Files to Modify
+Replace every hardcoded model string with `AI_CONFIG.model`. Files to update:
 
-| File | Change |
-|------|--------|
-| `supabase/functions/mcp-tools-server/tool-invoker.ts` | Wrap `args` in nested object instead of spreading |
+| File | Current hardcoded value | Change |
+|------|------------------------|--------|
+| `agent-chat/index.ts` | `'gpt-5-2025-08-07'` (8 occurrences) | Import and use `AI_CONFIG.model` |
+| `agent-chat/observability.ts` | `'gpt-5-2025-08-07'` fallback | Use `AI_CONFIG.model` as default rate |
+| `process-zoho-webhook/handlers/aiConfigHandler.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `process-zoho-webhook/ai.ts` | `'gpt-5-2025-08-07'` and `'gpt-4o'` defaults | Import from shared config |
+| `process-zoho-webhook/handlers/webhookHandler.ts` | `'gpt-4o'` fallback | Import from shared config |
+| `comms-business-logic/services/multiProjectUpdater.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `comms-business-logic/services/multiProjectProcessor.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `check-project-reminders/index.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `email-summary/index.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `generate-multi-project-message/index.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `test-workflow-prompt/ai-providers.ts` | Cost table + `'gpt-4o'` | Use shared `MODEL_COSTS` |
+| `test-workflow-prompt/middleware/promptRunner.ts` | `'gpt-4o'` default | Import from shared config |
+| `test-workflow-prompt/services/mcpService.ts` | `'gpt-4o'` default | Import from shared config |
+| `test-workflow-prompt/services/providers/openai/costCalculator.ts` | Multiple models in switch | Use shared `MODEL_COSTS` |
 
-### Implementation Details
+**3. Also fix stale `gpt-4o` references**
 
-```typescript
-// Line 44-56 in tool-invoker.ts
-const requestBody = {
-  // Wrap args in 'args' property - tools expect ToolRequest format
-  args,
-  // Include security context for access control
-  securityContext,
-  // Metadata for logging/debugging
-  metadata: {
-    orchestrator: 'mcp-tools-server',
-    company_id: securityContext.company_id,
-    timestamp: new Date().toISOString()
-  }
-};
-```
+Several files still default to `gpt-4o` which is inconsistent with the decision to standardize on GPT-5. These will all point to `AI_CONFIG.model` after the change.
 
-### Post-Fix Verification
+**4. Redeploy all affected edge functions**
 
-After deploying, the external agent should be able to:
-1. Call `crm_read` with `{ resource_type: 'project', limit: 10 }` successfully
-2. Call `crm_read` with `{ resource_type: 'contact', limit: 5 }` successfully
-3. Receive actual data instead of the "Edge Function returned a non-2xx status code" error
+### Benefits
 
-### Technical Note
+- **One-line model changes**: Edit the default in `_shared/aiConfig.ts` or set the `AI_MODEL` env var
+- **No code deploys needed for model switches**: If using the env var, just update the Supabase secret
+- **Eliminates inconsistency**: No more stale `gpt-4o` defaults mixed with `gpt-5` references
+- **Cost tables centralized**: One source of truth for pricing data
 
-The comment in the current code says "Pass args directly - tools expect their parameters at the top level" but this is incorrect. The `ToolRequest<T>` interface in `_shared/tool-types/request-response.ts` clearly shows that tools expect `{ securityContext, args, metadata }` structure.
+### Technical Notes
+
+- The `_shared` directory is already used by the project for shared edge function code
+- The env var approach (`AI_MODEL`) means future model changes can be done entirely through Supabase dashboard secrets, with no code change or redeployment needed
+- The hardcoded fallback (`gpt-5-nano-2025-08-07`) ensures the system works even without the env var set
+- Cost calculation tables will also be centralized so pricing stays in sync
+
