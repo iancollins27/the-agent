@@ -110,7 +110,7 @@ async function lookupKeyRecord(
       return {
         result: {
           table: candidate.table,
-          record: data as KeyRecord,
+          record: data as unknown as KeyRecord,
         },
       };
     }
