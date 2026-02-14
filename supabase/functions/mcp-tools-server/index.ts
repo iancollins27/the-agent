@@ -1,10 +1,16 @@
 /**
- * Tool API Server - Exposes tools over a simple JSON HTTP API
+ * MCP Tool Server — Exposes BidList tools via MCP Streamable HTTP protocol.
+ *
+ * This is the normalization layer: it converts BidList's internal edge functions
+ * into standard MCP tools that any MCP client (including Claude Agent SDK) can use.
  *
  * Endpoint:
  *   https://lvifsxsrbluehopamqpy.supabase.co/functions/v1/mcp-tools-server
  * Auth:
  *   Authorization: Bearer <api_key>
+ * Protocol:
+ *   MCP Streamable HTTP (JSON-RPC over POST)
+ *   Also supports REST endpoints for direct callers.
  */
 
 import { Hono } from "jsr:@hono/hono";
@@ -13,7 +19,8 @@ import { invokeToolFunction } from "./tool-invoker.ts";
 import { TOOL_DEFINITIONS } from "../_shared/tool-definitions/index.ts";
 import { TOOL_SCHEMAS } from "./schemas.ts";
 
-const VERSION = "3.0.0";
+const VERSION = "3.1.0";
+const MCP_PROTOCOL_VERSION = "2024-11-05";
 const DEPLOYED_AT = new Date().toISOString();
 
 const corsHeaders = {
@@ -38,7 +45,9 @@ interface JsonRpcRequest {
   params?: Record<string, unknown>;
 }
 
-const app = new Hono();
+// Supabase Edge Functions pass the function name as part of the URL path.
+// Without basePath, Hono sees "/mcp-tools-server/health" but routes define "/health" → 404.
+const app = new Hono().basePath("/mcp-tools-server");
 
 app.options("/*", () => new Response("ok", { headers: corsHeaders }));
 
@@ -199,17 +208,42 @@ app.post("/execute", async (c) => {
   }
 });
 
-// MCP JSON-RPC compatibility adapter.
-// This keeps a single internal tool execution model while supporting MCP clients at the edge.
+// MCP Streamable HTTP endpoint.
+// Handles JSON-RPC requests per the MCP specification: initialize, tools/list, tools/call.
+// This is the primary interface for MCP clients (e.g., Claude Agent SDK).
 app.post("/", async (c) => {
-  const auth = await authenticate(c);
-  if (!auth.ok) return auth.response;
-
   const requestId = crypto.randomUUID();
   try {
     const rpc = (await c.req.json()) as JsonRpcRequest;
     const method = rpc.method;
     const id = rpc.id ?? null;
+
+    // MCP initialize — must respond before auth since MCP clients call this first.
+    // Returns server capabilities so the client knows what methods are available.
+    if (method === "initialize") {
+      return c.json(
+        {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            protocolVersion: MCP_PROTOCOL_VERSION,
+            capabilities: { tools: {} },
+            serverInfo: { name: "bidlist-tools", version: VERSION },
+          },
+        },
+        200,
+        corsHeaders
+      );
+    }
+
+    // MCP notifications (no response expected, but acknowledge with 200)
+    if (method === "notifications/initialized") {
+      return c.json({}, 200, corsHeaders);
+    }
+
+    // All other methods require auth
+    const auth = await authenticate(c);
+    if (!auth.ok) return auth.response;
 
     if (method === "tools/list") {
       const tools = auth.enabledTools
@@ -347,7 +381,12 @@ app.all("/*", (c) =>
     {
       ok: false,
       error: "Not found",
-      routes: ["GET /health", "GET /tools", "POST /execute"],
+      routes: [
+        "GET /health",
+        "GET /tools",
+        "POST /execute",
+        "POST / (MCP Streamable HTTP — initialize, tools/list, tools/call)",
+      ],
       version: VERSION,
     },
     404,
