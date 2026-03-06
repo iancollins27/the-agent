@@ -1590,16 +1590,15 @@ export type Database = {
           search_embedding: string
         }
         Returns: {
-          address: string
-          company_id: string
-          company_name: string
+          Address: string
           crm_id: string
+          crm_status: string
           id: string
           next_step: string
+          project_manager: string
           project_name: string
-          project_track: string
+          Project_status: string
           similarity: number
-          status: string
           summary: string
         }[]
       }
