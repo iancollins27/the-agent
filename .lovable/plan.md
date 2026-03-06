@@ -1,36 +1,81 @@
 
 
-# Backfill `company_id` on Roofer Contacts
+## Centralize AI Model Configuration
 
-## Current State
+### Problem
 
-- **64 unique Roofer contacts**, all with `company_id = NULL`
-- **All 64** are linked to projects via `project_contacts`
-- Those projects all belong to **one company: BidList** (`45c8ff67-577b-41e4-bcf3-6f5da2880b40`)
-- **0 Roofer contacts** are orphaned (no project link)
-- Some roofers are linked to multiple projects, but all projects resolve to BidList (298 total project-contact links across the 64 roofers)
+The AI model name is hardcoded in **19+ locations** across **11 edge function directories**, with two different values:
+- `gpt-5-2025-08-07` in 11 files (the "current" model)
+- `gpt-4o` still lingering as defaults in 8 files (stale/inconsistent)
 
-## Plan
+Every model change requires editing 10+ files and risks missing some, leading to inconsistency.
 
-Since every Roofer contact is linked to BidList projects, this is a single UPDATE statement:
+### Solution
 
-**Step 1: Run a data update** to set `company_id` on all Roofer contacts by deriving the company from their linked projects.
+Create a single shared config file that all edge functions import from, and replace every hardcoded model string with a reference to that config.
 
-```sql
-UPDATE contacts c
-SET company_id = sub.derived_company_id
-FROM (
-  SELECT DISTINCT c2.id as contact_id, p.company_id as derived_company_id
-  FROM contacts c2
-  JOIN project_contacts pc ON pc.contact_id = c2.id
-  JOIN projects p ON p.id = pc.project_id
-  WHERE c2.role::text = 'Roofer'
-    AND c2.company_id IS NULL
-) sub
-WHERE c.id = sub.contact_id;
+### Implementation
+
+**1. Create shared AI config: `supabase/functions/_shared/aiConfig.ts`**
+
+```typescript
+// Central AI model configuration
+// Change the model here and it applies everywhere
+export const AI_CONFIG = {
+  provider: 'openai',
+  model: Deno.env.get('AI_MODEL') || 'gpt-5-nano-2025-08-07',
+  apiKeyEnvVar: 'OPENAI_API_KEY',
+} as const;
+
+export const MODEL_COSTS: Record<string, { prompt: number; completion: number }> = {
+  'gpt-5-2025-08-07': { prompt: 0.03, completion: 0.06 },
+  'gpt-5-mini-2025-08-07': { prompt: 0.01, completion: 0.03 },
+  'gpt-5-nano-2025-08-07': { prompt: 0.005, completion: 0.015 },
+  'gpt-4o': { prompt: 0.03, completion: 0.06 },
+  'gpt-4o-mini': { prompt: 0.01, completion: 0.03 },
+};
 ```
 
-This uses the project relationship as the source of truth -- each roofer gets the `company_id` of the project(s) they're associated with. In this case they all resolve to BidList, so all 64 will get set to `45c8ff67-577b-41e4-bcf3-6f5da2880b40`.
+This uses an environment variable `AI_MODEL` with a fallback default, so you can switch models via Supabase secrets without any code changes at all.
 
-No schema changes needed. No code changes needed. Just a one-time data backfill via the insert/update tool.
+**2. Update all edge functions to import from shared config**
+
+Replace every hardcoded model string with `AI_CONFIG.model`. Files to update:
+
+| File | Current hardcoded value | Change |
+|------|------------------------|--------|
+| `agent-chat/index.ts` | `'gpt-5-2025-08-07'` (8 occurrences) | Import and use `AI_CONFIG.model` |
+| `agent-chat/observability.ts` | `'gpt-5-2025-08-07'` fallback | Use `AI_CONFIG.model` as default rate |
+| `process-zoho-webhook/handlers/aiConfigHandler.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `process-zoho-webhook/ai.ts` | `'gpt-5-2025-08-07'` and `'gpt-4o'` defaults | Import from shared config |
+| `process-zoho-webhook/handlers/webhookHandler.ts` | `'gpt-4o'` fallback | Import from shared config |
+| `comms-business-logic/services/multiProjectUpdater.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `comms-business-logic/services/multiProjectProcessor.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `check-project-reminders/index.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `email-summary/index.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `generate-multi-project-message/index.ts` | `'gpt-5-2025-08-07'` | Import from shared config |
+| `test-workflow-prompt/ai-providers.ts` | Cost table + `'gpt-4o'` | Use shared `MODEL_COSTS` |
+| `test-workflow-prompt/middleware/promptRunner.ts` | `'gpt-4o'` default | Import from shared config |
+| `test-workflow-prompt/services/mcpService.ts` | `'gpt-4o'` default | Import from shared config |
+| `test-workflow-prompt/services/providers/openai/costCalculator.ts` | Multiple models in switch | Use shared `MODEL_COSTS` |
+
+**3. Also fix stale `gpt-4o` references**
+
+Several files still default to `gpt-4o` which is inconsistent with the decision to standardize on GPT-5. These will all point to `AI_CONFIG.model` after the change.
+
+**4. Redeploy all affected edge functions**
+
+### Benefits
+
+- **One-line model changes**: Edit the default in `_shared/aiConfig.ts` or set the `AI_MODEL` env var
+- **No code deploys needed for model switches**: If using the env var, just update the Supabase secret
+- **Eliminates inconsistency**: No more stale `gpt-4o` defaults mixed with `gpt-5` references
+- **Cost tables centralized**: One source of truth for pricing data
+
+### Technical Notes
+
+- The `_shared` directory is already used by the project for shared edge function code
+- The env var approach (`AI_MODEL`) means future model changes can be done entirely through Supabase dashboard secrets, with no code change or redeployment needed
+- The hardcoded fallback (`gpt-5-nano-2025-08-07`) ensures the system works even without the env var set
+- Cost calculation tables will also be centralized so pricing stays in sync
 
