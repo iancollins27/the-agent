@@ -1582,6 +1582,22 @@ export type Database = {
           url: string
         }[]
       }
+      search_contacts_fts: {
+        Args: {
+          match_limit?: number
+          p_company_id?: string
+          search_query: string
+        }
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          phone_number: string
+          project_ids: string[]
+          rank: number
+          role: string
+        }[]
+      }
       search_projects_by_vector: {
         Args: {
           match_count?: number
@@ -1602,6 +1618,27 @@ export type Database = {
           summary: string
         }[]
       }
+      search_projects_fts: {
+        Args: {
+          match_limit?: number
+          p_company_id?: string
+          search_query: string
+        }
+        Returns: {
+          Address: string
+          crm_id: string
+          crm_status: string
+          id: string
+          next_step: string
+          project_manager: string
+          project_name: string
+          Project_status: string
+          rank: number
+          summary: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       update_session_history: {
         Args: { p_content: string; p_role: string; p_session_id: string }
         Returns: boolean
